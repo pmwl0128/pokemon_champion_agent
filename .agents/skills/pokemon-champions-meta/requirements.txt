@@ -1,0 +1,4 @@
+# Optional, leaf-feature dependency for the pokemon-champions-meta skill.
+# Only `meta_query.py export-excel` needs it (imported lazily inside that command);
+# all query commands (ranking / detail / search / compare) are stdlib-only.
+openpyxl>=3.1

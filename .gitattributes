@@ -1,0 +1,26 @@
+# Line-ending & binary policy for the PUBLISHED skills repo.
+# The release is a clean snapshot of the four skills only (no dev tree, no external
+# reference clones), so a single global rule is safe and keeps the public repo
+# LF-clean — Windows and Unix users never see CRLF churn.
+
+* text=auto eol=lf
+
+# Binary types: never normalize (the dex ships a SQLite db; the env-change xlsx is a zip; cover assets).
+*.xlsx    binary
+*.sqlite  binary
+*.db      binary
+*.parquet binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.webp    binary
+*.pdf     binary
+*.gz      binary
+*.tgz     binary
+*.zip     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.eot     binary

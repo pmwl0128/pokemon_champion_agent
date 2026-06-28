@@ -1,0 +1,17 @@
+{
+  "name": "pmwl",
+  "owner": {
+    "name": "pmwl",
+    "email": "pmwl@outlook.com"
+  },
+  "plugins": [
+    {
+      "name": "pokemon-champions",
+      "source": "./",
+      "description": "Pokémon Champions (Reg. M-B, single & double) skills: battle dex, metagame usage, and damage/speed calculator — facts and exact calculations, never a strength score.",
+      "homepage": "https://github.com/pmwl0128/pokemon_champion_agent",
+      "license": "MIT",
+      "keywords": ["pokemon", "pokemon-champions", "vgc", "agent-skills", "damage-calculator"]
+    }
+  ]
+}

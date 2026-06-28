@@ -1,0 +1,209 @@
+{
+  "season": "M-3",
+  "rule": "M-B",
+  "format": "single",
+  "generated_at": "2026-06-27T16:57:07+00:00",
+  "thresholds": {
+    "tiers": [
+      {
+        "name": "A",
+        "min_rank": 1,
+        "max_rank": 10
+      },
+      {
+        "name": "B",
+        "min_rank": 11,
+        "max_rank": 30
+      },
+      {
+        "name": "C",
+        "min_rank": 31,
+        "max_rank": 60
+      },
+      {
+        "name": "D",
+        "min_rank": 61,
+        "max_rank": 100
+      },
+      {
+        "name": "E",
+        "min_rank": 101,
+        "max_rank": null
+      }
+    ],
+    "rank_move_threshold": {
+      "A": 3,
+      "B": 5,
+      "C": 10,
+      "D": 20,
+      "E": 50
+    },
+    "config_pp_threshold": {
+      "A": 10,
+      "B": 15,
+      "C": 20,
+      "D": null,
+      "E": null
+    },
+    "rank_triggered_pp_threshold": 20,
+    "suppress_config_decline_beyond_rank": 100
+  },
+  "baseline": {
+    "kind": "snapshot",
+    "ranking_updated_at": "2026-06-26T14:26:34+00:00",
+    "details_updated_at": "2026-06-26T14:26:34+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-06-27T16:57:07+00:00",
+    "details_updated_at": "2026-06-27T16:57:07+00:00"
+  },
+  "rank_moves": [],
+  "new_entries": [
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C"
+    }
+  ],
+  "dropped": [
+    {
+      "slug": "floette-eternal",
+      "name": "花叶蒂（永恒之花）",
+      "old": 54,
+      "tier": "C"
+    }
+  ],
+  "config_changes": [
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "abilities",
+      "item": "花幕",
+      "old_pct": 0.0,
+      "new_pct": 97.5,
+      "delta": 97.5,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "items",
+      "item": "花叶蒂进化石",
+      "old_pct": 0.0,
+      "new_pct": 96.1,
+      "delta": 96.1,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "moves",
+      "item": "月亮之力",
+      "old_pct": 0.0,
+      "new_pct": 85.5,
+      "delta": 85.5,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "moves",
+      "item": "冥想",
+      "old_pct": 0.0,
+      "new_pct": 85.0,
+      "delta": 85.0,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "moves",
+      "item": "吸取之吻",
+      "old_pct": 0.0,
+      "new_pct": 75.9,
+      "delta": 75.9,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "moves",
+      "item": "破灭之光",
+      "old_pct": 0.0,
+      "new_pct": 57.6,
+      "delta": 57.6,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "moves",
+      "item": "精神强念",
+      "old_pct": 0.0,
+      "new_pct": 30.0,
+      "delta": 30.0,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "natures",
+      "item": "胆小",
+      "old_pct": 0.0,
+      "new_pct": 52.6,
+      "delta": 52.6,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "natures",
+      "item": "内敛",
+      "old_pct": 0.0,
+      "new_pct": 41.7,
+      "delta": 41.7,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 57,
+      "tier": "C",
+      "panel": "spreads",
+      "item": "2/0/0/32/0/32",
+      "old_pct": 0.0,
+      "new_pct": 23.0,
+      "delta": 23.0,
+      "kind": "新增",
+      "rank_triggered": true
+    }
+  ]
+}

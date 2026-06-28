@@ -1,0 +1,17 @@
+Pokémon Champions Skills
+========================
+
+This distribution bundles third-party components:
+
+1. NCP VGC Damage Calculator
+   - Used by: skills/ncp-damage-calculator (the damage/speed formulas in scripts/script_res/).
+   - Upstream license: see
+     .agents/skills/ncp-damage-calculator/references/upstream-LICENSE
+     (mirrored at .claude/skills/ncp-damage-calculator/references/upstream-LICENSE).
+   - That license governs the bundled calculator code and must be retained on redistribution.
+
+Pokémon and Pokémon character names are trademarks of Nintendo / Creatures Inc. / GAME FREAK inc.
+This is an unofficial, fan-made tool and is not affiliated with or endorsed by those companies.
+Battle-fact data is derived from public community sources for interoperability/reference only.
+
+See LICENSE for the terms covering the original code in this distribution.

@@ -1,0 +1,9 @@
+# Runtime / regenerated artifacts — never part of a skill release.
+__pycache__/
+*.pyc
+# NOTE: *.xlsx is intentionally NOT ignored — the environment-change workbook
+# (<season>_<date>.xlsx) is shipped at the release root alongside the docs.
+
+# The real-team library (data/teams/*.jsonl + index.json) IS shipped data and is tracked here.
+# Only the dev-side quarantine audit is excluded (defensive; it should never appear in a release).
+**/data/teams/quarantine/

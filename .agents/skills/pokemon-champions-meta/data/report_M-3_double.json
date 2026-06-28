@@ -1,0 +1,222 @@
+{
+  "season": "M-3",
+  "rule": "M-B",
+  "format": "double",
+  "generated_at": "2026-06-27T16:57:08+00:00",
+  "thresholds": {
+    "tiers": [
+      {
+        "name": "A",
+        "min_rank": 1,
+        "max_rank": 10
+      },
+      {
+        "name": "B",
+        "min_rank": 11,
+        "max_rank": 30
+      },
+      {
+        "name": "C",
+        "min_rank": 31,
+        "max_rank": 60
+      },
+      {
+        "name": "D",
+        "min_rank": 61,
+        "max_rank": 100
+      },
+      {
+        "name": "E",
+        "min_rank": 101,
+        "max_rank": null
+      }
+    ],
+    "rank_move_threshold": {
+      "A": 3,
+      "B": 5,
+      "C": 10,
+      "D": 20,
+      "E": 50
+    },
+    "config_pp_threshold": {
+      "A": 10,
+      "B": 15,
+      "C": 20,
+      "D": null,
+      "E": null
+    },
+    "rank_triggered_pp_threshold": 20,
+    "suppress_config_decline_beyond_rank": 100
+  },
+  "baseline": {
+    "kind": "snapshot",
+    "ranking_updated_at": "2026-06-26T14:26:37+00:00",
+    "details_updated_at": "2026-06-26T14:26:37+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-06-27T16:57:07+00:00",
+    "details_updated_at": "2026-06-27T16:57:07+00:00"
+  },
+  "rank_moves": [],
+  "new_entries": [
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B"
+    }
+  ],
+  "dropped": [
+    {
+      "slug": "floette-eternal",
+      "name": "花叶蒂（永恒之花）",
+      "old": 22,
+      "tier": "B"
+    }
+  ],
+  "config_changes": [
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "abilities",
+      "item": "花幕",
+      "old_pct": 0.0,
+      "new_pct": 99.1,
+      "delta": 99.1,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "items",
+      "item": "花叶蒂进化石",
+      "old_pct": 0.0,
+      "new_pct": 99.3,
+      "delta": 99.3,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "守住",
+      "old_pct": 0.0,
+      "new_pct": 98.4,
+      "delta": 98.4,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "魔法闪耀",
+      "old_pct": 0.0,
+      "new_pct": 93.3,
+      "delta": 93.3,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "月亮之力",
+      "old_pct": 0.0,
+      "new_pct": 76.7,
+      "delta": 76.7,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "破灭之光",
+      "old_pct": 0.0,
+      "new_pct": 57.5,
+      "delta": 57.5,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "冥想",
+      "old_pct": 0.0,
+      "new_pct": 42.6,
+      "delta": 42.6,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "moves",
+      "item": "吸取之吻",
+      "old_pct": 0.0,
+      "new_pct": 23.1,
+      "delta": 23.1,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "natures",
+      "item": "内敛",
+      "old_pct": 0.0,
+      "new_pct": 76.4,
+      "delta": 76.4,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "natures",
+      "item": "胆小",
+      "old_pct": 0.0,
+      "new_pct": 22.0,
+      "delta": 22.0,
+      "kind": "新增",
+      "rank_triggered": true
+    },
+    {
+      "slug": "floette",
+      "name": "花叶蒂",
+      "rank": 22,
+      "tier": "B",
+      "panel": "spreads",
+      "item": "2/0/0/32/0/32",
+      "old_pct": 0.0,
+      "new_pct": 30.8,
+      "delta": 30.8,
+      "kind": "新增",
+      "rank_triggered": true
+    }
+  ]
+}

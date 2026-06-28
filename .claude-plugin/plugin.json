@@ -1,0 +1,12 @@
+{
+  "name": "pokemon-champions",
+  "description": "Battle dex, metagame usage, and damage/speed calculator skills for Pokémon Champions (Regulation M-B), single & double. Facts and exact calculations — never a strength score.",
+  "author": {
+    "name": "pmwl",
+    "email": "pmwl@outlook.com"
+  },
+  "homepage": "https://github.com/pmwl0128/pokemon_champion_agent",
+  "license": "MIT",
+  "keywords": ["pokemon", "pokemon-champions", "vgc", "agent-skills", "damage-calculator"],
+  "skills": "./.claude/skills/"
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "NCP Damage and Speed"
+  short_description: "Champions damage and speed-line calculations"
+  default_prompt: "Use $ncp-damage-calculator to check Pokémon Champions damage and speed thresholds."
+
+policy:
+  allow_implicit_invocation: true

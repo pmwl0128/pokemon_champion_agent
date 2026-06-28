@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pokemon Champions Meta"
+  short_description: "Pokemon Champions metagame cache and queries"
+  default_prompt: "Use $pokemon-champions-meta to query current or historical Pokemon Champions single/double metagame usage."

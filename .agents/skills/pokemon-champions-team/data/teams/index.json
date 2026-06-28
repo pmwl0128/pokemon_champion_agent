@@ -1,0 +1,22 @@
+{
+  "M-1_single": {
+    "season": "M-1",
+    "format": "single",
+    "count": 371
+  },
+  "M-2_single": {
+    "season": "M-2",
+    "format": "single",
+    "count": 302
+  },
+  "M-3_double": {
+    "season": "M-3",
+    "format": "double",
+    "count": 2538
+  },
+  "M-3_single": {
+    "season": "M-3",
+    "format": "single",
+    "count": 86
+  }
+}

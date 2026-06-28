@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pokemon Champions Dex"
+  short_description: "Offline battle dex lookup for Pokemon Champions"
+  default_prompt: "Use $pokemon-champions-dex to query Pokemon Champions battle dex data."
