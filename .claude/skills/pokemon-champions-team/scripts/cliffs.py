@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Pure cliff math for the tune operator (design.md §16) — no ncp/meta/dex calls here.
+"""Pure cliff math for the tune operator — no ncp/meta/dex calls here.
 
 Everything in this module is deterministic and unit-testable in isolation:
   - Champions speed is a closed form (verified against ncp), so speed cliffs need no calculator.
@@ -21,10 +21,12 @@ SP_CAP = get_ruleset().sp_per_stat_cap
 # Natures that shift Speed by +/-10% (Champions uses the standard nature table).
 _SPE_UP = {"Timid", "Hasty", "Jolly", "Naive"}
 _SPE_DOWN = {"Brave", "Relaxed", "Quiet", "Sassy"}
+SPE_DOWN_NATURES = _SPE_DOWN     # public alias: a -Speed modal makes a "fast variant" unrealistic
+                                 # (Trick Room / slow build). Single source for matchup + oppcache.
 
 # Full standard nature table: nature -> (boosted stat +10%, penalised stat -10%). Spread keys
 # (atk/def/spa/spd/spe; HP never participates). Neutral natures shift nothing. Single source of truth
-# for the nature-lane logic (design §16.8) — kept here next to champ_speed (the other nature math).
+# for the nature-lane logic — kept here next to champ_speed (the other nature math).
 NATURE_MOD: dict[str, tuple[str | None, str | None]] = {
     "Adamant": ("atk", "spa"), "Lonely": ("atk", "def"), "Brave": ("atk", "spe"), "Naughty": ("atk", "spd"),
     "Bold": ("def", "atk"), "Impish": ("def", "spa"), "Relaxed": ("def", "spe"), "Lax": ("def", "spd"),
@@ -47,7 +49,7 @@ def nature_mod(nature: str | None, stat: str) -> int:
 def candidate_natures(target_stat: str, current_nature: str | None, *,
                       invested_stats: set[str], offense_lean: str | None,
                       meta_natures: set[str]) -> list[dict]:
-    """Bounded nature lanes that improve `target_stat` vs `current_nature` (design §16.8) — PURE, no SP
+    """Bounded nature lanes that improve `target_stat` vs `current_nature` — PURE, no SP
     solving here. **REALITY GATE FIRST**: a candidate is considered only if it appears in `meta_natures`
     (the natures real players actually run on this species, ~2%+ usage). Natures nobody runs — most of
     the abstract table, e.g. a -Def or off-role nature on a sweeper — are NEVER proposed; this replaces
@@ -120,34 +122,44 @@ def champ_speed(base: int, sp: int, nature: str | None = None) -> int:
 # stops the bug where matchup computed bare Speed while diagnose applied Choice Scarf, so the same
 # Pokemon was reported at two different speeds (audit retro 2026-06-22).
 SPEED_ITEM_MULT = {"Choice Scarf": 1.5}                 # always-on item Speed multipliers
-WEATHER_SPEED_ABILITIES = {                              # ability -> (weather that triggers it, mult)
-    "Swift Swim": ("rain", 2.0), "Chlorophyll": ("sun", 2.0),
-    "Sand Rush": ("sandstorm", 2.0), "Slush Rush": ("snow/hail", 2.0),
-    # token is the bare keyword (like the weather ones) so a natural conditions.terrain="electric"
-    # matches; the verbose "electric terrain" still matches via substring (audit 2026-06-24).
-    "Surge Surfer": ("electric", 2.0),
+WEATHER_SPEED_ABILITIES = {                              # ability -> (weather tokens, mult)
+    "Swift Swim": ({"rain"}, 2.0), "Chlorophyll": ({"sun"}, 2.0),
+    "Sand Rush": ({"sand", "sandstorm"}, 2.0), "Slush Rush": ({"snow", "hail"}, 2.0),
+}
+TERRAIN_SPEED_ABILITIES = {                              # ability -> (terrain tokens, mult)
+    "Surge Surfer": ({"electric"}, 2.0),
 }
 
 
 def weather_speed_mult(ability: str | None, weather: str | None, terrain: str | None = None) -> int:
-    """The Speed multiplier a weather-speed ability grants when its trigger is up, else 1. Matches ANY
-    of the ability's trigger tokens (e.g. Slush Rush triggers under both 'snow' AND 'hail' — the old
-    `split('/')[0]` only matched 'snow', so Hail silently didn't activate it; audit 2026-06-24). The
-    trigger may be a TERRAIN, not weather: Surge Surfer keys off Electric Terrain, so `terrain` is
-    checked alongside `weather` — without it a legal `conditions.terrain` benchmark could never fire it
-    (audit 2026-06-24). Shared by effective_speed and tune's outspeed solver so they agree."""
+    """The Speed multiplier a field-speed ability grants when its trigger is up, else 1.
+
+    Weather and terrain are checked in separate lanes: `rain` must not match the word `terrain`, while
+    terrain abilities (Surge Surfer) still accept both `electric` and `electric terrain`. Shared by
+    effective_speed and tune's outspeed solver so they agree.
+    """
+    def tokens(value: str | None) -> set[str]:
+        raw = str(value or "").lower().replace("_", " ").replace("-", " ").replace("/", " ")
+        return {part for part in raw.split() if part}
+
+    w = tokens(weather)
+    t = tokens(terrain)
     trig = WEATHER_SPEED_ABILITIES.get(ability)
-    if not trig:
-        return 1
-    cond = " ".join(s for s in (str(weather or ""), str(terrain or "")) if s).lower()
-    return int(trig[1]) if any(tok in cond for tok in trig[0].lower().split("/")) else 1
+    if trig and w.intersection(trig[0]):
+        return int(trig[1])
+    trig = TERRAIN_SPEED_ABILITIES.get(ability)
+    if trig and t.intersection(trig[0]):
+        return int(trig[1])
+    return 1
 
 
 def effective_speed(base: int | None, sp: int, nature: str | None = None, *,
                     item: str | None = None, ability: str | None = None,
-                    weather: str | None = None, tailwind: bool = False) -> int | None:
+                    weather: str | None = None, terrain: str | None = None,
+                    tailwind: bool = False) -> int | None:
     """champ_speed plus the modifiers that actually decide who moves first: an always-on Speed item
-    (Choice Scarf), a weather-speed ability when its weather is up, and Tailwind. `weather`/`tailwind`
+    (Choice Scarf), a weather/terrain-speed ability when its trigger is up (Surge Surfer keys off a
+    TERRAIN, so `terrain` rides alongside `weather`), and Tailwind. `weather`/`terrain`/`tailwind`
     default off, so a field-agnostic caller (matchup) still gets the Choice Scarf correction right.
     Returns None when base Speed is unknown."""
     if base is None:
@@ -156,12 +168,25 @@ def effective_speed(base: int | None, sp: int, nature: str | None = None, *,
     mult = SPEED_ITEM_MULT.get(item)
     if mult:
         spd = int(spd * mult)
-    wmult = weather_speed_mult(ability, weather)
+    wmult = weather_speed_mult(ability, weather, terrain)
     if wmult != 1:
         spd = int(spd * wmult)
     if tailwind:
         spd *= 2
     return spd
+
+
+def fast_variant_speed(base: int | None, modal_speed: int | None, nature: str | None,
+                       *, item: str | None = None, speed_fn: Callable = effective_speed) -> int | None:
+    """The worst-case FAST variant of an opponent (§16.5): max-Spe SP + a Speed nature, x1.5 if the modal
+    set already runs a Speed item (Choice Scarf). Returns `modal_speed` unchanged for a -Speed modal
+    nature (a fast variant is unrealistic) or unknown base/modal; never below the modal speed. Single
+    source shared by matchup.pair_speed and oppcache.build_matrix so the two can't drift. `speed_fn` is
+    injectable (oppcache passes its own) and the item is generalised over SPEED_ITEM_MULT, not hardcoded."""
+    if base is None or modal_speed is None or nature in SPE_DOWN_NATURES:
+        return modal_speed
+    scarf = item if item in SPEED_ITEM_MULT else None
+    return max(modal_speed, speed_fn(base, SP_CAP, "Jolly", item=scarf))
 
 
 def solve_outspeed(base: int, nature: str | None, target_speed: int,
@@ -208,7 +233,7 @@ def survival_prob(damage_rolls: list[int], hp: int) -> float:
         return 1.0
     return sum(1 for d in damage_rolls if d < hp) / len(damage_rolls)
 
-# Discrete probability cliffs (design.md §16.2): "guaranteed" = survive every roll.
+# Discrete probability cliffs: "guaranteed" = survive every roll.
 PROB_TARGETS = {"guaranteed": 1.0, "likely": 13 / 16, "any": 1 / 16}
 
 
@@ -217,7 +242,7 @@ def meets_target(prob: float, target: str) -> bool:
 
 
 def ko_roll(damage_rolls: list[int], target: str) -> int:
-    """Representative single-hit damage for a KO target (kill cliffs, design §16.2): the worst roll
+    """Representative single-hit damage for a KO target (kill cliffs): the worst roll
     for 'guaranteed', the best for 'any', the ~13/16 roll for 'likely'. The kill predicate is then
     `ko_roll * hits >= effective_hp` — a per-hit-independent NHKO model (exact for a guaranteed OHKO:
     min roll >= HP; the standard N x roll >= HP approximation for multi-hit; ignores between-hit
@@ -250,7 +275,7 @@ def solve_min_sp(predicate: Callable[[int], bool], *, cap: int = SP_CAP) -> int 
 
 
 # --------------------------------------------------------------------------- #
-# Per-mon headroom (objective, stat-derived prior — NOT a role label; design.md §16.3)
+# Per-mon headroom (objective, stat-derived prior — NOT a role label)
 # --------------------------------------------------------------------------- #
 
 def defensive_headroom(stats: dict[str, int]) -> str:
@@ -273,7 +298,7 @@ def defensive_headroom(stats: dict[str, int]) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Ranking (design.md §16.3): value = magnitude x prevalence x decisiveness x cheapness,
+# Ranking: value = magnitude x prevalence x decisiveness x cheapness,
 # weighted by the format's aspect_priority. Transparent score, multi-view — never a single pick.
 # --------------------------------------------------------------------------- #
 

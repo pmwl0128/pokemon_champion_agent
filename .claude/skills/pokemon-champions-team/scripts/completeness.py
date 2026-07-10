@@ -1,9 +1,13 @@
 #!/usr/bin/env python
-"""Completeness semantics for team members (design.md §8; design audit 2026-06-21, point 8).
+"""Completeness semantics for team members.
 
 `completeness` records how much of a member's set we actually know / trust:
-  - observed_full_set      : full set observed (moves+item+ability+spread) — trust everything.
-  - extracted_set          : LLM-extracted from prose — fields present but lower trust.
+  - observed_full_set      : full set observed (moves+item+ability; spread when the source carries
+                             one — some real sources don't, see `spread_authoritative`) — high.
+  - extracted_set          : reconstructed from a real team but not the owner's own export (community
+                             reverse-engineered spread / LLM-from-prose). VALIDATED and usable as a
+                             template / tune target — the owner-published pool is too thin to rely on
+                             alone — but capped at MEDIUM confidence, never presented as high.
   - observed_species_only  : only the species is known (usage list / team preview) — no moveset.
   - inferred_set           : guessed — neither moves nor set are authoritative.
 
@@ -19,6 +23,8 @@ bare untagged species (no moves) is correctly NOT counted as offense coverage. P
 """
 from __future__ import annotations
 
+import evidence
+
 KNOWN_LEVELS = {"observed_full_set", "observed_species_only", "extracted_set", "inferred_set"}
 
 _CONF_FLOOR = {
@@ -27,7 +33,6 @@ _CONF_FLOOR = {
     "observed_species_only": "low",
     "inferred_set": "low",
 }
-_CONF_RANK = {"high": 2, "medium": 1, "low": 0}
 
 
 def effective_level(level: str | None, *, has_moves: bool) -> str:
@@ -44,14 +49,39 @@ def moveset_authoritative(level: str | None, *, has_moves: bool) -> bool:
     return has_moves and lvl in ("observed_full_set", "extracted_set")
 
 
+# Trustworthy enough to build a template / tune a spread off of. `extracted_set` qualifies (a validated
+# community reconstruction — the owner-published pool is too thin to lean on alone); it is usable, just
+# floored to MEDIUM confidence (confidence_floor), never claiming high. `observed_species_only` (no set)
+# and `inferred_set` (guessed) stay out. (audit 2026-07-01, user directive: extracted may be tune/
+# template-authoritative while staying medium-confidence.)
+_AUTHORITATIVE = frozenset({"observed_full_set", "extracted_set"})
+
+
 def set_authoritative(level: str | None, *, has_moves: bool) -> bool:
-    """True when item/ability/nature/spread are trustworthy enough to tune off of."""
-    return effective_level(level, has_moves=has_moves) == "observed_full_set"
+    """True when item/ability/nature are trustworthy enough to tune off of. Includes
+    `extracted_set` (validated reconstruction); the confidence it earns is still its floor (medium),
+    not high — `confidence_floor` carries that, so a caller must not read authoritative as 'high'.
+    The SPREAD is judged separately (`spread_authoritative`): an authoritative set may still carry
+    no spread at all."""
+    return effective_level(level, has_moves=has_moves) in _AUTHORITATIVE
+
+
+def spread_authoritative(level: str | None, *, has_spread: bool) -> bool:
+    """True when the member's SP spread can be trusted as its REAL allocation. Untagged input is
+    user-authored, so an absent spread is a real 0-SP state — trusted either way. A TAGGED member
+    (pipeline data) without a spread has an UNKNOWN spread: the raw row simply didn't carry one, so
+    reading it as 0 SP is a
+    guess, never authoritative — consumers must disclose 'SP assumed 0' and drop confidence."""
+    if level not in KNOWN_LEVELS:
+        return True
+    return level in _AUTHORITATIVE and has_spread
 
 
 def template_eligible(level: str | None) -> bool:
-    """Only an explicitly observed full set may become a real-team template (M4)."""
-    return level == "observed_full_set"
+    """A member that may seed a real-team template (M4): an observed full set OR a validated
+    community-reconstructed (`extracted_set`) set. An untagged/species-only/inferred member may not.
+    Confidence is still capped by `confidence_floor`, so an extracted-only archetype reads medium."""
+    return level in _AUTHORITATIVE
 
 
 def confidence_floor(level: str | None, *, has_moves: bool) -> str:
@@ -61,5 +91,4 @@ def confidence_floor(level: str | None, *, has_moves: bool) -> str:
 
 def min_confidence(a: str | None, b: str | None) -> str:
     """The lower (more cautious) of two confidence labels."""
-    ra, rb = _CONF_RANK.get(a or "medium", 1), _CONF_RANK.get(b or "medium", 1)
-    return a if ra <= rb else b
+    return evidence.min_confidence(a, b)

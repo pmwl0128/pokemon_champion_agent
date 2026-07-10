@@ -1,196 +1,464 @@
-<h1 align="center">⚔️ Pokémon Champions Skills</h1>
+<h1 align="center">Pokémon Champions Skills</h1>
 
 <p align="center">
-  <b>给 AI 智能体的《宝可梦 冠军赛》对战数据底座 —— 基于事实与精确计算</b><br/>
-  <i>Battle-data skills for AI agents — based on facts and exact calculations for Pokémon Champions.</i>
+  <b>Local battle facts, current metagame data, exact calculations, and evidence-grounded team building for AI agents</b>
 </p>
 
 <p align="center">
-  <img alt="skills" src="https://img.shields.io/badge/skills-3-blue"/>
-  <img alt="format" src="https://img.shields.io/badge/Champions-Reg.%20M--B-8A2BE2"/>
+  <img alt="skills" src="https://img.shields.io/badge/skills-4-blue"/>
   <img alt="modes" src="https://img.shields.io/badge/single%20%26%20double-supported-success"/>
-  <img alt="offline" src="https://img.shields.io/badge/offline--first-yes-success"/>
-  <img alt="agents" src="https://img.shields.io/badge/Claude%20Code%20%7C%20Codex-Agent%20Skills-orange"/>
+  <img alt="query" src="https://img.shields.io/badge/query-offline--first-success"/>
+  <img alt="languages" src="https://img.shields.io/badge/names-zh%20%7C%20en%20%7C%20ja-orange"/>
+  <img alt="agents" src="https://img.shields.io/badge/Claude%20Code%20%7C%20Codex-Agent%20Skills-blueviolet"/>
   <img alt="license" src="https://img.shields.io/badge/license-MIT-green"/>
 </p>
 
 <p align="center">
-  📅 <b>环境数据 / Metagame data</b> · M-3 / M-B · 截至 / as of <b>2026-06-27</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-10</b>
+</p>
+
+<p align="center">
+  <b>English</b> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a>
 </p>
 
 ---
 
-> 一组即插即用的轻量级 **Agent Skill**，把《宝可梦 冠军赛》（Regulation **M-B**，单打 & 双打）的
-> 图鉴、环境使用率、伤害/速度计算、建队辅助(indev)搬进你的 AI 助手。脚本只输出**可验证的事实**和**精确计算**，并标注
-> 每条结论的依据与所属赛季/规则
->
-> A set of lightweight, drop-in **Agent Skills** that bring the battle dex, metagame usage,
-> damage/speed math, and team-building help (in dev) for **Pokémon Champions** (Regulation **M-B**,
-> single & double) into your AI assistant. The scripts emit only **verifiable facts** and **exact
-> calculations**, each tagged with its evidence and the season/rule it was computed for.
+This repository packages four Agent Skills for Pokémon Champions. Together they let an AI agent:
 
-## ✨ 亮点 / Highlights
+- look up canonical battle-dex facts;
+- inspect current and historical metagame distributions;
+- calculate damage, KO, survival, and speed lines;
+- build, review, revise, select, and tune teams through an audited workflow.
 
-- 🔌 **即插即用 / Drop-in** — 兼容 [Agent Skills 标准](https://agentskills.io)：**Claude Code**、**OpenAI Codex** 等都能自动识别，无需注册。
-- 📴 **离线优先 / Offline-first** — 查询走本地缓存，断网也能用；联网只为刷新环境数据。
-- 🌏 **三语别名 / Trilingual** — 中文 / English / 日本語 名称互查，支持反向多条件检索。
-- 🎯 **基于事实 / Facts only** — 命中/生存/抢速等阈值用真实公式现算，带 evidence + 置信度，不下"最优"结论。
-- 📊 **环境快照工作簿 / A ready-to-read workbook** — 随包附带一份 Excel：环境一览 + 变动报告 + AI 解读（见下）。
-- 🔗 **三技能联动 / Better together** — 图鉴出事实、环境出使用率、计算器出伤害与速度；一个问题里 AI 会自动把三者串起来（比如「按当前环境前排，算我的烈咬陆鲨对位」会同时用到三个）。 / *Dex gives facts, meta gives usage, the calculator gives damage & speed — the agent chains all three within a single question.*
-- 🛠️ **建队辅助即将开发完成 / Team-builder almost ready** — 第四个 skill 基于上述三者做合法性校验、诊断、对位、SP 微调与候选检索（开发中）。 / *A fourth skill builds on these three for legality checks, diagnostics, matchup, SP tuning, and candidate retrieval (in dev).*
+All four skills are installed side by side and routed as peers. `pokemon-champions-team` coordinates the other three when the request concerns an entire team, but it does not replace them: a focused dex, usage, damage, or Speed question goes straight to the relevant factual skill.
 
-## 🧩 三个技能 / The three skills
+Queries read the data shipped with the package. The goal is not to manufacture a hidden “team strength” score, but to make the agent's facts, calculations, assumptions, and trade-offs inspectable.
 
-| Skill | 中文 | English |
-|---|---|---|
-| **`pokemon-champions-dex`** | 对战图鉴：宝可梦/形态、三语名、属性、种族值、特性、招式表、道具、Mega 石，批量与多条件反查。离线优先。 | Battle dex: roster/forms, trilingual names, types, base stats, abilities, learnsets, items, Mega stones, batch + multi-condition reverse search. Offline-first. |
-| **`pokemon-champions-meta`** | 环境缓存与查询：使用率排名、详情面板（招式/道具/特性/性格/队友/SP 努力值）、单双对照，按赛季/规则。可刷新。 | Metagame cache & query: usage rankings, detail panels (moves/items/abilities/natures/partners/SP spreads), single-vs-double, per season/rule. Refreshable. |
-| **`ncp-damage-calculator`** | 伤害区间、击杀/生存阈值、速度线，使用内置 NCP VGC 公式。 | Damage ranges, KO/survival thresholds, and speed lines using the bundled NCP VGC formulas. |
+## Product Positioning
 
-> 🛠️ **第四个也是最核心的 Skill 即将完成 / The fourth — and most central — skill is nearly ready** —— 一个基于以上三者的**建队编排器**：
-> 它把图鉴的事实、环境的使用率、计算器的伤害/速度串起来，做合法性校验、诊断、对位、SP 微调与候选检索，
-> 功能完整后会加入本仓库。
-> *A team-building **orchestrator** that chains the three skills above (dex facts + meta usage + damage/speed) for legality checks, diagnostics, matchup, SP tuning, and candidate retrieval — added once feature-complete.*
-
-## 📊 环境快照工作簿 / The metagame workbook (`<season>_<date>.xlsx`)
-
-仓库根目录附带一份最新的环境数据易读版 Excel，快速把握当前环境，无需运行任何脚本：
-*A ready-to-read Excel ships at the repo root — grasp the current metagame at a glance, no scripts needed:*
-
-| 工作表 / Sheet | 内容 / Contents |
+| What it is | What it is not |
 |---|---|
-| **单打 / 双打** | 每只一行：名次、中/英名、热门招式·道具·特性·性格·队友、SP 努力值分布。<br/>*One row per Pokémon: rank, names, top moves · items · abilities · natures · partners, SP spread.* |
-| **更新报告 / Update report** | 相对上一份快照的**事实性变动表**（名次升降、新进榜、跌出榜、配置变动）＋ 一个**中文名联动检索**（单/双对照）＋ 一块 **AI 环境解读**（对本期变动的AI生成判读，不保证准确性仅供参考）。<br/>*Factual change tables vs the previous snapshot (rank shifts, new/dropped, config changes) + an interactive 中文名 lookup (single/double) + an **AI-generated metagame read** of what changed (for reference only — accuracy not guaranteed).* |
+| A local skill set for Claude Code, Codex, and compatible agents | A hosted web team builder or account-based service |
+| Structured access to dex, metagame, calculation, and real-team evidence | A chatbot expected to answer from model memory |
+| A team-building workflow with legality checks, evidence, confidence, and audit gates | A black-box optimizer that produces an objectively best team |
+| An updatable snapshot tied to a season and regulation | A permanently live database that never needs a date stamp |
 
-> 工作簿随环境刷新重建；使用率是时效数据，请以最新一份为准。
-> *The workbook is regenerated as the metagame refreshes; usage is time-sensitive — trust the latest.*
+Scripts own facts, arithmetic, and deterministic checks. The model interprets your goal, designs candidates, weighs trade-offs, and explains the recommendation. That division of responsibility is the core design of the project.
 
-## 📥 安装 / Install
+> [!NOTE]
+> **The supported data domain is Pokémon Champions only.**
+>
+> The four skills support Pokémon, forms, moves, items, abilities, and rules that are officially available in the current Pokémon Champions release. Historical seasons are Champions snapshots as well. The package does not provide main-series datasets for games such as Pokémon Sword and Shield or Pokémon Scarlet and Violet, nor does it cover unreleased content. A familiar Pokémon or move may have different stats, power, abilities, learnsets, or mechanics in Champions; every lookup and calculation follows the current Champions values.
 
-> 🔰 **新手指南**：下面四种方法**任选其一**，从最省事到最手动。装好**不用注册**——技能靠各自 `SKILL.md` 的描述自动触发。拿不准就用**方法 A**。
-> *Beginner-friendly: pick **any one** method below, easiest first. No registration — skills auto-trigger from their `SKILL.md`. Unsure? Use **Method A**.*
+## The Four Skills
 
-### 方法 A · 一行命令（优先推荐）/ Single command (recommended)
+| Skill | Best suited for |
+|---|---|
+| [`pokemon-champions-dex`](#pokemon-champions-dex) | “What is it, what can it learn, and which entity does this name mean?” |
+| [`pokemon-champions-meta`](#pokemon-champions-meta) | “What is common now, how is it commonly used, and what changed?” |
+| [`ncp-damage-calculator`](#ncp-damage-calculator) | “How much does this hit do, does it secure the KO or survive the hit, and which side moves first?” |
+| [`pokemon-champions-team`](#pokemon-champions-team) | “Build a team, review this roster, revise it, plan selection, or tune SP.” |
 
-需要先装 **[Node.js](https://nodejs.org/)**。这条命令会**自动识别你装了哪个助手**（Claude Code / Codex / Cursor 等）并装到对应目录，一次把三个技能都装好：
-*Install **[Node.js](https://nodejs.org/)** first. This auto-detects your agent(s) and installs all three skills to the right place:*
+## `pokemon-champions-dex`
 
-```bash
-npx skills add pmwl0128/pokemon_champion_agent        # 项目级（在你项目目录里运行）/ project scope
-npx skills add pmwl0128/pokemon_champion_agent -g      # 全局（所有项目都能用）/ global
+An offline battle dex and the canonical name authority for the entire package. It covers Pokémon and forms, typing, base stats, abilities, learnsets, moves, items, natures, and Mega Stone mappings, with batch lookup and multi-condition reverse search.
+
+**What it does well:**
+
+- resolves Chinese, English, and Japanese names, including common aliases and multilingual Mega forms;
+- normalizes pasted teams, owned rosters, and set details in batches;
+- answers reverse queries such as “who learns this move?” or “which Pokémon satisfy these type, ability, and Speed conditions?”;
+- supplies the canonical identifiers shared by meta, calculator, and team.
+
+**Boundary:** a successful dex lookup proves an entity or legal learnset fact. It does not show that a choice is popular or strategically advisable.
+
+Example requests:
+
+```text
+Can Garchomp learn Ice Punch in Pokémon Champions?
+Which Fairy-types learn Earth Power?
+What are Mega Charizard X's base stats and abilities?
+Which Pokémon uses this Mega Stone?
 ```
 
-> 🟢 **还没装 Node.js？** 到 [nodejs.org](https://nodejs.org/) 下载 **LTS** 版一路下一步即可；或用包管理器：macOS `brew install node`、Windows `winget install OpenJS.NodeJS`、Linux 用你发行版的包管理器。装好后终端运行 `node -v` 能看到版本号就 OK。
-> *No Node.js yet? Grab the **LTS** build from [nodejs.org](https://nodejs.org/), or use a package manager (`brew install node` / `winget install OpenJS.NodeJS` / your distro's). Run `node -v` to confirm.*
+## `pokemon-champions-meta`
+
+An offline-first metagame snapshot for what players are actually using. Rankings and detail panels are separated by season, regulation, and Singles/Doubles, and include moves, items, abilities, natures, partners, and SP distributions.
+
+**What it does well:**
+
+- summarizes the top of a Singles or Doubles environment;
+- shows one Pokémon's common configurations and partners;
+- reverse-searches common users of a move, item, or configuration trait;
+- compares Singles and Doubles usage;
+- reports factual changes from the previous snapshot.
+
+**Boundary:** moves, items, abilities, natures, partners, and spreads in a detail panel are generally independent marginal distributions. Their top entries must not be stitched into an asserted joint set, and usage is not proof of strength.
+
+Example requests:
+
+```text
+What are the top 20 Pokémon in the current M-B Doubles snapshot?
+How do Mega Metagross movesets differ between Singles and Doubles?
+Which Pokémon rose or fell this update, and which item distributions changed?
+Which partners commonly appear around Tailwind setters in Doubles?
+```
+
+The release root also includes three single-language workbooks named `<season>_<date>_{zh,ja,en}.xlsx`. They contain the complete Singles and Doubles tables plus a factual update report, and can be read without running any script.
+
+## `ncp-damage-calculator`
+
+A Pokémon Champions damage and Speed calculator backed by the bundled NCP VGC Damage Calculator core. It accepts concrete attacker and defender states—including SP, nature, item, ability, stat stages, move, and field—and returns full damage rolls, percentages, KO/survival results, and move order.
+
+**What it does well:**
+
+- calculates a specific attack's range and OHKO/2HKO line;
+- checks whether a defined set survives a hit;
+- compares two complete Speed states;
+- handles Speed lines under Tailwind, Trick Room, Choice Scarf, and weather;
+- supplies exact calculations to team matchup and tuning workflows.
+
+**Boundary:** a calculation does not certify Champions legality. The calculator is also not a full turn simulator: recovery loops, status progression, PP, hidden information, and branching player choices remain outside its scope unless explicitly modeled. Any omitted set or field detail is an assumption and should be reported as such.
+
+Example requests:
+
+```text
+How much does 32 Attack Adamant Mega Metagross Earthquake do to this Mega Raichu Y?
+Does this Incineroar always survive the common Garchomp Earthquake line?
+Which side moves first under Tailwind, and how does Trick Room change the order?
+How many more Speed SP does this set need to cross the target line?
+```
+
+## `pokemon-champions-team`
+
+The dedicated skill for whole-team work: building from scratch, completing a partial roster, validating legality, diagnosing structure, reviewing matchups, planning battle selection, revising members, and tuning SP. It is published alongside the other skills, and coordinates their dex facts, metagame evidence, and exact calculations inside a single auditable task.
+
+It is deliberately not a one-prompt team generator. Its purpose is to help the model produce a transparent recommendation grounded in your intent, the current environment, real joint teams, and reproducible matchup facts—without turning team building into a synthetic score.
+
+> [!IMPORTANT]
+> **It raises the floor of an AI team-building answer; it does not replace expert team-building experience.**
 >
-> 安装器来自 [vercel-labs/skills](https://github.com/vercel-labs/skills)。第一次运行会让你确认，跟着提示按回车即可。
-> *Powered by [vercel-labs/skills](https://github.com/vercel-labs/skills); follow the prompts on first run.*
+> The workflow reduces common failures such as stale memory, name mismatches, illegal sets, bad arithmetic, fabricated joint sets assembled from marginal usage, and forgotten constraints. What it improves is factual reliability and reasoning discipline. Candidate quality and explanatory depth still vary with the model driving the skills. Whether a team fits your piloting habits, selection patterns, expected opponents, and in-game plan also depends on the battle context you provide.
 
-### 方法 B · Claude Code 插件市场 / Claude Code plugin marketplace
+Do not treat the first result as an automatically optimal team. Better results come from supplying a win condition, intended leads or selection plans, recurring opponents, acceptable weaknesses, observed losses, and any human insight you already trust. The most productive loop is usually: start with a grounded proposal, test or review it, report what failed, and ask the agent to revise the team or tune specific lines.
 
-用 **Claude Code** 的话，在它的**对话框里**输入这两行（是在 Claude Code 里输入，不是终端）：
-*With **Claude Code**, type these two lines **inside Claude Code** (not your terminal):*
+### What You Can Provide
+
+There is no required filename or user-facing schema. The agent can work from:
+
+- a request to build around one Pokémon;
+- a pasted Showdown-style team;
+- an existing team JSON object;
+- prose describing members, moves, and SP;
+- any local file containing a team or owned roster;
+- a clear screenshot that the agent can read first;
+- constraints such as “owned Pokémon only,” “keep this Mega,” or “no Trick Room.”
+
+The agent resolves every Pokémon, move, item, ability, and nature through the dex, then turns the team facts, hard constraints, soft preferences, and matchup goals into structured input that the tools can verify. You do not need to clean the format yourself.
+
+### Capability Map
+
+| Capability | What the team skill actually does |
+|---|---|
+| **Input and legality** | Reads prose, Showdown, or JSON; normalizes names and forms; checks the available roster, learnsets, abilities, items, Species/Item Clause, team size, SP limits, and Mega relationships. Results distinguish `valid`, `invalid`, and `unknown`. |
+| **Team diagnosis** | Surfaces defensive typing, offensive coverage, Speed structure, speed control, and functional signals without collapsing them into one score. |
+| **Matchups and selection** | Computes both directions of damage, Speed, and KO relationships against the current meta top-K; analyzes Singles 6-pick-3, Doubles 6-pick-4, and one-Mega-per-battle constraints without naming an objectively best selection. |
+| **SP tuning** | Turns “survive X,” “outspeed Y,” or “OHKO/2HKO Z” into explicit matchup targets and finds the minimum SP needed to cross each discrete threshold, including the opportunity cost. It does not search for one globally optimal spread. |
+| **Candidates and real-team evidence** | Retrieves additions and replacements from diagnosed gaps, compares before/after facts, and uses joint structures, representative sets, and complete observed teams as evidence for the model's own assembly. |
+| **Result checks** | Applies the same factual checks to every candidate, rejects illegal or hard-constraint-breaking proposals, and checks the final answer for missing assumptions, trade-offs, tuning notes, or unreproducible numbers. |
+
+### How a Team Task Runs
+
+Internally, the skill uses a structured workflow to avoid “generate from intuition, justify afterward.” End users do not need to learn its operators. A complete task can be understood in four stages:
+
+1. **Understand the target:** establish format, anchor, availability, hard constraints, play preference, and required matchup lines. Open-ended builds ask a few focused questions at a time; existing-team analysis asks only for missing information that matters.
+2. **Ground the build:** consult both the current metagame and real joint teams, keeping “what is popular” separate from “which elements actually co-occur,” so independent usage columns do not become a fictional set.
+3. **Compare candidates:** develop one or more directions, run the same legality, structure, matchup, and confidence checks, and explain what each change fixes and what it gives up.
+4. **Validate before delivery:** calculate the relevant damage, Speed, selection, and SP thresholds, then recheck the final prose, numbers, assumptions, and trade-offs before presenting the result for your judgment and iteration.
+
+The workflow guarantees traceable evidence, retained constraints, and reproducible numbers. It cannot determine that one battle philosophy is universally correct or certify a team as objectively optimal.
+
+### Common Ways to Use It
+
+| Your request | What the skill does |
+|---|---|
+| **Build from scratch** | “Start the team-building flow” enters the full guided intake. A normal build request asks only for missing information, then returns directions that have been compared and validated. |
+| **Review or revise a team** | Parses the current roster, checks legality and structure first, adds matchup work when needed, and explains the benefit and cost of each replacement. A user-locked anchor is not silently removed. |
+| **Plan selection, review matchups, or tune SP** | Routes the task to 6-pick-3/4 analysis, a full metagame matchup table, or a concrete threshold calculation. “Does this set survive?” and “change the set so it survives” are not treated as the same calculation. |
+
+### How Real-Team Evidence Is Used
+
+The release includes real-team samples partitioned by season, regulation, and format. Their distinctive value is **joint evidence**: which six Pokémon appeared together, whether a member's item/ability/moves/nature/SP came from one observed set, and which structures recur within a given evidence tier.
+
+The library is not a leaderboard:
+
+- records, placings, ratings, and sample counts are never normalized into a strength score;
+- Singles and Doubles remain separate, and old regulations do not silently enter the current evidence pool;
+- species-only rows can support co-occurrence facts but cannot masquerade as complete representative sets;
+- standard-set caches are always low-confidence references, while the user's actual team is recalculated from its real set;
+- the model may study complete observed teams, but it must not silently return one as “the recommendation.” A verbatim adoption must disclose the sample overlap, why it fits, and which modifications were considered.
+
+### Reading Team Results
+
+**Legality is not a guess with two outcomes.** `valid` means the available facts passed deterministic checks; `invalid` includes actionable errors; `unknown` means the input or factual base is incomplete and must not be presented as legal.
+
+**Usage is not strength.** Rankings, real-team co-occurrence, and event tags are separate views. The model may recommend after explaining trade-offs, but the tools do not blend those facts into an opaque score.
+
+**A CHECK label is not a battle simulator.** C2/C1/C0 describe switch-in, same-field/revenge, or no-clean-line relationships under the evaluated sets, damage, Speed, and turn budget. Setup, recovery, status, PP, and long-term play are only surfaced within the tool's stated limits.
+
+**Confidence belongs to the conclusion.** Real joint sets, marginal fallbacks, standard-set caches, thin samples, and partial calculation failures carry different confidence and caveats. Important assumptions should remain visible in the final answer.
+
+### Example Requests
+
+```text
+Start the team-building flow for an M-B Doubles team and ask me what you need to know.
+
+Build one final Singles team around Mega Staraptor, and explain the important trade-offs.
+
+Here is my Showdown team. Check legality, structural gaps, and matchups into the current top 20, then propose revisions.
+
+Build Doubles using only the Pokémon in roster.txt. Keep Gengar and do not use Trick Room.
+
+How should these six be selected into four? Which selection axis changes by opponent?
+
+Tune my Incineroar to always survive the specified Garchomp Earthquake, and show what SP must be sacrificed.
+
+Compare replacing member A with B across defense, speed control, and metagame holes—not just popularity.
+
+Find real-team structures containing these two anchors, summarize the common patterns and variants, and do not copy a full team.
+```
+
+## How the Skills Work Together
+
+A single request may invoke several skills, but each factual responsibility stays explicit:
+
+```text
+free-form user request
+  ├─ names, forms, learnsets, item legality ─────> dex
+  ├─ current usage and configuration marginals ─> meta
+  ├─ damage and Speed under defined conditions ─> calculator
+  └─ team intent, candidates, diagnosis, tuning ─> team
+                                                 └─ calls the other three as needed
+```
+
+For example, “build M-B Doubles around Mega Metagross and make it survive this Garchomp Earthquake” needs name and legality facts, current usage, real-team structures, candidate evaluation, and an exact survival threshold. “What type is Mega Metagross?” only needs the dex and does not enter the team workflow.
+
+## Installation
+
+All four skills are installed together. No command registration is required afterward; the agent selects a skill from its `SKILL.md` description.
+
+### Method A: One Command
+
+Install [Node.js](https://nodejs.org/) first, then run this in your project directory:
+
+```bash
+npx skills add pmwl0128/pokemon_champion_agent
+```
+
+For a global installation available to every project:
+
+```bash
+npx skills add pmwl0128/pokemon_champion_agent -g
+```
+
+The installer is provided by [vercel-labs/skills](https://github.com/vercel-labs/skills) and prompts for the target agent and scope. The current link-based installation path may fail on Windows; if it does, use the agent-assisted or manual-copy method instead.
+
+### Method B: Claude Code Plugin Marketplace
+
+Enter these commands inside Claude Code:
 
 ```text
 /plugin marketplace add pmwl0128/pokemon_champion_agent
 /plugin install pokemon-champions@pmwl
 ```
 
-> 这种方式带**自动更新**：以后一句 `/plugin marketplace update` 就更新到最新。
-> *This path has **automatic updates** — later just run `/plugin marketplace update`.*
+### Method C: Ask an Agent to Install It
 
-### 方法 C · 让 AI 帮你装（从 GitHub）/ Ask your agent to do it (from GitHub)
+Give the following request to an agent with shell access:
 
-完全不想碰命令行、也没装 Node.js？把下面这段发给有命令权限的 AI 助手，让它**直接从 GitHub 装**：
-*No terminal, no Node.js? Paste this to an agent with shell access — it installs **straight from GitHub**:*
+> Install all four skills from https://github.com/pmwl0128/pokemon_champion_agent. Use `.claude/skills/` for Claude Code or `.agents/skills/` for Codex, install them in my global skills directory, and confirm that all four `SKILL.md` files are discoverable.
 
-> 帮我安装这个仓库里的技能：把 https://github.com/pmwl0128/pokemon_champion_agent 克隆下来，然后把里面 `.claude/skills/` 下的三个技能文件夹拷进我的 `~/.claude/skills/`（如果我用 Codex 就把 `.agents/skills/` 拷进 `~/.agents/skills/`），装完告诉我装了哪几个。
-> *"Install the skills from https://github.com/pmwl0128/pokemon_champion_agent: clone it, then copy the three skill folders under `.claude/skills/` into my `~/.claude/skills/` (or `.agents/skills/` → `~/.agents/skills/` for Codex). Tell me which ones got installed."*
-
-### 方法 D · 手动复制 / Manual copy
-
-先克隆仓库，再把技能文件夹拷进你助手扫描的 skills 目录（三个装进**同一个**目录——meta 会用到 dex 的别名）：
-*Clone the repo, then copy the skill folders into your agent's skills directory (all three into the **same** dir):*
+### Method D: Manual Copy
 
 ```bash
 git clone https://github.com/pmwl0128/pokemon_champion_agent.git
-cp -r pokemon_champion_agent/.claude/skills/*  ~/.claude/skills/    # Claude Code（全局/global）
-cp -r pokemon_champion_agent/.agents/skills/*  ~/.agents/skills/    # OpenAI Codex（全局/global）
-# 项目级：改拷到你项目下的 .claude/skills 或 .agents/skills
-# (project scope: copy into your project's .claude/skills or .agents/skills instead)
+cp -r pokemon_champion_agent/.claude/skills/* ~/.claude/skills/   # Claude Code
+cp -r pokemon_champion_agent/.agents/skills/* ~/.agents/skills/   # Codex
 ```
 
-> 本仓库同时提供 `.agents/skills/`（Codex 等）与 `.claude/skills/`（Claude Code）两份**逐字节一致**的镜像，用你助手能发现的那份即可。
-> *Both mirrors are byte-identical — use whichever your agent discovers.*
+The `.agents/skills/` and `.claude/skills/` trees are byte-identical mirrors. Use the one discovered by your agent.
 
-### 🔄 更新 / Updating
+### Requirements
 
-| 你的装法 / Installed via | 更新命令 / Update command |
+- **Python 3.10+** for dex, meta, and team query scripts; normal queries use only the standard library.
+- **Node.js** for the NCP damage/Speed calculator and the Method-A `npx` installer.
+- **openpyxl 3.1+ (optional)** only when running meta `export-excel` yourself; release workbooks are already included.
+
+### Updating
+
+| Installation | Update method |
 |---|---|
-| 方法 A（npx skills） | `npx skills update`（更新单个：`npx skills update pokemon-champions-dex`）|
-| 方法 B（Claude 插件） | 在 Claude Code 里输入 `/plugin marketplace update` |
-| 方法 C / D（手动） | 重新 `git pull` 后重新复制，或让 AI 再做一遍 |
+| `npx skills` | `npx skills update` |
+| Claude Code plugin | `/plugin marketplace update` |
+| Git / manual copy | Run `git pull`, then copy the relevant skills tree again |
 
-### ✅ 验证安装 / Verify it worked
+### Verifying the Installation
 
-随便问一句需要数据的问题，比如「**M-B 双打最常见的空间手有哪些？**」——助手能用上技能、给出带数据的回答就说明装好了。也可以确认你的 skills 目录下出现了 `pokemon-champions-dex`、`pokemon-champions-meta`、`ncp-damage-calculator` 三个文件夹。
-*Ask a data question (e.g. "most-used M-B doubles Trick Room setters?") — a data-backed answer means it works. Or check the three folders exist in your skills directory.*
+Confirm that your skills directory contains:
 
-### 环境要求 / Requirements
-- **[Node.js](https://nodejs.org/)** —— 方法 A 的安装器 + 伤害计算器都需要。 / *needed for the Method-A installer and the damage calculator.*
-- **Python 3.10+** —— dex/meta 查询脚本（查询期仅用标准库）。 / *dex/meta query scripts (stdlib-only at query time).*
+```text
+ncp-damage-calculator
+pokemon-champions-dex
+pokemon-champions-meta
+pokemon-champions-team
+```
 
-## 💬 怎么用 / How to use
+Then ask “Can Garchomp learn Dragon Dance?” followed by “Build me a Singles team.” The first should route to the dex; the second should start the team's guided intake.
 
-### 🔰 从零到第一个回答（新手分步）/ From zero to your first answer
+## Beginner Guide: Set Up a Battle Project
 
-1. **建一个项目文件夹**（你的"队伍工作台"，AI 会在这里读写）/ *Make a project folder — your agent reads/writes here:*
-   ```bash
-   mkdir my-champions && cd my-champions
-   ```
-2. **装上技能**（见上面 [安装](#-安装--install)；新手就在这个文件夹里跑方法 A）/ *Install the skills (Method A, run inside this folder):*
-   ```bash
-   npx skills add pmwl0128/pokemon_champion_agent
-   ```
-3. **在这个文件夹里启动你的 AI 助手**（Claude Code / Codex…），用大白话提问（例子见下）。 / *Start your agent in this folder and ask in plain language (examples below).*
-4. **（可选）放一份你自己的"宝可梦/队伍清单"** / *(Optional) keep your own roster/team list:* 在文件夹里建个 `my_pokemon.md`，一行一只你拥有的宝可梦；提问时加一句「只用我清单里的」，AI 就会围绕你的宝可梦回答。等第四个建队 skill 上线后，这份清单还能直接用来校验/诊断你的队伍。
-   *Create `my_pokemon.md`, one owned Pokémon per line, and say "only from my list" — the agent will build around them. Once the team-builder skill lands, this list also feeds legality checks and diagnostics.*
+The skills can be installed globally, but a dedicated project directory works better for ongoing team work. It keeps rosters, sets, battle notes, and agent instructions together so later revisions retain useful context.
 
-### 提问示例 / Example prompts
+### 1. Create a Project Directory
 
-使用自然语言问你的AI助手，它会从各技能的描述里自动挑选合适的那个，常见的别名AI会自动识别：
-*Ask your agent naturally — it picks the right skill from each skill's description and recognizes common aliases:*
+```bash
+mkdir my-champions
+cd my-champions
+```
 
-- 「烈咬陆鲨能抵抗什么属性？」 / *"What does Garchomp resist?"*
-- 「M-B规则双打最常用的空间手有哪些？」 / *"Which Trick Room setters are most-used in M-B doubles?"*
-- 「魔幻假面喵能过速环境中的多龙巴鲁托吗？」 / *"Does Meowscarada outspeed Dragapult in the meta?"*
-- 「炽焰咆哮虎能吃下常见配置烈咬陆鲨的地震吗？」 / *"Does Incineroar survive a common Garchomp's Earthquake?"*
-- 「会大地之力、又是妖精属性的宝可梦有哪些？」 / *"Which Fairy-types learn Earth Power?"*（反查 / reverse search）
-- 「Mega 妙蛙花在 M-B 双打的常见努力值(SP)怎么配？」 / *"Mega Venusaur's common SP spread in M-B doubles?"*
+Any directory name is fine. Open it directly in an IDE-based agent, or change into it before starting Claude Code or Codex from the command line.
 
-也可以问需要三个技能配合才能答的问题，AI 会把它们串起来：
-*Or ask something that needs all three skills — the agent chains them:*
+### 2. Install the Four Skills
 
-- 「按当前环境双打使用率前 30，帮我大致过一遍烈咬陆鲨的对位和互相伤害关系」 / *"Against the current top-30 doubles by usage, walk Garchomp's matchups and mutual damage."*（环境 → 图鉴 → 计算器 / meta → dex → calc）
-- 「现在哪几只常见快攻手能在顺风下过速我的 Y 喷，其中哪些常见配置能一确我？」 / *"Which common fast attackers outspeed my Charizard-Y under Tailwind, and which of their common sets guarantee the OHKO on me?"*
+Use any [installation method](#installation) above. For a project-scoped installation, run from the new directory:
 
-> 等第四个**建队 skill** 上线后，你还能让它校验队伍合法性、诊断短板、给出对位与 SP 微调建议——而这些判断全都建立在上面三个 skill 的事实数据之上。
-> *Once the team-builder skill lands, you'll be able to validate legality, diagnose gaps, and get matchup / SP-tuning advice — all grounded on the three data skills above.*
+```bash
+npx skills add pmwl0128/pokemon_champion_agent
+```
 
-随包的 `AGENTS.md` / `CLAUDE.md` 是可选的入门提示模板，拷到你的项目根目录可强化"**查事实先调技能、别凭记忆作答**"，可根据具体需要自行编辑修改。
-*The optional `AGENTS.md` / `CLAUDE.md` are drop-in starters that reinforce "call the skills for facts, don't answer from memory" — edit them to fit your needs.*
+If link installation fails on Windows, use “Ask an Agent to Install It” or “Manual Copy” and place all four skills under the project's `.claude/skills/` or `.agents/skills/` tree.
 
-## 🔄 数据时效 / Data freshness
+### 3. Add Project Instructions (Optional, Recommended)
 
-环境数据和队伍信息实时变化，`pokemon-champions-meta` 内置了当前赛季/规则的缓存快照——**使用率是时效数据**，本仓库会跟随刷新，有需要时请更新skill。
-图鉴事实（属性、种族值、招式表）在一个规则周期内是稳定的。
-*The metagame and team data shift constantly; `pokemon-champions-meta` ships a cached snapshot for the current season/rule — usage is **time-sensitive**, this repo refreshes it, and you can update the skill when you need the latest. Battle-dex facts (types, stats, learnsets) are stable within a regulation.*
+The release root includes `CLAUDE.md` and `AGENTS.md`. Copy either or both into your own project root:
 
-## ⚖️ 许可与致谢 / License & attribution
+- use `CLAUDE.md` with Claude Code;
+- use `AGENTS.md` with Codex or another agent that recognizes it;
+- keep both when the same project is opened by multiple agents.
 
-`ncp-damage-calculator` 内置了 **NCP VGC Damage Calculator** 的公式；其上游许可保留在
-`.agents/skills/ncp-damage-calculator/references/upstream-LICENSE`，并在 `NOTICE` 中说明。本分发条款见 `LICENSE`（MIT）。
-*The damage skill bundles the NCP VGC Damage Calculator formulas (upstream license preserved in the skill + `NOTICE`); this distribution is MIT — see `LICENSE`.*
+These files remind the agent how the four skills are routed, how to read the current environment, why battle facts should not come from memory, and when the team workflow must be followed. The skills run without them, but they are especially useful with models that are less reliable at following long tool instructions.
 
-> 宝可梦及角色名称为 Nintendo / Creatures Inc. / GAME FREAK inc. 的商标。本项目是**非官方的同人工具**，与上述公司无关，也未获其背书。
-> *Pokémon and character names are trademarks of Nintendo / Creatures Inc. / GAME FREAK inc. This is an unofficial fan-made tool, not affiliated with or endorsed by them.*
+### 4. Add Your Own Data (Optional)
+
+Use any filenames and formats that are convenient:
+
+```text
+my-champions/
+  CLAUDE.md           # optional
+  AGENTS.md           # optional
+  roster.md           # Pokémon you own
+  current-team.txt    # Showdown export or prose set notes
+  matchup-notes.md    # battle logs, recurring opponents, revision ideas
+```
+
+No file follows a required schema. Tell the agent which path to read and how it should be used—for example, “use only Pokémon from `roster.md`” or “re-evaluate this team using `matchup-notes.md`.” The agent reads and normalizes the file before calling the relevant skill.
+
+### 5. Start Asking and Iterate
+
+Launch the agent in the project directory and begin with any of these:
+
+```text
+Can Garchomp learn Dragon Dance?
+Analyze current-team.txt for legality and metagame matchups.
+Build a Singles team using only roster.md.
+Revise the team around the failures in matchup-notes.md, but keep my locked anchor.
+```
+
+Keeping each team version and its battle notes gives the agent far better context than restarting from an empty conversation every time.
+
+## Model Routing and Workflow Reliability
+
+Automatic skill activation depends on the agent correctly interpreting `SKILL.md` and continuing to follow its instructions throughout the task. It is not a runtime guarantee that behaves identically across all models. Models with weaker tool use or long-horizon instruction following may answer from memory, call only one factual skill, or skip parts of the built-in team workflow.
+
+When that happens, be explicit:
+
+```text
+Read pokemon-champions-team/SKILL.md first, then handle this request with the complete team workflow.
+Do not answer this from memory: use dex for names and legality, meta for usage, and calculator for damage and Speed.
+Follow the team skill's built-in process; do not skip candidate comparison, legality validation, or final verification.
+```
+
+Using the bundled `CLAUDE.md` or `AGENTS.md` as project instructions also improves routing and workflow consistency. These files do not grant the model stronger battle judgment; they reinforce when and how the tools should be used. If a model repeatedly ignores tool results, moving to a model with stronger tool use and long-instruction adherence is usually more effective than adding more corrective prompting.
+
+## Usage Notes
+
+1. Start Claude Code, Codex, or another Agent Skills-compatible agent in any project directory.
+2. Ask naturally in Chinese, English, or Japanese; you do not need to memorize CLI commands.
+3. Paste teams, owned rosters, and constraints into the conversation, or keep them in any local file and provide the path. There is no required filename.
+4. For current-metagame claims, check the season/rule/as-of stamp at the top of this page. Update the whole skill package when you need a newer snapshot.
+5. If the agent does not invoke a skill as expected, ask it to read that skill's `SKILL.md`. The bundled `AGENTS.md` and `CLAUDE.md` can also serve as project-level instructions.
+
+## Metagame Workbooks
+
+Each release regenerates three workbooks from the complete Singles and Doubles snapshots and update reports:
+
+```text
+<season>_<date>_zh.xlsx
+<season>_<date>_ja.xlsx
+<season>_<date>_en.xlsx
+```
+
+Each workbook uses one primary language; the Chinese and Japanese versions include canonical English names for cross-reference. Main sheets include:
+
+| Sheet | Contents |
+|---|---|
+| Singles / Doubles | Rank, name, common moves, items, abilities, natures, partners, and SP distributions |
+| Update report | Factual ranking, entry/drop, and configuration changes from the previous snapshot, plus linked name lookup |
+
+The workbooks are facts-only reports and contain no AI interpretation of the metagame.
+
+## Freshness and Honest Limits
+
+- Meta and real-team data change with the environment. The release guarantees only the local snapshot identified at the top of this page; it does not claim to be live.
+- Dex, meta, team samples, and calculator data are queried from the package, so normal use requires no network. Update the skill package to obtain newer data.
+- Historical seasons are queryable, but an old regulation is never silently mixed into current evidence.
+- Dex facts and calculator formulas may also change with a regulation. Cross-regulation questions must state the intended season/rule.
+- The tools cannot cover every turn state, hidden-information branch, or player decision. Assumptions, confidence, and caveats are part of the result.
+
+## Data Sources and Acknowledgments
+
+The release contains transformed, validated query data and scrubbed facts-only projections. Raw development-side scrape caches are not distributed.
+
+### Metagame Rankings and Usage
+
+| Source | Use |
+|---|---|
+| [GameWith](https://gamewith.jp/) Pokémon Champions | Rankings and move, item, ability, nature, SP, and partner details |
+| [PokeChamp DB](https://pokechamdb.com/) | Independent metagame feed and cross-check |
+
+### Battle Dex, Names, and Calculation
+
+| Source | Use |
+|---|---|
+| [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | Core entity data and damage engine |
+| [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions learnsets, abilities, and move priority |
+| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | Chinese/Japanese/English display names, aliases, and form-specific facts |
+| [PokéAPI](https://pokeapi.co/) | Independent name validation; not a Champions battle-data authority |
+
+### Real-Team Samples
+
+| Source | Format | Use |
+|---|---|---|
+| [Yakkun / ポケモン徹底攻略](https://yakkun.com/) | Singles | Complete joint sets and SP |
+| [OP.GG](https://op.gg/) Pokémon Champions | Singles | Replica teams and SP |
+| [GameWith](https://gamewith.jp/) / [Game8](https://game8.jp/) | Singles | Top-build facts from completed seasons |
+| [Limitless TCG](https://play.limitlesstcg.com/) | Doubles | Online event teams, records, and placings |
+| [VGCPastes / Pokepaste](https://pokepast.es/) | Doubles | Community-curated complete teams and SP |
+
+Thank you to the projects, sites, tournament organizers, and community contributors who make these data and tools available. Rankings, records, and published teams are used as factual evidence only and do not imply a strength endorsement by this project.
+
+## License
+
+`ncp-damage-calculator` bundles formulas from the NCP VGC Damage Calculator. Its upstream license remains in the skill's `references/upstream-LICENSE` and is documented in `NOTICE`. See `LICENSE` for the MIT terms covering the rest of this release.
+
+> Pokémon and character names are trademarks of Nintendo / Creatures Inc. / GAME FREAK inc. This is an unofficial fan project and is neither affiliated with nor endorsed by those companies.

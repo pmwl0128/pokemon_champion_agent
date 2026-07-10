@@ -36,10 +36,13 @@ class Worker:
     """One resident sibling process speaking NDJSON: {"argv","stdin"} -> {"ok","stdout","error"}."""
 
     def __init__(self, spawn_argv: list[str]):
-        self.proc = subprocess.Popen(
-            spawn_argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            text=True, encoding="utf-8", bufsize=1,
-        )
+        try:
+            self.proc = subprocess.Popen(
+                spawn_argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                text=True, encoding="utf-8", bufsize=1,
+            )
+        except OSError as e:
+            raise WorkerError(f"worker failed to start: {e}") from e
         self._lock = threading.Lock()       # one in-flight request per worker (serialize callers)
 
     def request(self, argv: list[str], stdin_text: str = "") -> str:

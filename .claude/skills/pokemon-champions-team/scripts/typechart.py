@@ -45,7 +45,7 @@ TYPE_CHART: dict[str, dict[str, float]] = {
 IMMUNITY_ABILITIES: dict[str, str] = {
     # Verified against the Champions dex (2026-06-19). Abilities whose carriers are not in the
     # Champions roster (e.g. Storm Drain, Well-Baked Body) are intentionally omitted as dead code.
-    "Levitate": "Ground",
+    "Levitate": "Ground", "Eelevate": "Ground",   # Eelevate = Mega Eelektross's Levitate-clone
     "Water Absorb": "Water", "Dry Skin": "Water",
     "Volt Absorb": "Electric", "Lightning Rod": "Electric", "Motor Drive": "Electric",
     "Flash Fire": "Fire",

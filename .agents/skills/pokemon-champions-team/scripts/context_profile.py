@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Per-format environment priors for the tune operator (design.md §16.3/§16.4).
+"""Per-format environment priors for the tune operator.
 
 These are **human-experience seed defaults**, not derived facts: they only allocate the tune
 operator's probing effort and default ordering — they never suppress a computed cliff. Later they
@@ -66,7 +66,7 @@ def get_profile(fmt: str | None) -> ContextProfile:
 
 
 def speed_contexts(fmt: str | None) -> list[dict[str, Any]]:
-    """Default speed-line contexts to evaluate, derived from the profile (design.md §16.5).
+    """Default speed-line contexts to evaluate, derived from the profile.
 
     Always includes neutral speed; adds tailwind / trick-room only where the format makes them
     realistic (primary/secondary), so singles don't waste effort on tailwind lines.

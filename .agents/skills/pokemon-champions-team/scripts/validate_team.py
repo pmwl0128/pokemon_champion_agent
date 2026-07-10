@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from team_io import Team, STATS, BuildContext  # noqa: E402
 from dexlink import lookup_pokemon, lookup_items, DexUnavailable  # noqa: E402
 from rules import get_ruleset  # noqa: E402
+from mega import form_base_species  # noqa: E402
+import team_i18n as i18n  # noqa: E402
 
 
 @dataclass
@@ -45,27 +47,29 @@ class ValidationResult:
     unverified legality never comes back `valid=true, confidence=high`. `confidence` follows from
     what was actually checked, it is not a fixed constant.
     """
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    skipped: list[str] = field(default_factory=list)   # checks that could not run
+    # Messages are stored DEFERRED as (catalog_key, kwargs), NOT pre-rendered strings, so the same
+    # result renders localized for the md report and canonical-English for `--format json` (the
+    # JSON-never-localized contract). `err`/`warn`/`skip` take a catalog key + its fmt kwargs.
+    _errors: list[tuple[str, dict]] = field(default_factory=list)
+    _warnings: list[tuple[str, dict]] = field(default_factory=list)   # real warnings (≠ skipped)
+    _skipped: list[tuple[str, dict]] = field(default_factory=list)    # checks that could not run
 
-    def err(self, msg: str) -> None:
-        self.errors.append(msg)
+    def err(self, _key: str, **kw: Any) -> None:
+        self._errors.append((_key, kw))
 
-    def warn(self, msg: str) -> None:
-        self.warnings.append(msg)
+    def warn(self, _key: str, **kw: Any) -> None:
+        self._warnings.append((_key, kw))
 
-    def skip(self, msg: str) -> None:
-        self.skipped.append(msg)
-        self.warnings.append(f"Skipped: {msg}")
+    def skip(self, _key: str, **kw: Any) -> None:
+        self._skipped.append((_key, kw))
 
     @property
     def status(self) -> str:
         # A concrete violation is definitive even if other checks were skipped; absent any
         # violation, an incomplete check set means we cannot certify legality.
-        if self.errors:
+        if self._errors:
             return "invalid"
-        if self.skipped:
+        if self._skipped:
             return "unknown"
         return "valid"
 
@@ -80,6 +84,31 @@ class ValidationResult:
         # unknown: legality couldn't be fully established -> low.
         return "low" if self.status == "unknown" else "high"
 
+    # --- localizable views (Msg = localized value for md, .en() for JSON via i18n.jsonify) ---
+    def errors_msg(self) -> list[i18n.Msg]:
+        return [i18n.Msg(k, **kw) for k, kw in self._errors]
+
+    def skipped_msg(self) -> list[i18n.Msg]:
+        return [i18n.Msg(k, **kw) for k, kw in self._skipped]
+
+    def warnings_msg(self) -> list[i18n.Msg]:
+        # JSON/back-compat shape: warnings includes each skipped check as a "Skipped: …" entry.
+        return ([i18n.Msg(k, **kw) for k, kw in self._warnings]
+                + [i18n.Msg(k, _prefix="Skipped: ", **kw) for k, kw in self._skipped])
+
+    # --- canonical English views (what JSON / cross-module consumers read) ---
+    @property
+    def errors(self) -> list[str]:
+        return [m.en() for m in self.errors_msg()]
+
+    @property
+    def skipped(self) -> list[str]:
+        return [m.en() for m in self.skipped_msg()]
+
+    @property
+    def warnings(self) -> list[str]:
+        return [m.en() for m in self.warnings_msg()]
+
     def to_dict(self) -> dict[str, Any]:
         return {"status": self.status, "valid": self.valid, "confidence": self.confidence,
                 "errors": self.errors, "warnings": self.warnings, "skipped": self.skipped}
@@ -87,6 +116,25 @@ class ValidationResult:
 
 def _norm(s: str | None) -> str:
     return (s or "").strip().lower()
+
+
+def _incomplete_reason(m: Any) -> str | None:
+    """Return why a tagged member cannot be fully certified, or None when present fields suffice.
+
+    `completeness` is a source-trust tag, not an automatic legality veto. A fully specified
+    extracted/inferred set can still be checked for hard legality; only absent critical fields keep
+    the verdict in the unknown state. `observed_species_only` remains incomplete by definition.
+    """
+    if m.completeness == "observed_species_only":
+        return "species only"
+    if m.completeness not in ("extracted_set", "inferred_set"):
+        return None
+    missing = []
+    if not m.moves:
+        missing.append("moves")
+    if not m.ability:
+        missing.append("ability")
+    return ", ".join(missing) if missing else None
 
 
 def validate(team: Team, context: BuildContext | None = None) -> ValidationResult:
@@ -97,7 +145,7 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
     # team size (dex-independent, definitive)
     n = len(team.pokemon)
     if n < rs.team_min or n > rs.team_max:
-        r.err(f"Team has {n} Pokemon; Champions teams register {rs.team_min}-{rs.team_max}.")
+        r.err('val_team_size', n=n, min=rs.team_min, max=rs.team_max)
 
     # dex facts (one batch call). If the dex is down, roster/move/ability/Mega/base-species checks
     # cannot run -> record them as skipped (status becomes 'unknown', never a silent 'valid').
@@ -106,7 +154,7 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
     try:
         facts = lookup_pokemon(species_names)
     except DexUnavailable as e:
-        r.skip(f"roster/move/ability/Mega/Species-Clause legality — dex unavailable ({e})")
+        r.skip('val_skip_roster', e=e)
         facts = {}
         dex_ok = False
 
@@ -137,7 +185,7 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
                     ff = form_info.get(f)
                     if not ff:
                         continue
-                    fbase = _norm(ff.get("base_species") or ff.get("name") or f)
+                    fbase = _norm(form_base_species(f, ff) or f)
                     fabil = {_norm(a) for a in (ff.get("abilities") or [])}
                     if fabil:
                         entries.append((fbase, fabil))
@@ -156,18 +204,20 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
         # roster legality
         if fact is not None:
             if not fact.get("found"):
-                r.err(f"`{sp}` is not in the Champions dex (illegal / pre-evolution / wrong name).")
+                r.err('val_not_in_dex', sp=sp)
             else:
                 # move legality vs cached learnset
                 learn = {_norm(x) for x in fact.get("moves", [])}
                 if learn:
                     for mv in m.moves:
                         if _norm(mv) not in learn:
-                            r.err(f"`{sp}` cannot learn `{mv}` (not in Champions learnset).")
+                            r.err('val_move_illegal', sp=sp, mv=mv)
+                elif m.moves:
+                    r.skip('val_skip_learnset_empty', sp=sp)
                 # ability legality (base abilities + the Mega form's abilities for THIS member's stone,
                 # but only when the stone's Mega form shares THIS member's base species — a foreign
                 # stone grants nothing, see stone_form_abil above).
-                base = fact.get("base_species") or fact.get("name") or sp
+                base = form_base_species(sp, fact) or sp
                 abil = {_norm(x) for x in fact.get("abilities", [])}
                 mega_ab: set[str] = set()
                 for fbase, fabil in (stone_form_abil.get(_norm(m.item), []) if m.item else []):
@@ -175,11 +225,11 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
                         mega_ab |= fabil
                 allowed = abil | mega_ab
                 if m.ability and allowed and _norm(m.ability) not in allowed:
-                    r.err(f"`{sp}` cannot have ability `{m.ability}`.")
+                    r.err('val_ability_illegal', sp=sp, ability=m.ability)
                 # mega item match
                 req = fact.get("required_item")
                 if fact.get("is_mega") and req and _norm(m.item) != _norm(req):
-                    r.err(f"`{sp}` (Mega) requires item `{req}`, found `{m.item}`.")
+                    r.err('val_mega_item', sp=sp, req=req, item=m.item)
                 base_seen.setdefault(_norm(base), []).append(sp)
         elif dex_ok:
             # dex is up but this name wasn't resolvable (e.g. blank species); group by raw name.
@@ -194,7 +244,7 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
         # that, so e.g. 6 legal moves or 4x Protect passed as valid/high. audit 2026-06-28).
         if m.moves:
             if len(m.moves) > rs.moves_per_pokemon:
-                r.err(f"`{sp}` has {len(m.moves)} moves; max {rs.moves_per_pokemon}.")
+                r.err('val_move_count', sp=sp, n=len(m.moves), cap=rs.moves_per_pokemon)
             seen_moves: set[str] = set()
             dups: list[str] = []
             for mv in m.moves:
@@ -204,16 +254,25 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
                 else:
                     seen_moves.add(k)
             if dups:
-                r.err(f"`{sp}` carries duplicate move(s): {', '.join(dups)} (each move at most once).")
+                r.err('val_dup_moves', sp=sp, dups=', '.join(dups))
 
         # SP caps (dex-independent, definitive)
         if m.spread:
-            over = [s.upper() for s in STATS if int(m.spread.get(s, 0)) > rs.sp_per_stat_cap]
-            total = sum(int(m.spread.get(s, 0)) for s in STATS)
-            if over:
-                r.err(f"`{sp}` SP over {rs.sp_per_stat_cap} on: {', '.join(over)}.")
-            if total > rs.sp_total_cap:
-                r.err(f"`{sp}` SP total {total} exceeds cap {rs.sp_total_cap}.")
+            # Shape first: an unknown key ("speed"), a non-int value, or a negative would either
+            # silently DROP SP from the cap math below (32 Spe vanishing while the verdict says
+            # valid) or crash int() — the legality authority must reject the same shapes
+            # rules.legal_spread rejects (external audit 2026-07-02).
+            bad = sorted(k for k, v in m.spread.items()
+                         if k not in STATS or isinstance(v, bool) or not isinstance(v, int) or v < 0)
+            if bad:
+                r.err('val_sp_shape', sp=sp, bad=', '.join(bad), keys='/'.join(STATS))
+            else:
+                over = [s.upper() for s in STATS if int(m.spread.get(s, 0)) > rs.sp_per_stat_cap]
+                total = sum(int(m.spread.get(s, 0)) for s in STATS)
+                if over:
+                    r.err('val_sp_over', sp=sp, cap=rs.sp_per_stat_cap, over=', '.join(over))
+                if total > rs.sp_total_cap:
+                    r.err('val_sp_total', sp=sp, total=total, cap=rs.sp_total_cap)
 
     # item pool legality (dex is the authority for the Champions item pool)
     held = sorted({m.item for m in team.pokemon if m.item})
@@ -221,70 +280,74 @@ def validate(team: Team, context: BuildContext | None = None) -> ValidationResul
         try:
             for it, f in lookup_items(held).items():
                 if not f.get("found"):
-                    r.err(f"Item `{it}` is not in the Champions item pool.")
+                    r.err('val_item_pool', it=it)
         except DexUnavailable as e:
-            r.skip(f"item-pool legality — dex unavailable ({e})")
+            r.skip('val_skip_itempool', e=e)
 
-    # owned-only check (from build-context; owned list is AI-supplied / read_owned helper).
+    # owned-only check (from build-context; owned list is AI-supplied — resolved from the user's input).
     # owned_only with an EMPTY owned list cannot be certified — every member is unverifiable —
     # so it is skipped (status 'unknown'), never silently passed as valid (audit 2026-06-21).
     if context and context.owned_only:
         if not context.owned:
-            r.skip("owned-only requested but the owned list is empty — ownership not verifiable.")
+            r.skip('val_skip_owned_empty')
         else:
             try:
                 owned_base = {
-                    (f.get("base_species") or f.get("name"))
+                    form_base_species(f.get("name"), f)
                     for f in lookup_pokemon(context.owned).values() if f.get("found")
                 }
                 for m in team.pokemon:
                     ff = facts.get(m.species)
-                    base = (ff.get("base_species") or ff.get("name")) if ff and ff.get("found") else m.species
+                    base = form_base_species(m.species, ff) if ff and ff.get("found") else m.species
                     if base not in owned_base:
-                        r.err(f"`{m.species}` is not in your owned list (owned_only).")
+                        r.err('val_not_owned', species=m.species)
             except DexUnavailable as e:
-                r.skip(f"owned-only check — dex unavailable ({e})")
+                r.skip('val_skip_owned', e=e)
 
     # species clause (base resolution needs the dex; skipped above if it was down)
     if rs.species_clause and dex_ok:
         for base, owners in base_seen.items():
             if len(owners) > 1:
-                r.err(f"Species Clause: {', '.join(owners)} share a base species; keep at most one.")
+                r.err('val_species_clause', owners=', '.join(owners))
 
     # item clause (dex-independent)
     if rs.item_clause:
         for item, owners in item_seen.items():
             if len(owners) > 1:
-                r.err(f"Item Clause: item held by {', '.join(owners)}; each item at most once.")
+                r.err('val_item_clause', owners=', '.join(owners))
 
-    # missing vs illegal: on a low-trust/incomplete set, ABSENT fields are unknown, not legal.
-    # (Untagged sets are treated as user-authored = trusted, so they don't trip this.)
-    # This is recorded as a SKIP, not a mere warning: a team whose sets are incomplete cannot be
-    # certified `valid/high` on the strength of the few fields that happen to be present — its
-    # status must drop to 'unknown' (confidence low) so an incomplete team is never green-lit
-    # (audit 2026-06-21).
-    incomplete = [m.species or "(blank)" for m in team.pokemon
-                  if m.completeness in ("observed_species_only", "extracted_set", "inferred_set")]
+    # missing vs illegal: on a tagged low-trust/incomplete set, ABSENT critical fields are unknown,
+    # not legal. The tag itself is not a hard veto: a fully specified extracted/inferred set can be
+    # legality-checked, while a species-only or field-missing entry still drops to unknown.
+    # Untagged sets are treated as user-authored = trusted, so they don't trip this.
+    incomplete = []
+    for m in team.pokemon:
+        reason = _incomplete_reason(m)
+        if reason:
+            incomplete.append(f"{m.species or '(blank)'} ({reason})")
     if incomplete:
-        r.skip("legality only partially certifiable — incomplete/low-trust sets whose absent fields "
-               "(moves/item/ability) are unknown, not certified legal: " + ", ".join(incomplete) + ".")
+        r.skip('val_incomplete', incomplete=", ".join(incomplete))
 
     return r
 
 
 def format_report(r: ValidationResult) -> str:
     head = {"valid": "VALID", "invalid": "INVALID", "unknown": "UNKNOWN (incomplete)"}[r.status]
-    lines = [f"# Team validation: {head}  (confidence: {r.confidence})"]
-    if r.errors:
-        lines.append("\n## Errors")
-        lines += [f"- {e}" for e in r.errors]
-    if r.skipped:
-        lines.append("\n## Not checked (legality could not be established)")
-        lines += [f"- {s}" for s in r.skipped]
-    other_warnings = [w for w in r.warnings if not w.startswith("Skipped: ")]
+    lines = [f"# {i18n.t('val_title')}: {head}  ({i18n.t('confidence')}: {r.confidence})"]
+    # md uses the localized Msg values directly; real warnings come from `_warnings` (skipped checks
+    # are shown only under "not checked", never duplicated here — no more English "Skipped:" prefix filter).
+    errs = r.errors_msg()
+    if errs:
+        lines.append(f"\n## {i18n.t('val_errors')}")
+        lines += [f"- {e}" for e in errs]
+    skips = r.skipped_msg()
+    if skips:
+        lines.append(f"\n## {i18n.t('val_not_checked')}")
+        lines += [f"- {s}" for s in skips]
+    other_warnings = [i18n.Msg(k, **kw) for k, kw in r._warnings]
     if other_warnings:
-        lines.append("\n## Warnings")
+        lines.append(f"\n## {i18n.t('val_warnings')}")
         lines += [f"- {w}" for w in other_warnings]
     if r.status == "valid":
-        lines.append("\nNo legality issues found (all checks ran).")
+        lines.append(f"\n{i18n.t('val_no_issues')}")
     return "\n".join(lines)

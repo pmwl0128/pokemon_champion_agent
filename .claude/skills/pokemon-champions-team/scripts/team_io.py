@@ -166,16 +166,36 @@ class BuildContext:
     format: str | None = None
     locked: list[str] = field(default_factory=list)      # members the user will not change
     owned_only: bool = False                             # restrict to owned roster
-    owned: list[str] = field(default_factory=list)       # owned species (canonical or dex-resolvable)
+    owned: list[str] = field(default_factory=list)       # owned species the AI gathered from the user's
+    #                                                      input (any format) and resolved via the dex —
+    #                                                      canonical or dex-resolvable names; no fixed file
     wants: list[str] = field(default_factory=list)       # tactics: weather/trickroom/tailwind/...
-    keep_mega: str | None = None
-    avoid: list[str] = field(default_factory=list)
-    benchmarks: list[dict[str, Any]] = field(default_factory=list)   # SP-tuning targets (schema §7, design §16)
-    need: dict[str, Any] = field(default_factory=dict)               # L3 fill gap spec (design §6/§13 M3):
+    keep_mega: str | None = None                         # species/form whose Mega the user wants kept
+    avoid: list[str] = field(default_factory=list)       # raw input: species AND/OR items, mixed
+    prefer: list[str] = field(default_factory=list)      # soft species preference (anchor's soft half);
+    #                                                      AI-side intent — no operator filters on it yet
+    exclude_tactics: list[str] = field(default_factory=list)  # enumerated negative tactics (see
+    #                                                      contracts.EXCLUDE_TACTICS); AI-side intent
+    meta_conformance: str | None = None                  # posture knob proven|off_meta — a VIEW
+    style_lean: str | None = None                        # posture knob offense|balance|defense — a USER lens over profile facts, never a team label
+    variance_tolerance: str | None = None                # posture knob averse|tolerant — diagnose FLAGS luck lines when averse; a disclosure flag over dex accuracy, never a score
+    avoid_soft: list[str] = field(default_factory=list)   # SOFT exclude — prefer's mirror: honored when composing, no operator filters
+    #                                                      ordering for landscape cores, never a score
+    # Derived: `avoid` split by dex kind so an item entry ("Choice Scarf") stops masquerading as an
+    # unresolvable species. The CLI loader (_load_context) refines these via the dex; the dex-free
+    # constructor defaults avoid_species to the RAW avoid list so a consumer that filters on it
+    # (fill) never silently loses the constraint (an item entry then just never matches a species).
+    avoid_species: list[str] = field(default_factory=list)
+    avoid_items: list[str] = field(default_factory=list)
+    benchmarks: list[dict[str, Any]] = field(default_factory=list)   # SP-tuning targets (schema §7)
+    need: dict[str, Any] = field(default_factory=dict)               # L3 fill gap spec:
     #   {resist: type|[types], offense_type: type|[types], coverage_move_type: type|[types],
     #    role: name|[names], min_speed: int}
-    replace: dict[str, Any] = field(default_factory=dict)            # L3 replace-impact (design §6/§13 M3):
+    replace: dict[str, Any] = field(default_factory=dict)            # L3 replace-impact:
     #   {member: "<species to remove>", with: <full team-json member: species + set>}
+    direct_final: bool = False                  # checkpoint: user explicitly delegated final convergence
+    skip_checkpoint: bool = False               # checkpoint: explicit orchestration override
+    frame_required: bool = False                # build-flow slate must carry a frame receipt/binding
 
 
 def context_from_dict(d: dict[str, Any]) -> BuildContext:
@@ -187,20 +207,21 @@ def context_from_dict(d: dict[str, Any]) -> BuildContext:
         wants=list(d.get("wants") or []),
         keep_mega=d.get("keep_mega"),
         avoid=list(d.get("avoid") or []),
+        avoid_species=list(d.get("avoid") or []),   # dex-free default; _load_context refines the split
+        prefer=list(d.get("prefer") or []),
+        exclude_tactics=list(d.get("exclude_tactics") or []),
+        meta_conformance=d.get("meta_conformance"),
+        style_lean=d.get("style_lean"),
+        variance_tolerance=d.get("variance_tolerance"),
+        avoid_soft=[s for s in (d.get("avoid_soft") or []) if isinstance(s, str)],
         benchmarks=list(d.get("benchmarks") or []),
         need=dict(d.get("need") or {}),
         replace=dict(d.get("replace") or {}),
+        direct_final=d.get("direct_final") is True,
+        skip_checkpoint=d.get("skip_checkpoint") is True,
+        frame_required=d.get("frame_required") is True,
     )
 
 
 def load_context(path: str | Path) -> BuildContext:
     return context_from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
-
-
-def read_owned(path: str | Path) -> list[str]:
-    """Read pokemon_owned.md (one plain name per line, '#' comments ignored).
-
-    Convenience helper; the AI may instead resolve names and fill build-context.owned directly.
-    """
-    lines = Path(path).read_text(encoding="utf-8").splitlines()
-    return [ln.strip() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")]

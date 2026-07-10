@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Canonical evidence / confidence / assumptions vocabulary (design audit point 2; design §15).
+"""Canonical evidence / confidence / assumptions vocabulary.
 
 The skill's honesty rule (refined from "facts only"): output deterministic facts AND clearly-labelled
 heuristic derivations; never an opaque normative score. Several operators grew their own ad-hoc
@@ -39,13 +39,19 @@ CONFIDENCE_REASONS = {
 
 def min_confidence(a: str | None, b: str | None) -> str:
     """The more cautious (lower) of two confidence labels."""
-    ra, rb = _RANK.get(a or "medium", 1), _RANK.get(b or "medium", 1)
-    return a if ra <= rb else b  # type: ignore[return-value]
+    aa = a if a in _RANK else "medium"
+    bb = b if b in _RANK else "medium"
+    return aa if _RANK[aa] <= _RANK[bb] else bb
 
 
 def floor_confidence(level: str, cap: str) -> str:
     """Clamp `level` so it never exceeds `cap`."""
     return min_confidence(level, cap)
+
+
+def confidence_rank(level: str | None) -> int:
+    """Numeric confidence rank for ordering; unknown labels degrade to medium."""
+    return _RANK.get(level or "medium", 1)
 
 
 def make_evidence(*, facts: list | None = None, inputs: list | None = None,

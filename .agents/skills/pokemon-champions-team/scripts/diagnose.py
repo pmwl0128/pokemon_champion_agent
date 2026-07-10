@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Team diagnostics (M2). Accepts partial teams (1-6). Each result carries
-evidence + confidence + reason (design.md §6/§7). The model decides what to do;
+evidence + confidence + reason. The model decides what to do;
 this only reports objective facts. No team-strength score.
 
 Implemented: defense (type-matchup coverage + weakness concentration),
@@ -20,8 +20,10 @@ from typechart import (  # noqa: E402
 )
 from cliffs import (  # noqa: E402
     champ_speed, defensive_headroom, SPEED_ITEM_MULT, WEATHER_SPEED_ABILITIES,
+    TERRAIN_SPEED_ABILITIES,
 )
 import completeness  # noqa: E402
+import team_i18n as i18n  # noqa: E402
 
 WEAK_CONCENTRATION_MIN = 2          # >=2 members weak to a type is worth surfacing
 HIGH_SEVERITY_SHARE = 0.5           # >=50% of the team weak == high severity
@@ -163,22 +165,22 @@ def diagnose_defense(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, 
 
 
 def format_defense_md(d: dict[str, Any]) -> str:
-    lines = [f"# Defense ({d['team_size']} Pokemon{', partial' if d['partial'] else ''}) — confidence {d['confidence']}"]
+    lines = [f"# {i18n.t('def_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — {i18n.t('confidence')} {d['confidence']}"]
     conc = d["weakness_concentration"]
     if conc:
-        lines.append("\n## Weakness concentration (shared weaknesses are the real risk)")
+        lines.append(f"\n## {i18n.t('def_weak_conc')}")
         for c in conc:
-            lines.append(f"- **{c['type']}**: {c['weak_count']}/{d['team_size']} weak "
+            lines.append(f"- **{c['type']}**: {c['weak_count']}/{d['team_size']} {i18n.t('def_weak')} "
                          f"({c['severity']}) — {', '.join(c['weak_members'])}")
     else:
-        lines.append("\nNo attacking type hits 2+ members for super-effective. Defensively spread.")
-    lines.append("\n## Per member")
+        lines.append(f"\n{i18n.t('def_spread')}")
+    lines.append(f"\n## {i18n.t('per_member')}")
     for name, pm in d["per_member"].items():
         weak = ", ".join(pm["weak"]) or "—"
         immune = ", ".join(pm["immune"])
-        lines.append(f"- **{name}**: weak {weak}" + (f"; immune {immune}" if immune else ""))
+        lines.append(f"- **{name}**: {i18n.t('def_weak')} {weak}" + (f"; {i18n.t('def_immune')} {immune}" if immune else ""))
     if d["notes"]:
-        lines.append("\n## Notes")
+        lines.append(f"\n## {i18n.t('notes')}")
         lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)
 
@@ -194,7 +196,8 @@ def _norm_type(t: str | None) -> str | None:
 
 
 def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
-                     move_facts: dict[str, dict[str, Any]]) -> dict[str, Any]:
+                     move_facts: dict[str, dict[str, Any]],
+                     variance_averse: bool = False) -> dict[str, Any]:
     """Which defending types the team can hit super-effectively, classified by reliability.
 
     STAB is the decisive axis (NOT a 1.5x number): a STAB super-effective source is reliable
@@ -208,6 +211,11 @@ def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
     incomplete_members: list[dict[str, str]] = []
     unknown_moves: list[str] = []
     ate_used: list[str] = []
+    # "Luck lines" (variance_tolerance §19.5): the team's ACTUAL moves that can miss — accuracy < 100
+    # straight from the dex (None = no accuracy roll = always hits). A fact surfaced regardless of the
+    # knob; `variance_tolerance=averse` only FLAGS it. Damaging AND status (a 60% Hypnosis is a luck
+    # line too); only over authoritative movesets (an inferred set would fabricate a phantom line).
+    luck_lines: list[dict[str, Any]] = []
     for m in team.pokemon:
         f = facts.get(m.species)
         if not f or not f.get("found"):
@@ -231,6 +239,10 @@ def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
             if not mf or not mf.get("found"):
                 unknown_moves.append(mv)
                 continue
+            acc = mf.get("accuracy")
+            if acc is not None and acc < 100:
+                luck_lines.append({"species": m.species, "move": mv, "accuracy": acc,
+                                   "category": mf.get("category")})
             if (mf.get("category") or "").lower() not in ("physical", "special"):
                 continue  # status move
             mtype = _norm_type(mf.get("type"))
@@ -291,8 +303,16 @@ def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
     if skipped:
         notes.append("Skipped (no dex facts): " + ", ".join(skipped) + ".")
 
+    # The team's ATTACK-type inventory — the dual of by_defense_type's defending view: which typed
+    # damaging attacks the team actually carries, split by STAB. Kept HERE (not re-derived by
+    # consumers) so -ate re-typing and the authoritative-moveset gate above have exactly one
+    # implementation (self-audit 2026-07-02: profile's re-walk missed both).
+    stab_attack_types = sorted({a["type"] for _, _, atks in attackers for a in atks if a["stab"]})
+    other_attack_types = sorted({a["type"] for _, _, atks in attackers for a in atks
+                                 if not a["stab"]} - set(stab_attack_types))
+
     # Gaps are only trustworthy if every counted member has an authoritative moveset; otherwise a
-    # reported "hard gap" may just be a member whose moves we don't know (design audit point 8).
+    # reported "hard gap" may just be a member whose moves we don't know.
     gaps_confirmed = not incomplete_members
     confidence = "medium" if gaps_confirmed else "low"
     confidence_reason = "firepower-factors-not-modeled" if gaps_confirmed else "incomplete-movesets"
@@ -305,11 +325,19 @@ def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
         "STAB treated as a reliability signal, not a 1.5x number",
         "firepower factors NOT modelled (Adaptability/-ate/Technician, Choice/Life Orb/gems, base stats) — use ncp",
         "coverage judged from the team's actual moves, not the full learnset",
+        "a move counts as coverage the turn it FIRES: turn costs are not modelled (charge moves like "
+        "Solar Beam / Electro Shot spend a turn charging unless their weather is up; recharge moves "
+        "lose the next turn)",
     ]
     if not gaps_confirmed:
         assumptions.append("gaps unconfirmed: members with non-authoritative movesets are not counted")
     if ate_used:
         assumptions.append("-ate skin re-typed Normal moves (new type + STAB) for: " + ", ".join(ate_used))
+    if luck_lines:
+        notes.append(("FLAGGED (variance_tolerance=averse) — " if variance_averse else "")
+                     + "luck lines (accuracy < 100%, can miss): "
+                     + ", ".join(f"{l['species']} {l['move']} {l['accuracy']}%" for l in luck_lines)
+                     + ". A fact (dex accuracy), not a verdict — weigh it against what each move buys.")
 
     return {
         "kind": "offense",
@@ -319,6 +347,9 @@ def diagnose_offense(team: Team, facts: dict[str, dict[str, Any]],
         "thin": thin,
         "centralized": centralized,
         "by_defense_type": by_def,
+        "attack_types": {"stab": stab_attack_types, "other": other_attack_types},
+        "luck_lines": {"moves": luck_lines, "count": len(luck_lines),
+                       "flagged": bool(variance_averse and luck_lines)},
         "gaps_confirmed": gaps_confirmed,
         "incomplete_members": incomplete_members,
         "confidence": confidence,
@@ -342,30 +373,36 @@ def _src_str(s: dict[str, Any]) -> str:
 
 def format_offense_md(d: dict[str, Any]) -> str:
     # Every type below is a DEFENDING type the team is (or isn't) able to hit super-effectively.
-    lines = [f"# Offense ({d['team_size']} Pokemon{', partial' if d['partial'] else ''}) — "
-             f"confidence {d['confidence']} ({d['confidence_reason']})",
-             "_Types below are defending types your team hits super-effectively._"]
+    lines = [f"# {i18n.t('off_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
+             f"{i18n.t('confidence')} {d['confidence']} ({d['confidence_reason']})",
+             f"_{i18n.t('off_intro')}_"]
     if d.get("incomplete_members"):
         names = ", ".join(f"{m['species']} ({m['completeness']})" for m in d["incomplete_members"])
-        lines.append(f"\n> ⚠️ Gaps NOT confirmed — incomplete movesets not counted: {names}.")
+        lines.append(f"\n> ⚠️ {i18n.t('off_gaps_unconfirmed_warn')}: {names}.")
     if d["hard_gaps"]:
-        head = "Hard gaps" if d.get("gaps_confirmed", True) else "Possible gaps (unconfirmed)"
-        lines.append(f"\n## {head} — no super-effective answer vs these defending types")
+        head = i18n.t('off_hard_gaps') if d.get("gaps_confirmed", True) else i18n.t('off_possible_gaps')
+        lines.append(f"\n## {head} — {i18n.t('off_gaps_suffix')}")
         lines.append("- " + ", ".join(d["hard_gaps"]))
     if d["thin"]:
-        lines.append("\n## Thin — only non-STAB coverage (firepower likely soft)")
+        lines.append(f"\n## {i18n.t('off_thin')}")
         for D in d["thin"]:
             srcs = ", ".join(_src_str(s) for s in d["by_defense_type"][D]["sources"])
             lines.append(f"- vs **{D}**-types: {srcs}")
     if d["centralized"]:
-        lines.append("\n## Centralized — a single attacker covers this defending type")
+        lines.append(f"\n## {i18n.t('off_centralized')}")
         for c in d["centralized"]:
             tag = "STAB" if c["stab"] else "non-STAB"
             lines.append(f"- vs **{c['type']}**-types: only {c['mon']} ({tag})")
     covered = [D for D, v in d["by_defense_type"].items() if v["class"] == "covered"]
     if covered:
-        lines.append("\n## Covered — a STAB super-effective source exists vs: " + ", ".join(covered))
-    lines.append("\n## Notes")
+        lines.append(f"\n## {i18n.t('off_covered')} " + ", ".join(covered))
+    luck = d.get("luck_lines") or {}
+    if luck.get("moves"):
+        flag = " ⚑" if luck.get("flagged") else ""
+        lines.append(f"\n## {i18n.t('off_luck_lines')}{flag}")
+        for l in luck["moves"]:
+            lines.append(f"- {l['species']} — {l['move']} ({l['accuracy']}%)")
+    lines.append(f"\n## {i18n.t('notes')}")
     lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)
 
@@ -382,7 +419,9 @@ def format_offense_md(d: dict[str, Any]) -> str:
 
 # Speed modifiers are owned by cliffs.py (single source of truth, shared with matchup) so the two
 # operators can never disagree on a Pokemon's Speed again (audit retro 2026-06-22).
-_WEATHER_SPEED_ABILITIES = WEATHER_SPEED_ABILITIES
+# Weather AND terrain field-speed abilities (cliffs split them into two lanes; diagnose must recognize
+# both or it silently disagrees with matchup/tune on the same Pokemon — e.g. Surge Surfer).
+_WEATHER_SPEED_ABILITIES = {**WEATHER_SPEED_ABILITIES, **TERRAIN_SPEED_ABILITIES}
 _SPEED_ITEMS = SPEED_ITEM_MULT
 # Abilities that boost Speed under a non-weather trigger (annotated, not folded into the number).
 _OTHER_SPEED_ABILITIES = {
@@ -402,7 +441,7 @@ _SPEED_CONTROL_MOVES = {
 }
 # A priority ATTACKING move lets a member strike before a faster foe, so the neutral base-Speed
 # landscape can read "slower" yet the member still hits first. The priority STAGE is an authoritative
-# dex field (Serebii speed-priority brackets, signed int; 0 == normal) — we never hand-maintain it here.
+# dex field (signed priority stage int; 0 == normal) — we never hand-maintain it here.
 # We surface the FACT (the damaging move is in the set + its dex stage); we do NOT predict turn order —
 # that also depends on the foe's own priority, ability-granted priority (Prankster/Gale Wings), and field.
 # Excluded because their high stage doesn't mean reliable strike-first damage:
@@ -455,7 +494,8 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
                               "trigger": "always (locked into one move)", "speed": scarf_speed})
         if ability in _WEATHER_SPEED_ABILITIES:
             trig, mult = _WEATHER_SPEED_ABILITIES[ability]
-            modifiers.append({"source": ability, "kind": "ability", "mult": mult, "trigger": trig,
+            modifiers.append({"source": ability, "kind": "ability", "mult": mult,
+                              "trigger": "/".join(sorted(trig)),   # trig is a token SET (JSON needs a str)
                               "speed": int(speed * mult) if speed is not None else None})
         if ability in _OTHER_SPEED_ABILITIES:
             trig, mult = _OTHER_SPEED_ABILITIES[ability]
@@ -506,7 +546,7 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
         if ab in _WEATHER_SPEED_ABILITIES:
             trig, mult = _WEATHER_SPEED_ABILITIES[ab]
             control_abilities.append({"species": x["species"], "ability": ab,
-                                      "effect": f"x{mult:g} Speed in {trig}"})
+                                      "effect": f"x{mult:g} Speed in {'/'.join(sorted(trig))}"})
         elif ab in _OTHER_SPEED_ABILITIES:
             trig, mult = _OTHER_SPEED_ABILITIES[ab]
             control_abilities.append({"species": x["species"], "ability": ab,
@@ -523,7 +563,7 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
         "job — this is the team-internal landscape + the speed control you carry.",
     ]
     if any(x["priority_moves"] for x in members):
-        notes.append("Priority attacking moves (dex priority stage, Serebii brackets) let a member strike "
+        notes.append("Priority attacking moves (dex priority stage) let a member strike "
                      "BEFORE a faster foe — the base-Speed order above does not reflect this. Some are still "
                      "conditional (Sucker Punch only if the foe attacks; Grassy Glide only on Grassy Terrain), "
                      "and turn order also depends on the foe's own priority and ability-granted priority "
@@ -581,10 +621,10 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
 
 
 def format_speed_md(d: dict[str, Any]) -> str:
-    lines = [f"# Speed ({d['team_size']} Pokemon{', partial' if d['partial'] else ''}) — "
-             f"confidence {d['confidence']}"]
+    lines = [f"# {i18n.t('spd_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
+             f"{i18n.t('confidence')} {d['confidence']}"]
     if d["order"]:
-        lines.append("\n## Speed order (neutral, fastest first)")
+        lines.append(f"\n## {i18n.t('spd_order')}")
         for i, e in enumerate(d["order"], 1):
             member = next(m for m in d["members"] if m["species"] == e["species"])
             tag = " *(assumed neutral)*" if member["assumed_neutral"] else ""
@@ -595,16 +635,16 @@ def format_speed_md(d: dict[str, Any]) -> str:
             lines.append(f"{i}. **{e['species']}** {e['speed']}{tag}{mods}")
     unknown = [m["species"] for m in d["members"] if m["speed"] is None]
     if unknown:
-        lines.append("- (base Speed unknown, not ranked): " + ", ".join(unknown))
+        lines.append(f"- {i18n.t('spd_base_unknown')} " + ", ".join(unknown))
     prio = [m for m in d["members"] if m.get("priority_moves")]
     if prio:
-        lines.append("\n## Priority attacking moves (can strike before a faster foe)")
+        lines.append(f"\n## {i18n.t('spd_priority')}")
         for m in prio:
             moves = ", ".join(f"{pm['move']} (+{pm['priority']})" for pm in m["priority_moves"])
             lines.append(f"- **{m['species']}**: {moves}")
     sc = d["speed_control"]
     if sc["moves"] or sc["abilities"] or sc["items"]:
-        lines.append("\n## Speed control on the team")
+        lines.append(f"\n## {i18n.t('spd_control')}")
         for c in sc["moves"]:
             lines.append(f"- {c['species']}: **{c['move']}** — {c['effect']}")
         for c in sc["abilities"]:
@@ -612,9 +652,8 @@ def format_speed_md(d: dict[str, Any]) -> str:
         for c in sc["items"]:
             lines.append(f"- {c['species']}: **{c['item']}**")
     else:
-        lines.append("\n## Speed control on the team\n- none detected (no Tailwind/Trick Room/speed-drop "
-                     "moves, scarf, or weather-speed abilities)")
-    lines.append("\n## Notes")
+        lines.append(f"\n## {i18n.t('spd_control')}\n- {i18n.t('spd_control_none')}")
+    lines.append(f"\n## {i18n.t('notes')}")
     lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)
 
@@ -622,8 +661,8 @@ def format_speed_md(d: dict[str, Any]) -> str:
 # --------------------------------------------------------------------------- #
 # Roles: OBJECTIVE functional signals only.
 #
-# design.md is explicit that pinning a "role label" on a Pokemon is subjective, error-prone, and
-# slips into a strength judgment (§16 note). So this operator NEVER says "X is a wall" or "you are
+# Pinning a "role label" on a Pokemon is subjective, error-prone, and
+# slips into a strength judgment. So this operator NEVER says "X is a wall" or "you are
 # missing a pivot, add one". It reports verifiable signals — functional moves carried, base-stat
 # orientation, item/ability signals — and a neutral present/not-detected checklist of functional
 # categories. The model decides actual roles and what (if anything) to change. No score, no
@@ -698,7 +737,8 @@ _ABILITY_SIGNALS = {
     "Sand Stream": "sandstorm setter", "Snow Warning": "snow setter",
     "Electric Surge": "Electric Terrain setter", "Grassy Surge": "Grassy Terrain setter",
     "Misty Surge": "Misty Terrain setter", "Psychic Surge": "Psychic Terrain setter",
-    "Levitate": "Ground immunity (defensive)", "Magic Bounce": "reflects status/hazards",
+    "Levitate": "Ground immunity (defensive)", "Eelevate": "Ground immunity (defensive)",
+    "Magic Bounce": "reflects status/hazards",
     "Unaware": "ignores stat changes (wall)", "Multiscale": "halves damage at full HP (wall)",
 }
 # Items / abilities that ALSO fulfil a checklist category, so team coverage agrees with the
@@ -708,8 +748,8 @@ _ITEM_COVERAGE = {
     "Choice Scarf": {"speed_control"},
     "Leftovers": {"recovery"}, "Black Sludge": {"recovery"}, "Sitrus Berry": {"recovery"},
 }
-# Weather-speed abilities (from the shared cliffs map) all count as speed control for coverage.
-_ABILITY_COVERAGE = {ab: {"speed_control"} for ab in WEATHER_SPEED_ABILITIES}
+# Field-speed abilities (weather + terrain, from the shared cliffs maps) all count as speed control.
+_ABILITY_COVERAGE = {ab: {"speed_control"} for ab in _WEATHER_SPEED_ABILITIES}
 # The functional categories shown in the team checklist (present vs not-detected, neutral framing).
 _CHECKLIST = ["speed_control", "hazard_set", "hazard_control", "pivot", "recovery",
               "redirection", "screens", "status", "setup", "protect"]
@@ -865,13 +905,13 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
 
 
 def format_roles_md(d: dict[str, Any]) -> str:
-    lines = [f"# Roles ({d['team_size']} Pokemon{', partial' if d['partial'] else ''}) — "
-             f"confidence {d['confidence']} ({d['confidence_reason']})",
-             "_Objective signals only — the model decides actual roles; nothing here is a recommendation._"]
+    lines = [f"# {i18n.t('role_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
+             f"{i18n.t('confidence')} {d['confidence']} ({d['confidence_reason']})",
+             f"_{i18n.t('role_intro')}_"]
     if d.get("incomplete_members"):
         names = ", ".join(f"{m['species']} ({m['completeness']})" for m in d["incomplete_members"])
-        lines.append(f"\n> ⚠️ Move signals not counted (no authoritative moveset): {names}.")
-    lines.append("\n## Per member")
+        lines.append(f"\n> ⚠️ {i18n.t('role_moves_uncounted_warn')}: {names}.")
+    lines.append(f"\n## {i18n.t('per_member')}")
     for mm in d["members"]:
         so = mm["stat_orientation"]
         sig = []
@@ -882,10 +922,10 @@ def format_roles_md(d: dict[str, Any]) -> str:
         if mm["ability_signal"]:
             sig.append(f"ability: {mm['ability']} — {mm['ability_signal']}")
         if mm.get("ability_unknown"):
-            sig.append("ability: unspecified (2+ legal; ability signals omitted)")
-        sig_str = "; ".join(sig) if sig else "no functional signals detected"
+            sig.append(i18n.t('role_ability_unspecified'))
+        sig_str = "; ".join(sig) if sig else i18n.t('role_no_signals')
         lines.append(f"- **{mm['species']}** [{so['offense_lean']} lean, {so['bulk']} bulk]: {sig_str}")
-    lines.append("\n## Team functional coverage (moves + items + abilities; present / not detected — neutral facts)")
+    lines.append(f"\n## {i18n.t('role_coverage')}")
     # Iterate the coverage dict itself (insertion-ordered: singles checklist, then the doubles-only
     # partner_support / side_protect when present) so the doubles categories actually render here — not
     # the singles-only _CHECKLIST, which silently dropped them from the MD section (audit 2026-06-27).
@@ -895,11 +935,11 @@ def format_roles_md(d: dict[str, Any]) -> str:
             bearers = ", ".join(f"{b['species']} ({b['via']})" for b in c["bearers"])
             lines.append(f"- [x] {c['label']}: {bearers}")
         else:
-            lines.append(f"- [ ] {c['label']}: not detected")
+            lines.append(f"- [ ] {c['label']}: {i18n.t('role_not_detected')}")
     if d["compression"]:
-        lines.append("\n## Compression (members carrying multiple functional signals)")
+        lines.append(f"\n## {i18n.t('role_compression')}")
         for c in d["compression"]:
             lines.append(f"- **{c['species']}** ({c['signal_count']}): {', '.join(c['signals'])}")
-    lines.append("\n## Notes")
+    lines.append(f"\n## {i18n.t('notes')}")
     lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)

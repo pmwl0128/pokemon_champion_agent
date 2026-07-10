@@ -1,17 +1,22 @@
-# Pokemon Champions Dex Schema
+# Pokemon Champions Dex Data Model And Query Semantics
+
+This reference documents the bundled read-only database and the non-obvious semantics built on it.
+For the live CLI command and output contract, run `python scripts/champdex.py schema`; that executable
+self-description and the CLI behavior are authoritative if this prose ever differs.
 
 The database is a prebuilt, read-only SQLite file with a JSON export mirror. The skill performs no network access.
 
 ## Tables
 
-- `pokemon(canonical, display_name, types_json, stats_json, abilities_json, weight, is_mega, base_species, required_item, source)`
-- `moves(canonical, display_name, type, category, power, accuracy, pp, raw_json, source)`
-- `abilities(canonical, display_name, source)`
-- `items(canonical, display_name, source)`
+- `pokemon(canonical, display_name, display_name_ja, national_dex_no, types_json, stats_json, abilities_json, weight, is_mega, base_species, required_item, source)`
+- `moves(canonical, display_name, display_name_ja, type, category, power, accuracy, pp, priority, raw_json, source)`
+- `abilities(canonical, display_name, display_name_ja, source)`
+- `items(canonical, display_name, display_name_ja, source)`
+- `natures(canonical, display_name, display_name_ja, up_stat, down_stat, source)` — the 25 natures; `up_stat`/`down_stat` are smogon stat keys (null for the 5 neutral natures)
 - `aliases(alias, normalized, kind, canonical, source)`
 - `learnsets(pokemon, move, source)`
 
-The `source` columns are present for schema stability but are not populated in the shipped database. `canonical` values are English names; `display_name` prefers simplified Chinese when available and falls back to canonical English. The `aliases` table carries Chinese, English, and Japanese (kana) names for pokemon/moves/abilities/items, so queries in any of the three languages resolve to the same canonical. Japanese aliases are lookup-only — they never become a `display_name`.
+The `source` columns are present for schema stability but are not populated in the shipped database. `canonical` values are English names; `display_name` is the authoritative simplified-Chinese name and falls back to canonical English when absent. `display_name_ja` (on pokemon, moves, abilities, items and natures) is the authoritative Japanese name, and `pokemon.national_dex_no` the National Pokédex number. The `aliases` table carries Chinese (including full/half-width, traditional and pre-rename variants), English, and Japanese (kana) names for pokemon/moves/abilities/items, so queries in any of the three languages — and older spellings — resolve to the same canonical. Aliases are lookup-only — they never become a `display_name`.
 
 ## Name Resolution
 

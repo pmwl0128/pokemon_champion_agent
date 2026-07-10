@@ -16,8 +16,9 @@ DATA_DIR = SKILL_DIR / "data"
 CACHE_DIR = DATA_DIR
 CURRENT_PATH = DATA_DIR / "current.json"
 
-DEFAULT_SEASON = "M-3"
+DEFAULT_SEASON = "M-4"
 DEFAULT_RULE = "M-B"
+SEASON_RULE = {"M-1": "M-A", "M-2": "M-A", "M-3": "M-B", "M-4": "M-B"}
 
 PANEL_MAP = {
     "moves": "moves",
@@ -104,7 +105,7 @@ def default_current_state() -> dict[str, Any]:
         "seasons": {
             DEFAULT_SEASON: {
                 "rule": DEFAULT_RULE,
-                "label": "Pokemon Champions M-3 / Regulation M-B",
+                "label": "Pokemon Champions M-4 / Regulation M-B",
             }
         },
     }
@@ -114,6 +115,8 @@ def current_state() -> dict[str, Any]:
     state = load_json(CURRENT_PATH, default_current_state())
     state.setdefault("current", {"season": DEFAULT_SEASON, "rule": DEFAULT_RULE})
     state.setdefault("seasons", {})
+    for sid, srule in SEASON_RULE.items():
+        state["seasons"].setdefault(sid, {"rule": srule})
     cur = state["current"]
     season = cur.get("season") or DEFAULT_SEASON
     rule = cur.get("rule") or DEFAULT_RULE
@@ -127,7 +130,7 @@ def resolve_season_rule(season: str | None = None, rule: str | None = None) -> t
     current = state.get("current", {})
     seasons = state.get("seasons", {})
     if season:
-        resolved_rule = rule or seasons.get(season, {}).get("rule") or current.get("rule") or DEFAULT_RULE
+        resolved_rule = rule or seasons.get(season, {}).get("rule") or SEASON_RULE.get(season) or current.get("rule") or DEFAULT_RULE
         return season, resolved_rule
     if rule:
         current_season = current.get("season") or DEFAULT_SEASON

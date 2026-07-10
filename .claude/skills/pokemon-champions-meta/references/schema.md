@@ -1,4 +1,9 @@
-# Pokemon Champions Meta Schema
+# Pokemon Champions Meta Cache Schema
+
+This reference documents the bundled cache files and their stored rows. For the public CLI contract,
+run `python scripts/meta_query.py schema`; its executable self-description and actual output are
+authoritative. Stored rows may contain source-oriented names or casing that the CLI normalizes at the
+boundary.
 
 Runtime data root: `data/`. This is prebuilt, read-only data.
 
@@ -6,8 +11,6 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
 
 - `ranking_<season>_<format>.json`
 - `details_<season>_<format>.json`
-- `long_<season>_<format>.csv`
-- `spreads_<season>_<format>.csv`
 - `current.json`
 
 `format` is `single` or `double`.
@@ -22,7 +25,7 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
   "pokemon_en": "Garchomp",
   "pokemon_ja": "ガブリアス",
   "format": "single",
-  "season": "M-3",
+  "season": "M-4",
   "rule": "M-B"
 }
 ```
@@ -36,7 +39,7 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
   "slug": "garchomp",
   "pokedex_no": 445,
   "format": "double",
-  "season": "M-3",
+  "season": "M-4",
   "rule": "M-B",
   "detail_updated": "2026-06-18T07:53:51.288+00:00",
   "panels": {
@@ -58,9 +61,12 @@ Panel keys are normalized to English: `moves`, `items`, `abilities`, `natures`, 
 
 ```json
 {
-  "current": {"season": "M-3", "rule": "M-B"},
+  "current": {"season": "M-4", "rule": "M-B"},
   "seasons": {
-    "M-3": {"rule": "M-B", "label": "Pokemon Champions M-3 / Regulation M-B"}
+    "M-1": {"rule": "M-A", "label": "Pokemon Champions M-1 / Regulation M-A"},
+    "M-2": {"rule": "M-A", "label": "Pokemon Champions M-2 / Regulation M-A"},
+    "M-3": {"rule": "M-B", "label": "Pokemon Champions M-3 / Regulation M-B"},
+    "M-4": {"rule": "M-B", "label": "Pokemon Champions M-4 / Regulation M-B"}
   }
 }
 ```

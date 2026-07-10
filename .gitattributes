@@ -1,6 +1,6 @@
 # Line-ending & binary policy for the PUBLISHED skills repo.
-# The release is a clean snapshot of the four skills only (no dev tree, no external
-# reference clones), so a single global rule is safe and keeps the public repo
+# The release is a clean snapshot of the four skills only (no dev tree), so a
+# single global rule is safe and keeps the public repo
 # LF-clean — Windows and Unix users never see CRLF churn.
 
 * text=auto eol=lf

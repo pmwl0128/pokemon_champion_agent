@@ -1,16 +1,26 @@
 ---
 name: ncp-damage-calculator
-description: Run Pokémon Champions damage and speed-line calculations using the bundled NCP VGC Damage Calculator formulas. Use when building or reviewing Pokémon Champions teams, checking M-B/M-3 matchup damage ranges, comparing EV/SP spreads, validating KO ranges, testing weather/screens/items/abilities, querying speed tiers, checking whether one Pokémon outspeeds another, or answering whether one Pokémon survives or KOs another.
+description: Run Pokémon Champions damage and speed-line calculations using the bundled NCP VGC Damage Calculator formulas. Use when the request asks for a concrete damage, KO, survival, or speed-order calculation between specified Pokemon, moves, spreads, field states, items, abilities, or stat stages. For broad team-building or tuning, use the team skill first and let it delegate exact calc checks. Chinese examples include "X用Y打Z多少", "X能确一/二确Z吗", "Z吃得下X的Y吗", "X快过Z吗", "多少SP能快过/抗住". English examples include "calc X's move into Y", "does this OHKO/2HKO", "can Y survive this hit", "does X outspeed Y", "what spread reaches this benchmark". Japanese examples include "XのYでZにどれくらい入る？", "確定一発/二発？", "ZはYを耐える？", "XはZを抜ける？", "このラインに必要なSPは？".
 ---
 
 # NCP Damage Calculator
 
-Use this skill to compute Pokémon Champions damage ranges from the bundled NCP VGC Damage Calculator code. Prefer it over mental estimates whenever a team-building recommendation depends on a damage threshold.
-Also use it for speed-line checks, especially when Choice Scarf, Tailwind, weather abilities, terrain abilities, paralysis, or speed stages affect matchup decisions.
+Compute Pokemon Champions damage ranges and speed lines with the bundled NCP VGC Damage Calculator
+core. Use exact calculations whenever a claim depends on damage, KO, survival, or move order.
 
-## Quick Start
+## Workflow
 
-Run the CLI with JSON on stdin:
+1. Resolve Chinese or Japanese names through `$pokemon-champions-dex`; the NCP wrapper itself uses
+   English calculator keys.
+2. Run the wrapper's `resolve` command to align canonical English names to exact NCP keys.
+3. Supply the actual item, ability, nature, SP spread, stat stages, status, and relevant field state.
+4. Use the damage API for a concrete attack, or the speed API for one Pokemon, a table, or a direct
+   comparison.
+5. Report assumptions with the result. A successful calculation does not establish Champions legality.
+
+## Damage
+
+Run one calculation with JSON on stdin or use `batch` with a JSON array:
 
 ```powershell
 @'
@@ -20,7 +30,7 @@ Run the CLI with JSON on stdin:
     "ability": "Tough Claws",
     "item": "Metagrossite",
     "nature": "Jolly",
-    "sps": {"hp": 2, "at": 32, "df": 0, "sa": 0, "sd": 0, "sp": 32},
+    "sps": {"hp": 2, "atk": 32, "def": 0, "spa": 0, "spd": 0, "spe": 32},
     "moves": ["Earthquake"]
   },
   "defender": {
@@ -28,7 +38,7 @@ Run the CLI with JSON on stdin:
     "ability": "No Guard",
     "item": "Raichunite Y",
     "nature": "Timid",
-    "sps": {"hp": 2, "at": 0, "df": 0, "sa": 32, "sd": 0, "sp": 32},
+    "sps": {"hp": 2, "atk": 0, "def": 0, "spa": 32, "spd": 0, "spe": 32},
     "moves": ["Zap Cannon"]
   },
   "move": "Earthquake",
@@ -37,9 +47,12 @@ Run the CLI with JSON on stdin:
 '@ | node scripts\ncp-calc-api.js
 ```
 
-The output includes raw damage rolls, percent rolls, min/max percent, defender HP, and a calculator description.
+The result includes all rolls, percentage rolls, min/max values, defender HP, and the calculator
+description.
 
-Speed-line query:
+## Speed
+
+Query one speed line:
 
 ```powershell
 @'
@@ -47,43 +60,50 @@ Speed-line query:
 '@ | node scripts\ncp-speedline-api.js
 ```
 
-Speed table query:
+Query a filtered table or compare two complete speed states. `compare` also reports move order under
+Trick Room:
 
 ```powershell
 @'
 {"filters":{"type":"Flying","speedMin":170},"limit":20}
 '@ | node scripts\ncp-speedline-api.js table
+@'
+{"a":{"name":"Garchomp","nature":"Jolly","sps":{"spe":32}},
+ "b":{"name":"Archaludon","nature":"Modest","item":"Choice Scarf","sps":{"spe":32}}}
+'@ | node scripts\ncp-speedline-api.js compare
 ```
 
-## Workflow
+## Name Resolution
 
-1. Convert the matchup into calculator names in English, e.g. `Mega Staraptor`, `Archaludon`, `Mega Raichu Y`.
-2. Use Champions stat points in `sps`: `hp`, `at`, `df`, `sa`, `sd`, `sp`; typical max investment is `32`.
-3. Set nature names in English: `Jolly`, `Adamant`, `Timid`, `Modest`, `Bold`, `Careful`, etc.
-4. Set relevant ability and item explicitly, especially for new Mega abilities.
-5. Run one matchup with `node ...\ncp-calc-api.js`, or run a JSON array with `node ...\ncp-calc-api.js batch`.
-6. For speed thresholds, run `node ...\ncp-speedline-api.js`, `batch`, or `table`.
-7. Use results as a reference, not as a substitute for game-rule validation when mechanics are newly released.
+Do not scan vendored data files manually. Resolve calculator keys through the CLI; `--kind` defaults
+to `pokemon`:
 
-## Input Details
-
-Read `references/api.md` when you need field options, batch format, speed-line options, or example matchups.
-
-Core input shape:
-
-```json
-{
-  "attacker": {"name": "Mega Staraptor", "ability": "Contrary", "item": "Staraptorite", "nature": "Jolly", "sps": {"hp": 2, "at": 32, "df": 0, "sa": 0, "sd": 0, "sp": 32}, "moves": ["Close Combat"]},
-  "defender": {"name": "Archaludon", "ability": "Stamina", "item": "Sitrus Berry", "nature": "Modest", "sps": {"hp": 2, "at": 0, "df": 0, "sa": 32, "sd": 0, "sp": 32}, "moves": ["Draco Meteor"]},
-  "move": "Close Combat",
-  "field": {"weather": "", "terrain": ""}
-}
+```powershell
+'["garchomp","Rotom Wash","Mega Charizard X"]' | node scripts\ncp-calc-api.js resolve
+'["close combat","earthquake"]'                | node scripts\ncp-calc-api.js resolve --kind move
+'["choice scarf","lifeorb"]'                   | node scripts\ncp-calc-api.js resolve --kind item
+'["roughskin","intimidate"]'                   | node scripts\ncp-calc-api.js resolve --kind ability
 ```
+
+## Contract
+
+Treat the executable schemas as authoritative for commands, input fields, output fields, and errors:
+
+```powershell
+node scripts\ncp-calc-api.js schema
+node scripts\ncp-speedline-api.js schema
+```
+
+Read `references/api.md` when field options, batch shapes, speed modifiers, or a complete example are
+needed. It is explanatory documentation, not a second contract.
 
 ## Caveats
 
-- This wrapper vendors the NCP VGC Damage Calculator formula/data files (see `references/upstream-LICENSE` for attribution); it does not reimplement the damage formula.
-- It currently targets `gen = 10` / Pokémon Champions using Champions stat points.
-- Use exact English species, move, item, and ability names from the NCP data. If a name fails, inspect the bundled `scripts/script_res/pokedex.js`, `move_data.js`, `move_data_za.js`, `item_data.js`, or `ability_data.js`.
-- The wrapper is intentionally minimal: it computes direct damage ranges. It does not yet report full KO-chance text, residual damage sequencing, or UI-only advanced toggles unless represented in the JSON field options.
-- The speed-line wrapper follows the Champions convention of level 50, default 31 speed IV, default 32 speed SPs, and default positive speed nature for table-style speedline checks.
+- The wrapper vendors, rather than reimplements, the NCP core. Attribution and its upstream license
+  are in `references/upstream-LICENSE`.
+- It targets Pokemon Champions at level 50 with Champions stat points; canonical keys are
+  `hp/atk/def/spa/spd/spe`.
+- NCP contains entries beyond the Champions-legal roster. Use `$pokemon-champions-team` or the dex for
+  legality.
+- Damage results model the fields exposed by the API, not every possible residual or multi-turn effect.
+- Speed defaults are 31 Speed IV, 32 Speed SP, and a positive Speed nature unless explicitly replaced.

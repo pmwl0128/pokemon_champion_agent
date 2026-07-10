@@ -1,6 +1,8 @@
 # Pokemon Champions Meta API
 
-This skill is read-only: it queries the prebuilt data under `data/` and performs no network access. Refresh the data from the project-level `update/` pipeline; update defaults are full refreshes for both single and double formats.
+This skill is read-only: it queries the prebuilt data under `data/` and performs no network access.
+Run `python scripts/meta_query.py schema` for the authoritative command, flag, field, and error
+contract. This file provides usage guidance and export behavior rather than a second machine schema.
 
 ## Query
 
@@ -10,7 +12,7 @@ Ranking:
 
 ```bash
 python scripts/meta_query.py ranking --format double --limit 20
-python scripts/meta_query.py ranking --format double --season M-3 --rule M-B --limit 20
+python scripts/meta_query.py ranking --format double --season M-4 --rule M-B --limit 20
 ```
 
 Detail:
@@ -39,29 +41,37 @@ python scripts/meta_query.py compare --pokemon 雷丘
 Export Excel:
 
 ```bash
-# One combined workbook, written to the current directory (e.g. M-3_YYYYMMDD.xlsx):
-python scripts/meta_query.py export-excel --season M-3 --rule M-B
+# ALWAYS three single-language workbooks, written to the current directory:
+#   M-4_YYYYMMDD_zh.xlsx  M-4_YYYYMMDD_ja.xlsx  M-4_YYYYMMDD_en.xlsx
+python scripts/meta_query.py export-excel --season M-4 --rule M-B
 
-# Explicit path / output dir; --report-dir overrides where the report is read from.
-python scripts/meta_query.py export-excel --output-file teams/meta.xlsx
+# Pick the output dir; --report-dir overrides where the report is read from.
+python scripts/meta_query.py export-excel --output-dir teams/
 ```
 
-`export-excel` reads only local data and writes a single workbook with three
-worksheets:
+`export-excel` reads only local data and is a **distribution artifact**: it always writes
+**three standalone single-language workbooks** (zh / ja / en), independent of `--lang` / the
+env var / `DEFAULT_LANG`. Each workbook is self-contained, with three worksheets in its own
+language:
 
-- `单打` and `双打` — one row per Pokemon, columns `排名`, `中文名`, `英文名`,
-  `招式`, `道具`, `特性`, `性格`, `队友`, `努力值`. Panel entries are ranked
-  multiline cell text; SP spreads use `H/A/B/C/D/S`.
-- `更新报告` — a name-lookup block (type/pick a 中文名 to see its single and
-  double data side-by-side, so Ctrl-F never collides with the 队友 column) plus
-  the single and double **update reports** rendered side-by-side. The report is
-  read from `data/report_<season>_<format>.json` by default.
+- two data sheets (`单打`/`双打`, `シングル`/`ダブル`, or `Singles`/`Doubles`) — one row per
+  Pokemon. Names and every panel cell are rendered in that file's language via the dex (the
+  naming authority): the en file carries no Chinese, the zh/ja files add an English
+  cross-reference column. Columns (zh) are `排名`, `中文名`, `英文名`, `招式`, `道具`, `特性`,
+  `性格`, `队友`, `努力值`; ja/en use the translated headers (ja keeps `日本語名` + `英語名`, en
+  is `Name` only). Panel entries are ranked multiline cell text; SP spreads use `H/A/B/C/D/S`.
+- an update-report sheet (`更新报告` / `更新レポート` / `Update Report`) — a name-lookup block
+  (pick a name from the dropdown to see its single and double data side-by-side, in that
+  workbook's language) plus the single and double **update reports** side-by-side. The report
+  is read from `data/report_<season>_<format>.json` by default.
 
-The output file goes to the current working directory (the user's project), never
-into the skill. The default season/rule is read from `data/current.json`.
+The files go to the current working directory (the user's project), never into the skill. The
+default season/rule is read from `data/current.json`. Before writing, generated report workbooks in
+the output directory whose names match `<M-season>_<YYYYMMDD>_{zh,ja,en}.xlsx` are deleted, so stale
+triplets do not survive beside the current export.
 
 ## Output Formats
 
 `--output md` is default. Use `--output json` for structured downstream use.
-`export-excel` always writes `.xlsx` and prints a JSON summary with the output
-path, the sheet list, single/double row counts, and which reports were embedded.
+`export-excel` always writes the three `.xlsx` files and prints a JSON summary
+(`{files:[{lang, output_file, sheets, single_rows, double_rows}], reports_embedded}`).

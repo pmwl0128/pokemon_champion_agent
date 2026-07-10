@@ -1,14 +1,27 @@
 {
   "current": {
-    "season": "M-3",
+    "season": "M-4",
     "rule": "M-B"
   },
   "seasons": {
+    "M-1": {
+      "rule": "M-A",
+      "label": "Pokemon Champions M-1 / Regulation M-A"
+    },
+    "M-2": {
+      "rule": "M-A",
+      "label": "Pokemon Champions M-2 / Regulation M-A"
+    },
     "M-3": {
       "rule": "M-B",
       "label": "Pokemon Champions M-3 / Regulation M-B",
-      "updated_at": "2026-06-27T16:57:07+00:00",
+      "updated_at": "2026-07-06T06:58:34+00:00",
       "created_at": "2026-06-18T10:25:57+00:00"
+    },
+    "M-4": {
+      "rule": "M-B",
+      "label": "Pokemon Champions M-4 / Regulation M-B",
+      "updated_at": "2026-07-10T07:52:12+00:00"
     }
   }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Opponent standard-set matchup CACHE (M5 step 2; design §9/§10).
+"""Opponent standard-set matchup CACHE (M5 step 2).
 
 A precomputed grid of how the meta top-K's STANDARD sets interact — attacker i's hardest move vs
 defender j's standard set, plus the modal speed line, for every ordered pair. It is a fast REFERENCE
@@ -13,14 +13,14 @@ the fact-shaping (KO buckets, speed line) lives here so it ships and is unit-tes
 while the dev side only fetches + writes.
 
 Design discipline (mirrors matchup.py / repset.py):
-- FACTS ONLY. No matchup score, no ranking of species, no "best" anything (design §0).
-- ATTACKER ROWS ONLY FOR REAL-TEAM-BACKED SPECIES (design §10/§15 Q5): a meta-only species has no
-  REAL co-occurring 4-move set (meta gives independent marginals — stitching them is the §10 trap ①
-  forbidden move), so it cannot be an attacker. It CAN be a defender (being hit needs only its bulk:
+- FACTS ONLY. No matchup score, no ranking of species, no "best" anything.
+- ATTACKER ROWS ONLY FOR REAL-TEAM-BACKED SPECIES: a meta-only species has no
+  REAL co-occurring 4-move set (meta gives independent marginals — stitching them is the forbidden
+  marginal-stitch trap), so it cannot be an attacker. It CAN be a defender (being hit needs only its bulk:
   ability/item/nature/spread, which the meta modal supplies). This is the literal "build a cell only
   for species clearing MIN_SAMPLE" — the MIN_SAMPLE gate sits in repset and decides who is an attacker.
 - Single/double NEVER mixed (one cache file per format, built per season).
-- Time-validity follows the environment (design §9): the cache serves the CURRENT env only, carries a
+- Time-validity follows the environment: the cache serves the CURRENT env only, carries a
   light `built_for` for rebuild/debug, and is rebuilt by dev/update on a base refresh — readers assume
   it is current and do NOT version-check at query time.
 """
@@ -32,6 +32,9 @@ from math import ceil
 from pathlib import Path
 from typing import Any, Callable
 
+import checks
+import team_i18n as i18n
+
 # Disguise (Mimikyu) breaks on the first damaging hit: it blocks that hit ENTIRELY (0 dmg) and Mimikyu
 # loses 1/8 max HP, dropping to this fraction (Busted form, rest of battle). The effective KO is then
 # 1 blocked turn + the turns to remove this remaining HP at the move's per-turn band.
@@ -42,7 +45,6 @@ DEFAULT_CACHE = SCRIPTS.parent / "data" / "opponent_cache"   # ships WITH a snap
 
 CONFIDENCE = "low"                 # every cell is standard-vs-standard, never the user's real board
 CONFIDENCE_REASON = "vs-standard-set"
-_NEG_SPE_NATURES = {"Brave", "Relaxed", "Quiet", "Sassy"}   # -Speed modal: a fast variant is unrealistic
 
 
 # --- read side ---------------------------------------------------------------
@@ -99,7 +101,7 @@ def _disguise_adjust(off: dict[str, Any]) -> dict[str, Any]:
 
     NARROW labelling exception keyed on ability=Disguise (Mimikyu's whole value), computed from the
     nominal band at the cache layer — NOT a general recompute of one-time-survive effects into the calc,
-    which design §7 deliberately rejects (Sash/Sturdy/... would all follow → re-simulating the engine).
+    which the engine deliberately rejects (Sash/Sturdy/... would all follow → re-simulating the engine).
     Assumes Mimikyu starts disguised (true at the start of an engagement — the standard-set cell case).
     The raw `ko`/`ko_chance` ignore Disguise and OVERSTATE; read this vs Mimikyu instead."""
     def turns(p: Any) -> int | None:                 # 1 blocked turn + turns to remove the remaining HP
@@ -131,8 +133,8 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
                  carries the usage rank as a provenance fact.
     Cells carry the attacker's hardest move (by max roll) vs the defender + the modal speed line. Every
     cell is `low` confidence (reason=`vs-standard-set`); the flag sits once at the top level."""
-    from matchup import _dmg_fact as _default_dmg_fact   # reuse the KO-bucket / multi-hit logic
-    from cliffs import effective_speed as _default_speed, SP_CAP, SPEED_ITEM_MULT
+    from matchup import dmg_fact as _default_dmg_fact, best_offense as _best_offense
+    from cliffs import effective_speed as _default_speed, fast_variant_speed
     dmg_fact_fn = dmg_fact_fn or _default_dmg_fact
     speed_fn = speed_fn or _default_speed
     attackers = set(attackers)
@@ -150,15 +152,11 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
                         s.get("nature"), item=s.get("item"))
 
     def fast_spd(sp: str, modal: int | None) -> int | None:
-        """Worst-case FAST variant of a defender (§16.5, mirrors matchup): max-Spe SP + a speed nature,
-        x1.5 if the modal set runs Choice Scarf. So a slow MODAL line doesn't hide that the species CAN
-        run faster. Skipped (== modal) for a -Spe modal (Trick Room / slow build) or unknown base."""
+        """Worst-case FAST variant of a defender (§16.5) — the SAME formula matchup uses, shared via
+        cliffs so a slow MODAL line doesn't hide that the species CAN run faster and the two can't drift."""
         s = sets.get(sp) or {}
-        base = base_spe(sp)
-        if base is None or modal is None or s.get("nature") in _NEG_SPE_NATURES:
-            return modal
-        scarf = s.get("item") if (s.get("item") in SPEED_ITEM_MULT) else None
-        return max(modal, speed_fn(base, SP_CAP, "Jolly", item=scarf))
+        return fast_variant_speed(base_spe(sp), modal, s.get("nature"),
+                                  item=s.get("item"), speed_fn=speed_fn)
 
     speeds = {sp: spd(sp) for sp in species}
     fast_speeds = {sp: fast_spd(sp, speeds[sp]) for sp in species}
@@ -182,17 +180,13 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
     results = damage_fn(requests) if requests else []
 
     def best_offense(ai: str, dj: str) -> dict[str, Any] | None:
-        best_r = best_mv = None
-        for mv in (sets[ai].get("moves") or []):
+        def result_for(mv: str) -> dict[str, Any] | None:
             idx = index.get((ai, dj, mv))
             if idx is None or idx >= len(results):
-                continue
-            r = results[idx] or {}
-            if r.get("error") or r.get("maxPercent") is None:
-                continue
-            if best_r is None or r["maxPercent"] > best_r["maxPercent"]:
-                best_r, best_mv = r, mv
-        return dmg_fact_fn(best_mv, best_r) if best_r else None
+                return None
+            return results[idx]
+
+        return _best_offense(sets[ai].get("moves") or [], result_for, dmg_fact_fn)
 
     matrix: dict[str, dict[str, Any]] = {}
     for ai in species:
@@ -208,7 +202,7 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
                 faster = "attacker" if a_spe > d_spe else "defender" if a_spe < d_spe else "tie"
             off = best_offense(ai, dj)
             # Disguise backdoor: a Mimikyu defender eats the first hit, so annotate the effective KO
-            # (design §7 boundary: label it, don't recompute the whole engine — see _disguise_adjust).
+            # (boundary: label it, don't recompute the whole engine — see _disguise_adjust).
             if off and (sets.get(dj) or {}).get("ability") == "Disguise":
                 off["disguise_adjusted"] = _disguise_adjust(off)
             d_fast = fast_speeds.get(dj)
@@ -245,22 +239,101 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
         "confidence_reason": CONFIDENCE_REASON,
         "notes": [
             f"{fmt}: standard-set vs standard-set matchup grid over the meta top-{len(species)} "
-            "(usage ranking). Objective facts only — no matchup score, no ranking, no best pick "
-            "(design §0). This is a REFERENCE grid, not your team: match your real team LIVE.",
+            "(usage ranking). Objective facts only — no matchup score, no ranking, no best pick. "
+            "This is a REFERENCE grid, not your team: match your real team LIVE.",
             "ATTACKER rows exist ONLY for real-team-backed species (a real co-occurring 4-move set, "
             "sample >= MIN_SAMPLE). A meta-only species has no real joint move set (meta marginals "
-            "can't be stitched into one — design §10 trap ①), so it appears as a DEFENDER only.",
+            "can't be stitched into one), so it appears as a DEFENDER only.",
             "offense = the attacker's hardest move (by max roll) vs the defender's standard set: full "
             "roll band + ko_possible (best roll) / ko_guaranteed (worst roll). ONLY OHKO is exact; any "
             "2+ turn KO is a static approximation (see ko_caveat). speed = modal speed line "
             "(Choice Scarf applied), faster = attacker/defender/tie at MODAL; defender_fast = the "
-            "defender's worst-case fast variant (max Spe + speed nature, x1.5 if Choice Scarf, §16.5) "
+            "defender's worst-case fast variant (max Spe + speed nature, x1.5 if Choice Scarf) "
             "and fast_flips marks where the attacker beats the modal but loses to that fast build.",
             f"EVERY cell is {CONFIDENCE} confidence (reason={CONFIDENCE_REASON}): these are STANDARD "
             "sets, not the opponents' actual builds nor yours. The defender's spread/ability/item are "
             "the resolved standard set (real-team co-occurring for backed species, else meta modal).",
-            "Time-validity follows the environment (design §9): rebuilt by dev/update on a base "
+            "Time-validity follows the environment: rebuilt by dev/update on a base "
             "refresh; readers assume it is current and do not version-check.",
+        ],
+    }
+
+
+def _synth_cell(cache: dict[str, Any], ai: str, dj: str, rank: int | None) -> dict[str, Any] | None:
+    """Map an oppmatrix (ai -> dj) pair into the matchup-cell shape `checks.build_check` consumes.
+
+    The matrix stores ONE direction per cell (ai's hardest move vs dj). A check needs BOTH: ai's KO on
+    dj (the forward cell's offense) AND dj's hit on ai (the incoming). The incoming is exactly the
+    REVERSE cell's offense — dj's hardest move vs ai — which exists only because dj is itself an attacker
+    (real-team-backed). So a derived check is buildable ONLY for attacker x attacker pairs; a meta-only
+    defender has no offense row and cannot be graded as an incoming (disclosed in the notes).
+
+    The incoming surface is that single hardest reverse move, NOT a broad usage threat surface, so
+    headline == strict here; the whole grid stays `low`/vs-standard-set (standard sets, not real teams)."""
+    fwd = cell(cache, ai, dj) or {}
+    rev = cell(cache, dj, ai) or {}
+    offense = fwd.get("offense")
+    incoming = rev.get("offense")
+    if offense is None and incoming is None:
+        return None                                  # neither side lands a damaging move on record
+    sp = fwd.get("speed") or {}
+    # remap the matrix's attacker/defender speed keys to the member/opponent keys build_check reads.
+    faster = {"attacker": "member", "defender": "opponent", "tie": "tie"}.get(sp.get("faster"))
+    speed = {"member": sp.get("attacker"), "opponent": sp.get("defender"),
+             "opponent_fast": sp.get("defender_fast"), "faster": faster, "opponent_scarf": None}
+    synth = {
+        "opponent": dj, "usage_rank": rank,
+        "speed": speed,
+        "defense_type": {"max_effectiveness_vs_member": None},   # oppcache has no type layer -> bulk basis
+        "offense": offense,
+        "defense_damage": ({"moves": [incoming], "worst": incoming} if incoming else None),
+        "opponent_has_priority": None,               # UNTRACKED in the cache — None (unknown), not a
+                                                     # fabricated False (which would falsely license a
+                                                     # priority_first upgrade once the cache tracks it).
+    }
+    checks.assert_cell_contract(synth)               # loud-fail if build_check's cell contract grows a key
+    return synth
+
+
+def derive_checks(cache: dict[str, Any], attacker: str | None = None,
+                  defender: str | None = None) -> dict[str, Any]:
+    """A DERIVED check-grade view over the standard-vs-standard matrix (design §17 — a REFERENCE grid,
+    NOT your team). For each ordered attacker x attacker pair it runs `checks.build_check` over a
+    synthesised cell and rolls the grades up with `checks.coverage_summary`. `attacker` restricts to one
+    species' row; `defender` restricts that row to one opponent. Every grade inherits the cache's
+    `low`/vs-standard-set confidence — match a REAL team LIVE via `matchup` for YOUR board."""
+    fmt = (cache.get("built_for") or {}).get("format") or "single"
+    matrix = cache.get("matrix") or {}
+    sets = cache.get("sets") or {}
+    ranks = {r.get("species"): r.get("rank") for r in (cache.get("species") or [])}
+    attackers = [a for a in matrix if (attacker is None or a == attacker)]
+    grid: list[dict[str, Any]] = []
+    for ai in attackers:
+        cells: list[dict[str, Any]] = []
+        for dj in matrix:                            # defenders = the attacker set (both directions exist)
+            if dj == ai or (defender is not None and dj != defender):
+                continue
+            synth = _synth_cell(cache, ai, dj, ranks.get(dj))
+            if synth is None:
+                continue
+            synth["check"] = checks.build_check(synth, ai, sets.get(dj), fmt, member_set=sets.get(ai))
+            cells.append(synth)
+        grid.append({"member": ai, "cells": cells})
+    return {
+        "kind": "opponent-cache-checks", "format": fmt,
+        "top_k": len(matrix), "confidence": cache.get("confidence") or CONFIDENCE,
+        "confidence_reason": cache.get("confidence_reason") or CONFIDENCE_REASON,
+        "members": grid,
+        "check_coverage": checks.coverage_summary(grid),
+        "notes": [
+            f"{fmt}: DERIVED check grades (C2 safe switch-in / C1 same-field revenge only / C0 none) over "
+            f"the standard-vs-standard matrix. ATTACKER x ATTACKER only — a meta-only defender has no "
+            "offense row, so it can't be graded as an incoming and is absent from this view.",
+            "The incoming surface is the defender's SINGLE hardest move (the reverse cell), not a broad "
+            "usage threat surface, so headline == strict; there is no repset-archetype or scarf lane here.",
+            f"Every grade is {CONFIDENCE} confidence (reason={CONFIDENCE_REASON}): standard sets, NOT your "
+            "team nor the opponents' real builds. Match a real team LIVE via `matchup` for a graded read "
+            "of YOUR board. Ordinal LABELS only — never summed into a score, never a species ranking.",
         ],
     }
 
@@ -299,10 +372,10 @@ def _ko(off: dict[str, Any] | None) -> str:
 def format_oppcache_md(cache: dict[str, Any], attacker: str | None = None,
                        defender: str | None = None) -> str:
     bf = cache.get("built_for", {})
-    head = (f"# Opponent standard-set matrix ({bf.get('format')}) — top-{bf.get('top_k')}, "
-            f"{cache.get('confidence')} confidence ({cache.get('confidence_reason')}); facts, not a score")
-    lines = [head, f"_built_for {bf.get('season')}/{bf.get('rule')} @ {bf.get('built_at')} — "
-             "standard-vs-standard reference; match your real team live._\n"]
+    head = i18n.t("opp_matrix_head", fmt=bf.get("format"), top_k=bf.get("top_k"),
+                  conf=cache.get("confidence"), reason=cache.get("confidence_reason"))
+    lines = [head, i18n.t("opp_built_for", season=bf.get("season"), rule=bf.get("rule"),
+                          built_at=bf.get("built_at")) + "\n"]
     matrix = cache.get("matrix") or {}
     sets = cache.get("sets") or {}
 
@@ -310,23 +383,22 @@ def format_oppcache_md(cache: dict[str, Any], attacker: str | None = None,
         row = matrix.get(ai)
         if row is None:
             s = sets.get(ai) or {}
-            why = ("not real-team-backed (meta-only — no real joint move set, defender only)"
-                   if s else "not in the cached top-K")
-            return [f"## {ai}\n- no attacker row: {why}."]
+            why = (i18n.t("opp_why_meta_only") if s else i18n.t("opp_why_not_topk"))
+            return [i18n.t("opp_no_attacker_row", ai=ai, why=why)]
         s = sets.get(ai) or {}
-        out = [f"## {ai} — {s.get('item')} / {s.get('ability')} / {s.get('nature')} "
-               f"(set {s.get('confidence')}, {s.get('source')})",
-               f"  - moves: {', '.join(s.get('moves') or []) or '—'}"]
+        out = [i18n.t("opp_attacker_head", ai=ai, item=s.get("item"), ability=s.get("ability"),
+                      nature=s.get("nature"), conf=s.get("confidence"), source=s.get("source")),
+               f"  - {i18n.t('opp_moves')}: {', '.join(s.get('moves') or []) or '—'}"]
         items = [(defender, row.get(defender))] if defender else sorted(row.items())
         for dj, c in items:
             if c is None:
-                out.append(f"- vs **{dj}**: not in matrix")
+                out.append(i18n.t("opp_not_in_matrix", dj=dj))
                 continue
             sp = c["speed"]
-            arrow = {"attacker": "outspeeds", "defender": "slower than",
-                     "tie": "speed-ties"}.get(sp.get("faster"), "speed ?")
-            out.append(f"- vs **{dj}**: {arrow} ({sp.get('attacker')} vs {sp.get('defender')}); "
-                       f"we→them: {_ko(c.get('offense'))}")
+            arrow = {"attacker": i18n.t("opp_arrow_outspeeds"), "defender": i18n.t("opp_arrow_slower"),
+                     "tie": i18n.t("opp_arrow_tie")}.get(sp.get("faster"), i18n.t("opp_arrow_unknown"))
+            out.append(i18n.t("opp_vs_line", dj=dj, arrow=arrow, a_spe=sp.get("attacker"),
+                              d_spe=sp.get("defender"), ko=_ko(c.get("offense"))))
         return out
 
     if attacker:
@@ -335,5 +407,5 @@ def format_oppcache_md(cache: dict[str, Any], attacker: str | None = None,
         for ai in matrix:
             lines += one_attacker(ai)
     if not matrix:
-        lines.append("\n(empty matrix — no real-team-backed attacker in the current library.)")
+        lines.append(i18n.t("opp_empty_matrix"))
     return "\n".join(lines)

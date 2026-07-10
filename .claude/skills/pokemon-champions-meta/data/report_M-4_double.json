@@ -1,0 +1,119 @@
+{
+  "season": "M-4",
+  "rule": "M-B",
+  "format": "double",
+  "generated_at": "2026-07-10T07:52:13+00:00",
+  "thresholds": {
+    "tiers": [
+      {
+        "name": "S",
+        "min_rank": 1,
+        "max_rank": 10
+      },
+      {
+        "name": "A",
+        "min_rank": 11,
+        "max_rank": 30
+      },
+      {
+        "name": "B",
+        "min_rank": 31,
+        "max_rank": 60
+      },
+      {
+        "name": "C",
+        "min_rank": 61,
+        "max_rank": 100
+      },
+      {
+        "name": "D",
+        "min_rank": 101,
+        "max_rank": null
+      }
+    ],
+    "rank_move_threshold": {
+      "S": 3,
+      "A": 5,
+      "B": 10,
+      "C": 20,
+      "D": 50
+    },
+    "config_pp_threshold": {
+      "S": 10,
+      "A": 15,
+      "B": 20,
+      "C": null,
+      "D": null
+    },
+    "rank_triggered_pp_threshold": 20,
+    "suppress_config_decline_beyond_rank": 100
+  },
+  "baseline": {
+    "kind": "snapshot",
+    "ranking_updated_at": "2026-07-09T09:07:43+00:00",
+    "details_updated_at": "2026-07-09T09:07:43+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-07-10T07:52:12+00:00",
+    "details_updated_at": "2026-07-10T07:52:12+00:00"
+  },
+  "rank_moves": [
+    {
+      "slug": "floette-eternal",
+      "name": "花叶蒂（永恒之花）",
+      "old": 12,
+      "new": 19,
+      "delta": -7,
+      "tier": "A"
+    },
+    {
+      "slug": "sableye",
+      "name": "勾魂眼",
+      "old": 35,
+      "new": 30,
+      "delta": 5,
+      "tier": "A"
+    },
+    {
+      "slug": "pyroar",
+      "name": "火炎狮",
+      "old": 36,
+      "new": 47,
+      "delta": -11,
+      "tier": "B"
+    },
+    {
+      "slug": "gyarados",
+      "name": "暴鲤龙",
+      "old": 59,
+      "new": 69,
+      "delta": -10,
+      "tier": "B"
+    },
+    {
+      "slug": "liepard",
+      "name": "酷豹",
+      "old": 100,
+      "new": 130,
+      "delta": -30,
+      "tier": "C"
+    }
+  ],
+  "new_entries": [],
+  "dropped": [],
+  "config_changes": [
+    {
+      "slug": "zoroark-hisui",
+      "name": "索罗亚克（洗翠的样子）",
+      "rank": 60,
+      "tier": "B",
+      "panel": "moves",
+      "item": "大声咆哮",
+      "old_pct": 20.2,
+      "new_pct": 0.0,
+      "delta": -20.2,
+      "kind": "消失",
+      "rank_triggered": false
+    }
+  ]
+}

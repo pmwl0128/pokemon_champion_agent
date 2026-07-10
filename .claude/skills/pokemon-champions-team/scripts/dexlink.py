@@ -42,13 +42,33 @@ def _run(args: list[str]) -> Any:
     return json.loads(proc.stdout)
 
 
+def resolve_names(names: list[str], kind: str = "pokemon", *, fuzzy: bool = True) -> dict[str, dict[str, Any]]:
+    """Bridge to the dex `resolve` name-normalizer (batch + fuzzy + Mega-compose + nicknames). Returns
+    query -> the dex resolve record verbatim ({query, ok, canonical, display_name, match_type, score,
+    +is_mega/base_species/required_item for pokemon, suggestions? on miss}). resolve is 1:1 ordered;
+    the mapping is keyed BY QUERY, so a duplicate query name collapses to one entry (every team-side
+    caller resolves a de-duplicated set — context_audit/libsearch build `sorted(set(...))` first — so
+    this never loses a record in practice; the dex CLI itself keeps the strict positional 1:1 list).
+    This is how the team side normalizes USER-typed condition values (species/move/item/ability/nature)
+    for `search` without re-implementing dex's resolution rules (DRY)."""
+    if not names:
+        return {}
+    args = ["resolve", *names, "--kind", kind]
+    if not fuzzy:
+        args.append("--strict")
+    rows = _run(args)
+    if isinstance(rows, dict):
+        rows = [rows]
+    return {name: row for name, row in zip(names, rows)}
+
+
 def lookup_pokemon(names: list[str], *, fuzzy: bool = False) -> dict[str, dict[str, Any]]:
     """Resolve each name to dex facts. Returns query-name -> fact dict.
 
     Fact dict keys: found, name (canonical), display_name, types, stats, abilities,
     moves (cached learnset), is_mega, base_species, required_item.
 
-    With `fuzzy=True` the dex applies its conservative typo fallback (design §10): a confident-unique
+    With `fuzzy=True` the dex applies its conservative typo fallback: a confident-unique
     hit carries a `resolution` block ({match_type,score,distance,from}); a miss may carry `suggestions`
     (did-you-mean) and, on an ambiguous tie, resolves to NO name (found False) — never a guess. Used at
     runtime for USER-typed species. The dex resolves fuzzily by default, so this bridge passes --strict
@@ -88,7 +108,7 @@ def lookup_pokemon(names: list[str], *, fuzzy: bool = False) -> dict[str, dict[s
 
 
 def canonicalize_species(team: Any, *, fuzzy: bool = True) -> list[dict[str, Any]]:
-    """Rewrite each member's species to dex canonical IN PLACE, fuzzy-tolerant (design §10), and return
+    """Rewrite each member's species to dex canonical IN PLACE, fuzzy-tolerant, and return
     the typo corrections as [{from,to,match_type,score,distance}].
 
     Auto-corrects a confident-unique typo (garchmp -> Garchomp) and flags it; an exact-alias
@@ -158,7 +178,9 @@ def lookup_abilities(names: list[str]) -> dict[str, dict[str, Any]]:
 
 
 def lookup_moves(names: list[str]) -> dict[str, dict[str, Any]]:
-    """Resolve moves to dex facts. Returns query-name -> {found, name, type, category, power, priority}.
+    """Resolve moves to dex facts. Returns query-name -> {found, name, type, category, power,
+    accuracy, priority}. accuracy is int|None straight from the dex (None = no accuracy roll:
+    must-hit moves and no-check status moves).
 
     Used by offense diagnosis to tell attacking moves (physical/special) from status, get each move's
     type, and judge STAB; `priority` (signed speed-priority stage, 0 == normal) feeds the speed
@@ -179,6 +201,7 @@ def lookup_moves(names: list[str]) -> dict[str, dict[str, Any]]:
             "type": row.get("type"),
             "category": row.get("category"),
             "power": row.get("power"),
+            "accuracy": row.get("accuracy"),   # int|None — the dex emits ONE numeric surface
             "priority": row.get("priority"),
         }
     return out

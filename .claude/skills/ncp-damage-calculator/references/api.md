@@ -1,5 +1,19 @@
 # NCP Damage Calculator API Reference
 
+This reference explains supported inputs and common examples. The executable contracts are
+authoritative: run `node scripts/ncp-calc-api.js schema` and
+`node scripts/ncp-speedline-api.js schema` before constructing unfamiliar payloads.
+
+## Contents
+
+- [Commands](#commands)
+- [Pokemon Object](#pokémon-object)
+- [Field Object](#field-object)
+- [Damage Example](#example-mega-staraptor-vs-archaludon)
+- [Damage Output](#output)
+- [Speed-Line API](#speed-line-api)
+- [Attribution](#attribution)
+
 ## Commands
 
 Damage calculation:
@@ -15,6 +29,14 @@ node scripts\ncp-calc-api.js batch --input batch.json
 ```
 
 `batch.json` is an array of the same objects accepted by one calculation.
+
+Name resolution (align a dex-canonical or typed name to the exact NCP pokedex key — case/space/hyphen-insensitive, with did-you-mean candidates on a miss; never hand-scan the data files):
+
+```powershell
+'["garchomp","Rotom Wash","Mega Charizard X"]' | node scripts\ncp-calc-api.js resolve
+```
+
+Returns a 1:1 list `[{query, ok, name, match: exact|normalized}]`, or `{ok:false, error, suggestions}` on a miss; feed the returned `name` back to `one`/`batch`. Both CLIs also emit their full contract via `node scripts\ncp-calc-api.js schema` (and `ncp-speedline-api.js schema`).
 
 Speed-line calculation:
 
@@ -46,11 +68,11 @@ Recommended:
 - `ability`: exact English ability name.
 - `item`: exact English item name.
 - `nature`: English nature name.
-- `sps`: Champions stat points object: `hp`, `at`, `df`, `sa`, `sd`, `sp`.
+- `sps`: Champions stat points object with the canonical smogon keys `hp`, `atk`, `def`, `spa`, `spd`, `spe` (`spe` = Speed, `spa` = Special Attack). The legacy short keys `at/df/sa/sd/sp` are still accepted but not recommended.
 
 Optional:
 
-- `boosts`: stat stage object: `at`, `df`, `sa`, `sd`, `sp`.
+- `boosts`: stat stage object: `atk`, `def`, `spa`, `spd`, `spe` (legacy `at/df/sa/sd/sp` also accepted).
 - `status`: `Healthy`, `Burned`, `Poisoned`, etc.
 - `curHP`: current HP as raw integer.
 - `tera`: boolean.
@@ -64,10 +86,13 @@ Supported common options:
 {
   "weather": "Rain",
   "terrain": "Electric",
-  "attackerSide": {"helpingHand": true, "tailwind": true},
-  "defenderSide": {"reflect": true, "lightScreen": true, "auroraVeil": true, "stealthRock": true, "spikes": 1}
+  "attackerSide": {"helping_hand": true, "tailwind": true},
+  "defenderSide": {"reflect": true, "light_screen": true, "aurora_veil": true, "stealth_rock": true, "spikes": 1}
 }
 ```
+
+Side-option keys are canonically snake_case. The wrapper accepts legacy camelCase spellings for
+compatibility, but new callers should emit the canonical form shown above.
 
 Weather examples: `Rain`, `Sun`, `Sand`, `Snow`, or empty string.
 
@@ -82,7 +107,7 @@ Terrain examples: `Electric`, `Grassy`, `Psychic`, `Misty`, or empty string.
     "ability": "Contrary",
     "item": "Staraptorite",
     "nature": "Jolly",
-    "sps": {"hp": 2, "at": 32, "df": 0, "sa": 0, "sd": 0, "sp": 32},
+    "sps": {"hp": 2, "atk": 32, "def": 0, "spa": 0, "spd": 0, "spe": 32},
     "moves": ["Close Combat"]
   },
   "defender": {
@@ -90,7 +115,7 @@ Terrain examples: `Electric`, `Grassy`, `Psychic`, `Misty`, or empty string.
     "ability": "Stamina",
     "item": "Sitrus Berry",
     "nature": "Modest",
-    "sps": {"hp": 2, "at": 0, "df": 0, "sa": 32, "sd": 0, "sp": 32},
+    "sps": {"hp": 2, "atk": 0, "def": 0, "spa": 32, "spd": 0, "spe": 32},
     "moves": ["Draco Meteor"]
   },
   "move": "Close Combat",
@@ -124,9 +149,9 @@ Single input:
 {
   "name": "Mega Staraptor",
   "nature": "Jolly",
-  "sps": {"sp": 32},
-  "ivs": {"sp": 31},
-  "boosts": {"sp": 0},
+  "sps": {"spe": 32},
+  "ivs": {"spe": 31},
+  "boosts": {"spe": 0},
   "ability": "Contrary",
   "item": "",
   "status": "Healthy",
@@ -134,7 +159,7 @@ Single input:
 }
 ```
 
-Defaults match common speedline usage: `nature = Timid`, `sps.sp = 32`, `ivs.sp = 31`, no item, no ability, no field modifier. `Timid` and `Jolly` produce the same speed modifier; choose the nature that matches the actual set. Pass `ability` explicitly when a speed ability should apply, or set `useDefaultAbility: true` only when you intentionally want the NCP default ability inserted.
+Defaults match common speedline usage: `nature = Timid`, `sps.spe = 32`, `ivs.spe = 31`, no item, no ability, no field modifier. `Timid` and `Jolly` produce the same speed modifier; choose the nature that matches the actual set. Pass `ability` explicitly when a speed ability should apply, or set `useDefaultAbility: true` only when you intentionally want the NCP default ability inserted.
 
 Single output:
 
@@ -161,7 +186,7 @@ Table input:
 
 ```json
 {
-  "defaults": {"nature": "Timid", "sps": {"sp": 32}},
+  "defaults": {"nature": "Timid", "sps": {"spe": 32}},
   "field": {"weather": "Sand"},
   "filters": {"type": "Ground", "speedMin": 200},
   "sort": "desc",

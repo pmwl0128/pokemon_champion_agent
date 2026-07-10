@@ -133,12 +133,70 @@ function speedTable(input, ctx = loadCalculator()) {
   };
 }
 
-// Machine-readable I/O contract (dev/contracts/conventions.md), emitted by `schema`.
+// --- Name resolution (cross-skill key alignment; shares the pokedex with the calc CLI) -------------
+// The pokedex is keyed by exact English NCP names, so a name differing only in case/spacing/hyphenation
+// silently fails. `resolve` aligns any name to the real pokedex key (or returns did-you-mean candidates)
+// so a caller never hand-scans script_res/pokedex.js.
+function normName(s) {
+  return String(s == null ? '' : s).normalize('NFKC').toLowerCase().replace(/[\s._'’\-]/g, '');
+}
+function nameIndex(ctx) {
+  if (ctx._nameIndex) return ctx._nameIndex;
+  const m = new Map();
+  for (const k of Object.keys(ctx.pokedex)) m.set(normName(k), k);
+  ctx._nameIndex = m;
+  return m;
+}
+function resolveNames(input, ctx) {
+  const names = Array.isArray(input) ? input : (input && (input.names || input.pokemon)) || [];
+  const idx = nameIndex(ctx);
+  return names.map((q) => {
+    const key = String(q);
+    if (Object.prototype.hasOwnProperty.call(ctx.pokedex, key)) return { query: key, ok: true, name: key, match: 'exact' };
+    const hit = idx.get(normName(key));
+    if (hit) return { query: key, ok: true, name: hit, match: 'normalized' };
+    const nk = normName(key);
+    const suggestions = nk ? Object.keys(ctx.pokedex).filter((k) => normName(k).includes(nk)).slice(0, 5) : [];
+    return { query: key, ok: false, name: null,
+      error: { code: 'unknown_pokemon', message: `unknown Pokemon: ${key}` }, suggestions };
+  });
+}
+
+// --- Speed comparison / outspeed verdict ----------------------------------------------------------
+// SKILL.md advertises "does X outspeed Y"; `compare` gives the verdict directly instead of making the
+// caller run two `one` queries and eyeball the numbers. Each side is a full speed input (nature/item/
+// ability/boosts/status/field), so Choice Scarf / Tailwind / paralysis all fold into finalSpeed. `faster`
+// is the raw-speed verdict; `moves_first` also honors Trick Room (slower acts first) when set.
+function compareSpeed(input, ctx) {
+  const tr = !!(input && (input.trick_room || (input.field && input.field.trickroom)));
+  if (Array.isArray(input)) {
+    const rows = input.map((p) => { const r = speedOne(p, ctx); return { name: r.name, finalSpeed: r.finalSpeed }; });
+    const order = [...rows].sort((x, y) => (tr ? x.finalSpeed - y.finalSpeed : y.finalSpeed - x.finalSpeed));
+    const top = order.length ? order[0].finalSpeed : null;
+    const movesFirst = order.filter((r) => r.finalSpeed === top).map((r) => r.name);
+    return { trick_room: tr, rows, order, moves_first: movesFirst };
+  }
+  const a = speedOne(input.a, ctx), b = speedOne(input.b, ctx);
+  const da = a.finalSpeed, db = b.finalSpeed, tie = da === db;
+  const aFirst = tr ? da < db : da > db;
+  return {
+    trick_room: tr,
+    a: { name: a.name, finalSpeed: da }, b: { name: b.name, finalSpeed: db },
+    faster: tie ? 'tie' : (da > db ? 'a' : 'b'),
+    margin: Math.abs(da - db),
+    moves_first: tie ? 'tie' : (aFirst ? 'a' : 'b'),
+  };
+}
+
+// Machine-readable I/O contract (dev/conventions.md), emitted by `schema`.
 const SCHEMA = {
   skill: 'ncp-damage-calculator', cli: 'ncp-speedline-api.js',
-  contract: 'dev/contracts/conventions.md',
+  contract: 'dev/conventions.md',
   commands: { one: 'single speed query on stdin', batch: 'array -> array (faults isolated)',
-    table: '{defaults,filters,sort,limit,pokemon} -> {rows:[...]}', schema: 'this contract' },
+    table: '{defaults,filters,sort,limit,pokemon} -> {rows:[...]}',
+    compare: '{a:<speed input>, b:<speed input>, trick_room?:bool} (or an array of inputs) -> the outspeed verdict: {a,b,faster:a|b|tie, margin, moves_first} (array -> {rows, order, moves_first[]}). Each side is a full speed input, so Scarf/Tailwind/paralysis fold into finalSpeed; moves_first honors Trick Room',
+    resolve: 'names on stdin ([names] or {names:[...]}) -> [{query,ok,name,match|error,suggestions}]; aligns any name to the exact NCP pokedex key',
+    schema: 'this contract' },
   input: { name: 'str', nature: 'str',
     sps: '{spe:int}  (smogon; legacy sp still accepted)', ivs: '{spe:int}',
     boosts: '{spe:-6..6}', ability: 'str', item: 'str', status: 'str',
@@ -146,13 +204,18 @@ const SCHEMA = {
   output: { name: 'str', types: ['Type'], baseSpeed: 'int', nature: 'str', speedSPs: 'int',
     speedIV: 'int', speedBoost: 'int', rawSpeed: 'int', boostedSpeed: 'int', finalSpeed: 'int' },
   // query echoes the offending Pokémon name (conventions.md uniform error shape — calc carries it too).
-  error_shape: { ok: false, query: 'str (echo of input.name)', index: 'int (batch only)', error: { code: 'str', message: 'str' } },
+  error_shape: { ok: false, query: 'str (echo of input.name)', index: 'int (batch only)', error: { code: 'unknown_pokemon|bad_input', message: 'str' } },
 };
 
 function main() {
   const args = process.argv.slice(2);
   const command = args[0] || 'one';
   if (command === 'schema') { process.stdout.write(JSON.stringify(SCHEMA, null, 2) + '\n'); return; }
+  if (!['one', 'batch', 'table', 'compare', 'resolve'].includes(command)) {
+    process.stdout.write(JSON.stringify({ ok: false, query: command,
+      error: { code: 'bad_input', message: `unknown command '${command}'; expected one|batch|table|compare|resolve|schema` } }, null, 2) + '\n');
+    process.exit(1);
+  }
   const fileArg = args.find(a => a === '--input' || a === '-i');
   const file = fileArg ? args[args.indexOf(fileArg) + 1] : null;
   const payload = file ? fs.readFileSync(file, 'utf8') : fs.readFileSync(0, 'utf8');
@@ -161,7 +224,11 @@ function main() {
     input = payload.trim() ? JSON.parse(payload) : {};
     const ctx = loadCalculator();
     let output;
-    if (command === 'batch') {
+    if (command === 'resolve') {
+      output = resolveNames(input, ctx);
+    } else if (command === 'compare') {
+      output = compareSpeed(input, ctx);
+    } else if (command === 'batch') {
       output = input.map((i, idx) => {           // fault-isolate per item (uniform error shape)
         try { return speedOne(i, ctx); }
         // carry `query` (the item's name) like calc does — conventions.md requires it (audit 2026-06-28)

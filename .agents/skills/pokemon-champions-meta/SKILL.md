@@ -1,13 +1,23 @@
 ---
 name: pokemon-champions-meta
-description: Offline-first Pokemon Champions metagame cache and query API for current and historical seasons/rules, including M-3/M-B single and double formats. Use when you need cached usage rankings, top Pokemon details, moves/items/abilities/natures/partners/SP spreads, single-vs-double comparisons, or environment summaries while building or reviewing Pokemon Champions teams.
+description: Offline-first Pokemon Champions metagame cache and query API for current and historical seasons/rules, including M-B single and double formats. Use when the request is about metagame popularity, distribution, common sets, partners, format comparison, update reports, or current/historical environment summaries; do not trigger merely because an item/ability/nature is mentioned without usage or environment context. Chinese examples include "现在环境哪些常见", "X使用率/排名多少", "X常见配置", "X常带什么道具/常用什么性格/招式", "X常见队友", "单双打环境差异", "这期有什么变化". English examples include "usage/ranking for X", "what does X commonly run", "common items/moves/natures for X", "popular partners", "single vs double meta comparison", "latest meta changes". Japanese examples include "環境で多いポケモン", "Xの採用率/順位", "Xのよくある型", "よく採用される技/持ち物/性格", "相方", "シングルとダブルの違い", "今期の変化".
 ---
 
 # Pokemon Champions Meta
 
-Use this skill for Pokemon Champions metagame usage data. It is separate from `$pokemon-champions-dex`: this skill answers "what is popular and how is it used?", while the dex skill answers "what exists and what can it learn?".
+Query the bundled Pokemon Champions metagame snapshot for rankings, common configurations, partners,
+format comparisons, and factual changes between snapshots. This skill answers "what is popular and
+how is it used?"; canonical battle facts remain the responsibility of `$pokemon-champions-dex`.
 
-## Quick Start
+## Workflow
+
+1. Use the current season/rule unless the user explicitly requests a historical context.
+2. Use `ranking` for the environment overview and `detail` for one Pokemon's panels.
+3. Use `search` for reverse lookup across panel entries and `compare` for single-vs-double facts.
+4. Use `report` for snapshot changes. Use `export-excel` only when the user requests workbooks.
+5. Keep usage marginals factual: common moves/items/partners are not a guaranteed joint set.
+
+## Commands
 
 Query cached rankings:
 
@@ -15,7 +25,7 @@ Query cached rankings:
 # Uses the current season/rule by default.
 python scripts/meta_query.py ranking --format single --limit 20
 python scripts/meta_query.py ranking --format double --limit 20
-python scripts/meta_query.py ranking --format double --season M-3 --rule M-B --limit 20
+python scripts/meta_query.py ranking --format double --season M-4 --rule M-B --limit 20
 ```
 
 Query Pokemon details:
@@ -25,49 +35,54 @@ python scripts/meta_query.py detail --format single --pokemon 雷丘
 python scripts/meta_query.py detail --format double --pokemon garchomp
 ```
 
-Names resolve through the dex (Chinese / English / Japanese), and a misspelled query is typo-tolerant. A correction is **never silent**: when a typo is auto-resolved, `detail`/`compare` add `query`, `resolved_name`, and a `name_resolution` block (`{match_type, score, distance, from}`) so you can tell an exact lookup from a correction. An exact query carries none of these.
-
-Reverse-search panel entries:
+Reverse-search panel entries or compare formats:
 
 ```bash
 python scripts/meta_query.py search --format double --panel moves --name 地震
 python scripts/meta_query.py search --format both --panel moves --type ground --category physical --min-usage 20
-```
-
-Compare formats:
-
-```bash
+python scripts/meta_query.py search --format single --panel moves --where '{"and":[{"type":"Fire"},{"or":[{"category":"Special"},{"usage":">=20"}]}]}'
 python scripts/meta_query.py compare --pokemon 雷丘
+python scripts/meta_query.py report --format both
 ```
 
-Export JSON for programmatic use:
+Names resolve through the sibling dex in Chinese, English, or Japanese. Fuzzy corrections are always
+disclosed: structured detail/compare results carry resolution metadata, while `search` reports a
+correction on stderr without contaminating JSON stdout.
+
+Use JSON for downstream processing:
 
 ```bash
 python scripts/meta_query.py detail --format double --pokemon garchomp --output json
 ```
 
-Export a human-readable Excel workbook (one file, written to the current working directory — never into the skill):
+## Contract And Output
+
+Treat the executable schema as the authority for commands, flags, fields, boolean query grammar, and
+errors:
 
 ```bash
-# Combined workbook with three tabs: 单打 + 双打 data, plus a 更新报告 tab that has a
-# name lookup (single/double side-by-side) and the embedded update report.
-python scripts/meta_query.py export-excel --season M-3 --rule M-B
+python scripts/meta_query.py schema
 ```
 
-> Dependency: `export-excel` is the **only** command that needs a third-party library —
-> `openpyxl` (see `requirements.txt`). Install it with `pip install -r requirements.txt` (or
-> `pip install openpyxl`). Every other command is stdlib-only and works without it.
+Canonical JSON is language-independent. Human-readable output language precedence is `--lang`, then
+`POKEMON_CHAMPIONS_LANG`, then `en`. Read `references/api.md` for detailed command usage and
+`references/schema.md` only when the bundled cache layout matters.
 
-## Data Layout
+## Excel Export
 
-The skill ships prebuilt, read-only data and performs no network access.
+`export-excel` always writes three standalone single-language workbooks (`zh`, `ja`, `en`) to the
+chosen output directory, independently of `--lang`:
 
-- Structured runtime data lives under `data/`.
-- English slugs are the primary IDs.
-- Each season/format is a separate file: `ranking_<season>_<format>.json`, `details_<season>_<format>.json`, `long_<season>_<format>.csv`, `spreads_<season>_<format>.csv`.
-- `report_<season>_<format>.json` — the factual **update report** (significant ranking / move / item / nature / EV-spread changes vs the previous snapshot), regenerated on each refresh. AI can read it directly; the Excel export embeds it automatically.
-- The default season/rule and season-to-rule mapping live in `data/current.json`; no-argument queries resolve through this file.
-- Refreshes are maintained by the project-level `update/` pipeline, not by this skill's query scripts. The updater defaults to a full single/double refresh; `--ranking-limit 0` and `--detail-limit 0` mean all rows exposed by the source.
-- Use `$pokemon-champions-dex` or `champdex.py` only for base dex facts or name aliases not present in the metagame cache.
+```bash
+python scripts/meta_query.py export-excel --season M-4 --rule M-B
+```
 
-Read `references/api.md` for command/API details and `references/schema.md` for cache formats.
+This is the only command requiring `openpyxl`; install `requirements.txt` when export is needed. All
+query commands use the Python standard library.
+
+## Boundaries
+
+- The shipped snapshot is read-only and queried offline; its date and season/rule stamp define freshness.
+- Do not infer legality or learnsets from usage data.
+- Do not combine move, item, ability, nature, partner, or spread marginals into an asserted joint set.
+- A change report records factual differences between snapshots, not an interpretation of the metagame.

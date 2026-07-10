@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""L3 replace-impact diff — `replace_impact` (design §6 L3 / §13 M3).
+"""L3 replace-impact diff — `replace_impact`.
 
 Swap ONE member for a candidate and report the OBJECTIVE before/after diff across the four diagnose
-aspects — never a "better/worse" verdict or a score (design §0). It REUSES diagnose: run each aspect
+aspects — never a "better/worse" verdict or a score. It REUSES diagnose: run each aspect
 on the before- and after-team and diff the structured outputs.
 
 The candidate is a CONCRETE member (species + ability/item/nature/spread/moves), not a bare species:
@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import team_io  # noqa: E402
+import team_i18n as i18n  # noqa: E402
 from diagnose import (  # noqa: E402
     diagnose_defense, diagnose_offense, diagnose_speed, diagnose_roles,
 )
@@ -159,8 +160,8 @@ def replace_impact(team_dict: dict[str, Any], out_species: str, candidate: dict[
     confidence = "low" if reasons else "medium"
 
     notes = [
-        "Objective before/after diff of ONE swap — facts only, NOT a 'better/worse' verdict or score "
-        "(design §0). The AI weighs the trade.",
+        "Objective before/after diff of ONE swap — facts only, NOT a 'better/worse' verdict or score. "
+        "The AI weighs the trade.",
         "offense/roles reflect the candidate's GIVEN set (its moves); a different set changes them.",
     ]
     if legality and legality.get("status") == "invalid":
@@ -188,52 +189,52 @@ def replace_impact(team_dict: dict[str, Any], out_species: str, candidate: dict[
 
 def format_replace_impact_md(d: dict[str, Any]) -> str:
     if d.get("result") == "skipped":
-        return f"# Replace-impact — skipped\n- {d.get('note')}"
-    lines = [f"# Replace-impact: {d['out']} → {d['in']} — objective before/after diff (not a verdict)"]
+        return f"# {i18n.t('rep_skip_header')}\n- {d.get('note')}"
+    lines = [f"# {i18n.t('rep_main_header', out=d['out'], in_=d['in'])}"]
     leg = d.get("legality")
     if leg and leg.get("status") == "invalid":
-        lines.append(f"\n> ⚠️ **after-team is ILLEGAL** — {'; '.join(leg.get('errors') or [])}")
+        lines.append(f"\n> {i18n.t('rep_illegal')}{'; '.join(leg.get('errors') or [])}")
     elif leg and leg.get("status") == "unknown":
-        lines.append("\n> the after-team's legality is **unknown** (dex couldn't fully verify)")
+        lines.append(f"\n> {i18n.t('rep_legality_unknown')}")
     dd = d["defense"]
     if dd["shared_weakness_worsened"]:
-        lines.append("\n## Defense — shared weaknesses WORSENED")
+        lines.append(f"\n## {i18n.t('rep_defense_worsened')}")
         for w in dd["shared_weakness_worsened"]:
-            lines.append(f"- {w['type']}: {w['from']}→{w['to']} weak ({', '.join(w['weak_members'])})")
+            lines.append(f"- {w['type']}: {w['from']}→{w['to']} {i18n.t('rep_weak')} ({', '.join(w['weak_members'])})")
     if dd["shared_weakness_eased"]:
-        lines.append("\n## Defense — shared weaknesses EASED")
+        lines.append(f"\n## {i18n.t('rep_defense_eased')}")
         for w in dd["shared_weakness_eased"]:
-            lines.append(f"- {w['type']}: {w['from']}→{w['to']} weak")
+            lines.append(f"- {w['type']}: {w['from']}→{w['to']} {i18n.t('rep_weak')}")
     od = d["offense"]
     if od.get("skipped"):
-        lines.append(f"\n## Offense / Roles\n- skipped: {od['skipped']}")
+        lines.append(f"\n## {i18n.t('rep_offense_roles')}\n- {i18n.t('rep_skipped')} {od['skipped']}")
     elif any(od.get(k) for k in ("hard_gaps_added", "hard_gaps_removed", "thin_added", "thin_removed",
                                  "centralized_added", "centralized_removed")):
-        lines.append("\n## Offense coverage")
-        for label, key in [("gaps removed (now covered)", "hard_gaps_removed"),
-                           ("gaps added (newly uncovered)", "hard_gaps_added"),
-                           ("now only-non-STAB (thin)", "thin_added"),
-                           ("no longer thin", "thin_removed"),
-                           ("now single-bearer (centralized)", "centralized_added"),
-                           ("no longer centralized", "centralized_removed")]:
+        lines.append(f"\n## {i18n.t('rep_offense_coverage')}")
+        for label_key, key in [("rep_gaps_removed", "hard_gaps_removed"),
+                           ("rep_gaps_added", "hard_gaps_added"),
+                           ("rep_now_thin", "thin_added"),
+                           ("rep_no_longer_thin", "thin_removed"),
+                           ("rep_now_centralized", "centralized_added"),
+                           ("rep_no_longer_centralized", "centralized_removed")]:
             if od.get(key):
-                lines.append(f"- {label}: {', '.join(od[key])}")
+                lines.append(f"- {i18n.t(label_key)}: {', '.join(od[key])}")
     sp = d["speed"]
-    lines.append(f"\n## Speed\n- {sp['out']['species']} ({sp['out']['speed']}) → "
+    lines.append(f"\n## {i18n.t('rep_speed')}\n- {sp['out']['species']} ({sp['out']['speed']}) → "
                  f"{sp['in']['species']} ({sp['in']['speed']})"
                  + (f", Δ{sp['delta']:+d}" if sp.get("delta") is not None else "")
-                 + (f"; #{sp['in_team_speed_rank']}/{sp['team_size']} on the team" if sp.get("in_team_speed_rank") else ""))
+                 + (f"; #{sp['in_team_speed_rank']}/{sp['team_size']} {i18n.t('rep_on_the_team')}" if sp.get("in_team_speed_rank") else ""))
     rd = d["roles"]
     if not rd.get("skipped") and (rd["roles_lost"] or rd["roles_gained"]
                                   or rd["redundancy_reduced"] or rd.get("redundancy_increased")):
-        lines.append("\n## Roles")
+        lines.append(f"\n## {i18n.t('rep_roles')}")
         if rd["roles_lost"]:
-            lines.append(f"- LOST (no carrier left): {', '.join(rd['roles_lost'])}")
+            lines.append(f"- {i18n.t('rep_role_lost')}: {', '.join(rd['roles_lost'])}")
         if rd["roles_gained"]:
-            lines.append(f"- gained: {', '.join(rd['roles_gained'])}")
+            lines.append(f"- {i18n.t('rep_role_gained')}: {', '.join(rd['roles_gained'])}")
         for t in rd["redundancy_reduced"]:
-            lines.append(f"- thinner: {t['role']} bearers {t['bearers']}")
+            lines.append(f"- {i18n.t('rep_role_thinner')}: {t['role']} {i18n.t('rep_bearers')} {t['bearers']}")
         for t in rd.get("redundancy_increased", []):
-            lines.append(f"- more redundant: {t['role']} bearers {t['bearers']}")
+            lines.append(f"- {i18n.t('rep_role_more_redundant')}: {t['role']} {i18n.t('rep_bearers')} {t['bearers']}")
     lines += ["", *(f"> {n}" for n in d.get("notes", []))]
     return "\n".join(lines)

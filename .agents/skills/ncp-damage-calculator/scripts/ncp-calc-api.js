@@ -134,7 +134,7 @@ function champHP(base, points) {
   return Math.floor((base * 2 + 31) * 50 / 100) + 60 + (points || 0);
 }
 
-// --- Canonical I/O contract boundary (dev/contracts/conventions.md) --------------------------------
+// --- Canonical I/O contract boundary (dev/conventions.md) --------------------------------
 // Callers send smogon stat keys (hp/atk/def/spa/spd/spe), `power`, and lower-case format; the vendored
 // NCP engine is native short-key / Title-case, so normalize HERE (still accepting the legacy short keys
 // for safety). Damage output carries no stat keys; errors use the uniform {ok,error:{code,message}}.
@@ -586,13 +586,67 @@ function calculate(input, ctx) {
     ko_chance: koChance,        // engine KO verdict (recovery-aware); null for status/no-damage
     ko_caveats: koCaveats,      // [{code,direction,cause}] effects that make the STATIC multi-turn KO
     //                            unreliable (DETECTED, not modelled); null when none apply
+    category: move.category,    // 'Physical' | 'Special' | 'Status' — lets a consumer tell whether a
+    //                            defensive-stat effect (Stamina/Iron Defense = +Def) is even relevant
     move: moveName,
     attacker: attacker.name,
     defender: defender.name,
   };
 }
 
-function runCommand(command, input, ctx) {
+// --- Name resolution (cross-skill key alignment) --------------------------------------------------
+// The pokedex is keyed by exact English NCP names, so a dex-canonical or user-typed name that differs
+// only in case/spacing/hyphenation ("garchomp", "Rotom Wash" vs "Rotom-Wash") silently fails with
+// "Unknown Pokémon". `resolve` lets a caller ALIGN any name to the real pokedex key (or get did-you-mean
+// candidates) instead of hand-scanning script_res/pokedex.js. It never guesses into a calc — it just
+// reports the canonical key, so the caller feeds that key back to `one`/`batch`.
+function normName(s) {
+  return String(s == null ? '' : s).normalize('NFKC').toLowerCase().replace(/[\s._'’\-]/g, '');
+}
+// The calc rejects an off-key move/item/ability just like an off-key Pokemon, so `resolve` aligns ANY
+// of those name kinds to the exact NCP key (case/space/hyphen-insensitive) — not just pokemon. These
+// are NCP's ENGLISH keys; a Chinese/Japanese name resolves through `$pokemon-champions-dex resolve`
+// FIRST (NCP is deliberately dex-independent), then its canonical English feeds `resolve`/`one`/`batch`.
+const KIND_DICT = { pokemon: (c) => c.pokedex, move: (c) => c.moves, item: (c) => c.items,
+  ability: (c) => c.abilities };
+const KIND_ERR = { pokemon: 'unknown_pokemon', move: 'unknown_move', item: 'unknown_item',
+  ability: 'unknown_ability' };
+function keyIndex(ctx, kind) {
+  // The NCP data is not uniform: moves/pokedex are objects keyed by name (they carry per-entry data),
+  // while items/abilities are bare arrays of name strings. Normalize both to a canonical NAME list so
+  // resolution works the same across kinds.
+  ctx._keyIndex = ctx._keyIndex || {};
+  if (ctx._keyIndex[kind]) return ctx._keyIndex[kind];
+  const data = (KIND_DICT[kind] || KIND_DICT.pokemon)(ctx) || {};
+  const names = Array.isArray(data) ? data.slice() : Object.keys(data);
+  const exact = new Set(names);
+  const map = new Map();
+  for (const k of names) map.set(normName(k), k);
+  ctx._keyIndex[kind] = { map, names, exact };
+  return ctx._keyIndex[kind];
+}
+function resolveNames(input, ctx, kind) {
+  kind = kind || (input && !Array.isArray(input) && input.kind) || 'pokemon';
+  if (!KIND_DICT[kind]) {  // an unknown kind is a request error (§3 bad_input), not a per-name miss
+    return { ok: false, query: kind,
+      error: { code: 'bad_input', message: `unknown kind '${kind}'; expected pokemon|move|item|ability` } };
+  }
+  const names = Array.isArray(input) ? input : (input && (input.names || input.pokemon)) || [];
+  const { map, names: canon, exact } = keyIndex(ctx, kind);
+  return names.map((q) => {
+    const key = String(q);
+    if (exact.has(key)) return { query: key, ok: true, kind, name: key, match: 'exact' };
+    const hit = map.get(normName(key));
+    if (hit) return { query: key, ok: true, kind, name: hit, match: 'normalized' };
+    const nk = normName(key);
+    const suggestions = nk ? canon.filter((k) => normName(k).includes(nk)).slice(0, 5) : [];
+    return { query: key, ok: false, kind, name: null,
+      error: { code: KIND_ERR[kind], message: `unknown ${kind}: ${key}` }, suggestions };
+  });
+}
+
+function runCommand(command, input, ctx, kind) {
+  if (command === 'resolve') return resolveNames(input, ctx, kind);
   if (command === 'batch') {
     // One loaded calculator reused for every request; each item fault-isolated.
     return input.map((item, i) => {
@@ -624,7 +678,8 @@ function serve() {
     if (argv[0] === '_shutdown') { rl.close(); return; }
     try {
       const input = JSON.parse(req.stdin || 'null');
-      const result = runCommand(argv[0] || 'one', input, ctx);
+      const ki = argv.indexOf('--kind');
+      const result = runCommand(argv[0] || 'one', input, ctx, ki !== -1 ? argv[ki + 1] : undefined);
       process.stdout.write(JSON.stringify({ ok: true, stdout: JSON.stringify(result) }) + '\n');
     } catch (e) {
       process.stdout.write(JSON.stringify({ ok: false, error: String(e && e.message || e) }) + '\n');
@@ -633,13 +688,14 @@ function serve() {
   rl.on('close', () => process.exit(0));
 }
 
-// Machine-readable I/O contract (dev/contracts/conventions.md), emitted by `schema`. Side flags accept
+// Machine-readable I/O contract (dev/conventions.md), emitted by `schema`. Side flags accept
 // canonical snake_case (helping_hand/light_screen/aurora_veil); legacy camelCase is still accepted.
 const SCHEMA = {
   skill: 'ncp-damage-calculator', cli: 'ncp-calc-api.js',
-  contract: 'dev/contracts/conventions.md',
+  contract: 'dev/conventions.md',
   stat_keys: ['hp', 'atk', 'def', 'spa', 'spd', 'spe'],
   commands: { one: 'single calc object on stdin', batch: 'array on stdin -> array (faults isolated per item)',
+    resolve: 'names on stdin ([names] or {names:[...],kind?}) [--kind pokemon|move|item|ability] -> [{query,ok,kind,name,match:exact|normalized | error,suggestions}]; aligns a typed/dex-canonical name to the exact NCP KEY of that kind (case/space/hyphen-insensitive) so you never hand-scan the data files. Default kind=pokemon. NCP keys are English — a zh/ja name resolves through `$pokemon-champions-dex resolve --kind ...` first, then its canonical feeds this.',
     serve: 'NDJSON resident worker', schema: 'this contract' },
   input: {
     'attacker/defender': { name: 'str', ability: 'str', item: 'str', nature: 'str',
@@ -659,9 +715,10 @@ const SCHEMA = {
     max_env: 'int  | ...most hits x best roll. With min/max_env_percent. Consumers widen KO over this, not the central band',
     ko_chance: '{text,n,guaranteed,chance_pct} | engine KO verdict modelling Sitrus/Leftovers/hazards (recovery-aware; null for status/no-damage)',
     ko_caveats: '[{code,direction,cause}] | DETECTED effects making the static multi-turn KO unreliable (self/target stat-change, Stamina/Weak Armor, Multiscale, Sash/Sturdy/Disguise, Metronome, Knock Off, speed-BP, Contrary/Simple/White Herb...). direction = static overstates|understates|unclear the KO. NOT modelled — chain explicit-state snapshots to resolve. null when none apply',
+    category: "'Physical'|'Special'|'Status' | the move's damage category — lets a consumer tell whether a +Def effect (Stamina/Iron Defense) is even relevant to THIS hit (irrelevant vs a special move)",
     move: 'str', attacker: 'str', defender: 'str' },
   error_shape: { ok: false, query: '<input echo: move or attacker name>', index: 'int (batch only)',
-    error: { code: 'unknown_move|unknown_pokemon|bad_input', message: 'str' } },
+    error: { code: 'unknown_move|unknown_pokemon|unknown_item|unknown_ability|bad_input', message: 'str' } },
 };
 
 function main() {
@@ -669,16 +726,29 @@ function main() {
   const command = args[0] || 'one';
   if (command === 'serve') return serve();
   if (command === 'schema') { process.stdout.write(JSON.stringify(SCHEMA, null, 2) + '\n'); return; }
+  // A mistyped subcommand used to fall through to `one` and calc a garbage object with a cryptic
+  // error. Validate it up front so an unknown command is a clear bad_input (conventions §3), exit 1.
+  if (!['one', 'batch', 'resolve'].includes(command)) {
+    process.stdout.write(JSON.stringify({ ok: false, query: command,
+      error: { code: 'bad_input', message: `unknown command '${command}'; expected one|batch|resolve|serve|schema` } }, null, 2) + '\n');
+    process.exit(1);
+  }
   const fileArg = args.find(a => a === '--input' || a === '-i');
   const file = fileArg ? args[args.indexOf(fileArg) + 1] : null;
   const payload = file ? fs.readFileSync(file, 'utf8') : fs.readFileSync(0, 'utf8');
   // One-shot: load the calculator once for this process and run the requested command. Batch
   // fault-isolates per item; a single/one calc surfaces a failure as the uniform error shape + exit 1.
+  const kindArg = args.indexOf('--kind');
+  const kind = kindArg !== -1 ? args[kindArg + 1] : undefined;
   let input;
   try {
     input = JSON.parse(payload);
-    const output = runCommand(command, input, loadCalculator());
+    const output = runCommand(command, input, loadCalculator(), kind);
     process.stdout.write(JSON.stringify(output, null, 2) + '\n');
+    // A request-level failure — a single {ok:false} object such as `resolve --kind bogus` — exits 1,
+    // matching the unknown-command and thrown-error paths (conventions §3). Per-name misses inside a
+    // resolve/batch ARRAY stay exit 0 (graceful not_found, aligned per index).
+    if (output && !Array.isArray(output) && output.ok === false) process.exit(1);
   } catch (e) {
     const msg = String(e && e.message || e);
     process.stdout.write(JSON.stringify(

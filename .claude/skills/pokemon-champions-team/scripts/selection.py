@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Selection matrix (M2 core; design.md §6 L2, design audit point 7) — OBJECTIVE FACTS ONLY.
+"""Selection matrix (M2 core) — OBJECTIVE FACTS ONLY.
 
 Champions is bring-6 / pick-3 (singles) or pick-4 (doubles), and only ONE member may Mega Evolve
 per battle. This operator enumerates the legal pick subsets and reports objective facts for each —
 who's in it, which member(s) could Mega (and into what), the base-Speed ordering, and the types
 present — so the AI can reason about the 6vN choice. It assigns NO strength score and names NO single
-best pick (design §0); it does not rank combos, only lists them in a stable, neutral order.
+best pick; it does not rank combos, only lists them in a stable, neutral order.
 
 Deferred (need design / meta and are marked, not silently skipped): matchup vs a named opponent or
 meta top-K, lead/back constraints, doubles partner synergy & speed-control semantics. See `notes`.
@@ -17,39 +17,53 @@ from __future__ import annotations
 from itertools import combinations
 from typing import Any, Callable
 
+import checks
+import team_i18n as i18n
+from mega import mega_form_from_maps
+
 PICK_SIZE = {"single": 3, "double": 4}
 
 
-def _base_of(form_name: str) -> str:
-    """Bare base of a Mega form name, as a fallback when a form's dex fact isn't to hand."""
-    n = form_name
-    if n.startswith("Mega "):
-        n = n[5:]
-        if n.endswith((" X", " Y", " Z")):
-            n = n[:-2]
-    return n.split("-")[0] if "-" in n else n
+def _combo_check_coverage(members: list[str], grid: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Per-lineup CHECK coverage, as OBJECTIVE per-opponent facts — NEVER a lineup score/ranking.
+
+    `grid` is a matchup `members` grid (rows carrying `member` + `cells` with a derived `check`). We
+    restrict it to THIS lineup's members and reuse `checks.coverage_summary` — a pure set operation over
+    the already-computed per-member grades (ZERO extra ncp). What we surface per lineup is the same
+    facts the whole-team coverage surfaces: the grade DISTRIBUTION (a count), the HOLES (opponents no
+    lineup member switch-in checks), and the CONTESTED reads. We deliberately do NOT emit any lineup
+    aggregate or sort lineups by coverage — coverage-maximization is exactly the hidden optimizer the
+    facts-only red line forbids (design §1/§16). The AI reads these per-lineup facts; picking a lineup
+    stays its judgment, made against the disclosed holes, not a skill-emitted best."""
+    wanted = set(members)                         # hoisted: was rebuilt once per grid row
+    rows = [r for r in grid if r.get("member") in wanted]
+    if not rows:
+        return None
+    cov = checks.coverage_summary(rows)
+    return {
+        "grade_distribution": cov.get("grade_distribution"),   # a COUNT for THIS lineup, never a score
+        "by_opponent": cov.get("by_opponent"),                 # explicit per-opponent best-strict labels
+        "holes": cov.get("holes"),                             # opponents with no safe switch-in check
+        "contested": [r["opponent"] for r in cov.get("by_opponent", []) if r.get("contested")],
+        "note": "per-lineup coverage FACTS (best strict grade any lineup member reaches per opponent); "
+                "a per-opponent label table + counts, NEVER a lineup score and lineups are NOT ranked "
+                "by it — the hole list is the actionable fact, the pick stays your judgment (design §1).",
+    }
 
 
 def _mega_form_for(member: dict[str, Any], own_fact: dict[str, Any],
                    item_info: dict[str, dict], form_facts: dict[str, dict]) -> str | None:
     """The Mega form this member would become, or None. Given-as-Mega members resolve to themselves;
     otherwise a held Mega stone whose form's base matches the member's species resolves the form."""
-    sp = member.get("species")
-    if own_fact.get("is_mega"):
-        return sp
-    item = member.get("item")
-    if not item:
-        return None
-    for form in (item_info.get(item, {}) or {}).get("required_by", []):
-        base = (form_facts.get(form, {}) or {}).get("base_species") or _base_of(form)
-        if base == sp:
-            return form
-    return None
+    return mega_form_from_maps(member.get("species"), member.get("item"), own_fact, item_info, form_facts)
 
 
 def select(team: dict[str, Any], *, fmt: str | None = None,
            dex_fn: Callable, item_fn: Callable,
-           legality_status: str | None = None) -> dict[str, Any]:
+           legality_status: str | None = None,
+           keep_mega: str | None = None,
+           check_grid: list[dict[str, Any]] | None = None,
+           check_context: dict[str, Any] | None = None) -> dict[str, Any]:
     members = [m for m in team.get("pokemon", []) if m.get("species")]
     fmt = (fmt or team.get("format") or "single").lower()
     pick = PICK_SIZE.get(fmt, 3)
@@ -93,6 +107,12 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
             if not a["mega_form"]:
                 continue
             opt = {"member": s, "form": a["mega_form"]}
+            # The user's declared keep (build-context.keep_mega, dex-canonicalized upstream) — an
+            # objective highlight so the declaration is visibly honored instead of silently ignored
+            # (audit 2026-07-02: the field was accepted but consumed by nothing). It matches either
+            # the member species or the Mega form name; it is a marker, NEVER a recommendation.
+            if keep_mega and keep_mega in (s, a["mega_form"]):
+                opt["user_keep"] = True
             # Surface the objective Mega delta only when the form actually differs from the base.
             if a["mega_types"] and a["mega_types"] != a["types"]:
                 opt["form_types"] = a["mega_types"]
@@ -106,13 +126,21 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
             key=lambda x: (-(x["base_speed"] or -1), x["member"]),
         )
         types_present = sorted({t for s in sel for t in attrs[s]["types"]})
-        combos.append({
+        entry = {
             "members": sel,
             "mega_options": mega_options,
             "multiple_mega_brought": len(mega_options) > 1,   # legal to bring; only one may Mega in battle
             "speed_order": speed_order,        # as-brought (pre-Mega) base Speed
             "types_present": types_present,    # as-brought (pre-Mega) types
-        })
+        }
+        # Opt-in CHECK coverage per lineup (only when the caller ran the matchup battery and passed the
+        # grid). Objective per-opponent facts, reusing the whole-team roll-up restricted to this lineup —
+        # never a lineup score; lineups stay in neutral name order below (design §1/§16).
+        if check_grid is not None:
+            cc = _combo_check_coverage(sel, check_grid)
+            if cc is not None:
+                entry["check_coverage"] = cc
+        combos.append(entry)
     # Stable, neutral ordering (by member names) — explicitly NOT a quality ranking.
     combos.sort(key=lambda c: c["members"])
 
@@ -128,27 +156,55 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
                          "These are pick subsets of that team; selection itself certifies no legality.")
     notes = [
         f"{fmt}: bring {len(members)}, pick {pick}. Objective facts per pick subset — no strength score, "
-        "no single best pick (design §0); combos are listed in a neutral order, not ranked.",
+        "no single best pick; combos are listed in a neutral order, not ranked.",
         legality_note,
         "Only ONE member may Mega Evolve per battle: a combo carrying multiple Mega stones is legal to "
         "bring (multiple_mega_brought=true), but you Mega at most one once in battle.",
-        "speed_order and types_present are the as-brought (pre-Mega) values; if a member Mega Evolves, "
-        "its post-Mega type/Speed are given on its mega_option (form_types / form_base_speed when they differ).",
-        "DEFERRED (not modelled in v1): matchup vs a named opponent / meta top-K, lead vs back "
+        "DEFERRED (not modelled in v1): matchup vs a NAMED opponent, lead vs back "
         "constraints, doubles partner synergy and speed-control (tailwind/trick-room) semantics.",
     ]
-    if not any_mega_changes:
-        # No Mega in any combo alters type/Speed, so the pre-Mega note above is moot — drop it.
-        notes = [n for n in notes if not n.startswith("speed_order and types_present are the as-brought")]
+    if check_grid is not None:
+        notes.append(
+            "each combo carries `check_coverage` vs the meta top-K (opt-in, ncp-grounded): per-opponent "
+            "the best strict grade any lineup member reaches + the HOLES (opponents no lineup member "
+            "switch-in checks) + a grade COUNT. These are per-lineup FACTS — combos are still listed in a "
+            "neutral name order, never ranked by coverage, and no 'best lineup' is emitted (design §1/§16). "
+            "The coverage inherits the matchup battery's confidence (vs-standard-set), not selection's own.")
+    if any_mega_changes:
+        notes.insert(3, "speed_order and types_present are the as-brought (pre-Mega) values; if a member Mega Evolves, "
+                     "its post-Mega type/Speed are given on its mega_option (form_types / form_base_speed when they differ).")
     if len(members) <= pick:
         notes.append(f"team has {len(members)} <= pick {pick}; the whole team is the only selection.")
 
-    return {"kind": "selection", "format": fmt, "pick_size": pick,
-            "bring_size": len(members), "combos": combos, "notes": notes,
-            "legality_checked": legality_status,
-            "confidence": "high", "confidence_reason": None,
-            "evidence": {"facts": [{"source": "dex", "ref": "types / base speed / Mega form+stone"}],
-                         "assumptions": ["objective enumeration only; no matchup, no ranking"]}}
+    # keep_mega echo: the declaration must be visibly honored or visibly inapplicable — never
+    # silently dropped. `matched` False = it names no member/Mega-form of this team (a conflict the
+    # AI should surface back to the user; context-audit will classify it later).
+    keep_echo = None
+    if keep_mega:
+        matched = any(o.get("user_keep") for c in combos for o in c["mega_options"])
+        keep_echo = {"requested": keep_mega, "matched": matched}
+        if not matched:
+            notes.append(f"keep_mega={keep_mega!r} matches no member / Mega form of this team — "
+                         "declaration could not be applied; check the name or the team.")
+
+    # With --with-check the output embeds ncp-grounded per-combo check_coverage (whose own lower,
+    # vs-standard-set confidence lives in check_coverage_context — never selection's `high`), so the
+    # evidence must not still claim "no matchup". Top-level confidence stays high: it qualifies ONLY the
+    # dex enumeration facts, not the check coverage.
+    assumptions = (["objective enumeration + opt-in ncp-grounded per-combo check_coverage "
+                    "(its own confidence in check_coverage_context); combos never ranked"]
+                   if check_grid is not None else
+                   ["objective enumeration only; no matchup, no ranking"])
+    out = {"kind": "selection", "format": fmt, "pick_size": pick,
+           "bring_size": len(members), "combos": combos, "notes": notes,
+           "keep_mega": keep_echo,
+           "legality_checked": legality_status,
+           "confidence": "high", "confidence_reason": None,
+           "evidence": {"facts": [{"source": "dex", "ref": "types / base speed / Mega form+stone"}],
+                        "assumptions": assumptions}}
+    if check_grid is not None and check_context:
+        out["check_coverage_context"] = check_context   # coverage confidence is not selection confidence
+    return out
 
 
 def _mega_label(o: dict[str, Any]) -> str:
@@ -157,24 +213,34 @@ def _mega_label(o: dict[str, Any]) -> str:
         delta.append("type→" + "/".join(o["form_types"]))
     if o.get("form_base_speed") is not None:
         delta.append(f"Spe→{o['form_base_speed']}")
-    return f"{o['member']}→{o['form']}" + (f" ({', '.join(delta)})" if delta else "")
+    keep = " [user keep]" if o.get("user_keep") else ""
+    return f"{o['member']}→{o['form']}" + (f" ({', '.join(delta)})" if delta else "") + keep
 
 
 def format_selection_md(d: dict[str, Any]) -> str:
     status = d.get("legality_checked")
     leg = (f"legality checked: {status}" if status else "legality assumed; run `validate` separately")
-    lines = [f"# Selection ({d['format']}: bring {d['bring_size']}, pick {d['pick_size']}) — "
-             f"{len(d['combos'])} pick subset(s), unranked ({leg})"]
+    lines = ["# " + i18n.t('sel_header', format=d['format'], bring=d['bring_size'],
+                            pick=d['pick_size'], count=len(d['combos']), leg=leg)]
     for c in d["combos"]:
         head = " + ".join(c["members"])
-        mega = ("; Mega: " + ", ".join(_mega_label(o) for o in c["mega_options"])
-                if c["mega_options"] else "; no Mega")
+        mega = (i18n.t('sel_mega_prefix') + " " + ", ".join(_mega_label(o) for o in c["mega_options"])
+                if c["mega_options"] else i18n.t('sel_no_mega'))
         if c["multiple_mega_brought"]:
-            mega += " (multiple stones brought — only one may Mega)"
+            mega += i18n.t('sel_multi_mega')
         spe = ", ".join(f"{s['member']} {s['base_speed']}" for s in c["speed_order"])
-        lines.append(f"- **{head}**{mega}\n  - base-Speed order (pre-Mega): {spe}"
-                     f"\n  - types (pre-Mega): {', '.join(c['types_present'])}")
+        lines.append(f"- **{head}**{mega}\n  - {i18n.t('sel_speed_order')} {spe}"
+                     f"\n  - {i18n.t('sel_types')} {', '.join(c['types_present'])}")
+        cc = c.get("check_coverage")
+        if cc:
+            dist = cc.get("grade_distribution") or {}
+            holes = cc.get("holes") or []
+            hole_txt = (", ".join(h["opponent"] for h in holes) if holes
+                        else i18n.t('sel_chk_holes_none'))
+            lines.append(f"  - {i18n.t('sel_chk_label')} "
+                         f"C2:{dist.get('C2',0)} C1:{dist.get('C1',0)} C0:{dist.get('C0',0)}; "
+                         f"{i18n.t('sel_chk_holes')} {hole_txt}")
     if d.get("notes"):
-        lines.append("\n## Notes")
+        lines.append("\n## " + i18n.t('notes'))
         lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)
