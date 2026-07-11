@@ -243,7 +243,10 @@ function resolveMultiHit(move, attacker) {
 // survives a "static 2HKO"). Returns {text, n, guaranteed, chance_pct} or null for status/no-damage.
 function parseKoChance(txt) {
   if (typeof txt !== 'string' || !txt) return null;
-  const nOf = s => /OHKO/i.test(s) ? 1 : (/(\d+)HKO/i.test(s) ? +RegExp.$1 : null);
+  // Standard capture (`s.match`) not the legacy static `RegExp.$1`: `$1` is a non-standard V8/Spider
+  // Monkey extension absent from quickjs-ng, where reading it yields NaN -> a null `n`. `.match` is
+  // spec-compliant and identical under Node, so both the Node and quickjs runtimes agree.
+  const nOf = s => { if (/OHKO/i.test(s)) return 1; const m = s.match(/(\d+)HKO/i); return m ? +m[1] : null; };
   let g = txt.match(/guaranteed\s+(\w*HKO)/i);
   if (g) return { text: txt, n: nOf(g[1]), guaranteed: true, chance_pct: 100 };
   let c = txt.match(/([\d.]+)%\s*chance to\s+(\w*HKO)/i);

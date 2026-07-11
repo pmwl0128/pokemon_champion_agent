@@ -1,8 +1,12 @@
 # NCP Damage Calculator API Reference
 
 This reference explains supported inputs and common examples. The executable contracts are
-authoritative: run `node scripts/ncp-calc-api.js schema` and
-`node scripts/ncp-speedline-api.js schema` before constructing unfamiliar payloads.
+authoritative: run `python scripts/ncp-calc-api.py schema` and
+`python scripts/ncp-speedline-api.py schema` before constructing unfamiliar payloads. (Install the
+preferred runtime with `python -m pip install -r requirements.txt`. The Python CLIs host the vendored
+NCP JavaScript in-process via `quickjs-ng` — no Node needed; without it the
+same Python entries automatically delegate to the Node CLIs `node scripts/ncp-calc-api.js`, whose
+calculation/query results are identical. Each `schema` truthfully names its own runtime entry.)
 
 ## Contents
 
@@ -19,13 +23,13 @@ authoritative: run `node scripts/ncp-calc-api.js schema` and
 Damage calculation:
 
 ```powershell
-node scripts\ncp-calc-api.js --input calc.json
+python scripts\ncp-calc-api.py --input calc.json
 ```
 
 Batch calculation:
 
 ```powershell
-node scripts\ncp-calc-api.js batch --input batch.json
+python scripts\ncp-calc-api.py batch --input batch.json
 ```
 
 `batch.json` is an array of the same objects accepted by one calculation.
@@ -33,27 +37,27 @@ node scripts\ncp-calc-api.js batch --input batch.json
 Name resolution (align a dex-canonical or typed name to the exact NCP pokedex key — case/space/hyphen-insensitive, with did-you-mean candidates on a miss; never hand-scan the data files):
 
 ```powershell
-'["garchomp","Rotom Wash","Mega Charizard X"]' | node scripts\ncp-calc-api.js resolve
+'["garchomp","Rotom Wash","Mega Charizard X"]' | python scripts\ncp-calc-api.py resolve
 ```
 
-Returns a 1:1 list `[{query, ok, name, match: exact|normalized}]`, or `{ok:false, error, suggestions}` on a miss; feed the returned `name` back to `one`/`batch`. Both CLIs also emit their full contract via `node scripts\ncp-calc-api.js schema` (and `ncp-speedline-api.js schema`).
+Returns a 1:1 list `[{query, ok, name, match: exact|normalized}]`, or `{ok:false, error, suggestions}` on a miss; feed the returned `name` back to `one`/`batch`. Both CLIs also emit their full contract via `python scripts\ncp-calc-api.py schema` (and `ncp-speedline-api.py schema`).
 
 Speed-line calculation:
 
 ```powershell
-node scripts\ncp-speedline-api.js --input speed.json
+python scripts\ncp-speedline-api.py --input speed.json
 ```
 
 Speed-line batch:
 
 ```powershell
-node scripts\ncp-speedline-api.js batch --input speed-batch.json
+python scripts\ncp-speedline-api.py batch --input speed-batch.json
 ```
 
 Speed-line table:
 
 ```powershell
-node scripts\ncp-speedline-api.js table --input speed-table.json
+python scripts\ncp-speedline-api.py table --input speed-table.json
 ```
 
 ## Pokémon Object

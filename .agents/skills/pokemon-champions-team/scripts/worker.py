@@ -4,8 +4,9 @@
 A team build runs several operators (validate / diagnose / matchup / tune / select), each of which
 spawns sibling processes (dex / meta / ncp). Today every call is a fresh process: the dominant cost
 is interpreter/data-load startup, paid ~once per call. A `session()` keeps each sibling resident and
-routes all calls in the session to it, so that startup is paid once. Python siblings run through the
-generic `_serve.py` wrapper (their own CLI, just resident); ncp runs `ncp-calc-api.js serve`.
+routes all calls in the session to it, so that startup is paid once. Every sibling — including ncp,
+now that its calc runs in-process via quickjs-ng (ncp-calc-api.py) — runs through the generic
+`_serve.py` wrapper (its own Python CLI, just resident).
 
 Safety: this is purely a performance path. The bridges call `run_*` only inside an active session and
 ALWAYS fall back to a one-shot subprocess on any worker error, so results are identical and a worker
@@ -128,8 +129,3 @@ def _call(key: str, spawn_argv: list[str], argv: list[str], stdin_text: str) -> 
 def run_python(key: str, cli_path: Path | str, argv: list[str], stdin_text: str = "") -> str:
     """Run a Python sibling CLI via its resident worker. Returns stdout text; raises WorkerError."""
     return _call(key, [sys.executable, str(_SERVE), str(cli_path)], argv, stdin_text)
-
-
-def run_node(key: str, cli_path: Path | str, argv: list[str], stdin_text: str = "") -> str:
-    """Run the ncp node CLI via its resident `serve` worker. Returns stdout text; raises WorkerError."""
-    return _call(key, ["node", str(cli_path), "serve"], argv, stdin_text)

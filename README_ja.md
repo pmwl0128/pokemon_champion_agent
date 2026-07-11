@@ -1,7 +1,7 @@
 <h1 align="center">Pokémon Champions Skills</h1>
 
 <p align="center">
-  <b>ローカル対戦データ、現行環境、厳密な計算、根拠に基づく構築支援をAIエージェントへ</b>
+  <b>AIエージェントがローカルデータ、現行環境データ、厳密な計算を使って図鑑検索、対面計算、構築添削、構築作成を行えるよう支援します</b>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-07-10</b>
+  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-07-11</b>
 </p>
 
 <p align="center">
@@ -50,7 +50,7 @@
 >
 > 4つのskillが正式に対応するのは、現行の『ポケモンチャンピオンズ』で実装済みのポケモン、フォルム、技、道具、特性、ルールです。過去シーズンの検索もチャンピオンズ内のスナップショットです。『ポケットモンスター ソード・シールド』『スカーレット・バイオレット』など本編シリーズのデータや、未実装情報は対象外です。同名のポケモンや技でも、種族値、威力、特性、習得技、仕様が本編と異なる場合があります。検索と計算ではチャンピオンズ現行値を優先します。
 
-## 4つのSkill
+## Skill一覧
 
 | Skill | 主な用途 |
 |---|---|
@@ -241,13 +241,30 @@ AをBへ変更した場合の防御、S操作、環境上の穴を比較して�
                                              └─ 必要に応じて上の3つを利用
 ```
 
-たとえば「メガメタグロス軸のM-Bダブルを組み、このガブリアスのじしんを耐えるようにしたい」という依頼では、名称とルール適合性、現行採用率、実在構築の構造、候補比較、耐久ライン計算を組み合わせます。「メガメタグロスのタイプは？」ならdexだけで完結し、構築フローには入りません。
+たとえば「メガメタグロス軸のM-Bダブルを組み、このガブリアスのじしんを耐えるようにしたい」という依頼では、名称とルール適合性、現行採用率、実在構築の構造、候補比較、耐久ライン計算を組み合わせます。「現環境で主流のメガメタグロスのバレットパンチは、一般的なアローラキュウコンを確定1発にできる？」ならdex、meta、calculator skillを連携させますが、構築フローには入りません。
 
 ## インストール
 
 4つのskillはまとめてインストールされます。導入後のコマンド登録は不要で、agentが各`SKILL.md`の説明から適切なskillを選びます。
 
-### 方法A：1コマンド
+### 方法A：agentにインストールを依頼（推奨）
+
+シェルを使えるagentへ次のように依頼します。
+
+> https://github.com/pmwl0128/pokemon_champion_agent の4つのskillをグローバルにインストールしてください。依存パッケージ`quickjs-ng>=0.15`も導入し、この環境で導入できない場合はNode.jsフォールバックが動作することを確認してください。最後に4つの`SKILL.md`がすべて認識されることを確認し、計算機の`schema`コマンドを1回実行してください。
+
+これを既定の推奨方法とします。agentが実行環境を判定し、正しい配置先とランタイム依存を選び、コピー後の動作確認まで行えるため、ユーザーがパスやリンク方式を判断する必要がありません。
+
+### 方法B：Claude Codeプラグインマーケット
+
+Claude Code内で次を入力します。
+
+```text
+/plugin marketplace add pmwl0128/pokemon_champion_agent
+/plugin install pokemon-champions@pmwl
+```
+
+### 方法C：1コマンド
 
 先に[Node.js](https://nodejs.org/)を導入し、プロジェクトディレクトリで実行します。
 
@@ -261,22 +278,7 @@ npx skills add pmwl0128/pokemon_champion_agent
 npx skills add pmwl0128/pokemon_champion_agent -g
 ```
 
-インストーラーは[vercel-labs/skills](https://github.com/vercel-labs/skills)製で、対象agentとスコープを選択できます。現行版ではWindows上でリンク方式の導入に失敗する場合があります。その場合は「agentに依頼」または「手動コピー」を利用してください。
-
-### 方法B：Claude Codeプラグインマーケット
-
-Claude Code内で次を入力します。
-
-```text
-/plugin marketplace add pmwl0128/pokemon_champion_agent
-/plugin install pokemon-champions@pmwl
-```
-
-### 方法C：agentにインストールを依頼
-
-シェルを使えるagentへ次のように依頼します。
-
-> https://github.com/pmwl0128/pokemon_champion_agent の4つのskillをインストールしてください。Claude Codeでは`.claude/skills/`、Codexでは`.agents/skills/`を使い、グローバルskillディレクトリへ配置して、4つの`SKILL.md`がすべて認識されることを確認してください。
+インストーラーは[vercel-labs/skills](https://github.com/vercel-labs/skills)製で、対象agentとスコープを選択できます。現行版ではWindows上でリンク方式の導入に失敗する場合があります。その場合はコピー方式を選ぶか、手動でリンクしてください。
 
 ### 方法D：手動コピー
 
@@ -290,14 +292,22 @@ cp -r pokemon_champion_agent/.agents/skills/* ~/.agents/skills/   # Codex
 
 ### 動作要件
 
-- **Python 3.10+**：dex、meta、teamの検索スクリプト。通常の検索は標準ライブラリのみで動作します。
-- **Node.js**：NCPダメージ・素早さ計算、および方法Aの`npx`インストーラーに必要です。
+- **Python 3.10+**：4つのskillのPython検索エントリ。dex、meta、teamの通常検索は標準ライブラリのみで動作します。
+- **quickjs-ng 0.15+（推奨）**：NCPダメージ・素早さ計算機の既定インプロセスランタイム。導入済みならNode.jsは不要で、計算機skillには専用の`requirements.txt`も含まれます。
+- **Node.js（フォールバック／任意）**：quickjs-ngがない場合は計算機のPythonエントリが自動的に利用します。方法Cの`npx`インストーラーを使う場合は必須です。
 - **openpyxl 3.1+（任意）**：metaの`export-excel`を自分で実行する場合のみ必要です。配布版にはワークブックが含まれます。
+
+計算機のランタイム依存だけを直接導入する場合：
+
+```bash
+python -m pip install "quickjs-ng>=0.15"
+```
 
 ### 更新
 
 | 導入方法 | 更新方法 |
 |---|---|
+| agentに依頼 | 同じリポジトリから4つのskillを再インストールし、quickjs-ng／Nodeフォールバックも再確認するようagentへ依頼 |
 | `npx skills` | `npx skills update` |
 | Claude Codeプラグイン | `/plugin marketplace update` |
 | Git／手動コピー | `git pull`後、該当するskillsディレクトリを再コピー |
@@ -330,25 +340,13 @@ cd my-champions
 
 ### 2. 4つのskillを導入
 
-上記の[インストール方法](#インストール)から1つを選びます。プロジェクト単位で導入する場合は、作成したディレクトリ内で実行します。
+対応するAI agentを起動したら、agentへそのまま次のように依頼してください。
 
-```bash
-npx skills add pmwl0128/pokemon_champion_agent
-```
+> https://github.com/pmwl0128/pokemon_champion_agent の4つのskillを現在のプロジェクトへインストールし、リポジトリに同梱されている`CLAUDE.md`と`AGENTS.md`もプロジェクトディレクトリへ配置してください。`quickjs-ng>=0.15`も導入し、この環境で導入できない場合はNode.jsフォールバックが動作することを確認してください。最後に4つの`SKILL.md`がすべて認識されることを確認し、計算機の`schema`コマンドを1回実行してください。
 
-Windowsでリンク作成に失敗した場合は、「agentにインストールを依頼」または「手動コピー」を使い、4つすべてをプロジェクトの`.claude/skills/`か`.agents/skills/`へ配置します。
+上記の別の[インストール方法](#インストール)も利用できます。
 
-### 3. プロジェクト指示を追加（任意・推奨）
-
-配布版のルートには`CLAUDE.md`と`AGENTS.md`が含まれます。用途に応じて片方または両方を自分のプロジェクト直下へコピーします。
-
-- Claude Codeでは`CLAUDE.md`
-- Codex、または`AGENTS.md`を認識するagentでは`AGENTS.md`
-- 複数のagentで同じプロジェクトを開く場合は両方
-
-これらのファイルには、4つのskillの使い分け、現行環境の確認、記憶ではなくskillで対戦事実を調べること、構築タスクでteamの手順を守ることが記載されています。なくても動作しますが、長い指示の維持が苦手なモデルでは特に有効です。
-
-### 4. 自分のデータを追加（任意）
+### 3. 自分のデータを追加（任意）
 
 ファイル名や形式は自由です。
 
@@ -363,7 +361,7 @@ my-champions/
 
 固定スキーマはありません。「`roster.md`のポケモンだけを使う」「`matchup-notes.md`を踏まえて再検討する」のように、agentへパスと用途を伝えてください。agentが内容を読み取り、正規化してから対応skillへ渡します。
 
-### 5. 質問し、結果を蓄積する
+### 4. 質問し、結果を蓄積する
 
 プロジェクト内でagentを起動し、たとえば次のように始めます。
 
@@ -396,7 +394,6 @@ skillの自動起動は、agentが`SKILL.md`を正しく読み取り、タスク
 2. 中国語、英語、日本語の自然文で質問できます。CLIコマンドを覚える必要はありません。
 3. 構築、所持一覧、条件は会話へ貼り付けても、任意のローカルファイルに保存してパスを伝えても構いません。決まったファイル名はありません。
 4. 現行環境に関する回答では、ページ上部のseason/rule/as-ofを確認してください。新しいデータが必要ならskill一式を更新します。
-5. agentが想定どおりskillを使わない場合は、対応する`SKILL.md`を先に読むよう指示します。同梱の`AGENTS.md`と`CLAUDE.md`もプロジェクト指示として利用できます。
 
 ## 環境ワークブック
 
@@ -443,7 +440,7 @@ skillの自動起動は、agentが`SKILL.md`を正しく読み取り、タスク
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | 基礎エンティティデータとダメージ計算エンジン |
 | [Serebii.net](https://www.serebii.net/) Champions Pokédex | チャンピオンズの習得技、特性、技優先度 |
 | [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英の表示名、別名、フォルム別情報 |
-| [PokéAPI](https://pokeapi.co/) | 名称の独立検証。チャンピオンズ対戦データの根拠には使用しません |
+| [PokéAPI](https://pokeapi.co/) | 名称の独立検証 |
 
 ### 実在構築サンプル
 
@@ -456,6 +453,8 @@ skillの自動起動は、agentが`SKILL.md`を正しく読み取り、タスク
 | [VGCPastes / Pokepaste](https://pokepast.es/) | ダブル | コミュニティ整理の完全構築とSP |
 
 データとツールを公開している各プロジェクト、サイト、大会運営者、コミュニティ貢献者に感謝します。順位、戦績、公開構築は事実根拠としてのみ使用し、本プロジェクトが強さを保証するものではありません。
+
+skill開発に多大な協力をいただいた[PokeChamp DB](https://pokechamdb.com/)へ、特別な感謝を申し上げます。
 
 ## ライセンス
 

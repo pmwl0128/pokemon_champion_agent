@@ -1,8 +1,9 @@
 <h1 align="center">Pokémon Champions Skills</h1>
 
 <p align="center">
-  <b>让 AI 用本地事实、当前环境与精确计算来查图鉴、算对位、审队伍和建队</b>
+  <b>帮助你的 AI Agent用本地事实、当前环境数据与精确计算来查图鉴、算对位、审队伍和建队</b>
 </p>
+
 
 <p align="center">
   <img alt="skills" src="https://img.shields.io/badge/skills-4-blue"/>
@@ -14,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-07-10</b>
+  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-07-11</b>
 </p>
 
 <p align="center">
@@ -50,7 +51,7 @@
 >
 > 四个 skill 对外支持的数据范围只限《宝可梦冠军》当前正式版本中已经上线的宝可梦、形态、招式、道具、特性与规则；可查询的历史 season 也只是《宝可梦冠军》自身的环境快照。这里不包含《宝可梦 剑／盾》《宝可梦 朱／紫》等正作系列的数据，也不收录尚未正式上线的内容。同名宝可梦或招式在正作与《宝可梦冠军》中可能有种族值、威力、特性、学习集或机制差异，所有查询与计算均以《宝可梦冠军》的现行数据为准。
 
-## 四个 Skill 一览
+##  Skill 一览
 
 | Skill | 最适合回答 |
 |---|---|
@@ -241,13 +242,30 @@ team skill 内部使用一套流程化约束来减少“先凭印象生成，再
                                       └─ 按需调用前三者
 ```
 
-例如“围绕 Mega 巨金怪组一支双打，并保证它能吃下某只烈咬陆鲨的地震”会依次用到名称与合法性、当前环境、真实队结构、完整候选评估和伤害悬崖计算；而“Mega 巨金怪是什么属性”只需要 dex，不会进入建队流程。
+例如“围绕 Mega 巨金怪组一支双打，并保证它能吃下某只烈咬陆鲨的地震”会依次用到名称与合法性、当前环境、真实队结构、完整候选评估和伤害悬崖计算；而“Mega 巨金怪当前环境主流配置的子弹拳能否一确常见配置阿罗拉九尾”只需要联合 dex、meta和calculator skill，不会进入建队流程。
 
 ## 安装
 
 四个 skill 会一起安装。安装后不需要手工注册命令，agent 会根据每个 `SKILL.md` 的描述自动选择。
 
-### 方法 A：一行命令
+### 方法 A：让 agent 安装（推荐）
+
+把下面这段交给有 shell 权限的 agent：
+
+> 全局安装 https://github.com/pmwl0128/pokemon_champion_agent 中的四个 skill。同时安装依赖 `quickjs-ng>=0.15` ；如果当前环境无法安装，则确认 Node.js 回退可用。最后确认四个 `SKILL.md` 都能被发现，并实际运行一次计算器的 `schema` 命令。
+
+这是默认推荐方式：agent 可以识别当前宿主、选择正确目录、处理运行依赖，并在复制后直接验证，而不需要用户手工判断路径或链接方式。
+
+### 方法 B：Claude Code 插件市场
+
+在 Claude Code 对话框中输入：
+
+```text
+/plugin marketplace add pmwl0128/pokemon_champion_agent
+/plugin install pokemon-champions@pmwl
+```
+
+### 方法 C：一行命令
 
 先安装 [Node.js](https://nodejs.org/)，然后在项目目录运行：
 
@@ -261,22 +279,7 @@ npx skills add pmwl0128/pokemon_champion_agent
 npx skills add pmwl0128/pokemon_champion_agent -g
 ```
 
-安装器来自 [vercel-labs/skills](https://github.com/vercel-labs/skills)，会提示你选择可用 agent 与安装范围。注意：npx命令的链接安装方式当前版本在windows上会触发bug链接失败，推荐使用复制或手动链接。
-
-### 方法 B：Claude Code 插件市场
-
-在 Claude Code 对话框中输入：
-
-```text
-/plugin marketplace add pmwl0128/pokemon_champion_agent
-/plugin install pokemon-champions@pmwl
-```
-
-### 方法 C：让 agent 安装
-
-把下面这段交给有 shell 权限的 agent：
-
-> 安装 https://github.com/pmwl0128/pokemon_champion_agent 中的四个 skill。Claude Code 使用 `.claude/skills/`，Codex 使用 `.agents/skills/`；安装到我的全局 skills 目录，并确认四个 `SKILL.md` 都能被发现。
+安装器来自 [vercel-labs/skills](https://github.com/vercel-labs/skills)，会提示你选择可用 agent 与安装范围。注意：npx命令的链接安装方式当前版本在windows上会触发bug链接失败，推荐选择复制安装方式，或手动进行链接。
 
 ### 方法 D：手动复制
 
@@ -290,14 +293,22 @@ cp -r pokemon_champion_agent/.agents/skills/* ~/.agents/skills/   # Codex
 
 ### 环境要求
 
-- **Python 3.10+**：dex、meta 和 team 的查询脚本；日常查询只使用标准库。
-- **Node.js**：NCP 伤害/速度计算器；方法 A 的 `npx` 安装器也需要。
+- **Python 3.10+**：四个 skill 的 Python 查询入口；dex、meta 和 team 的日常查询只使用标准库。
+- **quickjs-ng 0.15+（推荐）**：NCP 伤害/速度计算器的默认进程内运行时，安装后不需要 Node.js；计算器 skill 自带 `requirements.txt`。
+- **Node.js（回退 / 可选）**：未安装 quickjs-ng 时，计算器的 Python 入口会自动回退到 Node；使用方法 C 的 `npx` 安装器时则必须安装。
 - **openpyxl 3.1+（可选）**：只有自行运行 meta 的 `export-excel` 时需要；发行版已经附带工作簿。
+
+单独安装计算器运行依赖也可以直接运行：
+
+```bash
+python -m pip install "quickjs-ng>=0.15"
+```
 
 ### 更新
 
 | 安装方式 | 更新方法 |
 |---|---|
+| 让 agent 安装 | 让 agent 从同一仓库重新安装四个 skill，并复查 quickjs-ng / Node 回退 |
 | `npx skills` | `npx skills update` |
 | Claude Code 插件 | `/plugin marketplace update` |
 | Git / 手动复制 | `git pull` 后重新复制对应 skills 目录 |
@@ -330,25 +341,13 @@ cd my-champions
 
 ### 2. 安装四个 skill
 
-按照上面的任一种 [安装方式](#安装)完成安装。项目级安装可以直接在当前目录运行：
+启动对应的AI agent之后，直接对你的Agents说：
 
-```bash
-npx skills add pmwl0128/pokemon_champion_agent
-```
+> 从 https://github.com/pmwl0128/pokemon_champion_agent 安装四个 skill 到当前项目，另外把git中附带的CLAUDE.md和AGENTS.md放到项目目录；同时安装 `quickjs-ng>=0.15`；如果当前环境无法安装，则确认 Node.js 回退可用。最后确认四个 `SKILL.md` 都能被发现，并实际运行一次计算器的 `schema` 命令。
 
-如果 Windows 上遇到链接安装失败，改用“让 agent 安装”或“手动复制”，把四个 skill 放入当前项目对应的 `.claude/skills/` 或 `.agents/skills/`。
+也可以使用上面的其他 [安装方式](#安装)。
 
-### 3. 放置项目指令（可选但推荐）
-
-发行版根目录附带 `CLAUDE.md` 和 `AGENTS.md`。可以把其中一个或两个放到自己的项目根目录：
-
-- 使用 Claude Code 时优先放置 `CLAUDE.md`；
-- 使用 Codex 或其他识别 `AGENTS.md` 的 agent 时放置 `AGENTS.md`；
-- 同一个项目会由多种 agent 打开时，可以两份都保留。
-
-它们会提醒 agent 区分四个 skill 的职责、读取当前环境、不要凭记忆回答事实，并在整队任务中遵守 team skill 的内置流程。skill 不依赖这两份文件才能运行，但对指令遵循能力较弱的模型尤其有帮助。
-
-### 4. 放入自己的数据（可选）
+### 3. 放入自己的数据（可选）
 
 你可以在项目里保存任意格式、任意文件名的个人资料，例如：
 
@@ -363,7 +362,7 @@ my-champions/
 
 这些文件都不是固定格式。提问时告诉 agent 文件路径和使用方式即可，例如“只用 `roster.md` 里的宝可梦”“结合 `matchup-notes.md` 重新检查这支队”。agent 会先读取并清洗内容，再交给相应 skill。
 
-### 5. 开始提问并持续迭代
+### 4. 开始提问并持续迭代
 
 在项目目录里启动 agent 后，可以从下面任一句开始：
 
@@ -396,7 +395,6 @@ skill 的自动触发依赖 agent 能正确理解 `SKILL.md` 并持续遵循其�
 2. 直接用中文、英文或日文提问，不需要记 CLI 命令。
 3. 队伍、持有列表和限制条件可以粘贴在对话里，也可以放在任意本地文件中并告诉 agent 路径；没有规定文件名。
 4. 需要当前环境结论时留意页首 season/rule/as-of；需要更新时更新整个 skill 包。
-5. 如果 agent 没有按预期调用技能，让它先读取对应 `SKILL.md`。发行版随附的 `AGENTS.md` / `CLAUDE.md` 也可以作为项目级工作规则使用。
 
 ## 环境工作簿
 
@@ -443,7 +441,7 @@ skill 的自动触发依赖 agent 能正确理解 `SKILL.md` 并持续遵循其�
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | 核心实体数据与伤害计算引擎 |
 | [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions 学习集、特性与招式先制度 |
 | [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英显示名、别名与分形态资料 |
-| [PokéAPI](https://pokeapi.co/) | 名称独立校验；不是 Champions 对战事实权威 |
+| [PokéAPI](https://pokeapi.co/) | 名称独立校验 |
 
 ### 真实队样本
 
@@ -456,6 +454,8 @@ skill 的自动触发依赖 agent 能正确理解 `SKILL.md` 并持续遵循其�
 | [VGCPastes / Pokepaste](https://pokepast.es/) | 双打 | 社区整理的完整队伍与 SP |
 
 感谢这些项目、站点、赛事组织者和社区贡献者公开数据与工具。来源中的排名、战绩和队伍只作为事实证据使用，不代表本项目对其强度作背书。
+
+特别感谢[PokeChamp DB](https://pokechamdb.com/)在skill开发过程中提供的大力协助。
 
 ## 许可
 

@@ -2,7 +2,7 @@
   "season": "M-4",
   "rule": "M-B",
   "format": "single",
-  "generated_at": "2026-07-10T07:52:13+00:00",
+  "generated_at": "2026-07-11T14:57:40+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -49,195 +49,30 @@
     "suppress_config_decline_beyond_rank": 100
   },
   "baseline": {
-    "kind": "snapshot",
-    "ranking_updated_at": "2026-07-09T09:07:41+00:00",
-    "details_updated_at": "2026-07-09T09:07:41+00:00"
-  },
-  "current": {
+    "kind": "git-HEAD",
     "ranking_updated_at": "2026-07-10T07:52:09+00:00",
     "details_updated_at": "2026-07-10T07:52:09+00:00"
   },
-  "rank_moves": [
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "old": 186,
-      "new": 136,
-      "delta": 50,
-      "tier": "D"
-    }
-  ],
+  "current": {
+    "ranking_updated_at": "2026-07-11T14:57:39+00:00",
+    "details_updated_at": "2026-07-11T14:57:39+00:00"
+  },
+  "rank_moves": [],
   "new_entries": [],
   "dropped": [],
   "config_changes": [
     {
-      "slug": "garchomp",
-      "name": "烈咬陆鲨",
-      "rank": 1,
-      "tier": "S",
-      "panel": "moves",
-      "item": "火焰牙",
-      "old_pct": 13.2,
+      "slug": "lucario",
+      "name": "路卡利欧",
+      "rank": 29,
+      "tier": "A",
+      "panel": "items",
+      "item": "路卡利欧进化石",
+      "old_pct": 97.8,
       "new_pct": 0.0,
-      "delta": -13.2,
+      "delta": -97.8,
       "kind": "消失",
       "rank_triggered": false
-    },
-    {
-      "slug": "garchomp",
-      "name": "烈咬陆鲨",
-      "rank": 1,
-      "tier": "S",
-      "panel": "moves",
-      "item": "毒击",
-      "old_pct": 0.0,
-      "new_pct": 13.1,
-      "delta": 13.1,
-      "kind": "新增",
-      "rank_triggered": false
-    },
-    {
-      "slug": "charizard",
-      "name": "喷火龙",
-      "rank": 10,
-      "tier": "S",
-      "panel": "moves",
-      "item": "逆鳞",
-      "old_pct": 22.7,
-      "new_pct": 0.0,
-      "delta": -22.7,
-      "kind": "消失",
-      "rank_triggered": false
-    },
-    {
-      "slug": "charizard",
-      "name": "喷火龙",
-      "rank": 10,
-      "tier": "S",
-      "panel": "moves",
-      "item": "龙爪",
-      "old_pct": 0.0,
-      "new_pct": 17.9,
-      "delta": 17.9,
-      "kind": "新增",
-      "rank_triggered": false
-    },
-    {
-      "slug": "annihilape",
-      "name": "弃世猴",
-      "rank": 56,
-      "tier": "B",
-      "panel": "natures",
-      "item": "爽朗",
-      "old_pct": 0.0,
-      "new_pct": 26.5,
-      "delta": 26.5,
-      "kind": "新增",
-      "rank_triggered": false
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "moves",
-      "item": "真气弹",
-      "old_pct": 95.0,
-      "new_pct": 45.6,
-      "delta": -49.4,
-      "kind": "下降",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "moves",
-      "item": "神通力",
-      "old_pct": 45.0,
-      "new_pct": 10.0,
-      "delta": -35.0,
-      "kind": "下降",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "moves",
-      "item": "过热",
-      "old_pct": 2.5,
-      "new_pct": 28.2,
-      "delta": 25.7,
-      "kind": "上升",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "moves",
-      "item": "电光一闪",
-      "old_pct": 0.0,
-      "new_pct": 22.6,
-      "delta": 22.6,
-      "kind": "新增",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "moves",
-      "item": "群魔乱舞",
-      "old_pct": 65.0,
-      "new_pct": 44.6,
-      "delta": -20.4,
-      "kind": "下降",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "natures",
-      "item": "胆小",
-      "old_pct": 5.0,
-      "new_pct": 31.0,
-      "delta": 26.0,
-      "kind": "上升",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "spreads",
-      "item": "3/0/0/32/0/31",
-      "old_pct": 25.0,
-      "new_pct": 4.6,
-      "delta": -20.4,
-      "kind": "下降",
-      "rank_triggered": true
-    },
-    {
-      "slug": "typhlosion-hisui",
-      "name": "火暴兽（洗翠的样子）",
-      "rank": 136,
-      "tier": "D",
-      "panel": "spreads",
-      "item": "0/0/32/29/0/5",
-      "old_pct": 20.0,
-      "new_pct": 0.0,
-      "delta": -20.0,
-      "kind": "消失",
-      "rank_triggered": true
     }
   ]
 }

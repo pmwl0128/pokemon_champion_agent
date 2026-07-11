@@ -1,7 +1,7 @@
 <h1 align="center">Pokémon Champions Skills</h1>
 
 <p align="center">
-  <b>Local battle facts, current metagame data, exact calculations, and evidence-grounded team building for AI agents</b>
+  <b>Help your AI agent use local facts, current metagame data, and exact calculations to look up the dex, calculate matchups, review teams, and build them</b>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-10</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-11</b>
 </p>
 
 <p align="center">
@@ -50,7 +50,7 @@ Scripts own facts, arithmetic, and deterministic checks. The model interprets yo
 >
 > The four skills support Pokémon, forms, moves, items, abilities, and rules that are officially available in the current Pokémon Champions release. Historical seasons are Champions snapshots as well. The package does not provide main-series datasets for games such as Pokémon Sword and Shield or Pokémon Scarlet and Violet, nor does it cover unreleased content. A familiar Pokémon or move may have different stats, power, abilities, learnsets, or mechanics in Champions; every lookup and calculation follows the current Champions values.
 
-## The Four Skills
+## Skills at a Glance
 
 | Skill | Best suited for |
 |---|---|
@@ -241,13 +241,30 @@ free-form user request
                                                  └─ calls the other three as needed
 ```
 
-For example, “build M-B Doubles around Mega Metagross and make it survive this Garchomp Earthquake” needs name and legality facts, current usage, real-team structures, candidate evaluation, and an exact survival threshold. “What type is Mega Metagross?” only needs the dex and does not enter the team workflow.
+For example, “build M-B Doubles around Mega Metagross and make it survive this Garchomp Earthquake” needs name and legality facts, current usage, real-team structures, candidate evaluation, and an exact survival threshold. “Can Bullet Punch from the current metagame's standard Mega Metagross set OHKO a common Alolan Ninetales set?” combines the dex, meta, and calculator skills but does not enter the team workflow.
 
 ## Installation
 
 All four skills are installed together. No command registration is required afterward; the agent selects a skill from its `SKILL.md` description.
 
-### Method A: One Command
+### Method A: Ask an Agent to Install It (Recommended)
+
+Give the following request to an agent with shell access:
+
+> Globally install all four skills from https://github.com/pmwl0128/pokemon_champion_agent. Also install the `quickjs-ng>=0.15` dependency; if that cannot be installed in this environment, confirm that the Node.js fallback works. Finally, confirm that all four `SKILL.md` files are discoverable and run the calculator's `schema` command once.
+
+This is the recommended default: the agent can identify the host, choose the correct directory, handle the runtime dependency, and verify the copied skills without asking the user to reason about paths or link behavior.
+
+### Method B: Claude Code Plugin Marketplace
+
+Enter these commands inside Claude Code:
+
+```text
+/plugin marketplace add pmwl0128/pokemon_champion_agent
+/plugin install pokemon-champions@pmwl
+```
+
+### Method C: One Command
 
 Install [Node.js](https://nodejs.org/) first, then run this in your project directory:
 
@@ -261,22 +278,7 @@ For a global installation available to every project:
 npx skills add pmwl0128/pokemon_champion_agent -g
 ```
 
-The installer is provided by [vercel-labs/skills](https://github.com/vercel-labs/skills) and prompts for the target agent and scope. The current link-based installation path may fail on Windows; if it does, use the agent-assisted or manual-copy method instead.
-
-### Method B: Claude Code Plugin Marketplace
-
-Enter these commands inside Claude Code:
-
-```text
-/plugin marketplace add pmwl0128/pokemon_champion_agent
-/plugin install pokemon-champions@pmwl
-```
-
-### Method C: Ask an Agent to Install It
-
-Give the following request to an agent with shell access:
-
-> Install all four skills from https://github.com/pmwl0128/pokemon_champion_agent. Use `.claude/skills/` for Claude Code or `.agents/skills/` for Codex, install them in my global skills directory, and confirm that all four `SKILL.md` files are discoverable.
+The installer is provided by [vercel-labs/skills](https://github.com/vercel-labs/skills) and prompts for the target agent and scope. The current link-based installation path may fail on Windows; choose its copy-install option instead, or create the links manually.
 
 ### Method D: Manual Copy
 
@@ -290,14 +292,22 @@ The `.agents/skills/` and `.claude/skills/` trees are byte-identical mirrors. Us
 
 ### Requirements
 
-- **Python 3.10+** for dex, meta, and team query scripts; normal queries use only the standard library.
-- **Node.js** for the NCP damage/Speed calculator and the Method-A `npx` installer.
+- **Python 3.10+** for all four Python query entry points; normal dex, meta, and team queries use only the standard library.
+- **quickjs-ng 0.15+ (recommended)** as the default in-process runtime for the NCP damage/Speed calculator; Node.js is not needed when it is installed, and the calculator skill ships its own `requirements.txt`.
+- **Node.js (fallback / optional)** is used automatically by the calculator's Python entries when quickjs-ng is absent, and is required when using the Method-C `npx` installer.
 - **openpyxl 3.1+ (optional)** only when running meta `export-excel` yourself; release workbooks are already included.
+
+To install only the calculator runtime dependency directly:
+
+```bash
+python -m pip install "quickjs-ng>=0.15"
+```
 
 ### Updating
 
 | Installation | Update method |
 |---|---|
+| Agent-assisted | Ask the agent to reinstall all four skills from the same repository and re-check quickjs-ng / the Node fallback |
 | `npx skills` | `npx skills update` |
 | Claude Code plugin | `/plugin marketplace update` |
 | Git / manual copy | Run `git pull`, then copy the relevant skills tree again |
@@ -330,25 +340,13 @@ Any directory name is fine. Open it directly in an IDE-based agent, or change in
 
 ### 2. Install the Four Skills
 
-Use any [installation method](#installation) above. For a project-scoped installation, run from the new directory:
+After starting the appropriate AI agent, tell your agent:
 
-```bash
-npx skills add pmwl0128/pokemon_champion_agent
-```
+> Install all four skills from https://github.com/pmwl0128/pokemon_champion_agent into the current project, and copy the bundled `CLAUDE.md` and `AGENTS.md` into the project directory. Also install `quickjs-ng>=0.15`; if that cannot be installed in this environment, confirm that the Node.js fallback works. Finally, confirm that all four `SKILL.md` files are discoverable and run the calculator's `schema` command once.
 
-If link installation fails on Windows, use “Ask an Agent to Install It” or “Manual Copy” and place all four skills under the project's `.claude/skills/` or `.agents/skills/` tree.
+You can also use any other [installation method](#installation) above.
 
-### 3. Add Project Instructions (Optional, Recommended)
-
-The release root includes `CLAUDE.md` and `AGENTS.md`. Copy either or both into your own project root:
-
-- use `CLAUDE.md` with Claude Code;
-- use `AGENTS.md` with Codex or another agent that recognizes it;
-- keep both when the same project is opened by multiple agents.
-
-These files remind the agent how the four skills are routed, how to read the current environment, why battle facts should not come from memory, and when the team workflow must be followed. The skills run without them, but they are especially useful with models that are less reliable at following long tool instructions.
-
-### 4. Add Your Own Data (Optional)
+### 3. Add Your Own Data (Optional)
 
 Use any filenames and formats that are convenient:
 
@@ -363,7 +361,7 @@ my-champions/
 
 No file follows a required schema. Tell the agent which path to read and how it should be used—for example, “use only Pokémon from `roster.md`” or “re-evaluate this team using `matchup-notes.md`.” The agent reads and normalizes the file before calling the relevant skill.
 
-### 5. Start Asking and Iterate
+### 4. Start Asking and Iterate
 
 Launch the agent in the project directory and begin with any of these:
 
@@ -396,7 +394,6 @@ Using the bundled `CLAUDE.md` or `AGENTS.md` as project instructions also improv
 2. Ask naturally in Chinese, English, or Japanese; you do not need to memorize CLI commands.
 3. Paste teams, owned rosters, and constraints into the conversation, or keep them in any local file and provide the path. There is no required filename.
 4. For current-metagame claims, check the season/rule/as-of stamp at the top of this page. Update the whole skill package when you need a newer snapshot.
-5. If the agent does not invoke a skill as expected, ask it to read that skill's `SKILL.md`. The bundled `AGENTS.md` and `CLAUDE.md` can also serve as project-level instructions.
 
 ## Metagame Workbooks
 
@@ -443,7 +440,7 @@ The release contains transformed, validated query data and scrubbed facts-only p
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | Core entity data and damage engine |
 | [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions learnsets, abilities, and move priority |
 | [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | Chinese/Japanese/English display names, aliases, and form-specific facts |
-| [PokéAPI](https://pokeapi.co/) | Independent name validation; not a Champions battle-data authority |
+| [PokéAPI](https://pokeapi.co/) | Independent name validation |
 
 ### Real-Team Samples
 
@@ -456,6 +453,8 @@ The release contains transformed, validated query data and scrubbed facts-only p
 | [VGCPastes / Pokepaste](https://pokepast.es/) | Doubles | Community-curated complete teams and SP |
 
 Thank you to the projects, sites, tournament organizers, and community contributors who make these data and tools available. Rankings, records, and published teams are used as factual evidence only and do not imply a strength endorsement by this project.
+
+Special thanks to [PokeChamp DB](https://pokechamdb.com/) for its strong support during skill development.
 
 ## License
 

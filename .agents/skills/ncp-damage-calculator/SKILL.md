@@ -44,7 +44,7 @@ Run one calculation with JSON on stdin or use `batch` with a JSON array:
   "move": "Earthquake",
   "field": {}
 }
-'@ | node scripts\ncp-calc-api.js
+'@ | python scripts\ncp-calc-api.py
 ```
 
 The result includes all rolls, percentage rolls, min/max values, defender HP, and the calculator
@@ -57,7 +57,7 @@ Query one speed line:
 ```powershell
 @'
 {"name":"Mega Staraptor"}
-'@ | node scripts\ncp-speedline-api.js
+'@ | python scripts\ncp-speedline-api.py
 ```
 
 Query a filtered table or compare two complete speed states. `compare` also reports move order under
@@ -66,11 +66,11 @@ Trick Room:
 ```powershell
 @'
 {"filters":{"type":"Flying","speedMin":170},"limit":20}
-'@ | node scripts\ncp-speedline-api.js table
+'@ | python scripts\ncp-speedline-api.py table
 @'
 {"a":{"name":"Garchomp","nature":"Jolly","sps":{"spe":32}},
  "b":{"name":"Archaludon","nature":"Modest","item":"Choice Scarf","sps":{"spe":32}}}
-'@ | node scripts\ncp-speedline-api.js compare
+'@ | python scripts\ncp-speedline-api.py compare
 ```
 
 ## Name Resolution
@@ -79,10 +79,10 @@ Do not scan vendored data files manually. Resolve calculator keys through the CL
 to `pokemon`:
 
 ```powershell
-'["garchomp","Rotom Wash","Mega Charizard X"]' | node scripts\ncp-calc-api.js resolve
-'["close combat","earthquake"]'                | node scripts\ncp-calc-api.js resolve --kind move
-'["choice scarf","lifeorb"]'                   | node scripts\ncp-calc-api.js resolve --kind item
-'["roughskin","intimidate"]'                   | node scripts\ncp-calc-api.js resolve --kind ability
+'["garchomp","Rotom Wash","Mega Charizard X"]' | python scripts\ncp-calc-api.py resolve
+'["close combat","earthquake"]'                | python scripts\ncp-calc-api.py resolve --kind move
+'["choice scarf","lifeorb"]'                   | python scripts\ncp-calc-api.py resolve --kind item
+'["roughskin","intimidate"]'                   | python scripts\ncp-calc-api.py resolve --kind ability
 ```
 
 ## Contract
@@ -90,8 +90,8 @@ to `pokemon`:
 Treat the executable schemas as authoritative for commands, input fields, output fields, and errors:
 
 ```powershell
-node scripts\ncp-calc-api.js schema
-node scripts\ncp-speedline-api.js schema
+python scripts\ncp-calc-api.py schema
+python scripts\ncp-speedline-api.py schema
 ```
 
 Read `references/api.md` when field options, batch shapes, speed modifiers, or a complete example are
@@ -101,6 +101,11 @@ needed. It is explanatory documentation, not a second contract.
 
 - The wrapper vendors, rather than reimplements, the NCP core. Attribution and its upstream license
   are in `references/upstream-LICENSE`.
+- The Python CLIs host that vendored JavaScript in-process via `quickjs-ng`
+  (`python -m pip install -r requirements.txt`),
+  so no Node runtime is needed. If quickjs-ng is not installed, those same Python entries automatically
+  delegate to the Node CLIs (`node scripts\ncp-calc-api.js` / `ncp-speedline-api.js`); calculation and
+  query results are identical.
 - It targets Pokemon Champions at level 50 with Champions stat points; canonical keys are
   `hp/atk/def/spa/spd/spe`.
 - NCP contains entries beyond the Champions-legal roster. Use `$pokemon-champions-team` or the dex for

@@ -1,0 +1,3 @@
+# Preferred runtime for the vendored NCP JavaScript engine.
+# The Python CLIs automatically fall back to Node.js when this package is unavailable.
+quickjs-ng>=0.15
