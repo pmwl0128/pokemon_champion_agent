@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-07-11</b>
+  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-07-13</b>
 </p>
 
 <p align="center">
@@ -104,7 +104,7 @@
 ダブルの追い風要員は誰と組まれることが多いですか？
 ```
 
-配布リポジトリ直下には、`<season>_<date>_{zh,ja,en}.xlsx` という3種類の単言語ワークブックも含まれます。シングル／ダブルの全表と事実ベースの更新レポートを、スクリプトを実行せずに閲覧できます。
+最新の3種類の単言語ワークブック（`workbook_{zh,ja,en}.xlsx`。シングル／ダブルの全表と事実ベースの更新レポートを収録）は、固定ファイル名で [data-latest リリース](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest)に公開され、リリースごとに置き換えられます。スクリプトを実行せずに閲覧できます。スナップショット日付はシート冒頭で確認してください。
 
 ## `ncp-damage-calculator`
 
@@ -397,13 +397,11 @@ skillの自動起動は、agentが`SKILL.md`を正しく読み取り、タスク
 
 ## 環境ワークブック
 
-正式リリースごとに、シングル／ダブルの全スナップショットと更新レポートから3つのワークブックを再生成します。
+正式リリースごとに、シングル／ダブルの全スナップショットと更新レポートから3つのワークブックを再生成し、固定ファイル名で [data-latest リリース](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest)に公開します（ローリング方式で最新スナップショットのみ保持。gitツリーにはバイナリを含めないため、cloneは軽量なままです）。
 
-```text
-<season>_<date>_zh.xlsx
-<season>_<date>_ja.xlsx
-<season>_<date>_en.xlsx
-```
+- [workbook_ja.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_ja.xlsx)（日本語）
+- [workbook_zh.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_zh.xlsx)（中国語）
+- [workbook_en.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_en.xlsx)（英語）
 
 各ファイルの主言語は1つです。中国語版と日本語版には照合用のcanonical英名列も含まれます。主なシートは次のとおりです。
 
@@ -413,6 +411,12 @@ skillの自動起動は、agentが`SKILL.md`を正しく読み取り、タスク
 | 更新レポート | 前回からの順位変動、新規・圏外、構成変化の事実表と名称連動検索 |
 
 ワークブックはfacts-onlyのレポートであり、AIによる環境解釈は含みません。
+
+順位トレンドの折れ線グラフ `trend_{single,double}_{zh,ja,en}.png`（シングル／ダブル × 3言語）も同じリリースで公開します。直近最大10期（1期＝1回のデータ更新）をローリングで表示し、いずれかの期でTop30に入ったポケモンは全期間追跡、60位以内に入った大きな変動も収録します。縦軸は1〜30位を等間隔、30位以降を圧縮表示し、上昇／下降／安定を色分けして線の両端にポケモン名を表示します。
+
+![シングル順位トレンド](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_single_ja.png)
+
+![ダブル順位トレンド](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_double_ja.png)
 
 ## データ鮮度と機能上の限界
 

@@ -2,7 +2,7 @@
   "season": "M-4",
   "rule": "M-B",
   "format": "double",
-  "generated_at": "2026-07-11T14:57:40+00:00",
+  "generated_at": "2026-07-13T07:51:40+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -49,24 +49,15 @@
     "suppress_config_decline_beyond_rank": 100
   },
   "baseline": {
-    "kind": "git-HEAD",
-    "ranking_updated_at": "2026-07-10T07:52:12+00:00",
-    "details_updated_at": "2026-07-10T07:52:12+00:00"
+    "kind": "snapshot",
+    "ranking_updated_at": "2026-07-13T07:28:30+00:00",
+    "details_updated_at": "2026-07-13T07:28:30+00:00"
   },
   "current": {
-    "ranking_updated_at": "2026-07-11T14:57:39+00:00",
-    "details_updated_at": "2026-07-11T14:57:39+00:00"
+    "ranking_updated_at": "2026-07-13T07:51:39+00:00",
+    "details_updated_at": "2026-07-13T07:51:39+00:00"
   },
-  "rank_moves": [
-    {
-      "slug": "gourgeist-super",
-      "name": "南瓜怪人（特大尺寸）",
-      "old": 175,
-      "new": 231,
-      "delta": -56,
-      "tier": "D"
-    }
-  ],
+  "rank_moves": [],
   "new_entries": [],
   "dropped": [],
   "config_changes": []

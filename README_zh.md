@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-07-11</b>
+  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-07-13</b>
 </p>
 
 <p align="center">
@@ -105,7 +105,7 @@ Mega 巨金怪在单打和双打的常用招式有什么差别？
 双打里常见的顺风手都有谁？通常和谁一起出现？
 ```
 
-发行版根目录还附带三份单语环境工作簿：`<season>_<date>_{zh,ja,en}.xlsx`。它们包含单打、双打完整环境表和事实性更新报告；无需运行脚本即可浏览，使用率请以文件名和页首快照日期为准。
+最新的三份单语环境工作簿（`workbook_{zh,ja,en}.xlsx`，含单打、双打完整环境表和事实性更新报告）以固定文件名发布在 [data-latest Release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest)，随每次发行滚动覆盖；无需运行脚本即可浏览，使用率请以页首快照日期为准。
 
 ## `ncp-damage-calculator`
 
@@ -398,13 +398,11 @@ skill 的自动触发依赖 agent 能正确理解 `SKILL.md` 并持续遵循其�
 
 ## 环境工作簿
 
-每次正式发行会从完整的单打、双打快照与更新报告重新生成三份工作簿：
+每次正式发行会从完整的单打、双打快照与更新报告重新生成三份工作簿，并以固定文件名发布到 [data-latest Release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest)（滚动覆盖，只保留最新一期；git 树不携带二进制文件，克隆保持轻量）：
 
-```text
-<season>_<date>_zh.xlsx
-<season>_<date>_ja.xlsx
-<season>_<date>_en.xlsx
-```
+- [workbook_zh.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_zh.xlsx)（中文）
+- [workbook_ja.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_ja.xlsx)（日文）
+- [workbook_en.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_en.xlsx)（英文）
 
 每份文件只使用一种主语言；中/日版附英文 canonical 名称便于交叉检索。主要工作表包括：
 
@@ -414,6 +412,12 @@ skill 的自动触发依赖 agent 能正确理解 `SKILL.md` 并持续遵循其�
 | 更新报告 | 相对上一快照的排名、新进/跌出与配置变化事实，以及名称联动检索 |
 
 工作簿是 facts-only 报告，不包含 AI 对环境的主观解读。
+
+排名趋势折线图 `trend_{single,double}_{zh,ja,en}.png`（单打 / 双打 × 三种语言）发布在同一 Release。它们滚动展示最近至多 10 期（每期对应一次数据刷新）的排名走势：任意一期进入过 Top30 的宝可梦全程追踪，另收录进过前 60 名的大幅变动；纵轴 1–30 名等距、30 名以后压缩，上升 / 下降 / 稳定折线以颜色区分，线两端直接标注宝可梦名。
+
+![单打排名趋势](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_single_zh.png)
+
+![双打排名趋势](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_double_zh.png)
 
 ## 数据时效与诚实边界
 

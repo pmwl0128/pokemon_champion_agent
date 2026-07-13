@@ -140,6 +140,11 @@ def build_matrix(sets: dict[str, dict[str, Any]], dex_facts: dict[str, dict[str,
     attackers = set(attackers)
 
     ordered = [r for r in rows if (r.get("species") or r.get("pokemon_en")) in sets]
+    # Stable-key row order: `rows` arrives rank-ordered, but the cache is rewritten on every refresh
+    # and a rank shuffle would relocate whole species/sets/matrix blocks in the file, exploding its
+    # git diff. Sort by species name instead — rank stays as a per-row FACT in `species`, and every
+    # reader indexes by name, so only the usage-rank NUMBERS change between refreshes.
+    ordered.sort(key=lambda r: str(r.get("species") or r.get("pokemon_en") or ""))
     species = [r.get("species") or r.get("pokemon_en") for r in ordered]
     sp_set = set(species)
 

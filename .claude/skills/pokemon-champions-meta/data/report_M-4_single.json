@@ -2,7 +2,7 @@
   "season": "M-4",
   "rule": "M-B",
   "format": "single",
-  "generated_at": "2026-07-11T14:57:40+00:00",
+  "generated_at": "2026-07-13T07:51:40+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -49,30 +49,16 @@
     "suppress_config_decline_beyond_rank": 100
   },
   "baseline": {
-    "kind": "git-HEAD",
-    "ranking_updated_at": "2026-07-10T07:52:09+00:00",
-    "details_updated_at": "2026-07-10T07:52:09+00:00"
+    "kind": "snapshot",
+    "ranking_updated_at": "2026-07-13T07:28:28+00:00",
+    "details_updated_at": "2026-07-13T07:28:28+00:00"
   },
   "current": {
-    "ranking_updated_at": "2026-07-11T14:57:39+00:00",
-    "details_updated_at": "2026-07-11T14:57:39+00:00"
+    "ranking_updated_at": "2026-07-13T07:51:37+00:00",
+    "details_updated_at": "2026-07-13T07:51:37+00:00"
   },
   "rank_moves": [],
   "new_entries": [],
   "dropped": [],
-  "config_changes": [
-    {
-      "slug": "lucario",
-      "name": "路卡利欧",
-      "rank": 29,
-      "tier": "A",
-      "panel": "items",
-      "item": "路卡利欧进化石",
-      "old_pct": 97.8,
-      "new_pct": 0.0,
-      "delta": -97.8,
-      "kind": "消失",
-      "rank_triggered": false
-    }
-  ]
+  "config_changes": []
 }

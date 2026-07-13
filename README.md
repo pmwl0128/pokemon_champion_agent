@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-11</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-13</b>
 </p>
 
 <p align="center">
@@ -104,7 +104,7 @@ Which Pokémon rose or fell this update, and which item distributions changed?
 Which partners commonly appear around Tailwind setters in Doubles?
 ```
 
-The release root also includes three single-language workbooks named `<season>_<date>_{zh,ja,en}.xlsx`. They contain the complete Singles and Doubles tables plus a factual update report, and can be read without running any script.
+The latest three single-language workbooks (`workbook_{zh,ja,en}.xlsx`, containing the complete Singles and Doubles tables plus a factual update report) are published under fixed names on the [data-latest release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest), replaced on every release. They can be read without running any script; check the snapshot date in the sheet header.
 
 ## `ncp-damage-calculator`
 
@@ -397,13 +397,11 @@ Using the bundled `CLAUDE.md` or `AGENTS.md` as project instructions also improv
 
 ## Metagame Workbooks
 
-Each release regenerates three workbooks from the complete Singles and Doubles snapshots and update reports:
+Each release regenerates three workbooks from the complete Singles and Doubles snapshots and update reports, published under fixed names on the [data-latest release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest) (rolling: only the newest snapshot is kept; the git tree carries no binaries, so clones stay lean):
 
-```text
-<season>_<date>_zh.xlsx
-<season>_<date>_ja.xlsx
-<season>_<date>_en.xlsx
-```
+- [workbook_en.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_en.xlsx) (English)
+- [workbook_zh.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_zh.xlsx) (Chinese)
+- [workbook_ja.xlsx](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/workbook_ja.xlsx) (Japanese)
 
 Each workbook uses one primary language; the Chinese and Japanese versions include canonical English names for cross-reference. Main sheets include:
 
@@ -413,6 +411,12 @@ Each workbook uses one primary language; the Chinese and Japanese versions inclu
 | Update report | Factual ranking, entry/drop, and configuration changes from the previous snapshot, plus linked name lookup |
 
 The workbooks are facts-only reports and contain no AI interpretation of the metagame.
+
+Rank-trend line charts `trend_{single,double}_{zh,ja,en}.png` (Singles / Doubles × three languages) ship on the same release. They cover the last up to 10 refreshes on a rolling basis: any Pokemon that entered the Top 30 in any period is tracked across the whole window, plus big movers that reached the top 60. The axis keeps ranks 1–30 uniform and compresses everything deeper; rising / falling / stable lines are color-coded with Pokemon names labeled at both ends.
+
+![Singles rank trend](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_single_en.png)
+
+![Doubles rank trend](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_double_en.png)
 
 ## Freshness and Honest Limits
 

@@ -3,25 +3,25 @@
     "season": "M-1",
     "rule": "M-A",
     "format": "double",
-    "count": 729
+    "count": 751
   },
   "M-1_single": {
     "season": "M-1",
     "rule": "M-A",
     "format": "single",
-    "count": 371
+    "count": 448
   },
   "M-2_double": {
     "season": "M-2",
     "rule": "M-A",
     "format": "double",
-    "count": 288
+    "count": 301
   },
   "M-2_single": {
     "season": "M-2",
     "rule": "M-A",
     "format": "single",
-    "count": 302
+    "count": 305
   },
   "M-3_double": {
     "season": "M-3",
@@ -33,18 +33,18 @@
     "season": "M-3",
     "rule": "M-B",
     "format": "single",
-    "count": 446
+    "count": 487
   },
   "M-4_double": {
     "season": "M-4",
     "rule": "M-B",
     "format": "double",
-    "count": 280
+    "count": 332
   },
   "M-4_single": {
     "season": "M-4",
     "rule": "M-B",
     "format": "single",
-    "count": 4
+    "count": 6
   }
 }

@@ -41,7 +41,6 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
   "format": "double",
   "season": "M-4",
   "rule": "M-B",
-  "detail_updated": "2026-06-18T07:53:51.288+00:00",
   "panels": {
     "moves": [{"rank": 1, "name": "龙爪", "name_ja": "ドラゴンクロー", "percentage": 89.5, "type": "dragon", "category": "physical", "power": 80, "accuracy": 100}],
     "items": [{"rank": 1, "name": "讲究围巾", "percentage": 14.8}],
@@ -54,6 +53,9 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
 ```
 
 Panel keys are normalized to English: `moves`, `items`, `abilities`, `natures`, `partners`, `spreads`.
+
+A row carries an optional `detail_updated` ISO stamp only when the source provides a real
+per-pokemon update time; the file-level `updated_at` is the refresh stamp for every row.
 
 ## Current State
 
