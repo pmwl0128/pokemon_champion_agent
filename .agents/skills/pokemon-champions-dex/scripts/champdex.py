@@ -80,7 +80,11 @@ def ensure_db() -> None:
 
 def conn() -> sqlite3.Connection:
     ensure_db()
-    c = sqlite3.connect(DB_PATH)
+    # The shipped dex is immutable runtime data.  ``mode=ro`` alone can still create WAL/SHM
+    # sidecars for a WAL-mode database, which fails when production mounts the release tree
+    # read-only (systemd ProtectSystem=strict).  ``immutable=1`` forbids those writes as well.
+    c = sqlite3.connect(f"{DB_PATH.as_uri()}?mode=ro&immutable=1", uri=True)
+    c.execute("pragma query_only = on")
     c.row_factory = sqlite3.Row
     return c
 
@@ -301,6 +305,43 @@ def _display_name(c: sqlite3.Connection, kind: str, canonical: str) -> tuple[str
     return (row["display_name"], row["display_name_ja"]) if row else (None, None)
 
 
+_MD_CONN: sqlite3.Connection | None = None
+
+
+def _md_entity(kind: str, canonical: str | None) -> str:
+    """Localized Markdown display value; JSON continues to carry canonical English only."""
+    if not canonical or i18n.lang() == "en" or _MD_CONN is None:
+        return canonical or ""
+    zh, ja = _display_name(_MD_CONN, kind, canonical)
+    return (zh if i18n.lang() == "zh" else ja) or canonical
+
+
+def _md_head(data: dict[str, Any]) -> str:
+    if i18n.lang() == "zh":
+        return data.get("display_name") or data.get("name") or ""
+    if i18n.lang() == "ja":
+        return data.get("display_name_ja") or data.get("name") or ""
+    return data.get("name") or ""
+
+
+def _md_stats(stats: dict[str, Any]) -> str:
+    return " / ".join(f"{i18n.value('stat', k)} {v}" for k, v in stats.items())
+
+
+def _md_join(values: Any) -> str:
+    return i18n.list_sep().join(str(v) for v in values)
+
+
+def _md_value(value: Any) -> str:
+    return "—" if value is None or value == "" else str(value)
+
+
+def _md_effect(data: dict[str, Any]) -> str:
+    """Effect prose in the selected UI language, with canonical English fallback."""
+    preferred = data.get(f"effect_{i18n.lang()}")
+    return preferred if preferred not in (None, "") else (data.get("effect_en") or "")
+
+
 def _possible_kinds(c: sqlite3.Connection, text: str, *, exclude_kind: str) -> list[dict[str, Any]]:
     """Exact cross-kind hints for a miss, e.g. `pokemon Crabominite` -> item Crabominite.
 
@@ -435,6 +476,7 @@ def get_one(c: sqlite3.Connection, kind: str, name: str, fuzzy: bool = True) -> 
     elif kind == "move":
         row = c.execute("select * from moves where canonical=?", (canonical,)).fetchone()
         if row:
+            raw = json.loads(row["raw_json"] or "{}")
             users = [r["pokemon"] for r in c.execute("select pokemon from learnsets where move=? order by pokemon", (canonical,))]
             entity = {
                 "name": row["canonical"], "display_name": row["display_name"],
@@ -444,7 +486,13 @@ def get_one(c: sqlite3.Connection, kind: str, name: str, fuzzy: bool = True) -> 
                 # the move/batch endpoints emitted '70' while find-move emitted 70 (self-audit
                 # 2026-07-03); pp likewise below.
                 "accuracy": canonical_power(row["accuracy"]),
-                "pp": canonical_power(row["pp"]), "priority": row["priority"], "known_users": users,
+                "pp": canonical_power(row["pp"]), "priority": row["priority"],
+                # Trilingual effect texts (effects_seed.py sources; None on a pre-effects DB
+                # so an old data file degrades instead of crashing the CLI).
+                **_effects(row),
+                # Mechanical flag from the vendored NCP move catalog. Accuracy alone is not a safe
+                # proxy: ordinary 30%-accuracy attacks and OHKO moves have different semantics.
+                "is_ohko": raw.get("isOHKO") is True, "known_users": users,
             }
         else:
             entity = None
@@ -457,7 +505,8 @@ def get_one(c: sqlite3.Connection, kind: str, name: str, fuzzy: bool = True) -> 
                 if canonical in abilities:
                     users.append(p["canonical"])
             entity = {"name": row["canonical"], "display_name": row["display_name"],
-                      "display_name_ja": row["display_name_ja"], "known_users": users}
+                      "display_name_ja": row["display_name_ja"], **_effects(row),
+                      "known_users": users}
         else:
             entity = None
     elif kind == "item":
@@ -465,7 +514,8 @@ def get_one(c: sqlite3.Connection, kind: str, name: str, fuzzy: bool = True) -> 
         if row:
             holders = [r["canonical"] for r in c.execute("select canonical from pokemon where required_item=? order by canonical", (canonical,))]
             entity = {"name": row["canonical"], "display_name": row["display_name"],
-                      "display_name_ja": row["display_name_ja"], "required_by": holders}
+                      "display_name_ja": row["display_name_ja"], **_effects(row),
+                      "required_by": holders}
         else:
             entity = None
     elif kind == "nature":
@@ -606,11 +656,18 @@ def _num_cmp(raw: Any, expr: str, field: str) -> bool:
     return OPS[m.group(1) or "=="](v, int(m.group(2)))
 
 
+def _effects(row: sqlite3.Row) -> dict[str, Any]:
+    """Trilingual effect columns (effects_seed.py). Tolerates a pre-effects DB file."""
+    keys = row.keys()
+    return {f"effect_{lang}": (row[f"effect_{lang}"] if f"effect_{lang}" in keys else None)
+            for lang in ("zh", "en", "ja")}
+
+
 def _move_row(row: sqlite3.Row) -> dict[str, Any]:
     return {"name": row["canonical"], "display_name": row["display_name"],
             "display_name_ja": row["display_name_ja"], "type": row["type"], "category": row["category"],
             "power": canonical_power(row["power"]), "accuracy": canonical_power(row["accuracy"]),
-            "pp": canonical_power(row["pp"]), "priority": row["priority"]}
+            "pp": canonical_power(row["pp"]), "priority": row["priority"], **_effects(row)}
 
 
 def _move_leaf(c: sqlite3.Connection, field: str, value: Any):
@@ -722,34 +779,44 @@ def _resolution_md(data: dict[str, Any]) -> list[str]:
     r = data.get("resolution")
     if not r:
         return []
-    return [f"- {i18n.t('resolved')}: `{r.get('from', '')}` → {data.get('name')} "
-            f"({r.get('match_type')}, {i18n.t('distance')} {r.get('distance')}, {i18n.t('score')} {r.get('score')})"]
+    detail = (f"{i18n.t('fuzzy')}, {i18n.t('distance')} {r.get('distance')}, "
+              f"{i18n.t('score')} {r.get('score')}")
+    return [f"- {i18n.t('resolved')}: `{r.get('from', '')}` → {data.get('name')}"
+            f"{i18n.parens(detail)}"]
 
 
 def format_md(data: Any) -> str:
     if isinstance(data, list):
         return "\n\n".join(format_md(x) for x in data)
     if "results" in data:
-        lines = [f"{i18n.t('conditions')}: {', '.join(f'{k}={v}' for k, v in data['conditions'])}",
+        lines = [f"{i18n.t('conditions')}: {_md_join(f'{k}={v}' for k, v in data['conditions'])}",
                  f"{i18n.t('count')}: {data['count']}"]
         if data.get("unresolved_conditions"):
             # find/reverse are exact-only: an unresolved keyword filtered on raw text, so Count may be 0
             # because the FILTER is invalid, not because nothing matched — say which (audit 2026-06-28).
-            bad = ", ".join(f"{c['field']}={c['value']}" for c in data["unresolved_conditions"])
+            bad = _md_join(f"{c['field']}={c['value']}" for c in data["unresolved_conditions"])
             lines.append(i18n.t("note_unrecognized", bad=bad))
         if data.get("learnset_warning"):
             lines.append(i18n.t("note_no_learnset"))
         for p in data["results"]:
             if "category" in p:                       # a move row (find-move), not a pokemon row
-                extra = "".join([f" | power {p['power']}" if p.get("power") else "",
-                                 f" | priority {p['priority']:+d}" if p.get("priority") else ""])
-                lines.append(f"- {p['display_name']} / {p['name']} | {p['type']} {p['category']}{extra}")
+                extra = "".join([f" | {i18n.t('power')} {p['power']}" if p.get("power") else "",
+                                 f" | {i18n.t('priority')} {p['priority']:+d}" if p.get("priority") else ""])
+                lines.append(f"- {_md_head(p)} | {i18n.value('type', p['type'])} "
+                             f"{i18n.value('category', p['category'])}{extra}")
             else:
-                lines.append(f"- {p['display_name']} / {p['name']} | {'/'.join(p['types'])} | stats {p['stats']} | abilities {', '.join(p['abilities'])}" + (f" | item {p['required_item']}" if p.get("required_item") else ""))
+                lines.append(f"- {_md_head(p)} | {'/'.join(i18n.value('type', x) for x in p['types'])} "
+                             f"| {i18n.t('stats')} {_md_stats(p['stats'])} | {i18n.t('abilities')} "
+                             f"{_md_join(_md_entity('ability', x) for x in p['abilities'])}"
+                             + (f" | {i18n.t('required_item')} {_md_entity('item', p['required_item'])}"
+                                if p.get("required_item") else ""))
         return "\n".join(lines)
     if data.get("error"):
         err = data["error"]
-        msg = err.get("message") if isinstance(err, dict) else err
+        code = err.get("code") if isinstance(err, dict) else ""
+        msg = (i18n.t("error_ambiguous" if code == "ambiguous" else "error_not_found",
+                      query=data.get("query", "")) if code in ("ambiguous", "not_found")
+               else err.get("message") if isinstance(err, dict) else err)
         # Batch error items carry their input position (contract §3); keep that anchor in md so a caller
         # can align the failure to the Nth argument. Did-you-mean suggestions (ambiguous tie / near miss)
         # are surfaced too, so a miss is never silent at the md layer (audit 2026-06-28).
@@ -757,7 +824,7 @@ def format_md(data: Any) -> str:
         line = f"{prefix}{data.get('query')}: {msg}"
         sugg = data.get("suggestions")
         if sugg:
-            cands = ", ".join(f"{s.get('canonical')} ({i18n.t('distance')} {s.get('distance')})" for s in sugg)
+            cands = _md_join(f"{s.get('canonical')} ({i18n.t('distance')} {s.get('distance')})" for s in sugg)
             line += f" — {i18n.t('did_you_mean')}: {cands}"
         pk = data.get("possible_kinds") or []
         if pk:
@@ -765,54 +832,61 @@ def format_md(data: Any) -> str:
             for h in pk:
                 extra = ""
                 if h.get("required_by"):
-                    extra = " -> " + ", ".join(h["required_by"])
+                    extra = " → " + _md_join(h["required_by"])
                 hints.append(f"{h.get('kind')}:{h.get('canonical')}{extra}")
-            line += f" — {i18n.t('possible_kinds')}: " + ", ".join(hints)
+            line += f" — {i18n.t('possible_kinds')}: " + _md_join(hints)
         return line
     if "types" in data:
         lines = [
-            f"## {data['display_name']} / {data['name']}",
-            f"- {i18n.t('types')}: {'/'.join(data['types'])}",
-            f"- {i18n.t('stats')}: {data['stats']}",
-            f"- {i18n.t('abilities')}: {', '.join(data['abilities'])}",
-            f"- {i18n.t('mega')}: {data['is_mega']}",
+            f"## {_md_head(data)}",
+            f"- {i18n.t('types')}: {'/'.join(i18n.value('type', x) for x in data['types'])}",
+            f"- {i18n.t('stats')}: {_md_stats(data['stats'])}",
+            f"- {i18n.t('abilities')}: {_md_join(_md_entity('ability', x) for x in data['abilities'])}",
+            f"- {i18n.t('mega')}: {i18n.t('yes' if data['is_mega'] else 'no')}",
         ]
         if data.get("mega_forms"):
-            forms = ", ".join(
-                f"{m['name']} ({m['required_item']})" if m.get("required_item") else m["name"]
+            forms = _md_join(
+                f"{_md_entity('pokemon', m['name'])}{i18n.parens(_md_entity('item', m['required_item']))}"
+                if m.get("required_item") else _md_entity('pokemon', m["name"])
                 for m in data["mega_forms"]
             )
             lines.append(f"- {i18n.t('mega_forms')}: {forms}")
         if data.get("required_item"):
-            lines.append(f"- {i18n.t('required_item')}: {data['required_item']}")
+            lines.append(f"- {i18n.t('required_item')}: {_md_entity('item', data['required_item'])}")
         if data.get("moves") is not None:
-            lines.append(f"- {i18n.t('cached_moves')} ({len(data['moves'])}): "
-                         f"{', '.join(data['moves']) if data['moves'] else i18n.t('none_cached')}")
+            lines.append(f"- {i18n.t('cached_moves')}{i18n.parens(len(data['moves']))}: "
+                         f"{_md_join(_md_entity('move', x) for x in data['moves']) if data['moves'] else i18n.t('none_cached')}")
         lines += _resolution_md(data)
         return "\n".join(lines)
     if "known_users" in data:
         # Priority shown only when non-zero (0 == normal); signed so -7 Trick Room / +2 Extreme Speed read right.
         prio = data.get("priority")
         prio_line = [f"- {i18n.t('priority')}: {prio:+d}"] if isinstance(prio, int) and prio != 0 else []
+        effect = _md_effect(data)
+        effect_line = [f"- {i18n.t('effect')}: {effect}"] if effect else []
         return "\n".join([
-            f"## {data.get('display_name')} / {data.get('name')}",
-            *(f"- {i18n.t(k)}: {data[k]}" for k in ["type", "category", "power", "accuracy", "pp"] if k in data),
+            f"## {_md_head(data)}",
+            *(f"- {i18n.t(k)}: {i18n.value(k, data[k]) if k in ('type', 'category') else _md_value(data[k])}"
+              for k in ["type", "category", "power", "accuracy", "pp"] if k in data),
             *prio_line,
-            f"- {i18n.t('known_users')} ({len(data['known_users'])}): "
-            f"{', '.join(data['known_users']) if data['known_users'] else i18n.t('none_cached')}",
+            *effect_line,
+            f"- {i18n.t('known_users')}{i18n.parens(len(data['known_users']))}: "
+            f"{_md_join(_md_entity('pokemon', x) for x in data['known_users']) if data['known_users'] else i18n.t('none_cached')}",
             *_resolution_md(data),
         ])
     if "required_by" in data:
+        effect = _md_effect(data)
         return "\n".join([
-            f"## {data['display_name']} / {data['name']}",
-            f"- {i18n.t('required_by')}: {', '.join(data['required_by']) if data['required_by'] else i18n.t('none')}",
+            f"## {_md_head(data)}",
+            *([f"- {i18n.t('effect')}: {effect}"] if effect else []),
+            f"- {i18n.t('required_by')}: {_md_join(_md_entity('pokemon', x) for x in data['required_by']) if data['required_by'] else i18n.t('none')}",
             *_resolution_md(data),
         ])
     if "up_stat" in data:        # nature
         up, down = data.get("up_stat"), data.get("down_stat")
-        effect = f"+{up} -{down}" if up and down else i18n.t("none")
+        effect = f"{i18n.value('stat', up)}↑ / {i18n.value('stat', down)}↓" if up and down else i18n.t("none")
         return "\n".join([
-            f"## {data['display_name']} / {data['name']}",
+            f"## {_md_head(data)}",
             f"- {i18n.t('nature_effect')}: {effect}",
             *_resolution_md(data),
         ])
@@ -832,7 +906,8 @@ def emit_error(query: str, code: str, message: str, fmt: str) -> None:
     if fmt == "json":
         emit({"ok": False, "query": query, "error": {"code": code, "message": message}}, "json")
     else:
-        print(f"{code}: {message}", file=sys.stderr)
+        display = i18n.t("error_bad_input") if code == "bad_input" and i18n.lang() != "en" else message
+        print(f"{code}: {display}", file=sys.stderr)
 
 
 # Machine-readable I/O contract (dev/conventions.md), emitted by the `schema` command so an
@@ -888,7 +963,8 @@ SCHEMA = {
                     "moves": ["str (pokemon/batch only)"]},
         "move": {"name": "str", "display_name": "str (zh)", "display_name_ja": "str|null",
                  "type": "Type (Title-case)", "category": "Physical|Special|Status",
-                 "power": "int|null", "priority": "int (signed speed-priority stage; 0 == normal)",
+                 "power": "int|null", "accuracy": "int|null",
+                 "priority": "int (signed speed-priority stage; 0 == normal)", "is_ohko": "bool",
                  "known_users": ["str"]},
         "ability": {"name": "str", "display_name": "str (zh)", "display_name_ja": "str|null", "known_users": ["str"]},
         "item": {"name": "str", "display_name": "str (zh)", "display_name_ja": "str|null", "required_by": ["str"]},
@@ -922,7 +998,8 @@ def _run_where(c: sqlite3.Connection, ns, where_fn, shorthand_fn):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Query the offline Pokemon Champions dex.")
+    global _MD_CONN
+    parser = argparse.ArgumentParser(description="Query the offline Pokémon Champions dex.")
     parser.add_argument("command", choices=["pokemon", "move", "ability", "item", "nature", "batch", "resolve", "find", "find-move", "reverse", "schema"])
     parser.add_argument("args", nargs="*")
     parser.add_argument("--format", choices=["md", "json"], default="md")
@@ -948,6 +1025,7 @@ def main() -> int:
         print(json.dumps(SCHEMA, ensure_ascii=False, indent=2))
         return 0
     c = conn()
+    _MD_CONN = c
     try:
         if ns.command == "batch":
             if len(ns.args) < 2:
@@ -993,6 +1071,7 @@ def main() -> int:
                 return 1
         emit(data, ns.format)
     finally:
+        _MD_CONN = None
         c.close()
     return 0
 

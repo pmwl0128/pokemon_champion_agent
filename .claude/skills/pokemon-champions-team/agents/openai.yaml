@@ -1,7 +1,7 @@
 interface:
-  display_name: "Pokemon Champions Team"
-  short_description: "Build, validate, and review Pokemon Champions teams"
-  default_prompt: "Use $pokemon-champions-team to build or review a Pokemon Champions team with the mandatory audited workflow."
+  display_name: "Pokémon Champions Team"
+  short_description: "Build, validate, and review Pokémon Champions teams"
+  default_prompt: "Use $pokemon-champions-team to build or review a Pokémon Champions team with the mandatory audited workflow."
 
 policy:
   allow_implicit_invocation: true

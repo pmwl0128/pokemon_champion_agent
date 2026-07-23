@@ -60,8 +60,14 @@ function createContext() {
   };
   $.isEmptyObject = obj => !obj || Object.keys(obj).length === 0;
 
+  // Vendored calculator files occasionally contain upstream debug console.log calls. The CLI stdout
+  // is a JSON protocol, so the sandbox must never inherit Node's host console (one stray log makes the
+  // entire response unparsable and also breaks byte parity with the quiet quickjs host).
+  const quietConsole = {};
+  ['log', 'error', 'warn', 'info', 'debug'].forEach(key => { quietConsole[key] = () => {}; });
+
   const context = {
-    console,
+    console: quietConsole,
     Math,
     JSON,
     $,

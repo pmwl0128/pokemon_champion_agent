@@ -105,7 +105,7 @@ def default_current_state() -> dict[str, Any]:
         "seasons": {
             DEFAULT_SEASON: {
                 "rule": DEFAULT_RULE,
-                "label": "Pokemon Champions M-4 / Regulation M-B",
+                "label": "Pokémon Champions M-4 / Regulation M-B",
             }
         },
     }

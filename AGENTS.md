@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Optional project-level instructions for agents using the four Pokemon Champions skills in this
+Optional project-level instructions for agents using the four Pokémon Champions skills in this
 distribution. The skills auto-trigger without this file; keep these rules when copying or adapting it.
 
 ## Language And Names
@@ -10,7 +10,7 @@ distribution. The skills auto-trigger without this file; keep these rules when c
 - Pass `--lang zh|ja|en` when requesting human-readable Markdown from dex, meta, or team CLIs. Prefer
   canonical JSON for orchestration; JSON fields, stat keys, types, and English `name` join keys are
   intentionally language-independent.
-- Resolve every Pokemon, move, item, ability, and nature through `pokemon-champions-dex`. In Chinese
+- Resolve every Pokémon, move, item, ability, and nature through `pokemon-champions-dex`. In Chinese
   answers render `中文名 (English)` on first use; in Japanese render `日本語名 (English)`; in English
   use the canonical English name. Do not translate names from memory.
 - Keep technical terms understandable for the user's language. Explain SP as Champions Stat Points,
@@ -18,7 +18,7 @@ distribution. The skills auto-trigger without this file; keep these rules when c
 
 ## Current Environment
 
-- Pokemon Champions rules and metagame data are versioned. Read the current season/rule from skill
+- Pokémon Champions rules and metagame data are versioned. Read the current season/rule from skill
   output or `pokemon-champions-meta/data/current.json`; never hardcode an older season.
 - Meta data is a shipped snapshot. State its season/rule and `as_of`/update stamp when freshness
   matters. If it is stale, tell the user to update the skill package; do not pretend the snapshot is

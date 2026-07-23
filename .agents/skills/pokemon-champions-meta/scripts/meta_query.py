@@ -297,16 +297,34 @@ def emit(data: Any, output: str) -> None:
         print(data if isinstance(data, str) else to_markdown(data))
 
 
+def _md_pokemon(row: dict[str, Any]) -> str:
+    lang = i18n.lang()
+    direct = row.get({"en": "pokemon_en", "ja": "pokemon_ja"}.get(lang, "pokemon"))
+    src = direct or row.get("pokemon") or row.get("pokemon_en") or row.get("slug") or ""
+    return repair_display_name(src, "pokemon", lang)
+
+
+def _md_panel_name(entry: dict[str, Any], panel: str) -> str:
+    lang = i18n.lang()
+    if panel == "spreads":
+        return i18n.spread(entry)
+    src = (entry.get("name_ja") if lang == "ja" else entry.get("name")) \
+        or entry.get("name_ja") or entry.get("key") or ""
+    return repair_display_name(src, _KIND_BY_PANEL.get(panel), i18n.lang())
+
+
 def ranking_md(rows: list[dict[str, Any]]) -> str:
     lines = [f"| {i18n.t('rank')} | {i18n.t('pokemon')} | {i18n.t('slug')} | {i18n.t('en')} |", "|---:|---|---|---|"]
     for row in rows:
-        lines.append(f"| {row.get('rank','')} | {row.get('pokemon','')} | {row.get('slug','')} | {row.get('pokemon_en','')} |")
+        lines.append(f"| {row.get('rank','')} | {_md_pokemon(row)} | {row.get('slug','')} | {row.get('pokemon_en','')} |")
     return "\n".join(lines)
 
 
 def detail_md(detail: dict[str, Any], panel: str | None = None) -> str:
+    heading_context = (f"{i18n.value('format', detail.get('format', ''))} · "
+                       f"{detail.get('season')}/{detail.get('rule', '')}")
     lines = [
-        f"# {detail.get('pokemon') or detail.get('slug')} ({detail.get('format')}, {detail.get('season')}/{detail.get('rule', '')})",
+        f"# {_md_pokemon(detail)}{i18n.parens(heading_context)}",
         "",
         f"- {i18n.t('rank')}: {detail.get('rank','')}",
         f"- {i18n.t('slug')}: {detail.get('slug','')}",
@@ -314,27 +332,29 @@ def detail_md(detail: dict[str, Any], panel: str | None = None) -> str:
     ]
     nr = detail.get("name_resolution")
     if nr:  # non-silent typo correction: tell the reader the query was auto-resolved
-        lines.append(f"- {i18n.t('resolved')}: `{detail.get('query','')}` → {detail.get('resolved_name','')} "
-                     f"(fuzzy, {i18n.t('distance')} {nr.get('distance')})")
+        correction = f"{i18n.t('fuzzy')}, {i18n.t('distance')} {nr.get('distance')}"
+        lines.append(f"- {i18n.t('resolved')}: `{detail.get('query','')}` → {detail.get('resolved_name','')}"
+                     f"{i18n.parens(correction)}")
     lines.append("")
     panels = detail.get("panels", {})
     selected = [norm_panel(panel)] if panel else ["moves", "items", "abilities", "natures", "partners", "spreads"]
     for key in selected:
         entries = panels.get(key, [])
         lines.extend([f"## {i18n.panel_label(key)}", "",
-                      f"| {i18n.t('rank')} | {i18n.t('name')} | {i18n.t('ja_key')} | {i18n.t('usage')} | {i18n.t('extra')} |",
-                      "|---:|---|---|---:|---|"])
+                      f"| {i18n.t('rank')} | {i18n.t('name')} | {i18n.t('usage')} | {i18n.t('extra')} |",
+                      "|---:|---|---:|---|"])
         for entry in entries:
             extra = []
             for k in ("type", "category", "power", "accuracy"):
                 if entry.get(k) not in ("", None):
-                    extra.append(f"{k}={entry.get(k)}")
+                    value = i18n.value(k, entry.get(k)) if k in ("type", "category") else entry.get(k)
+                    extra.append(f"{i18n.t(k) if k in ('type', 'category', 'power', 'accuracy') else k}={value}")
             lines.append(
-                f"| {entry.get('rank','')} | {entry.get('name','')} | {entry.get('name_ja') or entry.get('key','')} | "
-                f"{percent_text(entry.get('percentage'))} | {', '.join(extra)} |"
+                f"| {entry.get('rank','')} | {_md_panel_name(entry, key)} | "
+                f"{percent_text(entry.get('percentage'))} | {i18n.list_sep().join(extra) if extra else '—'} |"
             )
         if not entries:
-            lines.append("|  |  |  |  |  |")
+            lines.append("|  |  |  |  |")
         lines.append("")
     return "\n".join(lines)
 
@@ -345,8 +365,8 @@ def search_md(rows: list[dict[str, Any]]) -> str:
              "|---:|---|---|---|---|---:|---|---:|"]
     for row in rows:
         lines.append(
-            f"| {row.get('pokemon_rank','')} | {row.get('pokemon','')} | {row.get('slug','')} | {row.get('format','')} | "
-            f"{row.get('panel','')} | {row.get('entry_rank','')} | {row.get('name','')} | {percent_text(row.get('percentage'))} |"
+            f"| {row.get('pokemon_rank','')} | {_md_pokemon(row)} | {row.get('slug','')} | {i18n.value('format', row.get('format',''))} | "
+            f"{i18n.panel_label(row.get('panel',''))} | {row.get('entry_rank','')} | {_md_panel_name(row, row.get('panel',''))} | {percent_text(row.get('percentage'))} |"
         )
     return "\n".join(lines)
 
@@ -675,7 +695,7 @@ XLSX_LANG: dict[str, dict[str, Any]] = {
     "zh": {
         "cross_ref": True,
         "labels": {"rank": "排名", "name": "中文名", "en": "英文名", "moves": "招式", "items": "道具",
-                   "abilities": "特性", "natures": "性格", "partners": "队友", "spreads": "努力值"},
+                   "abilities": "特性", "natures": "性格", "partners": "队友", "spreads": "SP 分配"},
         "sheets": {"lookup": "检索", "single": "单打", "double": "双打", "report": "更新报告"},
         "search_title": "宝可梦检索（单 / 双 对照）", "search_prompt": "输入中文名 →", "item_col": "项目",
         "report_title": {"single": "单打更新报告", "double": "双打更新报告"},
@@ -690,7 +710,7 @@ XLSX_LANG: dict[str, dict[str, Any]] = {
     "ja": {
         "cross_ref": True,
         "labels": {"rank": "順位", "name": "日本語名", "en": "英語名", "moves": "わざ", "items": "もちもの",
-                   "abilities": "とくせい", "natures": "せいかく", "partners": "パートナー", "spreads": "努力値"},
+                   "abilities": "とくせい", "natures": "せいかく", "partners": "パートナー", "spreads": "SP配分"},
         "sheets": {"lookup": "検索", "single": "シングル", "double": "ダブル", "report": "更新レポート"},
         "search_title": "ポケモン検索（シングル / ダブル 対照）", "search_prompt": "名前を入力 →", "item_col": "項目",
         "report_title": {"single": "シングル更新レポート", "double": "ダブル更新レポート"},
@@ -698,7 +718,7 @@ XLSX_LANG: dict[str, dict[str, Any]] = {
         "changes": "今回の変化", "chg_rank": "順位", "chg_in": "ランクイン", "chg_out": "ランク外", "chg_none": "今回は大きな変化なし",
         "tables": {
             "rank_moves": ("順位の大きな変動", ["ポケモン", "旧順位", "新順位", "Δ", "段"]),
-            "tier_change": ("段位変化", ["ポケモン", "旧段", "新段", "順位"]),
+            "tier_change": ("使用率帯の変化", ["ポケモン", "旧帯", "新帯", "順位"]),
             "config": ("構成の大きな変動", ["ポケモン(順位)", "パネル/項目", "旧%", "新%", "Δpp", "段"]),
         },
     },
@@ -707,14 +727,14 @@ XLSX_LANG: dict[str, dict[str, Any]] = {
         "labels": {"rank": "Rank", "name": "Name", "en": "English", "moves": "Moves", "items": "Items",
                    "abilities": "Abilities", "natures": "Natures", "partners": "Partners", "spreads": "Spreads"},
         "sheets": {"lookup": "Lookup", "single": "Singles", "double": "Doubles", "report": "Update Report"},
-        "search_title": "Pokemon Lookup (Singles / Doubles)", "search_prompt": "Enter name →", "item_col": "Field",
+        "search_title": "Pokémon Lookup (Singles / Doubles)", "search_prompt": "Enter name →", "item_col": "Field",
         "report_title": {"single": "Singles Update Report", "double": "Doubles Update Report"},
         "baseline": "Baseline", "current": "Current", "none": "(none)", "yes": "yes", "unranked": "Unranked",
         "changes": "This update", "chg_rank": "Rank", "chg_in": "In", "chg_out": "Out", "chg_none": "No significant change this update",
         "tables": {
-            "rank_moves": ("Major rank shifts", ["Pokemon", "Old", "New", "Δ", "Tier"]),
-            "tier_change": ("Tier changes", ["Pokemon", "From", "To", "Rank"]),
-            "config": ("Major config shifts", ["Pokemon(rank)", "Panel/item", "Old%", "New%", "Δpp", "Tier"]),
+            "rank_moves": ("Major rank shifts", ["Pokémon", "Old", "New", "Δ", "Tier"]),
+            "tier_change": ("Tier changes", ["Pokémon", "From", "To", "Rank"]),
+            "config": ("Major config shifts", ["Pokémon (rank)", "Panel/item", "Old%", "New%", "Δpp", "Tier"]),
         },
     },
 }
@@ -780,29 +800,29 @@ TIER_DEFS: dict[str, dict[str, Any]] = {
     "en": {
         "intro_title": "Usage Tier Definitions",
         "intro": (
-            "This report groups Pokemon by usage ranking into five tiers: 1-10, 11-30, 31-60, 61-100, and 101+. "
-            "These tiers are intended to describe how prominent each Pokemon is in the current metagame, including "
+            "This report groups Pokémon by usage ranking into five tiers: 1-10, 11-30, 31-60, 61-100, and 101+. "
+            "These tiers are intended to describe how prominent each Pokémon is in the current metagame, including "
             "its consistency, splashability, team-building impact, and how urgently it needs to be accounted for in "
-            "preparation. Usage ranking should not be read as a strict power ranking. Some Pokemon with lower usage "
+            "preparation. Usage ranking should not be read as a strict power ranking. Some Pokémon with lower usage "
             "may still be highly effective in specific archetypes, matchups, or player-dependent strategies."),
         "thr_prefix": "Significance: ", "thr_rank": "rank shift ≥{r}",
         "thr_pp": ", config shift ≥{p}pp", "thr_pp_null": ", config only when rank moves significantly (≥{trig}pp)",
         "tiers": [
             ("S", "1-10", "Metagame-Defining Staples",
-             "Pokemon in this range are the central pieces of the current metagame. They are highly consistent, broadly applicable, and frequently shape how teams are built.\n"
-             "These Pokemon often define the pace and structure of the format. Whether a team uses them or not, it usually needs a clear plan for handling them. Their common sets, items, moves, and partner choices tend to influence the broader direction of the metagame."),
+             "Pokémon in this range are the central pieces of the current metagame. They are highly consistent, broadly applicable, and frequently shape how teams are built.\n"
+             "These Pokémon often define the pace and structure of the format. Whether a team uses them or not, it usually needs a clear plan for handling them. Their common sets, items, moves, and partner choices tend to influence the broader direction of the metagame."),
             ("A", "11-30", "Major Meta Threats",
-             "Pokemon in this tier are still firmly established as strong and common choices. Compared with the top 10, they may be slightly less universal, slightly more team-dependent, or easier to replace in certain structures, but they remain major parts of the format.\n"
-             "They often serve important competitive roles such as primary attackers, defensive pivots, setup sweepers, speed control options, matchup stabilizers, or checks to popular top-tier threats. These Pokemon should be treated as regular and relevant components of the metagame."),
+             "Pokémon in this tier are still firmly established as strong and common choices. Compared with the top 10, they may be slightly less universal, slightly more team-dependent, or easier to replace in certain structures, but they remain major parts of the format.\n"
+             "They often serve important competitive roles such as primary attackers, defensive pivots, setup sweepers, speed control options, matchup stabilizers, or checks to popular top-tier threats. These Pokémon should be treated as regular and relevant components of the metagame."),
             ("B", "31-60", "Established Role Players",
-             "Pokemon in this range have moderate usage and usually appear as role-specific picks rather than universal staples. They may not define the format, but they have clear value in the right team structure.\n"
-             "Many Pokemon in this tier are chosen for specific utility, defensive coverage, offensive pressure, matchup targeting, or synergy with a particular archetype. They are not always easy to fit, but when the team context is correct, they can perform their assigned role reliably."),
+             "Pokémon in this range have moderate usage and usually appear as role-specific picks rather than universal staples. They may not define the format, but they have clear value in the right team structure.\n"
+             "Many Pokémon in this tier are chosen for specific utility, defensive coverage, offensive pressure, matchup targeting, or synergy with a particular archetype. They are not always easy to fit, but when the team context is correct, they can perform their assigned role reliably."),
             ("C", "61-100", "Fringe Meta Options",
-             "Pokemon in this tier sit near the edge of regular metagame usage. They are not common enough to be considered standard picks, but they still have enough practical relevance to be worth tracking.\n"
-             "These Pokemon often require more deliberate support, more precise positioning, or a clearer matchup purpose. They may be used to exploit specific trends, punish common team structures, or introduce an unexpected angle into a matchup. They are not broadly reliable, but they are not irrelevant."),
+             "Pokémon in this tier sit near the edge of regular metagame usage. They are not common enough to be considered standard picks, but they still have enough practical relevance to be worth tracking.\n"
+             "These Pokémon often require more deliberate support, more precise positioning, or a clearer matchup purpose. They may be used to exploit specific trends, punish common team structures, or introduce an unexpected angle into a matchup. They are not broadly reliable, but they are not irrelevant."),
             ("D", "101+", "Low-Usage and Specialist Picks",
-             "Pokemon ranked outside the top 100 have limited presence in the current metagame. They are usually held back by low consistency, narrow matchups, heavy team-building costs, competition from stronger alternatives, or difficulty fitting into mainstream structures.\n"
-             "That said, low usage does not automatically mean a Pokemon is unviable. Some may offer a unique trait, surprise factor, specific counterplay option, or synergy within a specialized team. These Pokemon should be evaluated primarily by their distinct role rather than their raw usage alone."),
+             "Pokémon ranked outside the top 100 have limited presence in the current metagame. They are usually held back by low consistency, narrow matchups, heavy team-building costs, competition from stronger alternatives, or difficulty fitting into mainstream structures.\n"
+             "That said, low usage does not automatically mean a Pokémon is unviable. Some may offer a unique trait, surprise factor, specific counterplay option, or synergy within a specialized team. These Pokémon should be evaluated primarily by their distinct role rather than their raw usage alone."),
         ],
     },
 }
@@ -1582,21 +1602,23 @@ def command_compare(args: argparse.Namespace) -> None:
             out[row["format"]] = row
         emit(out, args.output)
         return
-    lines = [f"# Compare {args.pokemon}", ""]
+    lines = [f"# {i18n.t('pokemon')}: {repair_display_name(args.pokemon, 'pokemon', i18n.lang())}", ""]
     if resolution:
-        lines.append(f"- {i18n.t('resolved')}: `{args.pokemon}` → {resolved_name} (fuzzy, {i18n.t('distance')} {resolution.get('distance')})")
+        correction = f"{i18n.t('fuzzy')}, {i18n.t('distance')} {resolution.get('distance')}"
+        lines.append(f"- {i18n.t('resolved')}: `{args.pokemon}` → {resolved_name}{i18n.parens(correction)}")
         lines.append("")
     for row in rows:
         if not row.get("found"):
             lines.append(f"## {row['format']}\n{i18n.t('nf')}\n")
             continue
-        lines.append(f"## {row['format']}")
+        lines.append(f"## {i18n.value('format', row['format'])}")
         lines.append(f"- {i18n.t('rank')}: {row.get('rank')}")
-        lines.append(f"- {i18n.t('pokemon')}: {row.get('pokemon')} ({row.get('slug')})")
-        lines.append(f"- {i18n.panel_label('moves')}: {'; '.join(row.get('top_moves', []))}")
-        lines.append(f"- {i18n.panel_label('items')}: {'; '.join(row.get('top_items', []))}")
-        lines.append(f"- {i18n.panel_label('abilities')}: {'; '.join(row.get('top_abilities', []))}")
-        lines.append(f"- {i18n.panel_label('partners')}: {'; '.join(row.get('top_partners', []))}")
+        lines.append(f"- {i18n.t('pokemon')}: {_md_pokemon(row)}{i18n.parens(row.get('slug'))}")
+        for panel, field in (("moves", "top_moves"), ("items", "top_items"),
+                             ("abilities", "top_abilities"), ("partners", "top_partners")):
+            values = [repair_display_name(x, _KIND_BY_PANEL.get(panel), i18n.lang())
+                      for x in row.get(field, [])]
+            lines.append(f"- {i18n.panel_label(panel)}: {i18n.list_sep().join(values)}")
         lines.append("")
     print("\n".join(lines))
 
@@ -1678,7 +1700,7 @@ def main() -> int:
 
     detail = sub.add_parser("detail", parents=[common])
     detail.add_argument("pokemon_pos", nargs="*",
-                        help="Pokemon names; convenience alias for --pokemon")
+                        help="Pokémon names; convenience alias for --pokemon")
     detail.add_argument("--format", "--game-format", choices=["single", "double"], required=True)
     detail.add_argument("--season")
     detail.add_argument("--rule")

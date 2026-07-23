@@ -12,7 +12,7 @@ Model (frozen rubric — the audited turn-budget engagement, not a static thresh
       - same_field : both already out.        incoming = kill_hits - (we_act_first ? 1 : 0)
       - switch_in  : we pivot in on its move.  incoming = 1 + kill_hits - (we_act_first ? 1 : 0)
     `incoming` = how many enemy hits we must absorb before our KO lands.
-  * primary_grade — the ONLY hole-detection axis — is 3-way:
+  * grade is the one atomic build-pair axis and is 3-way:
       C2 = switch_in line safe (survive the switch hit + budget) AND we kill  -> "switch-in check"
            (NOT "counter": the engine models no status/recovery/PP/boosts/hazards/multi-turn, so a
            repeatable-wall claim would over-reach).
@@ -32,18 +32,17 @@ Model (frozen rubric — the audited turn-budget engagement, not a static thresh
     Hard C2/C1 require safe in {exact_true, approx_true}; `uncertain` never hardens a grade.
     The multi-hit integrity gate REUSES ncp's own ko_caveats detection (design §14 "DETECTED, not
     modelled") rather than a hand-kept unsafe-ability list.
-  * Two grades per cell, over two DIFFERENT incoming surfaces so the field names don't lie:
-      headline : the opponent's MODAL joint moveset (`opp_set['moves']`) + its MODAL speed.
-      strict   : the BROAD threat surface (`defense_damage`, meta >=floor U real joint) + its
-                 worst-case FAST speed variant. The pessimistic floor; hole detection uses THIS.
-    strict also evaluates meaningful non-modal Choice-Scarf speed and, when matchup supplies it,
-    real-team (item,ability) archetypes. Any unavailable archetype lane is declared in
-    `strict.missing_lanes` (never silently skipped).
+  * Each cell is one named member build × one retained observed opponent build. Its item, ability,
+    moves, spread and real speed are evaluated together; uncertainty lives in sibling cells rather
+    than a hidden synthetic fast lane. A species roll-up may take an observed floor only after every
+    retained build has its own atomic grade and must name the floor's witness build IDs.
   * resolvability — an ORTHOGONAL multi-turn qualifier, NOT part of the ordinal grade. The grade is a
     single-FRAME fact; a positive read (C2 wall / no-KO stalemate / slow grind) silently assumes the
     opponent neither sets up nor heals. When that is DETECTED false the read is `contested`, unless our
     member negates it — Unaware (纯朴) ignores the opponent's stat changes (hard), Haze/Taunt/phaze
-    answer at a tempo cost (soft). DETECTED not modelled (design §14): no boosted-state damage is run.
+    answer at a tempo cost (soft). An applicable accuracy-based OHKO route on either side also marks
+    the read `contested` without changing C2/C1/C0. DETECTED not modelled (design §14): no boosted-state
+    damage or OHKO probability sequence is run.
 
 Pure functions only: this module consumes already-computed matchup cell facts and calls no
 dex/meta/ncp sibling. All damage/speed arithmetic happened upstream in `matchup`.
@@ -272,23 +271,8 @@ _GRADE_RANK = {"C0": 0, "C1": 1, "C2": 2}
 # --------------------------------------------------------------------------------------------------
 # cell -> check object
 # --------------------------------------------------------------------------------------------------
-def _modal_incoming(cell: dict[str, Any],
-                    opp_set: dict[str, Any] | None) -> tuple[list[dict[str, Any]], bool]:
-    """The HEADLINE incoming surface + whether it is a DISTINCT modal read. Returns (surface, is_modal):
-    the broad `defense_damage` facts filtered down to the opponent's MODAL joint moveset — a subset of an
-    already-computed list, no extra ncp. `is_modal` is False when it FALLS BACK to the broad surface (no
-    distinct joint set, or the joint moves are all non-damaging / absent from the damage facts) so the
-    caller can label the headline honestly instead of claiming a modal read it never evaluated."""
-    dd = (cell.get("defense_damage") or {}).get("moves") or []
-    joint = {m for m in (opp_set or {}).get("moves") or [] if isinstance(m, str)}
-    if not joint:
-        return dd, False
-    subset = [f for f in dd if f.get("move") in joint]
-    return (subset, True) if subset else (dd, False)
-
-
 def _broad_incoming(cell: dict[str, Any]) -> list[dict[str, Any]]:
-    """The STRICT incoming surface: the full broad threat surface matchup already computed."""
+    """All damaging moves carried by this concrete opponent build."""
     return (cell.get("defense_damage") or {}).get("moves") or []
 
 
@@ -301,6 +285,7 @@ def _eid(fmt: str, attacker: str, defender: str, move: str | None) -> str | None
 # contract fails LOUDLY in the derived views instead of silently reading as None (a quietly weaker grade).
 REQUIRED_CELL_KEYS = frozenset({
     "offense", "defense_damage", "opponent", "speed", "defense_type", "opponent_has_priority",
+    "ohko_moves", "incoming_ohko_moves",
 })
 
 
@@ -313,26 +298,14 @@ def assert_cell_contract(cell: dict[str, Any]) -> None:
 
 
 def build_check(cell: dict[str, Any], member: str, opp_set: dict[str, Any] | None,
-                fmt: str, member_set: dict[str, Any] | None = None,
-                archetypes: list[dict[str, Any]] | None = None,
-                archetypes_partial: bool = False) -> dict[str, Any] | None:
-    """The `check` sub-object for one matchup cell. Returns None when damage is unavailable (no
-    offense/defense to grade on) — the cell keeps its raw facts and simply carries no grade.
+                fmt: str, member_set: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Grade one concrete member-build × opponent-build pair.
 
-    `member` is the species NAME (evidence_ids); `member_set` (optional) is our full set — its
-    ability + moves drive the multi-turn resolvability gate's OUR-negation leg (Unaware / Haze / ...).
-
-    `archetypes` is the repset (item,ability) lane (design §17). None (the default) = the lane was NOT
-    evaluated (thin/absent repset), so it stays disclosed in `strict.missing_lanes` and `primary_grade`
-    rests on the modal set alone (the pre-existing behaviour — every legacy caller keeps it). A LIST
-    (even empty) = the lane WAS evaluated: each entry is a pre-graded EXTRA archetype
-    ({cluster, coverage, confidence, grade, we_act_first_fast}) matchup computed with that archetype's
-    own item/ability/spread. Then `primary_grade` (the hole-detection axis) becomes the pessimistic
-    FLOOR across the modal grade AND every archetype grade — a real build that breaks the check drops
-    the floor — while `strict.grade` keeps the MODAL grade (its lines + evidence_ids), and
-    `strict.archetypes` discloses each. An empty list = repset resolved but the modal is the only real
-    archetype (nothing extra to worsen the floor), which still clears the missing lane (evaluated)."""
-    if cell.get("offense") is None and cell.get("defense_damage") is None:
+    Build uncertainty is represented by other matrix cells, never by hidden archetype or synthetic
+    fast lanes inside this cell. Returns None when neither direction has damage evidence.
+    """
+    if (cell.get("offense") is None and cell.get("defense_damage") is None
+            and not cell.get("ohko_moves") and not cell.get("incoming_ohko_moves")):
         return None
     opp = cell.get("opponent")
     speed = cell.get("speed") or {}
@@ -358,49 +331,10 @@ def build_check(cell: dict[str, Any], member: str, opp_set: dict[str, Any] | Non
     # (design §17 "只上不下"); a negative bracket just blocks the Speed-based first read.
     speed_first_ok = our_prio >= 0
 
-    # headline: modal moveset + modal speed order (priority upgrades a slow member to first).
-    we_first_modal = (speed.get("faster") == "member" and speed_first_ok) or priority_first
-    modal_surface, modal_is_distinct = _modal_incoming(cell, opp_set)
-    headline = grade_over_surface(offense, modal_surface, we_first_modal, resist_stab)
-
-    # strict: broad surface + worst-case fast speed (member must beat the opponent's fast variant AND,
-    # when the foe runs Choice Scarf at meaningful usage, its x1.5 scarf variant too — a tie counts as
-    # NOT first). This is the pessimistic floor hole-detection reads.
-    m_spe, o_fast = speed.get("member"), speed.get("opponent_fast")
-    o_scarf = speed.get("opponent_scarf")                # non-modal Scarf speed when it is a real lane
-    fast_threshold = o_fast
-    if o_scarf is not None and (fast_threshold is None or o_scarf > fast_threshold):
-        fast_threshold = o_scarf
-    we_first_fast = (bool(m_spe is not None and fast_threshold is not None and m_spe > fast_threshold)
-                     and speed_first_ok) or priority_first
-    strict = grade_over_surface(offense, _broad_incoming(cell), we_first_fast, resist_stab)
-
-    # strict completeness: matchup folds a meaningful non-modal Scarf variant into `opponent_scarf`.
-    # The repset archetype lane is evaluated only when the caller supplies a list (including empty).
-    missing: list[str] = [] if archetypes is not None else ["repset_archetypes"]
-    if archetypes is not None and archetypes_partial:
-        missing.append("repset_archetypes_partial")     # a real archetype's ncp requests ALL failed —
-                                                         # evaluated but not fully covered, not a clean lane
-    completeness = "incomplete" if missing else "complete"
-
-    # Archetype floor (design §17): primary_grade — the hole-detection axis — is the PESSIMISTIC grade
-    # across the modal set AND every real archetype (a build that breaks the check drops the floor).
-    # `strict.grade` stays the MODAL grade (it owns the displayed lines + evidence_ids); the archetype
-    # grades are DISCLOSED facts (like resolvability / intimidate_lane — no evidence_id of their own).
-    arch_lanes = None
-    strict_floor = strict["grade"]
-    if archetypes is not None:
-        arch_lanes = [{"cluster": a.get("cluster"), "coverage": a.get("coverage"),
-                       "confidence": a.get("confidence"), "grade": a.get("grade"),
-                       "we_act_first_fast": a.get("we_act_first_fast"), "c0_kind": a.get("c0_kind"),
-                       "resolvability": a.get("resolvability")}
-                      for a in archetypes]
-        for a in arch_lanes:
-            if a.get("grade") and _GRADE_RANK[a["grade"]] < _GRADE_RANK[strict_floor]:
-                strict_floor = a["grade"]
-
-    fragility = _fragility(headline, strict, offense, cell, opp_set, resist_stab,
-                           we_first_modal, we_first_fast, completeness)
+    # This pair names one concrete build on each side. The broad incoming list is the complete move
+    # surface carried by that named representative set; no second modal/strict reading exists.
+    we_first = (speed.get("faster") == "member" and speed_first_ok) or priority_first
+    graded = grade_over_surface(offense, _broad_incoming(cell), we_first, resist_stab)
 
     # C0 sub-kind (ORTHOGONAL to the ordinal — it never re-ranks C0): a defensive STALEMATE (we can't
     # reliably close, but the opponent can't 2HKO us either — a wall that just can't finish) vs an
@@ -411,21 +345,31 @@ def build_check(cell: dict[str, Any], member: str, opp_set: dict[str, Any] | Non
     # would have passed to C1/C2). So the split is purely defensive: do they break us in the near term?
     # A slow guaranteed kill (7HKO) is NOT "closing" and must not disqualify the wall.
     worst_broad = _worst_incoming(_broad_incoming(cell))
-    modal_c0_kind = None
-    if strict["grade"] == "C0":
-        modal_c0_kind = "wall_no_ko" if _survive(2, worst_broad) in _SAFE_HARD else "loss"
     c0_kind = None
-    if strict_floor == "C0":
-        floor_kinds = ([modal_c0_kind] if strict["grade"] == "C0" else []) + [
-            a.get("c0_kind") for a in (arch_lanes or []) if a.get("grade") == "C0"]
-        c0_kind = ("loss" if "loss" in floor_kinds else
-                   "wall_no_ko" if "wall_no_ko" in floor_kinds else None)
+    if graded["grade"] == "C0":
+        c0_kind = "wall_no_ko" if _survive(2, worst_broad) in _SAFE_HARD else "loss"
 
-    modal_resolvability = _resolvability(
-        offense, strict, cell, opp_set, member_set, modal_c0_kind, priority_first=priority_first)
-    resolvability = _floor_resolvability(
-        modal_resolvability, strict["grade"], strict_floor, arch_lanes, c0_kind)
-    intimidate_lane = _intimidate_switch_in(cell, offense, opp_set, member_set, we_first_fast)
+    resolvability = _resolvability(
+        offense, graded, cell, opp_set, member_set, c0_kind, priority_first=priority_first)
+    our_ohko = list(cell.get("ohko_moves") or [])
+    incoming_ohko = list(cell.get("incoming_ohko_moves") or [])
+    if our_ohko or incoming_ohko:
+        # Like setup/recovery, OHKO is a real but non-deterministic route: disclose uncertainty without
+        # changing the stable ordinal. The positive calc result already filtered obvious immunities.
+        parts = []
+        if our_ohko:
+            parts.append("our probabilistic OHKO route: " + ", ".join(our_ohko))
+        if incoming_ohko:
+            parts.append("opponent probabilistic OHKO threat: " + ", ".join(incoming_ohko))
+        ohko_note = "; ".join(parts) + "; stable C grade unchanged"
+        # Preserve ANY prior note, not just a prior CONTESTED one — a "clear"/soft note (e.g. an
+        # Unaware/Haze negation the OHKO route is orthogonal to) must not be discarded when OHKO
+        # flips the verdict to contested.
+        previous = str(resolvability.get("note") or "")
+        resolvability = {**resolvability, "verdict": "contested", "active": True,
+                         "applies_to": resolvability.get("applies_to") or "ohko_uncertainty",
+                         "note": (previous + "; " + ohko_note if previous else ohko_note)}
+    intimidate_lane = _intimidate_switch_in(cell, offense, opp_set, member_set, we_first)
 
     # priority revenge lane (soft): our best PRIORITY move striking first — a weaker move than our
     # hardest hit, but it can revenge a fast frail threat the neutral best-damage grade misses. Grade it
@@ -448,51 +392,54 @@ def build_check(cell: dict[str, Any], member: str, opp_set: dict[str, Any] | Non
     ) if e]
 
     caveats: list[str] = []
-    for scen in (headline, strict):
+    caveat_details: list[dict[str, Any]] = []
+
+    def add_caveat(code: str, text: str, **params: Any) -> None:
+        """Keep legacy English prose and add language-invariant presentation coordinates."""
+        caveats.append(text)
+        caveat_details.append({"code": code, "params": {
+            k: (v if v is None or isinstance(v, (str, int, float, bool)) else str(v))
+            for k, v in params.items()
+        }})
+
+    for scen in (graded,):
         sw = scen["lines"]["switch_in"]
         if sw["safe"] == "approx_true":
-            caveats.append(f"{scen is strict and 'strict' or 'headline'}: switch_in "
-                           f"incoming={sw['incoming_hits_required']} static approx (only OHKO exact)")
+            surface = "pair"
+            add_caveat(
+                "static_switch_approx",
+                f"{surface}: switch_in incoming={sw['incoming_hits_required']} static approx "
+                "(only OHKO exact)",
+                surface=surface, incoming_hits=sw["incoming_hits_required"],
+            )
         if sw["integrity_gate"]:
-            caveats.append(f"switch_in survival uncertain — {sw['integrity_gate']}")
-    if completeness == "incomplete":
-        caveats.append("strict floor incomplete — unevaluated lanes: " + ", ".join(missing))
-    if arch_lanes and _GRADE_RANK[strict_floor] < _GRADE_RANK[strict["grade"]]:
-        worst = min((a for a in arch_lanes if a.get("grade")),
-                    key=lambda a: _GRADE_RANK[a["grade"]])
-        caveats.append(f"a real archetype {worst.get('cluster')} (coverage {worst.get('coverage')}) "
-                       f"drops the strict floor to {strict_floor} from the modal {strict['grade']} — "
-                       "primary_grade reads this pessimistic floor")
+            add_caveat("switch_survival_uncertain",
+                       f"switch_in survival uncertain — {sw['integrity_gate']}",
+                       gate=sw["integrity_gate"])
     if our_prio > 0 and not priority_first and speed.get("faster") != "member":
-        why = ("blocked by opponent " + opp_ability if ability_blocks
-               else "conditional (only if the foe attacks)" if prio_move in _CONDITIONAL_PRIORITY
+        reason = ("ability_block" if ability_blocks else
+                  "conditional" if prio_move in _CONDITIONAL_PRIORITY else "opponent_priority")
+        why = ("blocked by opponent " + opp_ability if reason == "ability_block"
+               else "conditional (only if the foe attacks)" if reason == "conditional"
                else "opponent also carries priority")
-        caveats.append(f"our priority KO move is not counted as acting-first — {why}")
+        add_caveat("priority_not_first",
+                   f"our priority KO move is not counted as acting-first — {why}",
+                   reason=reason, ability=opp_ability if reason == "ability_block" else None)
     if resolvability["verdict"] == "contested":
-        caveats.append("multi-turn: " + resolvability["note"])
+        add_caveat("multi_turn_contested", "multi-turn: " + resolvability["note"],
+                   applies_to=resolvability.get("applies_to"))
 
     return {
-        "primary_grade": strict_floor,                   # hole-detection axis = the pessimistic floor
-                                                         # across the modal set AND every real archetype
-        "headline": {"grade": headline["grade"], "c1_mode": headline["c1_mode"],
-                     "c2_basis": headline["c2_basis"],
-                     "surface": "modal_joint_moves" if modal_is_distinct else "broad_fallback",
-                     "lines": headline["lines"]},
-        "strict": {"grade": strict["grade"], "c1_mode": strict["c1_mode"],
-                   "c2_basis": strict["c2_basis"], "surface": "broad_threat_surface",
-                   "completeness": completeness, "missing_lanes": missing,
-                   "archetypes": arch_lanes,             # per-archetype strict facts (null = unevaluated)
-                   "floor_grade": strict_floor,          # == primary_grade; worst of modal + archetypes
-                   "modal_resolvability": modal_resolvability,
-                   "lines": strict["lines"]},
-        "predicates": {**headline["predicates"],
-                       "we_act_first_fast": we_first_fast,
+        "grade": graded["grade"],
+        "c1_mode": graded["c1_mode"],
+        "c2_basis": graded["c2_basis"],
+        "lines": graded["lines"],
+        "predicates": {**graded["predicates"],
                        "priority_first": priority_first,
                        "priority_kill_candidate": priority_kill_candidate},
         "condition_profile": "neutral",
         "c0_kind": c0_kind,                              # loss | wall_no_ko | null (only meaningful on C0)
-        "set_fragility": fragility,
-        "resolvability": resolvability,                  # qualifier aligned to primary_grade / floor
+        "resolvability": resolvability,
         "intimidate_lane": intimidate_lane,              # soft -1 Atk switch-in read (null unless we have it)
         "priority_lane": priority_lane,                  # soft: best priority move striking first (null if none)
         "vs_set": {"set_confidence": (opp_set or {}).get("confidence"),
@@ -501,38 +448,8 @@ def build_check(cell: dict[str, Any], member: str, opp_set: dict[str, Any] | Non
                               "note": "does not enumerate rare coverage moves below the usage floor"},
         "evidence_ids": evidence,
         "caveats": caveats,
+        "caveat_details": caveat_details,
     }
-
-
-def _fragility(headline: dict[str, Any], strict: dict[str, Any], offense: dict[str, Any] | None,
-               cell: dict[str, Any], opp_set: dict[str, Any] | None, resist_stab: bool,
-               we_first_modal: bool, we_first_fast: bool, completeness: str) -> dict[str, Any]:
-    """Why (and how far) the grade drops from headline to strict — an ENUM + reason list, NEVER a
-    numeric tier gap (a distance integer is a latent score; audit). Attributes the drop to speed
-    (fast/scarf variant flips who-acts-first) vs coverage (a broad-surface move the modal set omits)
-    by re-grading each axis in isolation."""
-    if _GRADE_RANK[strict["grade"]] >= _GRADE_RANK[headline["grade"]]:
-        tag = "stable" if completeness == "complete" else "low_confidence"
-        reason = [] if completeness == "complete" else ["strict_incomplete"]
-        return {"tag": tag, "from": headline["grade"], "to": strict["grade"], "reason": reason}
-    reason: list[str] = []
-    # speed-only demotion: modal surface but the fast speed order.
-    if we_first_modal != we_first_fast:
-        speed_only = grade_over_surface(offense, _modal_incoming(cell, opp_set)[0], we_first_fast, resist_stab)
-        if _GRADE_RANK[speed_only["grade"]] < _GRADE_RANK[headline["grade"]]:
-            reason.append("scarf_speed")
-    # coverage-only demotion: broad surface but the modal speed order.
-    cover_only = grade_over_surface(offense, _broad_incoming(cell), we_first_modal, resist_stab)
-    if _GRADE_RANK[cover_only["grade"]] < _GRADE_RANK[headline["grade"]]:
-        reason.append("coverage_move")
-    if not reason:
-        reason.append("combined")
-    if completeness == "incomplete":
-        reason.append("strict_incomplete")
-    tag = ("speed_fragile" if reason == ["scarf_speed"]
-           else "coverage_fragile" if reason == ["coverage_move"]
-           else "fragile")
-    return {"tag": tag, "from": headline["grade"], "to": strict["grade"], "reason": reason}
 
 
 # --------------------------------------------------------------------------------------------------
@@ -580,50 +497,7 @@ _ANTI_RECOVERY_MOVES = {"taunt", "roar", "whirlwind", "dragon tail", "circle thr
 _ANTI_SETUP_ABILITY = {"unaware"}       # 纯朴: ignores the opponent's stat changes entirely (both ways)
 
 
-def _floor_resolvability(modal: dict[str, Any], modal_grade: str, floor_grade: str,
-                         archetypes: list[dict[str, Any]] | None,
-                         c0_kind: str | None) -> dict[str, Any]:
-    """Align the public qualifier with the same modal/archetype floor as `primary_grade`. The floor lane
-    is the modal set PLUS any real archetype tied at the floor grade; the qualifier reads the PESSIMISTIC
-    verdict across them, so a clean modal wall that a same-floor-grade real archetype contests still
-    surfaces as `contested` (it is not hidden behind the modal reading clean)."""
-    floor_rows = [a for a in (archetypes or []) if a.get("grade") == floor_grade]
-    resolved = [(a, a.get("resolvability")) for a in floor_rows
-                if isinstance(a.get("resolvability"), dict)]
-    contested = [(a, r) for a, r in resolved if r.get("verdict") == "contested"]
-    contested_floor = [{"cluster": a.get("cluster"), "applies_to": r.get("applies_to")}
-                       for a, r in contested]
-
-    def _qual(verdict: str, applies_to: str | None, active: bool,
-              archetype_floor: list, note: str) -> dict[str, Any]:
-        """Single source for the floor-qualifier shape — a future resolvability key is added here ONCE,
-        never missed in one of the cold branches below."""
-        return {"verdict": verdict, "applies_to": applies_to, "active": active,
-                "opponent": {}, "our_negation": {}, "archetype_floor": archetype_floor, "note": note}
-
-    if floor_grade == modal_grade:
-        # Floor is the modal lane; its own read qualifies it, but a real archetype TIED at the same grade
-        # whose positive read is contested makes the floor contested too (else it hides behind the modal).
-        if modal.get("verdict") == "contested" or not contested:
-            return modal
-        return _qual("contested", modal.get("applies_to"), True, contested_floor,
-                     "a real archetype tied at the floor grade has its positive read contested by "
-                     "detected setup/recovery (the modal read is clean); inspect strict.archetypes")
-    if floor_grade == "C0" and c0_kind == "loss":
-        return _qual("clean", None, False, [a.get("cluster") for a in floor_rows],
-                     "the archetype floor is a loss, so there is no positive multi-turn read to qualify")
-    if contested:
-        return _qual("contested", "archetype_floor", True, contested_floor,
-                     "a floor-defining real archetype has a positive read contested by its "
-                     "detected setup/recovery; inspect strict.archetypes")
-    active = [(a, r) for a, r in resolved if r.get("active")]
-    return _qual("clean", "archetype_floor" if active else None, bool(active),
-                 [a.get("cluster") for a in floor_rows],
-                 "floor-defining archetype reads are clean" if active
-                 else "no positive floor-archetype multi-turn read to qualify")
-
-
-def _resolvability(offense: dict[str, Any] | None, strict: dict[str, Any], cell: dict[str, Any],
+def _resolvability(offense: dict[str, Any] | None, graded: dict[str, Any], cell: dict[str, Any],
                    opp_set: dict[str, Any] | None, member_set: dict[str, Any] | None,
                    c0_kind: str | None = None, *, priority_first: bool = False) -> dict[str, Any]:
     """Qualify the cell's POSITIVE multi-turn read (C2 wall / stalemate / slow grind) as clean vs
@@ -638,7 +512,7 @@ def _resolvability(offense: dict[str, Any] | None, strict: dict[str, Any], cell:
     converters = sorted(opp_moves & _DEF_TO_OFFENSE)
     recovery = sorted(opp_moves & _RECOVERY)
     defense_conversion = bool(def_setup) and bool(converters)
-    speed_escalation = (bool(speed_setup) and strict["predicates"].get("we_act_first")
+    speed_escalation = (bool(speed_setup) and graded["predicates"].get("we_act_first")
                         and not priority_first)
     # Stored Power / Power Trip scale with the TOTAL boost count (Speed boosts included), which Unaware
     # does not ignore — so an Agility (speed-only) + Stored Power line still escalates through a wall.
@@ -649,9 +523,9 @@ def _resolvability(offense: dict[str, Any] | None, strict: dict[str, Any], cell:
     # (>=2-hit) grind we survive, or a defensive STALEMATE (`c0_kind == wall_no_ko` — we can't close but
     # they can't 2HKO us). A plain loss and a clean fast (OHKO) revenge carry no multi-turn claim.
     kill, _ = _kill_hits(offense)
-    sw, sf = strict["lines"]["switch_in"], strict["lines"]["same_field"]
+    sw, sf = graded["lines"]["switch_in"], graded["lines"]["same_field"]
     we_survive = sf["safe"] in _SAFE_HARD or sw["safe"] in _SAFE_HARD
-    if strict["grade"] == "C2":
+    if graded["grade"] == "C2":
         claim = "switch_in_wall"
     elif kill is not None and kill >= 2 and we_survive:
         claim = "slow_grind"
@@ -735,7 +609,7 @@ def _intimidate_switch_in(cell: dict[str, Any], offense: dict[str, Any] | None,
                           opp_set: dict[str, Any] | None, member_set: dict[str, Any] | None,
                           we_first: bool) -> dict[str, Any] | None:
     """The switch-in survival WITH our Intimidate applied (physical incoming x2/3). None when our member
-    has no Intimidate. Informational only: a softer switch-in read, never folded into primary_grade."""
+    has no Intimidate. Informational only: a softer switch-in read, never folded into `grade`."""
     if str((member_set or {}).get("ability") or "").casefold() != "intimidate":
         return None
     opp_ab = str((opp_set or {}).get("ability") or "").casefold()
@@ -784,68 +658,101 @@ def _intimidate_switch_in(cell: dict[str, Any], offense: dict[str, Any] | None,
 
 
 # --------------------------------------------------------------------------------------------------
-# coverage roll-up (per opponent, across the team) — the headline PRODUCT: where the holes are
+# coverage roll-up (per opponent species, across observed build variants and the team)
 # --------------------------------------------------------------------------------------------------
 def coverage_summary(members: list[dict[str, Any]]) -> dict[str, Any]:
-    """Per-opponent: the best strict primary grade any member reaches + who, and the explicit HOLE
-    list (opponents whose best strict grade is only C1 (revenge-only) or C0 (none)). Facts only —
-    a per-opponent label table + a distribution, NOT a team score and NOT a ranking of opponents."""
+    """Derive an explainable species portfolio from atomic build-pair checks.
+
+    Each opponent variant first keeps the strongest answer among the supplied members. The species'
+    ``observed_floor`` is then the weakest of those per-variant answers and always names its witness
+    variant(s). Calculation completeness and observed sample coverage are separate facts.
+    """
     per_opp: dict[str, dict[str, Any]] = {}
     order: list[str] = []
     for mrow in members:
         who = mrow.get("member")
         for c in mrow.get("cells", []):
+            opp = c.get("opponent")
+            if not opp:
+                continue
+            if opp not in per_opp:
+                per_opp[opp] = {"opponent": opp, "usage_rank": c.get("usage_rank"), "variants": {}}
+                order.append(opp)
+            vid = c.get("opponent_variant") or opp
+            variants = per_opp[opp]["variants"]
+            v = variants.setdefault(vid, {
+                "variant_id": vid,
+                "coverage": c.get("opponent_coverage"),
+                "is_modal": bool(c.get("opponent_is_modal") or vid == opp),
+                "grade": None,
+                "best_by": [],
+                "c0_kind": None,
+                "wall_no_ko_by": [],
+                "contested_by": [],
+            })
             chk = c.get("check")
             if not chk:
                 continue
-            opp = c.get("opponent")
-            if opp not in per_opp:
-                per_opp[opp] = {"opponent": opp, "usage_rank": c.get("usage_rank"),
-                                "best_strict": "C0", "best_switch_in_by": [],
-                                "best_modal_headline": "C0", "modal_headline_by": [], "fragile": [],
-                                "contested": [], "wall_no_ko_by": []}
-                order.append(opp)
-            e = per_opp[opp]
-            g = chk["primary_grade"]
-            if g == "C0" and chk.get("c0_kind") == "wall_no_ko" and who not in e["wall_no_ko_by"]:
-                e["wall_no_ko_by"].append(who)             # walls it but can't KO (a stalemate, not a loss)
-            if _GRADE_RANK[g] > _GRADE_RANK[e["best_strict"]]:
-                e["best_strict"] = g
-                e["best_switch_in_by"] = [who] if g == "C2" else []
-            elif g == e["best_strict"] == "C2":
-                e["best_switch_in_by"].append(who)
+            g = chk["grade"]
+            if v["grade"] is None or _GRADE_RANK[g] > _GRADE_RANK[v["grade"]]:
+                v["grade"] = g
+                v["best_by"] = [who]
+                v["c0_kind"] = chk.get("c0_kind") if g == "C0" else None
+            elif g == v["grade"]:
+                if who not in v["best_by"]:
+                    v["best_by"].append(who)
+                if g == "C0" and chk.get("c0_kind") == "loss":
+                    v["c0_kind"] = "loss"
+            if g == "C0" and chk.get("c0_kind") == "wall_no_ko" and who not in v["wall_no_ko_by"]:
+                v["wall_no_ko_by"].append(who)
             res = chk.get("resolvability") or {}
-            if res.get("verdict") == "contested" and all(
-                    who != x.split(":", 1)[0] for x in e["contested"]):
-                e["contested"].append(f"{who}:{res.get('applies_to')}")
-            mh = chk["headline"]["grade"]                # the MODAL-surface overall grade (not a strict
-            if _GRADE_RANK[mh] > _GRADE_RANK[e["best_modal_headline"]]:   # switch-in and not a same-field
-                e["best_modal_headline"] = mh            # line — named honestly so a hole row does not
-                e["modal_headline_by"] = [who]           # read a modal C2 as a strict answer
-            elif mh == e["best_modal_headline"] and mh != "C0":
-                e["modal_headline_by"].append(who)
-            frag = (chk.get("set_fragility") or {}).get("tag")
-            if frag in ("speed_fragile", "coverage_fragile", "fragile") and who not in e["fragile"]:
-                e["fragile"].append(f"{who}:{frag}")
-    rows = [per_opp[o] for o in order]
-    holes = [r for r in rows if _GRADE_RANK[r["best_strict"]] <= 1]      # C1 or C0 = no hard check
+            if res.get("verdict") == "contested" and who not in v["contested_by"]:
+                v["contested_by"].append(who)
+
+    rows: list[dict[str, Any]] = []
     dist: dict[str, int] = {"C2": 0, "C1": 0, "C0": 0}
-    for r in rows:
-        dist[r["best_strict"]] += 1
+    for opp in order:
+        base = per_opp[opp]
+        variants = list(base["variants"].values())
+        variants.sort(key=lambda v: (not v["is_modal"], -(v["coverage"] or 0), v["variant_id"]))
+        calculated = [v for v in variants if v["grade"] is not None]
+        floor = (min((v["grade"] for v in calculated), key=lambda g: _GRADE_RANK[g])
+                 if calculated else None)
+        witnesses = [v["variant_id"] for v in calculated if v["grade"] == floor]
+        representative = next((v for v in variants if v["is_modal"]), variants[0] if variants else None)
+        numeric = [float(v["coverage"]) for v in variants if isinstance(v.get("coverage"), (int, float))]
+        represented = round(sum(numeric), 4) if numeric else None
+        calculated_coverage = (round(sum(float(v["coverage"]) for v in calculated
+                                         if isinstance(v.get("coverage"), (int, float))), 4)
+                               if numeric else None)
+        row = {
+            "opponent": opp,
+            "usage_rank": base["usage_rank"],
+            "representative": ({"variant_id": representative["variant_id"],
+                                "grade": representative["grade"],
+                                "best_by": representative["best_by"]}
+                               if representative else None),
+            "observed_floor": {"grade": floor, "witness_variant_ids": witnesses},
+            "variants": variants,
+            "coverage": {
+                "represented": represented,
+                "calculated": calculated_coverage,
+                "unrepresented": round(max(0.0, 1.0 - represented), 4)
+                                 if represented is not None else None,
+            },
+            "calculation_complete": bool(variants) and len(calculated) == len(variants),
+        }
+        rows.append(row)
+        if floor:
+            dist[floor] += 1
+    holes = [r for r in rows
+             if r["observed_floor"]["grade"] is not None
+             and _GRADE_RANK[r["observed_floor"]["grade"]] <= 1]
     return {
         "by_opponent": rows,
-        "holes": [{"opponent": r["opponent"], "usage_rank": r["usage_rank"],
-                   "best_strict": r["best_strict"], "best_modal_headline": r["best_modal_headline"],
-                   "modal_headline_by": r["modal_headline_by"], "wall_no_ko_by": r["wall_no_ko_by"]}
-                  for r in holes],
-        "grade_distribution": dist,      # a COUNT, not a score; no cross-team ranking is emitted
-        "note": ("best_strict = strongest strict (pessimistic-floor) grade any member reaches vs that "
-                 "opponent; a HOLE = best_strict in {C1,C0} (no safe switch-in check). "
-                 "`best_modal_headline` is the MODAL-set overall grade (a typical-set read, may exceed "
-                 "best_strict — NOT a strict answer). `wall_no_ko_by` = members that WALL the opponent "
-                 "(survive it) but can't KO — a stalemate, NOT a loss (distinct from a plain C0). "
-                 "`contested` lists members whose positive read that opponent's DETECTED setup/recovery "
-                 "undermines (a C2 wall / a stalemate is not clean if it is also contested; design §17). "
-                 "C2/C1/C0 is an ordinal LABEL, never summed into a team score — cross-team comparison "
-                 "is the reader's judgment (design §1/§16)."),
+        "holes": holes,
+        "grade_distribution": dist,
+        "note": ("Each variant keeps the strongest member answer; observed_floor is the weakest of "
+                 "those answers and names the witness variants. Coverage is observed sample share; "
+                 "calculation_complete is a separate fact. C grades remain ordinal labels, never a score."),
     }

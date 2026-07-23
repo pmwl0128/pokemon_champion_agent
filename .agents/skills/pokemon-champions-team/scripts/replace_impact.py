@@ -79,21 +79,27 @@ def _roles_diff(b: dict[str, Any], a: dict[str, Any]) -> dict[str, Any]:
     """Team role-coverage shifts: roles wholly lost / gained, and roles that lost redundancy (a role
     still present but down to fewer bearers — losing the only / a backup carrier)."""
     cb, ca = b.get("coverage", {}), a.get("coverage", {})
-    lost, gained, thinner, thicker = [], [], [], []
+    lost, req_lost, gained, thinner, thicker = [], [], [], [], []
     for tag in sorted(set(cb) | set(ca)):
         pb, pa = cb.get(tag, {}), ca.get(tag, {})
         label = pa.get("label") or pb.get("label") or tag
+        # tier-aware: a LEVEL-1 (required) role wholly lost is a focused-attention gap, ranked
+        # ahead of level-2 losses. The role's tier is identical before/after (same format).
+        required = (pa.get("expectation") or pb.get("expectation") or "optional") == "required"
         if pb.get("present") and not pa.get("present"):
-            lost.append(label)
+            (req_lost if required else lost).append(label)
         elif not pb.get("present") and pa.get("present"):
             gained.append(label)
         elif pb.get("present") and pa.get("present"):
             nb, na = len(pb.get("bearers") or []), len(pa.get("bearers") or [])
             if na < nb:
-                thinner.append({"role": label, "bearers": f"{nb}->{na}"})
+                thinner.append({"role": label, "bearers": f"{nb}->{na}", "required": required})
             elif na > nb:
                 thicker.append({"role": label, "bearers": f"{nb}->{na}"})
-    return {"roles_lost": lost, "roles_gained": gained,
+    # roles_lost keeps EVERY lost label (level-1 first) for backward-compatible consumers;
+    # roles_lost_required isolates the level-1 subset for prominent rendering.
+    return {"roles_lost": req_lost + lost, "roles_lost_required": req_lost,
+            "roles_gained": gained,
             "redundancy_reduced": thinner, "redundancy_increased": thicker}
 
 
@@ -228,8 +234,12 @@ def format_replace_impact_md(d: dict[str, Any]) -> str:
     if not rd.get("skipped") and (rd["roles_lost"] or rd["roles_gained"]
                                   or rd["redundancy_reduced"] or rd.get("redundancy_increased")):
         lines.append(f"\n## {i18n.t('rep_roles')}")
-        if rd["roles_lost"]:
-            lines.append(f"- {i18n.t('rep_role_lost')}: {', '.join(rd['roles_lost'])}")
+        req_lost = rd.get("roles_lost_required") or []
+        opt_lost = [l for l in rd["roles_lost"] if l not in set(req_lost)]
+        if req_lost:
+            lines.append(f"- ⚠ {i18n.t('rep_role_lost_req')}: {', '.join(req_lost)}")
+        if opt_lost:
+            lines.append(f"- {i18n.t('rep_role_lost')}: {', '.join(opt_lost)}")
         if rd["roles_gained"]:
             lines.append(f"- {i18n.t('rep_role_gained')}: {', '.join(rd['roles_gained'])}")
         for t in rd["redundancy_reduced"]:

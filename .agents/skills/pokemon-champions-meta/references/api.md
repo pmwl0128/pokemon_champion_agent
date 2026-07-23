@@ -1,4 +1,4 @@
-# Pokemon Champions Meta API
+# Pokémon Champions Meta API
 
 This skill is read-only: it queries the prebuilt data under `data/` and performs no network access.
 Run `python scripts/meta_query.py schema` for the authoritative command, flag, field, and error
@@ -51,19 +51,20 @@ python scripts/meta_query.py export-excel --output-dir teams/
 
 `export-excel` reads only local data and is a **distribution artifact**: it always writes
 **three standalone single-language workbooks** (zh / ja / en), independent of `--lang` / the
-env var / `DEFAULT_LANG`. Each workbook is self-contained, with three worksheets in its own
+env var / `DEFAULT_LANG`. Each workbook is self-contained, with four worksheets in its own
 language:
 
+- a lookup sheet (`检索` / `検索` / `Lookup`) first — select one Pokémon to see its Singles and
+  Doubles panels plus the current factual changes for that Pokémon;
 - two data sheets (`单打`/`双打`, `シングル`/`ダブル`, or `Singles`/`Doubles`) — one row per
-  Pokemon. Names and every panel cell are rendered in that file's language via the dex (the
+  Pokémon. Names and every panel cell are rendered in that file's language via the dex (the
   naming authority): the en file carries no Chinese, the zh/ja files add an English
   cross-reference column. Columns (zh) are `排名`, `中文名`, `英文名`, `招式`, `道具`, `特性`,
-  `性格`, `队友`, `努力值`; ja/en use the translated headers (ja keeps `日本語名` + `英語名`, en
+  `性格`, `队友`, `SP 分配`; ja/en use the translated headers (ja keeps `日本語名` + `英語名`, en
   is `Name` only). Panel entries are ranked multiline cell text; SP spreads use `H/A/B/C/D/S`.
-- an update-report sheet (`更新报告` / `更新レポート` / `Update Report`) — a name-lookup block
-  (pick a name from the dropdown to see its single and double data side-by-side, in that
-  workbook's language) plus the single and double **update reports** side-by-side. The report
-  is read from `data/report_<season>_<format>.json` by default.
+- an update-report sheet (`更新报告` / `更新レポート` / `Update Report`) — the single and double
+  factual change tables plus their tier reference. Reports are read from
+  `data/report_<season>_<format>.json` by default.
 
 The files go to the current working directory (the user's project), never into the skill. The
 default season/rule is read from `data/current.json`. Before writing, generated report workbooks in

@@ -1,4 +1,4 @@
-# Pokemon Champions Dex Data Model And Query Semantics
+# Pokémon Champions Dex Data Model And Query Semantics
 
 This reference documents the bundled read-only database and the non-obvious semantics built on it.
 For the live CLI command and output contract, run `python scripts/champdex.py schema`; that executable
@@ -28,11 +28,11 @@ When an exact alias/canonical match fails, the resolver applies a conservative t
 
 Search conditions are ANDed:
 
-- `move <name>`: Pokemon must have the move in `learnsets`.
-- `ability <name>`: Pokemon ability list must contain the resolved ability.
-- `type <name>`: Pokemon must have that type.
+- `move <name>`: Pokémon must have the move in `learnsets`.
+- `ability <name>`: Pokémon ability list must contain the resolved ability.
+- `type <name>`: Pokémon must have that type.
 - `stat <expr>`: base stat must satisfy the expression, e.g. `spe>=110`.
 - `mega true|false`: filter Mega forms.
 - `pokemon/name <text>`: name or alias contains the text after normalization.
 
-When learnsets are unavailable for a Pokemon, move-based reverse searches should not guess. Report that results depend on the coverage of the `learnsets` table.
+When learnsets are unavailable for a Pokémon, move-based reverse searches should not guess. Report that results depend on the coverage of the `learnsets` table.

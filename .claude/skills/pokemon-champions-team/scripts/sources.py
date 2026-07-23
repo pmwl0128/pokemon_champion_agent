@@ -27,11 +27,75 @@ import json
 import sys
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import quote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import repset  # noqa: E402
 import evidence  # noqa: E402
+from mega import base_of_form_name  # noqa: E402
 from metalink import canonical_attacker_set, canonical_attacker_sets  # noqa: E402
+
+
+# --- Mega run-form resolution ------------------------------------------------------------------
+# The library stores a registered Mega in EITHER of two shapes, and both must resolve to the form
+# that actually battles:
+#   1. as the Mega species itself ('Mega Staraptor')  -- repset.dominant_form_from_teams handles it
+#   2. as the BASE species holding its stone ('Staraptor' + 'Staraptite')  -- resolved here
+# Shape 2 is how every DOUBLES partition is written (M-4 doubles: 2283 rows across 67 Mega forms,
+# zero explicit 'Mega X' rows), so before this resolver every doubles Mega was priced with base-form
+# stats, types and ability -- e.g. Staraptor stayed Normal/Flying 120 Atk instead of Fighting/Flying
+# 140 Atk, turning a guaranteed OHKO on Kingambit into a coin-flip. The 2026-06-25 audit fixed only
+# shape 1 (singles), which is why the doubles half of the matrix kept reading wrong.
+_MEGA_MEMO: dict[tuple[str, str], str | None] = {}
+
+
+def _default_item_fn(names: list[str]) -> dict[str, dict[str, Any]]:
+    from dexlink import lookup_items          # local: keeps sources importable without the dex
+    return lookup_items(names)
+
+
+def _default_dex_fn(names: list[str]) -> dict[str, dict[str, Any]]:
+    from dexlink import lookup_pokemon
+    return lookup_pokemon(names)
+
+
+def mega_run_form(species: str, item: str | None, *,
+                  item_fn: Callable[[list[str]], dict] | None = None) -> str | None:
+    """The Mega form `species` battles as while holding `item`, or None.
+
+    The dex `required_by` mapping is authoritative (it distinguishes X/Y stones and rejects a stone
+    belonging to another species). Memoized per (species, item) — an opponent battery resolves the
+    same handful of stones repeatedly."""
+    if not species or not item:
+        return None
+    key = (species, item)
+    if key in _MEGA_MEMO:
+        return _MEGA_MEMO[key]
+    fn = item_fn or _default_item_fn
+    form = None
+    try:
+        info = (fn([item]) or {}).get(item) or {}
+        for candidate in info.get("required_by") or []:
+            if base_of_form_name(candidate) == species:
+                form = candidate
+                break
+    except Exception:
+        form = None                            # dex unavailable -> no remap, never a guess
+    _MEGA_MEMO[key] = form
+    return form
+
+
+def mega_ability(form: str, *, dex_fn: Callable[[list[str]], dict] | None = None) -> str | None:
+    """The Mega form's own ability. A real-team row records the ability the mon holds BEFORE it Mega
+    evolves (Staraptor's Intimidate), which is illegal on the Mega and would price the wrong
+    ability-driven effects — the form's dex ability replaces it once the run form is known."""
+    try:
+        fn = dex_fn or _default_dex_fn
+        abilities = ((fn([form]) or {}).get(form) or {}).get("abilities") or []
+        first = abilities[0] if abilities else None
+        return first.get("name") if isinstance(first, dict) else first
+    except Exception:
+        return None
 
 
 def _cap(conf: str, ceiling: str) -> str:
@@ -101,13 +165,28 @@ def _merge_set(species: str, rep: dict | None, meta: dict | None,
     meta_move_names = {m.get("name") for m in meta_moves}
     threat_moves = list(meta_moves) + [{"name": mv, "pct": None}
                                        for mv in (rep["moves"] or []) if mv not in meta_move_names]
-    return {
+    # A run form implies the Mega's OWN ability: a base+stone library row records what the mon holds
+    # before it Mega evolves (Staraptor's Intimidate), which is illegal on the Mega and would price
+    # the wrong ability-driven effects. Only override when the dex actually answers.
+    effective_form = run_form if (run_form and run_form != species) else None
+    # Doubles registers a Mega as BASE species + stone, so the real-team row's ability is the
+    # pre-Mega ability that actually applies on switch-in.  Once `ability` below is rewritten to the
+    # Mega form's battle ability, preserve that joint base ability explicitly.  Singles commonly
+    # stores the Mega form itself; in that shape the row ability is already the run-form ability and
+    # must not be mislabeled as a pre-Mega fact.
+    rep_form = rep.get("_form") or rep.get("species")
+    base_ability = rep.get("ability") if effective_form and rep_form == species else None
+    ability = rep["ability"]
+    if effective_form:
+        ability = mega_ability(effective_form) or ability
+    out = {
         "species": species,
-        # The form actually RUN, when it differs from the meta label: singles rank a Mega under the base
-        # name ('Staraptor') but the library stores 'Mega Staraptor', so the real set is the Mega's and
-        # consumers must use the Mega's stats/types (audit 2026-06-25). None when there is no remap.
-        "run_form": run_form if (run_form and run_form != species) else None,
-        "ability": rep["ability"], "item": rep["item"], "nature": rep["nature"],
+        # The form actually RUN, when it differs from the meta label. Two library shapes reach this:
+        # singles rank a Mega under the base name while storing 'Mega Staraptor' (audit 2026-06-25),
+        # and doubles store the base species holding its stone (resolved via `mega_run_form`).
+        # Consumers must use this form's stats/types. None when there is no remap.
+        "run_form": effective_form,
+        "ability": ability, "item": rep["item"], "nature": rep["nature"],
         "moves": rep["moves"],                        # the real co-occurring set (what it RUNS)
         "threat_moves": threat_moves,                 # broad meta surface U joint (what it can HIT with)
         "sps": sps,                                   # real co-occurring spread or meta modal
@@ -130,6 +209,9 @@ def _merge_set(species: str, rep: dict | None, meta: dict | None,
         },
         "note": rep["note"] + spread_note,
     }
+    if base_ability:
+        out["base_ability"] = base_ability
+    return out
 
 
 def _rep_for(species: str, fmt: str, season: str | None, rule: str | None,
@@ -148,8 +230,17 @@ def _rep_for(species: str, fmt: str, season: str | None, rule: str | None,
                              "cross-regulation pollution)")
         try:
             teams = repset.cached_teams_for_rule(fmt, rule) if rule else repset.cached_teams(fmt, season)
-            run_form = repset.dominant_form_from_teams(species, fmt, teams)
-            return repset.representative_set_from_teams(run_form, fmt, teams), run_form
+            # The LIBRARY KEY and the BATTLE FORM are different questions and must not be conflated:
+            # the set is fetched under the name the partition actually stores, then the stone the
+            # fetched set holds decides the form it runs as. Remapping before the fetch (the obvious
+            # shortcut) would query 'Mega Staraptor' against a doubles partition that only has
+            # 'Staraptor' rows and read back as "no real data".
+            lib_key = repset.dominant_form_from_teams(species, fmt, teams)
+            rep = repset.representative_set_from_teams(lib_key, fmt, teams)
+            run_form = lib_key
+            if lib_key == species and rep:
+                run_form = mega_run_form(species, rep.get("item")) or species
+            return rep, run_form
         except (OSError, json.JSONDecodeError):
             return None, species
     else:
@@ -179,6 +270,139 @@ def resolve_opponent_set(species: str, fmt: str | None, *, season: str | None = 
     except Exception:
         meta = None
     return _merge_set(species, rep, meta, run_form=run_form)
+
+
+def variant_id(species: str, item: str | None, ability: str | None) -> str:
+    """Lossless stable key for one (item, ability) archetype.
+
+    Each component is percent-encoded independently, so spaces inside a field can never collide with
+    structural separators (the old slug boundary mapped ``A B|C`` and ``A|B C`` to the same key).
+    """
+    enc = lambda value: quote(value or "", safe="")
+    return f"variant:{enc(species)}|item={enc(item)}|ability={enc(ability)}"
+
+
+def _variant_rep(arch: dict[str, Any]) -> dict[str, Any]:
+    """An (item,ability) archetype in the `rep` shape `_merge_set` consumes (it needs a `note`)."""
+    cl = arch.get("cluster") or {}
+    note = (f"real-team archetype {cl.get('item') or '-'}/{cl.get('ability') or '-'}: "
+            f"{arch.get('count')}/{arch.get('sample')} teams"
+            + (" (fragmented — no cluster cleared the sample floor)" if arch.get("fragmented") else ""))
+    return {**arch, "note": note}
+
+
+def resolve_opponent_variants(species: str, fmt: str, *, season: str | None = None,
+                              rule: str | None = None,
+                              repset_fn: Callable[..., list | None] | None = None,
+                              meta: dict[str, Any] | None = None,
+                              meta_fn: Callable[..., dict | None] = canonical_attacker_set
+                              ) -> list[dict[str, Any]]:
+    """Every real-team (item,ability) archetype of `species`, each merged into a FULL opponent set.
+
+    This is the plural sibling of `resolve_opponent_set`. The single-modal resolver can only describe
+    one build, but a species that genuinely splits — doubles Staraptor runs Staraptite (88% coverage)
+    AND Choice Scarf (8%) — has two materially different opponents behind one name: only the first
+    Mega-evolves, so they differ in typing, stats, ability and speed tier. Collapsing them to the
+    modal made the Scarf build invisible.
+
+    Each variant resolves its OWN `run_form`, because the archetype's ITEM is what decides
+    Mega-vs-base. `is_modal` marks the highest-coverage variant (what a caller shows by default) and
+    `coverage` is that archetype's share of the species' team pool — surfaced so a 2%-coverage row is
+    never read as an equal-weight fact next to an 88% one.
+
+    Returns [] when the species has no real-team read at all (below MIN_SAMPLE); callers fall back to
+    `resolve_opponent_set` for the meta-only path.
+    """
+    if not fmt:
+        raise ValueError("resolve_opponent_variants requires an explicit format")
+    if repset_fn is not None:
+        arches = repset_fn(species, fmt, season=season) or []
+    else:
+        if not (season or rule):
+            raise ValueError("an explicit season or rule is required for the real-team library")
+        try:
+            teams = repset.cached_teams_for_rule(fmt, rule) if rule else repset.cached_teams(fmt, season)
+            # Collect across EVERY library form of the species, not just its dominant one.
+            # Clustering is per species-NAME, and the singles partition files a registered Mega under
+            # its own name ('Mega Greninja'), so querying only the dominant form made the other half
+            # of the species invisible: singles Greninja is ~36 base / ~38 Mega, and only the Mega
+            # was ever shown. Doubles stores base+stone, where (item,ability) already separates them.
+            arches = []
+            for form in repset.library_forms(species, teams) or [species]:
+                for a in repset.representative_sets_from_teams(form, fmt, teams) or []:
+                    arches.append({**a, "_form": form})
+            # Coverage arrives denominated on each FORM's own pool, which would read as
+            # "100% of Mega Greninja" next to "100% of Greninja". Re-denominate on the combined pool
+            # so the shares are comparable and sum to the species.
+            #
+            # The numerator is the CLUSTER's size, recovered as coverage x that form's sample.
+            # `count` is a different number — the exact joint set within the cluster — and using it
+            # collapsed every share to a few percent AND inverted the ranking: singles Charizard is
+            # 35 Mega-Y vs 17 Mega-X, but their exact-joint counts are 4 and 5, so X sorted ahead
+            # of a build twice its size.
+            total = 0
+            for form in {a["_form"] for a in arches}:
+                first = next(a for a in arches if a["_form"] == form)
+                total += int(first.get("species_sample") or 0)
+            if total > 0:
+                for a in arches:
+                    cov, samp = a.get("coverage"), a.get("species_sample")
+                    if isinstance(cov, (int, float)) and isinstance(samp, int):
+                        a["coverage"] = round(cov * samp / total, 4)
+        except (OSError, json.JSONDecodeError):
+            return []
+    if not arches:
+        return []
+    # Form-local clustering can yield up to MAX_CLUSTERS for EACH form. Once their coverage shares
+    # have the common base+Mega denominator, apply the materiality floor and the global ceiling once.
+    # This is both the public evidence boundary and the calculation budget boundary.
+    arches = [a for a in arches
+              if a.get("coverage") is None
+              or float(a.get("coverage") or 0) >= repset.MIN_CLUSTER_COVERAGE]
+    arches.sort(key=lambda a: (-(a.get("coverage") or 0),
+                               str((a.get("cluster") or {}).get("item") or ""),
+                               str((a.get("cluster") or {}).get("ability") or "")))
+    arches = arches[:repset.MAX_CLUSTERS]
+    if not arches:
+        return []
+    if meta is None:
+        try:
+            meta = meta_fn(species, fmt)
+        except Exception:
+            meta = None
+
+    represented = round(sum(float(a.get("coverage") or 0) for a in arches), 4)
+    out: list[dict[str, Any]] = []
+    for arch in arches:
+        run_form = mega_run_form(species, arch.get("item")) or species
+        merged = _merge_set(species, _variant_rep(arch), meta, run_form=run_form)
+        if not merged:
+            continue
+        merged["variant_id"] = variant_id(species, arch.get("item"), arch.get("ability"))
+        # The PRE-Mega ability, kept whenever it differs from the battle ability. Two archetypes can
+        # share a stone yet differ only here (Staraptite|Intimidate vs Staraptite|Reckless both fight
+        # as Contrary) — and that is NOT a duplicate row: the mon enters in its base form, so
+        # Intimidate still fires on switch-in before it Mega evolves. Damage is priced on the Mega's
+        # ability; this field is what lets a reader tell the two apart.
+        if run_form != species and arch.get("ability") != merged.get("ability"):
+            merged["base_ability"] = arch.get("ability")
+        merged["coverage"] = arch.get("coverage")
+        merged["variant_sample"] = arch.get("sample")
+        merged["variant_count"] = arch.get("count")
+        merged["fragmented"] = bool(arch.get("fragmented"))
+        merged["cluster"] = arch.get("cluster")
+        merged["cluster_basis"] = "item_ability"
+        merged["represented_coverage"] = represented
+        merged["unrepresented_coverage"] = (round(max(0.0, 1.0 - represented), 4)
+                                               if any(a.get("coverage") is not None for a in arches)
+                                               else None)
+        merged["speed_profile"] = arch.get("speed_profile")
+        out.append(merged)
+    # Highest coverage is the default row. `sorted` is stable, so repset's own ordering breaks ties.
+    out.sort(key=lambda v: -(v.get("coverage") or 0))
+    for i, v in enumerate(out):
+        v["is_modal"] = (i == 0)
+    return out
 
 
 def resolve_opponent_sets(species_list: list[str], fmt: str | None, *, season: str | None = None,

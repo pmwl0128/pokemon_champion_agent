@@ -47,7 +47,7 @@ BANNED_CLAIM_TERMS = (
 # The structured numbers a claim's `expect` may pin, per evidence kind — exactly the keys the
 # recompute produces (matchup.dmg_fact / matchup.pair_speed), never free-form.
 DAMAGE_EXPECT_KEYS = frozenset({"ko_guaranteed", "ko_possible", "min_percent", "max_percent"})
-SPEED_EXPECT_KEYS = frozenset({"faster", "member", "opponent", "opponent_fast"})
+SPEED_EXPECT_KEYS = frozenset({"faster", "member", "opponent"})
 _PCT_TOLERANCE = 0.1                      # damage percents may be transcribed rounded to one decimal
 _SCAFFOLD_FIELDS = ("worst_matchup", "accepted_by_constraint", "opportunity_cost")
 _TUNING_STATUSES = frozenset({"tuned", "proposed", "not_run", "not_applicable"})
@@ -299,6 +299,27 @@ def _mega_rationale_violations(rec: dict[str, Any], cand: dict[str, Any],
     return []
 
 
+def _mega_deviation_violations(rec: dict[str, Any], cand: dict[str, Any],
+                               where: str) -> list[dict[str, Any]]:
+    assessment = (cand.get("mega_registration_assessment")
+                  if isinstance(cand.get("mega_registration_assessment"), dict) else {})
+    if not assessment.get("requires_deviation_ack"):
+        return []
+    dev = rec.get("mega_registration_deviation")
+    if not isinstance(dev, dict):
+        return [{"code": "missing_mega_registration_deviation", "where": where,
+                 "detail": "this survivor uses an observed minority/rare Mega-registration lane; "
+                           "disclose {reason,evidence,opportunity_cost} instead of presenting the "
+                           "deviation as the frame's normal registration shape"}]
+    missing = [key for key in ("reason", "evidence", "opportunity_cost")
+               if not _nonempty(dev.get(key))]
+    if missing:
+        return [{"code": "incomplete_mega_registration_deviation",
+                 "where": f"{where}.mega_registration_deviation",
+                 "detail": "missing " + ", ".join(missing)}]
+    return []
+
+
 def _replacement_rationale_violations(rec: dict[str, Any], where: str) -> list[dict[str, Any]]:
     entries = rec.get("replacement_rationale")
     if entries is None:
@@ -380,16 +401,35 @@ def audit_answer(draft: Any, slate_input: Any, slate_output: Any, *,
         c = candidates[i] if 0 <= i < len(candidates) else None
         return c if isinstance(c, dict) else {}
 
+    candidate_facts = None
+    if out_receipt.get("candidate_facts_bound"):
+        candidate_facts = {
+            i: {"mega_plan": _cand(i).get("mega_plan"),
+                "mega_registration_assessment": _cand(i).get("mega_registration_assessment"),
+                "selection": _cand(i).get("selection")}
+            for i in survivors}
+        candidate_facts["_slate"] = slate_output.get("mega_registration_slate")
     recomputed = slate_mod.slate_fingerprint(
         out_receipt.get("audit_fingerprint"), slate_input["teams"], survivors, battery_fmt,
         {i: _cand(i).get("matchup_risk") for i in survivors},
-        out_receipt.get("frame_fingerprint"))    # P4.5 chain link (None on a non-build slate)
+        out_receipt.get("frame_fingerprint"), candidate_facts)  # frame + selection/registration facts
     if recomputed != out_receipt["fingerprint"]:
         return _refuse("slate_output_inconsistent",
                        "the slate output does not reproduce its own receipt fingerprint from this "
                        "slate input — the output was edited after the run, or it is paired with a "
                        "different slate.json",
                        expected_fingerprint=recomputed, provided_fingerprint=out_receipt["fingerprint"])
+    # A frame-bound (build-flow) slate that reproduces its fingerprint WITHOUT candidate_facts_bound
+    # predates the Mega-registration / 6-pick-N selection gates (399fcf2): its receipt binds neither,
+    # so the mega_registration_slate / deviation checks below would silently no-op on the pre-gate
+    # receipt and grandfather it to PASS.  Refuse — the terminal gate re-runs against the current
+    # chain instead of certifying an answer whose registration/selection facts were never bound.
+    if out_receipt.get("frame_fingerprint") and not out_receipt.get("candidate_facts_bound"):
+        return _refuse("receipt_upgrade_required",
+                       "this build-flow slate output predates the Mega-registration / selection "
+                       "gates (frame-bound receipt without candidate_facts_bound). Re-run "
+                       "team.py slate-evaluate --frame-output so the receipt binds the current "
+                       "candidate facts, then re-audit.")
     ctx = slate_input.get("context") if isinstance(slate_input.get("context"), dict) else {}
     ctx_audit = context_audit_fn(ctx) or {}
     audit_fp = (ctx_audit.get("audit_receipt") or {}).get("fingerprint")
@@ -411,6 +451,16 @@ def audit_answer(draft: Any, slate_input: Any, slate_output: Any, *,
                                      "slate output has no frame fingerprint. Re-run team.py frame, then "
                                      "slate-evaluate with --frame-output before drafting the answer."})
     violations.extend(_onboarding_summary_violations(draft, ctx))
+    mega_slate = (slate_output.get("mega_registration_slate")
+                  if isinstance(slate_output.get("mega_registration_slate"), dict) else {})
+    if mega_slate.get("status") == "missing_modal_lane":
+        violations.append({
+            "code": "missing_modal_mega_registration_lane",
+            "where": "mega_registration_slate",
+            "detail": "no survivor is modal relative to its bound frame's observed Mega-registration "
+                      "distribution. Re-slate with at least one modal lane, or encode the "
+                      "user's explicit none/single/multi mega_posture in build-context and rerun the chain.",
+        })
     if not library_copy_fn:
         # The transparency gate must never fail SILENT: without a library to check against, a
         # verbatim copy would pass indistinguishably from "checked and clean" (self-audit
@@ -506,7 +556,24 @@ def audit_answer(draft: Any, slate_input: Any, slate_output: Any, *,
                                          "trade-off — a recommendation without a cost is a crowned "
                                          "winner"})
         violations.extend(_mega_rationale_violations(rec, _cand(idx), where))
+        violations.extend(_mega_deviation_violations(rec, _cand(idx), where))
         violations.extend(_replacement_rationale_violations(rec, where))
+
+    # Carrying a modal lane in the slate is not enough if the final answer silently drops it.  Under
+    # the environment posture the recommended set retains at least one survivor that was modal relative
+    # to its own frame; an intentional single/none/multi or off-meta answer must be encoded upstream and
+    # re-slated so the receipt states that posture instead of laundering the choice at prose time.
+    modal_indices = {i for i in (mega_slate.get("modal_lane_indices") or []) if isinstance(i, int)}
+    recommended_indices = {i for i, _ in canon_rec if isinstance(i, int) and i in survivors}
+    if mega_slate.get("status") == "covered" and modal_indices \
+            and not (recommended_indices & modal_indices):
+        violations.append({
+            "code": "recommended_omits_modal_mega_registration_lane",
+            "where": "recommended",
+            "detail": "the slate carried a candidate that is modal relative to its bound frame, but "
+                      "the recommended set omits every such lane. Include at least one, or encode an "
+                      "explicit mega_posture/off_meta intent upstream and rerun the receipt chain.",
+        })
 
     # One team = one DISTINCT team (duplicates collapse), and the declaration is the TYPED contract
     # `single_team_requested: true` — a truthy string like "yes"/"false" is not a declaration

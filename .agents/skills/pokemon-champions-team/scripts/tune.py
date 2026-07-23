@@ -1,12 +1,10 @@
 #!/usr/bin/env python
-"""tune operator: SP fine-tuning as cliff detection.
+"""tune operator: explicit SP benchmark frontiers.
 
-First version: survival cliffs (via ncp) and speed cliffs (pure closed form, joined to a KO check).
-The threat *targets* come from explicit `build-context.benchmarks`; each target's attacker *set*
-(ability / item / nature / spread) is the meta MODAL set (so Huge Power etc. is never silently
-dropped), with a synthetic max-offense fallback flagged low-confidence when meta has no data.
-Auto-discovering the threat LIST from meta top-K is still a later increment. Output is ranked cliff
-cards (facts + minimum SP), never a single "optimal spread".
+Threat targets come only from `build-context.benchmarks`. Each card preserves the requested
+benchmark as its primary objective, reports factual adjacent lanes (probability, allocation,
+conditions, nature, or target-set ceiling), and exposes the 66-SP funding trade-off. It never
+auto-selects threats, combines unrelated objectives into a score, or emits a single "optimal spread".
 
 All external lookups are injected (damage_fn / move_fn / dex_fn / meta_fn) so the logic is
 unit-testable without the sibling skills; defaults wire to ncplink + dexlink + metalink.
@@ -21,19 +19,21 @@ from typing import Any, Callable
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cliffs import (  # noqa: E402
     SP_CAP, champ_speed, solve_outspeed, solve_min_sp, survival_prob, meets_target, ko_roll,
-    defensive_headroom, rank_cards, candidate_natures, weather_speed_mult, effective_speed,
+    candidate_natures, weather_speed_mult, effective_speed,
 )
-from context_profile import get_profile  # noqa: E402
 from typechart import effectiveness  # noqa: E402
 from rules import get_ruleset  # noqa: E402
 from diagnose import _stat_orientation  # noqa: E402  (reuse the base-stat offense lean)
-from mega import mega_form_from_maps  # noqa: E402
+from mega import (  # noqa: E402
+    effective_form_ability, effective_member_from_maps, mega_form_from_maps,
+)
 from battle_effects import INTIMIDATE_BLOCKING_ITEMS, INTIMIDATE_NO_RELIEF_ABILITIES  # noqa: E402
 import completeness  # noqa: E402
 import team_i18n as i18n  # noqa: E402
 
 SP_TOTAL_CAP = get_ruleset().sp_total_cap   # centralized registration constant (rules.py)
 SPREAD_TO_SPS = {"hp": "hp", "atk": "at", "def": "df", "spa": "sa", "spd": "sd", "spe": "sp"}
+SPS_TO_SPREAD = {v: k for k, v in SPREAD_TO_SPS.items()}
 DEF_SPS = {"physical": "df", "special": "sd"}        # which defensive stat a move pressures
 DEF_SPREAD = {"physical": "def", "special": "spd"}   # the same stat as a team-json spread key
 # Special-category moves that deal damage against the PHYSICAL defense (Def), not SpD. Category alone
@@ -54,26 +54,16 @@ OFF_SPS = {"physical": "at", "special": "sa"}
 OFF_SPREAD = {"physical": "atk", "special": "spa"}    # offensive stat as a team-json spread key
 OFF_NATURE = {"physical": "Adamant", "special": "Modest"}
 KILL_HITS = {"ohko": 1, "2hko": 2}                    # benchmark kind -> hits the KO needs
-NATURE_LANE_MIN_SAVINGS = 8   # §16.8 importance gate: a nature lane surfaces only if it unlocks an
-                              # unreachable/infeasible cliff OR frees at least this many SP
+NATURE_LANE_MIN_SAVINGS = 1   # a meta-grounded improvement is a fact; opportunity cost stays explicit
 
-# --- Mega form + ability special-judgment (design §9, re-audit 2026-07-07) -----------------
-# A Mega-stone holder is computed as its MEGA form (Mega stats / typing / ability) everywhere — the
-# defender we survive on, the attacker we KO with, the speed base. A few abilities act at switch-in
-# (BEFORE Mega Evolution) or otherwise describe the pre-Mega form, so the special checks below consider
-# BOTH the base (pre-Mega) ability AND the Mega ability — EITHER present counts. A base ability read
-# from a meta usage distribution counts only when it is run at >= this share; a member's OWN base
-# ability comes from the team-json (the player's declared choice) and needs no usage gate.
+# --- Mega form + phase-specific ability judgments (design §9) ------------------------------
+# Damage and post-evolution Speed use the effective Mega form and Mega ability. Switch-in effects
+# use the pre-Mega form and base ability. Effects that can occur on either side of evolution (for
+# example Intimidate) explicitly inspect both phases; this is never a blanket ability union.
 SPECIAL_BASE_ABILITY_USAGE_FLOOR = 20.0
 
 # Back-compatible public name; the shared constant mirrors the calculator's Intimidate handler.
 INTIMIDATE_IMMUNE_ABILITIES = INTIMIDATE_NO_RELIEF_ABILITIES
-
-# Opponent Choice Scarf is modelled as a faster speed target when it is a TOP-N meta item at > this
-# usage (a rank-2/3 item at ~0.3% is noise, not a threat). Single source in metalink so tune's speed
-# advice and matchup's check scarf lane agree on the threshold (re-audit 2026-07-07).
-from metalink import OPPONENT_SCARF_TOP_N, OPPONENT_SCARF_USAGE_FLOOR  # noqa: E402
-
 
 def _ability_key(ability: Any) -> str:
     return str(ability or "").strip().casefold()
@@ -210,7 +200,7 @@ def _form_record(name: str | None, item: str | None, ability: str | None, dex_fn
         base_abilities = set(base_facts.get("abilities") or [])
         # Real-team/meta run_form sets usually carry the actually-run ability. Preserve it if present;
         # otherwise fall back to the run form's first ability.
-        resolved = ability if ability else (run_abilities[0] if run_abilities else None)
+        resolved = effective_form_ability(ability, rfacts)
         resolved_base_ability = base_ability or (ability if ability in base_abilities else None)
         return {"name": run_form, "ability": resolved, "base_ability": resolved_base_ability,
                 "mega_ability": resolved if rfacts.get("is_mega") else None,
@@ -221,8 +211,13 @@ def _form_record(name: str | None, item: str | None, ability: str | None, dex_fn
     mform = _mega_form_name(name, item, dex_fn, item_fn, facts=base_facts)
     if mform and mform != name:
         mfacts = _dex_facts(mform, dex_fn)
-        mega_ability = (mfacts.get("abilities") or [None])[0]
-        return {"name": mform, "ability": mega_ability or ability,
+        actor = effective_member_from_maps(
+            {"species": name, "item": item, "ability": ability},
+            {name: base_facts, mform: mfacts},
+            {item: {"required_by": [mform]}} if item else {},
+        )
+        mega_ability = actor.get("ability")
+        return {"name": mform, "ability": mega_ability,
                 "base_ability": base_ability or ability, "mega_ability": mega_ability,
                 "is_mega": True, "facts": mfacts, "base_facts": base_facts,
                 "base_name": name}
@@ -238,8 +233,7 @@ def _effective_form(member: dict[str, Any], dex_fn: Callable,
     {name, ability, base_ability, mega_ability, is_mega, facts, base_facts} — `name`/`ability` feed the
     ncp calc, `base_ability` is the team-json/pre-Mega ability (for switch-in special checks), `facts`
     are the resolved form's dex facts (types/stats), and `base_facts` are the PRE-Mega form's (entry
-    hazards resolve at switch-in, before Mega Evolution, so hazard typing reads the base form). See
-    _special_ability_present for the two-place ability rule."""
+    hazards resolve at switch-in, before Mega Evolution, so hazard typing reads the base form)."""
     return _form_record(member.get("species"), member.get("item"), member.get("ability"),
                         dex_fn, item_fn, base_ability=member.get("base_ability"))
 
@@ -253,7 +247,7 @@ def _calc_member(member: dict[str, Any], eff: dict[str, Any]) -> dict[str, Any]:
 def _special_ability_present(specials: set[str], resolved_ability: str | None,
                              base_ability: str | None, base_pct: float | None,
                              *, base_gated: bool) -> bool:
-    """Whether any ability in `specials` is present on the set as MODELLED (§9 two-place rule). The
+    """Whether any ability in `specials` is present in a phase where the effect can apply. The
     resolved (in-calc, post-Mega for a stone holder) ability counts UNCONDITIONALLY — it IS the set the
     damage math runs, so gating it would contradict the calc on the same card. The pre-Mega base
     ability counts unconditionally when declared/observed (an explicit set, a real-team joint set, or
@@ -275,18 +269,55 @@ def _invested_stats(spread: dict[str, Any] | None) -> set[str]:
     return {k for k, v in (spread or {}).items() if k in ("atk", "def", "spa", "spd", "spe") and v}
 
 
-def _outcome(min_total: int | None, cur: int, base_sps: dict[str, int]) -> dict[str, Any]:
-    """Normalise a solved min-SP into {result, delta_sp, need_total} against the current spend + the
-    66 SP budget — the shared verdict for a baseline card and each nature lane (so they compare)."""
+def _reallocation_plan(delta: int, target_stat: str | set[str],
+                       base_sps: dict[str, int]) -> dict[str, Any] | None:
+    """Describe how a target-stat increase fits the 66-SP registration budget.
+
+    A legal full spread is not a dead end: it can fund a cliff by moving SP from another invested
+    stat. Donors are candidates, not an automatic spread recommendation; every donor carries an
+    opportunity cost that the caller must compare with its other explicit benchmarks.
+    """
+    spent = sum(base_sps.values())
+    unused = max(0, SP_TOTAL_CAP - spent)
+    required = max(0, delta - unused)
+    if required == 0:
+        return None
+    target_stats = {target_stat} if isinstance(target_stat, str) else set(target_stat)
+    donors = [
+        {"stat": SPS_TO_SPREAD.get(stat, stat), "current_sp": amount,
+         "opportunity_cost": f"reducing {SPS_TO_SPREAD.get(stat, stat)} may give up another benchmark"}
+        for stat, amount in base_sps.items()
+        if stat not in target_stats and amount > 0
+    ]
+    donors.sort(key=lambda row: (-row["current_sp"], row["stat"]))
+    return {
+        "required_sp": required,
+        "available_sp": sum(row["current_sp"] for row in donors),
+        "unused_sp": unused,
+        "candidate_donors": donors,
+        "note": "candidate donors are not an automatic spread; re-check every affected benchmark",
+    }
+
+
+def _outcome(min_total: int | None, cur: int, base_sps: dict[str, int],
+             target_stat: str) -> dict[str, Any]:
+    """Normalise a solved min-SP into a budget-aware cliff verdict.
+
+    The target-stat minimum is a one-dimensional fact. Budget funding is reported separately:
+    unused SP first, then an explicit reallocation envelope over other invested stats.
+    """
     if min_total is None:
         return {"result": "unreachable", "delta_sp": SP_CAP + 1}
     delta = max(0, min_total - cur)
-    total_after = sum(base_sps.values()) - cur + max(cur, min_total)
     if delta == 0:
         return {"result": "already", "delta_sp": 0, "need_total": min_total}
-    if total_after > SP_TOTAL_CAP:
-        return {"result": "infeasible", "delta_sp": delta, "need_total": min_total}
-    return {"result": "cliff", "delta_sp": delta, "need_total": min_total}
+    plan = _reallocation_plan(delta, target_stat, base_sps)
+    out = {"result": "cliff", "delta_sp": delta, "need_total": min_total}
+    if plan is not None:
+        out["reallocation"] = plan
+        if plan["required_sp"] > plan["available_sp"]:
+            out["result"] = "infeasible"
+    return out
 
 
 def _nature_lanes(target_spread_stat: str, current_nature: str | None, cur: int,
@@ -294,8 +325,8 @@ def _nature_lanes(target_spread_stat: str, current_nature: str | None, cur: int,
                   invested: set[str], offense_lean: str | None, meta_natures: set[str]) -> dict[str, Any]:
     """Build the §16.8 nature-lane attachment for one cliff. `solve_min_fn(nature)->min_total|None`
     re-solves the EXISTING 1-D SP cliff under a different nature (no new search dimension). Only
-    `propose` lanes are solved; a lane is kept only if it UNLOCKS an unreachable/infeasible baseline
-    or frees >= NATURE_LANE_MIN_SAVINGS SP (importance gate). Returns {alternatives, notes, unlock} —
+    `propose` lanes are solved; a lane is kept when it unlocks an unreachable/infeasible baseline
+    or saves any positive SP. Returns {alternatives, notes, unlock} —
     NEVER a recommended (nature, SP); the caller attaches it as a sub-field, out of the head ranking.
     `meta_natures` is the REALITY GATE (natures real players run on this species, ~2%+): empty -> no
     lanes at all (an off-role nature nobody runs is not a real option)."""
@@ -312,7 +343,8 @@ def _nature_lanes(target_spread_stat: str, current_nature: str | None, cur: int,
         if L["status"] != "propose":          # summarize / locked -> a compact note, not a solved lane
             notes.append(f"{L['nature']} ({L['reason']}) — not auto-proposed")
             continue
-        oc = _outcome(solve_min_fn(L["nature"]), cur, base_sps)
+        oc = _outcome(solve_min_fn(L["nature"]), cur, base_sps,
+                      SPREAD_TO_SPS[target_spread_stat])
         lane_reachable = oc["result"] in ("cliff", "already")
         saves = base_cost - oc["delta_sp"]
         is_unlock = (not base_reachable) and lane_reachable
@@ -357,8 +389,9 @@ def _attacker_ncp(species: str, category: str, attacker_set: dict[str, Any] | No
                 {"source": "explicit", "confidence": "high",
                  "note": "attacker set supplied by the caller"})
     if meta_set:
-        base_ability = (((meta_set.get("set") or {}).get("ability") or {}).get("name")
-                        if isinstance(meta_set.get("set"), dict) else None)
+        base_ability = meta_set.get("base_ability") or (
+            (((meta_set.get("set") or {}).get("ability") or {}).get("name"))
+            if isinstance(meta_set.get("set"), dict) else None)
         source = meta_set.get("source") or "meta"
         return ({"name": species, "ability": meta_set.get("ability"), "item": meta_set.get("item"),
                  "nature": meta_set.get("nature") or "Hardy", "sps": meta_set.get("sps") or {},
@@ -371,6 +404,68 @@ def _attacker_ncp(species: str, category: str, attacker_set: dict[str, Any] | No
             {"source": "synthetic", "confidence": "low",
              "note": "no meta set for this attacker; synthetic max-offense, abilities/items NOT "
                      "modelled — a real set (e.g. Huge Power) may hit far harder"})
+
+
+def _variant_speed_lines(species: str, fmt: str | None, archetypes_fn: Callable | None,
+                         dex_fn: Callable, item_fn: Callable | None,
+                         conds: dict[str, Any]) -> list[dict[str, Any]]:
+    """Each REAL build of `species` as its own speed line, with the share of that species' teams it
+    accounts for.
+
+    The primary card line uses the explicit or resolved set. These rows add alternative observed
+    peaks without flattening them: "outspeed the Scarf build" and "outspeed the Mega build" are
+    different investments with their own prevalence.
+
+    Each build's item/nature/spread are its own, so no Scarf-vs-Mega guard is needed here: a stone
+    holder simply never carries Scarf in real data. That is the same impossible-set problem the
+    caller's `not target_is_mega` heuristic exists to dodge, dissolved by using real builds.
+    """
+    if archetypes_fn is None:
+        return []
+    try:
+        arches = archetypes_fn(species, fmt) or []
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    for a in arches:
+        item = a.get("item")
+        # A stone resolves the build to its Mega form: different base Speed AND a different ability.
+        form = _form_record(species, item, a.get("ability"), dex_fn, item_fn)
+        base = ((form.get("facts") or {}).get("stats") or {}).get("spe")
+        if base is None:
+            continue
+        sps = a.get("sps") or {}
+        spe_sp = int(sps.get("sp") or sps.get("spe") or 0)
+        speed = effective_speed(base, spe_sp, a.get("nature"), item=item,
+                                ability=form.get("ability"), weather=conds.get("weather"),
+                                terrain=conds.get("terrain"))
+        if speed is None:
+            continue
+        if conds.get("opponent_tailwind"):
+            speed *= 2
+        out.append({
+            "clusters": [{"item": item, "ability": a.get("ability")}],
+            "coverage": a.get("coverage"),
+            "confidence": a.get("confidence"),
+            "form": form.get("name"),
+            "occupies_mega_slot": bool(form.get("is_mega")),
+            "nature": a.get("nature"), "speed_sp": spe_sp, "speed": speed,
+        })
+    # Builds that land on the SAME speed are one line to clear, not several: two Mega archetypes
+    # differing only in their pre-Mega ability fight at identical Speed, and listing them twice
+    # invites reading one threshold as two. Merge them and SUM the coverage — the share of the
+    # species sitting at that speed is the number that matters when deciding how much SP to spend.
+    merged: dict[tuple[Any, int], dict[str, Any]] = {}
+    for line in out:
+        key = (line["form"], line["speed"])
+        if key in merged:
+            prev = merged[key]
+            prev["clusters"].extend(line["clusters"])
+            if prev.get("coverage") is not None and line.get("coverage") is not None:
+                prev["coverage"] = round(prev["coverage"] + line["coverage"], 4)
+        else:
+            merged[key] = line
+    return sorted(merged.values(), key=lambda ln: -ln["speed"])   # fastest real build first
 
 
 def _meta_set(meta_fn: Callable | None, species: str, fmt: str | None,
@@ -444,21 +539,33 @@ def _meta_special_ability_pct(meta_set: dict[str, Any] | None, specials: set[str
 
 
 def _base_ability_gated(prov: dict[str, Any], meta_set: dict[str, Any] | None) -> bool:
-    return (prov.get("source") == "meta"
-            and not str((meta_set or {}).get("source") or "").startswith("real-team"))
+    # A real-team set is joint only for the form actually stored.  Doubles base+stone rows now carry
+    # an explicit `base_ability`; singles often stores the Mega form itself, so its pre-Mega ability
+    # still falls back to the independent meta marginal in `set.ability`.  Gate that fallback even
+    # though the rest of the set is real-team-backed; otherwise a 5% base ability is treated as an
+    # observed certainty merely because the Mega-form item/nature/moves are joint.
+    if prov.get("source") == "explicit":
+        return False
+    return not bool((meta_set or {}).get("base_ability"))
 
 
 def _hazard_abilities_for_modeled_set(actor: dict[str, Any], meta_set: dict[str, Any] | None,
                                       prov: dict[str, Any]) -> tuple[str, ...]:
+    """Abilities active when entry hazards resolve.
+
+    Hazards happen before Mega Evolution. A Mega-only Levitate/Magic Guard cannot retroactively
+    cancel chip; conversely a declared pre-Mega immunity still applies even when the run form loses it.
+    """
     base_ability = actor.get("base_ability")
     base_pct = _meta_ability_pct(meta_set)
     base_gated = _base_ability_gated(prov, meta_set)
-    return tuple({a for a in (
-        actor.get("ability"),
-        base_ability if base_ability and (not base_gated
-                                          or (base_pct or 0.0) >= SPECIAL_BASE_ABILITY_USAGE_FLOOR)
-        else None,
-    ) if a})
+    if actor.get("is_mega"):
+        entry = (base_ability if base_ability and
+                 (not base_gated or (base_pct or 0.0) >= SPECIAL_BASE_ABILITY_USAGE_FLOOR)
+                 else None)
+    else:
+        entry = actor.get("ability")
+    return (entry,) if entry else ()
 
 
 def _attacker_intimidatable(attacker: dict[str, Any], base_pct: float | None,
@@ -508,7 +615,7 @@ def _member_completeness(member: dict[str, Any]) -> tuple[str, str | None]:
 def _sr_chip(types: list[str], hp: int, *, abilities: tuple[str, ...] | set[str] = ()) -> int:
     """Stealth Rock chip = 1/8 * Rock effectiveness of max HP (type-based), floored. Entry hazards
     resolve at SWITCH-IN — before Mega Evolution — so `types` must be the PRE-Mega form's and
-    `abilities` carries the §9 two-place set (base + resolved): any Magic Guard present -> 0 chip.
+    `abilities` must contain only abilities active at that phase: any Magic Guard present -> 0 chip.
     Magic Guard is the only SR-negating ability modelled for now (Heavy-Duty Boots / Air Balloon-vs-SR
     are a deferred increment)."""
     if any((a or "").lower() == "magic guard" for a in abilities):
@@ -531,7 +638,7 @@ def _spikes_layers(conds: dict[str, Any]) -> int:
 def _spikes_chip(types: list[str], hp: int, layers: int, *,
                  abilities: tuple[str, ...] | set[str] = (), item: str | None = None) -> int:
     """Spikes chip on a grounded target. Same switch-in (pre-Mega) basis as _sr_chip: `types` are the
-    PRE-Mega form's, `abilities` the §9 two-place set (any airborne/Magic Guard entry -> 0)."""
+    PRE-Mega form's and `abilities` are those active before evolution."""
     if layers <= 0:
         return 0
     ability_ns = {(a or "").lower() for a in abilities}
@@ -581,8 +688,8 @@ def _damage_field(conds: dict[str, Any], category: str, fmt: str | None = None, 
     both cliffs: the chipped Pokemon is always the ncp `defender` (survive: our member; kill: the
     target), and ncp reads SR from the side (`defenderSide.stealthRock` -> handlerSide.isSR), never
     a top-level field key. Tailwind / Trick Room don't change damage, so they live in the speed cliff.
-    Conditions are applied only when the benchmark sets them explicitly — the format profile informs
-    ranking, it never silently turns a condition on/off."""
+    Conditions are applied only when the benchmark sets them explicitly or a documented team-carries
+    lane supplies them; format alone never silently turns a condition on or off."""
     field: dict[str, Any] = {}
     if fmt:
         field["format"] = fmt
@@ -626,8 +733,7 @@ def _survive_min_sp(member: dict[str, Any], nature: str, attacker: dict[str, Any
     `precomputed` for the survive-2 solve — same (attacker, field, nature), no second batch call.
 
     `defender_types`/`hazard_abilities` feed ONLY the hazard chip and must describe the PRE-Mega
-    (switch-in) form: base typing + the §9 two-place ability set. The damage side reads the Mega form
-    from `member` (the calc member) via the engine."""
+    (switch-in) form and ability. The damage side reads the effective Mega form from `member`."""
     m = member if nature == (member.get("nature") or "Hardy") else {**member, "nature": nature}
 
     def _defender(total: int):
@@ -662,7 +768,7 @@ def _survive_min_sp(member: dict[str, Any], nature: str, attacker: dict[str, Any
     return solve_min_sp(predicate, cap=SP_CAP), rolls_cache
 
 
-def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
+def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                   damage_fn: Callable, move_fn: Callable, dex_fn: Callable,
                   meta_fn: Callable | None = None, meta_natures: set[str] | None = None,
                   locked: bool = False, damage_batch_fn: Callable | None = None,
@@ -692,15 +798,16 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     # so on the survive side it is an EXPLICIT opt-in and SINGLES-only (re-audit 2026-07-07); a Magic
     # Guard defender takes no chip (handled inside _sr_chip). Spikes stays default-off (conds-driven).
     sr_requested = conds.get("stealth_rock") is True
-    sr_ignored = sr_requested and prof.fmt != "single"
-    use_sr = sr_requested and prof.fmt == "single"
+    sr_ignored = sr_requested and fmt != "single"
+    use_sr = sr_requested and fmt == "single"
     spikes = _spikes_layers(conds)
     # field.format makes the engine apply the DOUBLES spread-move reduction (0.75x) — the fix at the
-    # heart of this re-audit; without it a doubles Earthquake was scored at full single-target damage.
-    field = _damage_field(conds, cat, prof.fmt, use_sr=use_sr, spikes=spikes)
+    # Format must reach the damage engine so doubles spread moves receive their spread modifier.
+    field = _damage_field(conds, cat, fmt, use_sr=use_sr, spikes=spikes)
 
-    meta_set = _meta_set(meta_fn, b["vs"], prof.fmt, b.get("attacker_set"), dex_fn=dex_fn)
-    attacker0, prov = _attacker_ncp(b["vs"], cat, b.get("attacker_set"), meta_set)
+    explicit_opponent = b.get("opponent_set") or b.get("attacker_set")
+    meta_set = _meta_set(meta_fn, b["vs"], fmt, explicit_opponent, dex_fn=dex_fn)
+    attacker0, prov = _attacker_ncp(b["vs"], cat, explicit_opponent, meta_set)
     attacker = _mega_resolve_attacker(attacker0, dex_fn, item_fn)   # Mega Staraptor -> Contrary + Mega stats
     atk_base_pct = _meta_ability_pct(meta_set)
     atk_base_special_pct = _meta_special_ability_pct(meta_set, INTIMIDATE_IMMUNE_ABILITIES)
@@ -710,21 +817,18 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     mc_conf, mc_note = _member_completeness(member)
     base_sps = _sps_from_spread(member.get("spread"))
     cur = base_sps[dstat]
-    # Hazards resolve at SWITCH-IN (pre-Mega): chip typing = the BASE form's, and the immunity check
-    # carries the §9 two-place ability set (own declared base ability + the resolved/Mega one, ungated —
-    # both are the member's own facts).
+    # Hazards resolve at SWITCH-IN (pre-Mega): chip typing and immunity both use the BASE phase.
+    # A Mega-only Magic Guard/Levitate cannot retroactively cancel entry damage.
     defender_types = list(eff["base_facts"].get("types") or [])
-    hazard_abilities = tuple({a for a in (eff["base_ability"], eff["ability"]) if a})
+    hazard_abilities = ((eff["base_ability"],) if eff["is_mega"] and eff.get("base_ability")
+                        else (eff["ability"],) if eff.get("ability") else ())
 
     # Only `dstat` (Def or SpD, never HP) varies across the SP search, so the incoming damage is
     # monotonic in SP and one batch [0..cap] feeds the search (the kernel handles batch-vs-live).
     cur_nature = member.get("nature") or "Hardy"
-    # DEFENSE mirror of the kill tiers (§9): solve BOTH surviving 1 hit (avoid the OHKO) and 2 hits
-    # (avoid the 2HKO — the opponent's usual 'break the wall' standard). NO-TUNING subsumption: hide the
-    # easier survive-1 line ONLY when survive-2 is ALREADY met at the current spread (if you already eat
-    # two hits the one-hit line is noise); otherwise show both — survive-1 is the achievable floor when
-    # survive-2 needs tuning or is unreachable. Damage rolls don't depend on `hits`, so the survive-1
-    # rolls_cache feeds the HP lane unchanged (only the threshold scales with the headline's hit count).
+    # Solve both one- and two-hit survival lines, while keeping the requested `survive` benchmark's
+    # one-hit objective primary. Damage rolls don't depend on `hits`, so the one-hit cache feeds the
+    # contextual two-hit and HP lanes unchanged.
     tiers: dict[int, dict[str, Any]] = {}
     rolls_cache: dict[int, tuple[list[int], int]] = {}
     for h in (1, 2):
@@ -736,14 +840,30 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         if h == 1:
             rolls_cache = rc
         t = {"hits": h, "label": "survive 1 hit" if h == 1 else "survive 2 hits",
-             **_outcome(mt, cur, base_sps)}
+             **_outcome(mt, cur, base_sps, dstat)}
         if t["result"] == "already" and mt is not None:      # slack = pullable SP while still surviving
             t["slack_sp"] = cur - mt
         tiers[h] = t
-    survive2_already = tiers[2]["result"] == "already"
-    survive_tiers = [tiers[2]] if survive2_already else [tiers[1], tiers[2]]
-    headline = tiers[2] if survive2_already else tiers[1]
+    # The benchmark's declared target is surviving the named hit ONCE. Survive-2 is useful context,
+    # never a replacement objective: a facts operator must not silently strengthen the user's request.
+    survive_tiers = [tiers[1], tiers[2]]
+    headline = tiers[1]
     head_hits = headline["hits"]
+    probability_lanes: list[dict[str, Any]] = []
+    for lane_target in ("guaranteed", "likely", "any"):
+        lane_min, _ = _survive_min_sp(
+            calc_member, cur_nature, attacker, move, field, dstat, base_sps,
+            lane_target, defender_types, use_sr, spikes,
+            damage_fn=damage_fn, damage_batch_fn=damage_batch_fn, hits=1,
+            precomputed=rolls_cache, hazard_abilities=hazard_abilities,
+        )
+        probability_lanes.append({
+            "probability": lane_target,
+            "primary": lane_target == target,
+            "stat": dspread,
+            "scope": "defense_axis",
+            **_outcome(lane_min, cur, base_sps, dstat),
+        })
 
     # HP lane (audit retro 2026-06-22): HP is often the cheaper survival lever and scales BOTH
     # defenses, yet the cliff above tunes only one defensive stat — so a cliff reachable via HP was
@@ -778,7 +898,53 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         if min_hp is None:
             hp_lane = {"stat": "hp", "result": "unreachable", "delta_sp": SP_CAP + 1}
         else:
-            hp_lane = {"stat": "hp", **_outcome(min_hp, cur_hp_sp, base_sps)}
+            hp_lane = {"stat": "hp", **_outcome(min_hp, cur_hp_sp, base_sps, "hp")}
+
+    # Bounded two-stat survival frontier. Damage is already known for each Def/SpD point; HP only
+    # changes the threshold, so enumerating HP x relevant defense adds no calculator work on the
+    # production batch path. This catches real mixed cliffs that both one-dimensional lanes miss.
+    combined_lane: dict[str, Any] | None = None
+    if move not in HP_DEPENDENT_MOVES and cur_hp:
+        hp0 = cur_hp - cur_hp_sp
+        best: tuple[int, int, int] | None = None       # total delta, hp total, defense total
+        for defense_sp in range(cur, SP_CAP + 1):
+            cached = rolls_cache.get(defense_sp)
+            if cached is None:
+                probe_sps = dict(base_sps)
+                probe_sps[dstat] = defense_sp
+                cached = damage_fn(
+                    attacker, _member_ncp(calc_member, probe_sps), move, field
+                )
+                rolls_cache[defense_sp] = cached
+            defense_rolls, _probe_hp = cached
+            for hp_sp in range(cur_hp_sp, SP_CAP + 1):
+                mhp = hp0 + hp_sp
+                hazard_chip = (
+                    _sr_chip(defender_types, mhp, abilities=hazard_abilities) if use_sr else 0
+                ) + _spikes_chip(
+                    defender_types, mhp, spikes, abilities=hazard_abilities,
+                    item=calc_member.get("item"),
+                )
+                if meets_target(survival_prob(defense_rolls, mhp - hazard_chip), target):
+                    cand = ((defense_sp - cur) + (hp_sp - cur_hp_sp), hp_sp, defense_sp)
+                    if best is None or cand < best:
+                        best = cand
+                    break
+        if best is not None and best[1] > cur_hp_sp and best[2] > cur:
+            delta, need_hp, need_defense = best
+            combined_lane = {
+                "stat": f"hp+{dspread}", "result": "already" if delta == 0 else "cliff",
+                "delta_sp": delta,
+                "allocation": {
+                    "hp": {"current": cur_hp_sp, "need_total": need_hp,
+                           "delta_sp": need_hp - cur_hp_sp},
+                    dspread: {"current": cur, "need_total": need_defense,
+                              "delta_sp": need_defense - cur},
+                },
+            }
+            plan = _reallocation_plan(delta, {"hp", dstat}, base_sps)
+            if plan:
+                combined_lane["reallocation"] = plan
 
     # Intimidate lane (§9, doubles only): when our team fields an Intimidate provider AND the
     # physical attacker is not Intimidate-immune (Contrary/Defiant/Clear Body/Mirror Armor on either
@@ -795,7 +961,7 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
                                          base_sps, target, defender_types, use_sr, spikes,
                                          damage_fn=damage_fn, damage_batch_fn=damage_batch_fn, hits=head_hits,
                                          hazard_abilities=hazard_abilities)
-        intimidate_lane = {"stages": 1, **_outcome(intim_min, cur, base_sps)}
+        intimidate_lane = {"stages": 1, **_outcome(intim_min, cur, base_sps, dstat)}
 
     def _hp_suffix() -> str:
         if not hp_lane:
@@ -809,31 +975,52 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
             return " | HP lane also can't reach within the cap"
         return f" | HP lane: +{hp_lane['delta_sp']} HP SP (to {hp_lane['need_total']}) [{r}]"
 
+    def _combined_suffix() -> str:
+        if not combined_lane:
+            return ""
+        alloc = combined_lane["allocation"]
+        return (f" | mixed HP+{dspread} lane: +{combined_lane['delta_sp']} SP "
+                f"(HP {alloc['hp']['need_total']}, {dspread} {alloc[dspread]['need_total']})")
+
+    allocation_lanes: list[dict[str, Any]] = [
+        {"lane": dspread, **headline},
+    ]
+    if hp_lane and hp_lane.get("result") in ("already", "cliff"):
+        allocation_lanes.append({"lane": "hp", **hp_lane})
+    if combined_lane:
+        allocation_lanes.append({"lane": "mixed", **combined_lane})
+    reachable_allocations = [
+        lane for lane in allocation_lanes if lane.get("result") in ("already", "cliff")
+    ]
+    selected = min(
+        reachable_allocations,
+        key=lambda lane: (int(lane.get("delta_sp") or 0),
+                          {"already": 0, "cliff": 1}.get(lane.get("result"), 2),
+                          {dspread: 0, "hp": 1, "mixed": 2}.get(lane.get("lane"), 3)),
+    ) if reachable_allocations else {"lane": dspread, **headline}
+
     card: dict[str, Any] = {
         "aspect": "defense", "kind": "survive", "member": member_label, "vs": b.get("vs"), "move": move,
-        "category": cat, "stat": dspread, "probability": target,
+        "category": cat, "stat": selected.get("stat") or selected.get("lane") or dspread,
+        "probability": target,
         "stealth_rock": use_sr, "spikes": spikes,
         "survive_tiers": survive_tiers, "hits": head_hits,
-        "headroom": defensive_headroom(eff["facts"].get("stats") or {}),
-        "magnitude": 1.0 if target == "guaranteed" else 0.8,
-        # Prevalence = how common this threat/set actually is: meta supplies it; otherwise the
-        # benchmark was user-deemed relevant (0.7 baseline). `or` also guards an injected meta set
-        # that carries an explicit None (a bare .get default would let None crash score_card).
-        "prevalence": prov.get("prevalence") or 0.7,
-        "decisiveness": 0.8,      # surviving -> you get to act
+        "probability_lanes": probability_lanes,
         # Confidence = the more cautious of the attacker-set confidence and the tuned member's own
         # set completeness (tuning off an unknown spread/ability is a guess).
         "confidence": completeness.min_confidence(prov.get("confidence", "medium"), mc_conf),
         "attacker": {"source": prov.get("source"), "ability": attacker.get("ability"),
                      "item": attacker.get("item"), "nature": attacker.get("nature"),
-                     "sps": attacker.get("sps")},
+                     "sps": attacker.get("sps"), "prevalence": prov.get("prevalence")},
         "hp_lane": hp_lane,
-        "assumptions": [f"attacker = {prov.get('source')} set"]
-        + (["both survival tiers solved (survive 1 hit / 2 hits); survive-1 is hidden only when survive-2 "
-            "is already met without tuning"])
+        "combined_lane": combined_lane,
+        "allocation_lanes": allocation_lanes,
+        "selected_lane": selected.get("lane"),
+        "assumptions": [f"attacker = {prov.get('source')} set",
+                        "requested survive benchmark is the one-hit primary; two-hit survival is contextual"]
         + (["STATIC 2-hit survival: repeats hit 1 and applies the entry-hazard chip once; ignores "
             "between-hit recovery (Sitrus/Leftovers), ability shifts (Stamina/Multiscale) & field changes "
-            "— a heal can flip it. Only survive-1 is exact." ] if head_hits >= 2 else [])
+            "— a heal can flip it. Only survive-1 is exact."])
         # The meta attacker stitches independent ability/item/nature marginals onto a real spread row;
         # surface that caveat in assumptions too (matchup already does), not only in evidence.note.
         + (["attacker fields are independent meta marginals — exact ability+item+nature combo may not co-occur"]
@@ -872,15 +1059,23 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         if r == "unreachable":
             return f"can't {lab} even at {SP_CAP} {dspread} SP"
         if r == "infeasible":
-            return f"{lab} needs +{t['delta_sp']} {dspread} SP (to {t['need_total']}) — over the 66 SP budget"
-        return f"{lab} at +{t['delta_sp']} {dspread} SP (to {t['need_total']})"
+            return f"{lab} needs +{t['delta_sp']} {dspread} SP (to {t['need_total']}) — no legal donor capacity"
+        funding = t.get("reallocation")
+        suffix = (f", reallocating {funding['required_sp']} SP from other invested stats"
+                  if funding else "")
+        return f"{lab} at +{t['delta_sp']} {dspread} SP (to {t['need_total']}{suffix})"
 
-    card.update(result=headline["result"], delta_sp=headline["delta_sp"])
-    if headline.get("need_total") is not None:
-        card["need_total"] = headline["need_total"]
-    if headline.get("slack_sp") is not None:
-        card["slack_sp"] = headline["slack_sp"]
-    card["note"] = " | ".join(_stier_phrase(t) for t in survive_tiers) + _hp_suffix()
+    card.update(result=selected["result"], delta_sp=selected["delta_sp"])
+    if selected.get("need_total") is not None:
+        card["need_total"] = selected["need_total"]
+    if selected.get("allocation") is not None:
+        card["allocation"] = selected["allocation"]
+    if selected.get("slack_sp") is not None:
+        card["slack_sp"] = selected["slack_sp"]
+    if selected.get("reallocation") is not None:
+        card["reallocation"] = selected["reallocation"]
+    card["note"] = (" | ".join(_stier_phrase(t) for t in survive_tiers)
+                    + _hp_suffix() + _combined_suffix())
 
     # Stealth Rock 0/1 dual (§9): when our team-benchmark puts opponent SR on us (opt-in, singles),
     # also solve the headline tier WITHOUT the chip so both hazard states are visible — you may or may not
@@ -892,17 +1087,19 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], prof, *,
                                        target, defender_types, False, spikes, damage_fn=damage_fn,
                                        damage_batch_fn=damage_batch_fn, hits=head_hits,
                                        precomputed=rolls_cache, hazard_abilities=hazard_abilities)
-        card["stealth_rock_lane"] = {"stealth_rock": False, **_outcome(no_sr_min, cur, base_sps)}
+        card["stealth_rock_lane"] = {
+            "stealth_rock": False, **_outcome(no_sr_min, cur, base_sps, dstat)
+        }
 
     # §16.8 nature lanes: re-solve THIS cliff under candidate natures (reuses the 1-D kernel, no new
     # search dimension) and attach the impactful ones (unlock / save >= floor) as an OPTIONAL sub-field.
     # NEVER enters the head ranking — `nature` is a whole-spread single-slot commitment the model owns.
     # A `locked` member (user declared it won't change) gets no lanes at all.
-    if card["result"] in ("cliff", "infeasible", "unreachable") and not locked:
+    if headline["result"] in ("cliff", "infeasible", "unreachable") and not locked:
         m_stats = eff["facts"].get("stats") or {}
         lanes = _nature_lanes(
             dspread, cur_nature, cur, base_sps,
-            {"result": card["result"], "delta_sp": card["delta_sp"]},
+            {"result": headline["result"], "delta_sp": headline["delta_sp"]},
             solve_min_fn=lambda nat: _survive_min_sp(calc_member, nat, attacker, move, field, dstat, base_sps,
                                                      target, defender_types, use_sr, spikes, damage_fn=damage_fn,
                                                      damage_batch_fn=damage_batch_fn, hits=head_hits,
@@ -930,11 +1127,12 @@ def _raw_speed(vs: Any) -> int | None:
     return None
 
 
-def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
+def _outspeed_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                    damage_fn: Callable, move_fn: Callable, dex_fn: Callable,
                    meta_fn: Callable | None = None, meta_natures: set[str] | None = None,
                    locked: bool = False, item_fn: Callable | None = None,
                    team_flags: dict[str, bool] | None = None,
+                   archetypes_fn: Callable | None = None,
                    effective: dict[str, Any] | None = None) -> dict[str, Any]:
     team_flags = team_flags or {}
     raw_target = _raw_speed(b["vs"])
@@ -951,19 +1149,29 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     conds = b.get("conditions") or {}
     trickroom = bool(conds.get("trickroom"))             # opt-in; default off (§9)
 
-    # Target is either a raw Speed value or, for a named species, its conservative max-speed line
-    # (max SP + speed nature, to beat the fast variant); distribution coverage is later.
-    d_meta = None if raw_target is not None else _meta_set(meta_fn, b["vs"], prof.fmt, None, dex_fn=dex_fn)
+    # Named targets use the same resolved real/modal set authority as damage. The old theoretical
+    # max-speed line remains a ceiling lane; it no longer overwrites the actual benchmark coordinate.
+    explicit_target = b.get("opponent_set")
+    d_meta = None if raw_target is not None else _meta_set(
+        meta_fn, b["vs"], fmt, explicit_target, dex_fn=dex_fn
+    )
+    target_set = explicit_target or d_meta
+    speed_basis = "raw" if raw_target is not None else (
+        "explicit" if explicit_target else
+        str((d_meta or {}).get("source") or "resolved") if d_meta else
+        "theoretical_max"
+    )
     tr_floor_base: int | None = None
     target_is_mega = False
+    ceiling_speed: int | None = None
+    ceiling_label: str | None = None
     if raw_target is not None:
         tgt_speed, tgt_label = raw_target, f"{raw_target} Speed"
     else:
         tfacts = facts.get(b["vs"], {}) or {}
         tgt_base = (tfacts.get("stats") or {}).get("spe")
         tgt_name = b["vs"]
-        target_item = (d_meta or {}).get("item") if isinstance(d_meta, dict) else None
-        tgt_abilities = list(tfacts.get("abilities") or [])
+        target_item = (target_set or {}).get("item") if isinstance(target_set, dict) else None
         if tfacts.get("is_mega"):
             target_is_mega = True
             _base_name, _base_facts = _base_form_facts(tgt_name, dex_fn, tfacts)
@@ -971,14 +1179,12 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
             _floor_candidates = [x for x in (tgt_base, base_spe) if x is not None]
             if _floor_candidates:
                 tr_floor_base = min(_floor_candidates)
-            tgt_abilities += list(_base_facts.get("abilities") or [])
-        # Mega-resolve the TARGET (§9 unification — opponents too): the real-team run_form when the
-        # library has one, else the meta modal item's stone. The speed line then uses the Mega base
-        # Speed, and the weather-ability check reads BOTH forms' abilities (two-place rule) — a base
-        # line understates a Mega target (Metagross 70 vs Mega 110) and misses a Mega-only Swift Swim.
-        tgt_form = (d_meta or {}).get("run_form") if isinstance(d_meta, dict) else None
+        # Mega-resolve the target. Only the CURRENT run-form ability modifies current Speed; unlike
+        # switch-in effects, a pre-Mega weather ability that was replaced cannot keep doubling Speed.
+        tgt_form = (target_set or {}).get("run_form") if isinstance(target_set, dict) else None
         if not tgt_form:
             tgt_form = _mega_form_name(tgt_name, target_item, dex_fn, item_fn, facts=tfacts)
+        target_ability = (target_set or {}).get("ability") if isinstance(target_set, dict) else None
         if tgt_form and tgt_form != tgt_name:
             tform_facts = _dex_facts(tgt_form, dex_fn)
             t_spe = (tform_facts.get("stats") or {}).get("spe")
@@ -988,36 +1194,52 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
                 tgt_base = t_spe
                 tgt_name = tgt_form
                 target_is_mega = bool(tform_facts.get("is_mega"))
-                tgt_abilities += list(tform_facts.get("abilities") or [])
+                target_ability = effective_form_ability(target_ability, tform_facts)
         if tgt_base is None:
             return {"aspect": "speed", "kind": "outspeed", "member": member_label, "vs": b.get("vs"),
                     "result": "skipped", "note": "missing base speed for target"}
         if tr_floor_base is None:
             tr_floor_base = tgt_base
-        tgt_speed = champ_speed(tgt_base, SP_CAP, "Jolly")
-        tgt_label = f"max-speed {tgt_name}"
-        # Opponent Choice Scarf (x1.5): a resolved JOINT set holding Scarf counts even without the
-        # marginal top-item flag; a marginal Scarf lane is allowed only when the modelled target is NOT
-        # a Mega. A Mega-stone holder cannot also hold Scarf, so stacking the marginal Scarf on the
-        # Mega-resolved speed line would synthesize an impossible set.
-        scarf = (d_meta or {}).get("choice_scarf") if isinstance(d_meta, dict) else None
-        scarf_known = (target_item == "Choice Scarf")
-        scarf_marginal = (scarf and (scarf.get("rank") or 99) <= OPPONENT_SCARF_TOP_N
-                          and (scarf.get("pct") or 0) > OPPONENT_SCARF_USAGE_FLOOR)
-        if not target_is_mega and (scarf_known or scarf_marginal):
-            tgt_speed = int(tgt_speed * 1.5)
-            pct_note = f"{scarf.get('pct')}% top item" if scarf and scarf.get("pct") is not None else "resolved item"
-            tgt_label += f" + Choice Scarf x1.5 ({pct_note})"
-        tgt_wmult = max((weather_speed_mult(a, conds.get("weather"), conds.get("terrain"))
-                         for a in (tgt_abilities or [None])), default=1)
-        if tgt_wmult != 1:
-            tgt_speed *= tgt_wmult
-            tgt_label += f" (x{tgt_wmult} from its weather/terrain ability)"
+        if target_set:
+            target_sps = (target_set.get("sps") or {})
+            if not target_sps and isinstance(target_set.get("spread"), dict):
+                target_sps = _sps_from_spread(target_set.get("spread"))
+            target_nature = target_set.get("nature") or "Hardy"
+            tgt_speed = effective_speed(
+                tgt_base, int(target_sps.get("sp") or 0), target_nature,
+                item=target_item, ability=target_ability,
+                weather=conds.get("weather"), terrain=conds.get("terrain"),
+            )
+            tgt_label = f"{speed_basis} set {tgt_name}"
+            ceiling_speed = effective_speed(
+                tgt_base, SP_CAP, "Jolly", item=target_item, ability=target_ability,
+                weather=conds.get("weather"), terrain=conds.get("terrain"),
+            )
+            ceiling_label = f"theoretical max of the resolved {tgt_name} form/set"
+        else:
+            # No set authority: retain the conservative synthetic maximum and disclose the fallback.
+            # Pick the current-form ability that MAXIMISES the weather/terrain Speed boost, so a
+            # non-first weather ability (e.g. Swift Swim listed second) still doubles the synthetic
+            # max under its weather — the pre-refactor max-over-all-abilities conservatism.
+            target_ability = max(
+                (tfacts.get("abilities") or [None]),
+                key=lambda a: weather_speed_mult(a, conds.get("weather"), conds.get("terrain")),
+            )
+            tgt_speed = effective_speed(
+                tgt_base, SP_CAP, "Jolly", ability=target_ability,
+                weather=conds.get("weather"), terrain=conds.get("terrain"),
+            )
+            tgt_label = f"theoretical max-speed {tgt_name}"
+            ceiling_speed, ceiling_label = tgt_speed, tgt_label
     # Opponent Tailwind (x2): modelled but OPT-IN (default off) — only when the benchmark asks, and
     # doubles only (§9). It doubles the target's Speed, including raw-Speed targets.
-    if conds.get("opponent_tailwind") and prof.fmt == "double":
+    if conds.get("opponent_tailwind") and fmt == "double":
         tgt_speed *= 2
+        if ceiling_speed is not None:
+            ceiling_speed *= 2
         tgt_label += " under their Tailwind (x2)"
+        if ceiling_label:
+            ceiling_label += " under their Tailwind (x2)"
     my_nature = member.get("nature")
     base_sps = _sps_from_spread(member.get("spread"))
     cur_sp = base_sps["sp"]
@@ -1042,8 +1264,8 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         # uses (vs the fast line "already under-speeds" would be the OPTIMISTIC extreme). Scarf /
         # weather / Tailwind only make the target faster (easier to under-speed), so none apply here.
         # Speed SP is a lever to PULL (a -Speed nature under-speeds harder), not add.
-        if raw_target is not None:
-            tr_target, tr_label = raw_target, f"{raw_target} Speed"
+        if raw_target is not None or target_set:
+            tr_target, tr_label = tgt_speed, tgt_label
         else:
             tr_target = champ_speed(tr_floor_base, 0, "Brave")
             tr_label = f"floor-speed {b['vs']} (0 SP, -Speed nature, slowest form)"
@@ -1061,7 +1283,7 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
             "trickroom": True, "tailwind": explicit_tailwind,
             "tailwind_mode": "explicit-main" if explicit_tailwind else "none",
             "tailwind_main": explicit_tailwind, "tailwind_lane_available": False,
-            "magnitude": 0.7, "prevalence": 0.7, "confidence": mc_conf,
+            "confidence": mc_conf,
             "result": "already" if under else "unreachable",
             "delta_sp": 0 if under else SP_CAP + 1,
             "needs": None if under else "lower_speed",
@@ -1085,15 +1307,48 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     tw_note = (f" under {_trig} ({my_ability} x{wmult} Speed)" if wmult != 1 else "") \
         + (" under my Tailwind (x2, explicit condition)" if explicit_tailwind else "")
 
+    # What other observed builds of the target cost to outspeed. The primary line remains the explicit
+    # or resolved set; these disclose alternative speed peaks without flattening them into one target.
+    variant_lines = []
+    if raw_target is None and b.get("vs"):
+        for line in _variant_speed_lines(str(b["vs"]), fmt, archetypes_fn, dex_fn, item_fn, conds):
+            need = None
+            for sp in range(0, SP_CAP + 1):
+                got = effective_speed(my_base, sp, my_nature, item=member.get("item"),
+                                      ability=my_ability, weather=conds.get("weather"),
+                                      terrain=conds.get("terrain"), tailwind=explicit_tailwind)
+                if got is not None and got > line["speed"]:
+                    need = sp
+                    break
+            variant_lines.append({**line, "sp_to_outspeed": need,
+                                  "already": need is not None and need <= cur_sp})
+
+    ceiling_lane = None
+    if ceiling_speed is not None:
+        ceiling_sol = solve_outspeed(
+            my_base, my_nature, ceiling_speed, cap=SP_CAP, self_mult=self_mult,
+            item=member.get("item"),
+        )
+        ceiling_min = ceiling_sol.get("sp") if ceiling_sol else None
+        ceiling_lane = {
+            "basis": "theoretical_max", "target_speed": ceiling_speed,
+            "label": ceiling_label, **_outcome(ceiling_min, cur_sp, base_sps, "sp"),
+        }
+        if ceiling_sol and ceiling_sol.get("result") == "tie-only":
+            ceiling_lane["result"] = "tie-only"
+
     card: dict[str, Any] = {
         "aspect": "speed", "kind": "outspeed", "member": member_label, "vs": b.get("vs"),
+        "stat": "spe",
+        "speed_basis": speed_basis, "target_speed": tgt_speed,
+        **({"ceiling_lane": ceiling_lane} if ceiling_lane else {}),
+        **({"variant_lines": variant_lines} if variant_lines else {}),
         "tailwind": bool(explicit_tailwind or my_tailwind),
         "tailwind_mode": ("explicit-main" if explicit_tailwind else "team-lane" if my_tailwind else "none"),
         "tailwind_main": explicit_tailwind,
         "tailwind_lane_available": bool(my_tailwind),
-        "magnitude": 0.7, "prevalence": 0.7,
         "confidence": mc_conf,
-        "assumptions": ["target = max-speed +nature (conservative single point)",
+        "assumptions": [f"primary target = {speed_basis} speed set",
                         "main line is SP-only on the current nature; bounded nature lanes are attached "
                         "separately (not a joint nature x SP search)"]
         + (["my Tailwind applied to the MAIN line (x2 Speed — explicit benchmark condition)"]
@@ -1105,8 +1360,8 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         + ([mc_note] if mc_note else []),
         "evidence": {"facts": [{"source": "dex", "ref": "base speeds"},
                                {"source": "builtin", "ref": "Champions speed formula"}],
-                     "note": f"vs {tgt_label} +nature target (conservative)" + tw_note
-                             + "; distribution coverage is a later increment"
+                     "note": f"vs {tgt_label}" + tw_note
+                             + "; theoretical maximum is a separate ceiling lane"
                              + (f" | {mc_note}" if mc_note else "")},
     }
     if my_tailwind:
@@ -1116,20 +1371,20 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         _tw_min = sol_tw["sp"] if sol_tw and tw_result in ("outspeed", "tie-only") else None
         lane = {"self_mult": 2,
                 "tie_only": bool(tw_result == "tie-only"),
-                **_outcome(_tw_min, cur_sp, base_sps)}
+                **_outcome(_tw_min, cur_sp, base_sps, "sp")}
         if tw_result == "tie-only":
             lane["result"] = "tie-only"
         card["tailwind_lane"] = lane
     if sol is None:
-        card.update(result="unreachable", delta_sp=SP_CAP + 1, decisiveness=0.3,
+        card.update(result="unreachable", delta_sp=SP_CAP + 1,
                     note=f"cannot outspeed {tgt_label} ({tgt_speed}){tw_note} even at {SP_CAP} Speed SP")
     else:
         delta = max(0, sol["sp"] - cur_sp)
-        # Spending Speed SP shares the same 66 SP budget as everything else; a cliff that needs more
-        # than the budget allows is infeasible, not advice (mirrors the survival path; audit 2026-06-21).
-        total_after = sum(base_sps.values()) - cur_sp + max(cur_sp, sol["sp"])
+        budget = _outcome(sol["sp"], cur_sp, base_sps, "sp")
         # Join with a KO check: a speed cliff only matters if moving first flips an outcome.
-        decisiveness, ko_note = 0.5, "speed only — couple a move to judge if moving first flips the KO"
+        ko_impact, ko_note = "not_evaluated", (
+            "speed only — couple a move to judge if moving first flips the KO"
+        )
         move = b.get("move")
         if move and raw_target is not None:
             ko_note = "speed only — a raw-speed target has no species to run a KO check against"
@@ -1142,43 +1397,58 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
                 # naked defender — a naked target turned every fast hit into a false "guaranteed OHKO"
                 # (audit retro 2026-06-22). No meta set -> fall back to naked and flag the optimism.
                 # Defender is Mega-resolved so a stone-holding target is judged on its Mega bulk/typing.
-                if d_meta:
+                if target_set:
+                    target_actor = dict(target_set)
+                    if "sps" not in target_actor and isinstance(target_actor.get("spread"), dict):
+                        target_actor["sps"] = _sps_from_spread(target_actor.get("spread"))
                     defender = _mega_resolve_attacker(
-                        {"name": b["vs"], "ability": d_meta.get("ability"), "item": d_meta.get("item"),
-                         "nature": d_meta.get("nature") or "Hardy", "sps": d_meta.get("sps") or {},
-                         "run_form": d_meta.get("run_form")},
+                        {"name": b["vs"], **target_actor,
+                         "nature": target_actor.get("nature") or "Hardy",
+                         "sps": target_actor.get("sps") or {}},
                         dex_fn, item_fn)
-                    d_basis = "vs meta modal defender"
+                    d_basis = ("vs explicit defender" if explicit_target
+                               else "vs resolved modal defender")
                 else:
                     defender = {"name": b["vs"], "nature": "Hardy", "sps": {}}
                     d_basis = "vs a 0-investment defender (no meta set) — bulkier real sets may survive"
                 # I attack as my Mega form (calc_member); doubles applies the 0.75x spread reduction. (SR
                 # rides only the engine ko_chance, not these static rolls, so it isn't wired into this join.)
                 rolls, hp = damage_fn(_member_ncp(calc_member, sps), defender, move,
-                                      _damage_field(conds, cat, prof.fmt))
+                                      _damage_field(conds, cat, fmt))
                 if hp and rolls and min(rolls) >= hp:
-                    decisiveness, ko_note = 0.95, f"moving first guarantees the OHKO with {move} — decisive ({d_basis})"
+                    ko_impact, ko_note = "guaranteed_ohko", (
+                        f"moving first guarantees the OHKO with {move} — decisive ({d_basis})"
+                    )
                 elif hp and rolls and max(rolls) >= hp:
-                    decisiveness, ko_note = 0.7, f"moving first can OHKO with {move} (roll-dependent; {d_basis})"
+                    ko_impact, ko_note = "possible_ohko", (
+                        f"moving first can OHKO with {move} (roll-dependent; {d_basis})"
+                    )
                 else:
-                    decisiveness, ko_note = 0.35, f"outspeeding doesn't secure a KO with {move} — matchup stays unclear ({d_basis})"
+                    ko_impact, ko_note = "no_ohko", (
+                        f"outspeeding doesn't secure a KO with {move} — matchup stays unclear ({d_basis})"
+                    )
 
-        card["decisiveness"] = decisiveness
-        if delta > 0 and total_after > SP_TOTAL_CAP:
+        card["ko_impact"] = ko_impact
+        if budget["result"] == "infeasible":
             verb = "tie" if sol["result"] == "tie-only" else "outspeed"
             card.update(result="infeasible", delta_sp=delta, need_total=sol["sp"],
                         note=f"+{delta} Speed SP (to {sol['sp']}) to {verb} {tgt_label} "
-                             f"({tgt_speed}) exceeds the 66 SP budget; {ko_note}")
+                             f"({tgt_speed}) has no legal donor capacity; {ko_note}")
         elif sol["result"] == "tie-only":
             card.update(result="tie-only", delta_sp=delta,
                         note=f"can only tie {tgt_label} ({tgt_speed}){tw_note}; {ko_note}")
         elif delta == 0:
-            card.update(result="already", delta_sp=0,
+            card.update(result="already", delta_sp=0, need_total=sol["sp"],
                         note=f"already outspeeds {tgt_label} ({tgt_speed}){tw_note}; {ko_note}")
         else:
+            funding = budget.get("reallocation")
+            funding_note = (f", reallocating {funding['required_sp']} SP from other invested stats"
+                            if funding else "")
             card.update(result="cliff", delta_sp=delta, need_total=sol["sp"],
                         note=f"+{delta} Speed SP (to {sol['sp']}) outspeeds {tgt_label} "
-                             f"({tgt_speed}){tw_note}; {ko_note}")
+                             f"({tgt_speed}){tw_note}{funding_note}; {ko_note}")
+        if budget.get("reallocation") is not None:
+            card["reallocation"] = budget["reallocation"]
 
     # §16.8 nature lanes for the Speed cliff (closed-form, near-free): re-solve under candidate natures,
     # attach the impactful ones. A -Speed (Trick Room/weather) member yields no auto speed-nature lane
@@ -1204,20 +1474,35 @@ def _outspeed_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     return card
 
 
+def _engine_ko_meets(kc: dict[str, Any], hits: int, target: str) -> bool:
+    """Whether the recovery-aware engine verdict meets an N-hit probability target."""
+    try:
+        n = int(kc.get("n"))
+    except (TypeError, ValueError):
+        return False
+    if n < hits:
+        return True
+    if n > hits:
+        return False
+    chance = float(kc.get("chance_pct") or (100.0 if kc.get("guaranteed") else 0.0))
+    threshold = {"guaranteed": 100.0, "likely": 81.25, "any": 0.000001}.get(target, 100.0)
+    return bool(kc.get("guaranteed")) if target == "guaranteed" else chance >= threshold
+
+
 def _kill_min_sp(member: dict[str, Any], nature: str, defender: dict[str, Any], move: str,
                  field: dict[str, Any], off_stat: str, base_sps: dict[str, int], eff_hp: int,
                  hits: int, target: str, *, damage_fn: Callable,
                  damage_batch_fn: Callable | None,
-                 precomputed: dict | None = None) -> tuple[int | None, dict, dict]:
+                 precomputed: dict | None = None,
+                 precomputed_kochance: dict | None = None) -> tuple[int | None, dict, dict]:
     """Min `off_stat` (Atk/SpD... Atk or SpA) SP for `member` UNDER `nature` to KO `defender` (the
     mirror of _survive_min_sp: vary the ATTACKER's offensive stat, damage is monotonic in it, one
-    batch [0..cap] feeds the search). KO predicate = ko_roll(rolls,target) * hits >= eff_hp (STATIC).
+    batch [0..cap] feeds the search). For multi-turn targets, engine `ko_chance` is authoritative when
+    available; otherwise the predicate falls back to repeating the selected first-hit roll.
 
-    Returns (min_sp, rolls_cache, kochance_cache). The batch also carries the engine's recovery-aware
-    `ko_chance` per SP point — captured so the caller can annotate the static cliff with the real verdict
-    (the static band repeats hit 1 and over-counts KOs vs a recovering target; §7 boundary). The rolls
-    don't depend on `eff_hp`/`hits`, so a prior tier's rolls_cache can be passed back as `precomputed`
-    (same attacker/field/nature) — e.g. the no-SR dual lane re-solves against a different eff_hp for free."""
+    Returns (min_sp, rolls_cache, kochance_cache). The rolls don't depend on `eff_hp`/`hits`, so a
+    prior tier's cache can be reused. Recovery-aware KO chances remain field-specific and therefore
+    must be recomputed when a hazard lane changes the field."""
     m = member if nature == (member.get("nature") or "Hardy") else {**member, "nature": nature}
 
     def _attacker(total: int):
@@ -1225,8 +1510,10 @@ def _kill_min_sp(member: dict[str, Any], nature: str, defender: dict[str, Any], 
         return _member_ncp(m, sps)
 
     rolls_cache: dict[int, list[int]] = precomputed if precomputed is not None else {}
-    kochance_cache: dict[int, dict] = {}
-    if precomputed is None and damage_batch_fn is not None:
+    kochance_cache: dict[int, dict] = precomputed_kochance or {}
+    if damage_batch_fn is not None and (
+        precomputed is None or (hits >= 2 and not kochance_cache)
+    ):
         reqs = [{"attacker": _attacker(t), "defender": defender, "move": move, "field": field}
                 for t in range(SP_CAP + 1)]
         for t, r in enumerate(damage_batch_fn(reqs) or []):
@@ -1238,6 +1525,13 @@ def _kill_min_sp(member: dict[str, Any], nature: str, defender: dict[str, Any], 
                 kochance_cache[t] = kc
 
     def predicate(total: int) -> bool:
+        if hits >= 2 and kochance_cache:
+            kc = kochance_cache.get(total)
+            if kc:
+                return _engine_ko_meets(kc, hits, target)
+            # No engine verdict at this SP point (a cache hole): fall back to the static
+            # repeated-hit roll instead of returning False, so a hole can't break the
+            # monotonicity solve_min_sp's bisection assumes.
         rolls = rolls_cache.get(total)
         if rolls is None:
             rolls, _hp = damage_fn(_attacker(total), defender, move, field)
@@ -1246,20 +1540,19 @@ def _kill_min_sp(member: dict[str, Any], nature: str, defender: dict[str, Any], 
     return solve_min_sp(predicate, cap=SP_CAP), rolls_cache, kochance_cache
 
 
-def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
+def _kill_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                damage_fn: Callable, move_fn: Callable, dex_fn: Callable,
                meta_fn: Callable | None = None, meta_natures: set[str] | None = None,
                locked: bool = False, damage_batch_fn: Callable | None = None,
                item_fn: Callable | None = None,
                team_flags: dict[str, bool] | None = None,
                effective: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Kill cliff: min Atk/SpA SP for the member's move to break a named target (its meta MODAL
-    defensive set, Mega-resolved). BOTH KO tiers are solved — the OHKO and the guaranteed 2HKO (the
-    usual 'break the wall' standard) — and shown with a NO-TUNING subsumption: the 2HKO is hidden ONLY
-    when the OHKO is ALREADY secured at the current spread (no SP), so the cheaper breakthrough line is
-    never buried when the OHKO needs tuning or is out of reach (re-audit 2026-07-07). Mirror of the
-    survival cliff on the offense side; benchmark-driven (target is explicit). `slack_sp` on an
-    `already` tier is the reverse/over-investment margin (SP pullable while still securing the KO)."""
+    """Kill cliff against the requested target set, with the benchmark's declared KO tier primary.
+
+    The adjacent OHKO/2HKO threshold is contextual only. Recovery-aware engine KO results are
+    authoritative for multi-turn targets when available; the static repeated-hit predicate is a
+    disclosed fallback.
+    """
     team_flags = team_flags or {}
     kind = b.get("kind")
     move = b.get("move")
@@ -1283,16 +1576,25 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     # field.format applies the doubles spread-move reduction to our own move (a spread KO move deals
     # 0.75x too).
     sr_cond = conds.get("stealth_rock")
-    sr_ignored = sr_cond is True and prof.fmt != "single"
+    sr_ignored = sr_cond is True and fmt != "single"
     use_sr = (bool(sr_cond) if sr_cond is not None else bool(team_flags.get("stealth_rock"))) \
-        and prof.fmt == "single"
+        and fmt == "single"
     spikes = _spikes_layers(conds)
-    field = _damage_field(conds, cat, prof.fmt, use_sr=use_sr, spikes=spikes)
+    field = _damage_field(conds, cat, fmt, use_sr=use_sr, spikes=spikes)
 
-    d_meta = _meta_set(meta_fn, b["vs"], prof.fmt, None, dex_fn=dex_fn)
-    if d_meta:
-        base_ability = (((d_meta.get("set") or {}).get("ability") or {}).get("name")
-                        if isinstance(d_meta.get("set"), dict) else None)
+    explicit_defender = b.get("opponent_set")
+    d_meta = _meta_set(meta_fn, b["vs"], fmt, explicit_defender, dex_fn=dex_fn)
+    if explicit_defender:
+        dset = dict(explicit_defender)
+        if "sps" not in dset and isinstance(dset.get("spread"), dict):
+            dset["sps"] = _sps_from_spread(dset.get("spread"))
+        defender0 = {"name": b["vs"], **dset}
+        d_prov = {"source": "explicit", "confidence": "high",
+                  "note": "opponent set supplied by the benchmark", "prevalence": None}
+    elif d_meta:
+        base_ability = d_meta.get("base_ability") or (
+            (((d_meta.get("set") or {}).get("ability") or {}).get("name"))
+            if isinstance(d_meta.get("set"), dict) else None)
         defender0 = {"name": b["vs"], "ability": d_meta.get("ability"), "item": d_meta.get("item"),
                      "nature": d_meta.get("nature") or "Hardy", "sps": d_meta.get("sps") or {},
                      "run_form": d_meta.get("run_form"), "base_ability": base_ability}
@@ -1308,10 +1610,8 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     base_sps = _sps_from_spread(member.get("spread"))
     cur = base_sps[off_stat]
     cur_nature = member.get("nature") or "Hardy"
-    # Hazards chip the target at SWITCH-IN (pre-Mega): typing = the BASE species' (b['vs'] — a
-    # Charizard-X target takes SR on Fire/Flying, not Fire/Dragon), and the immunity check carries the
-    # §9 two-place ability set — the resolved (in-calc) ability unconditionally, the pre-Mega base
-    # ability ungated for a real-team set and at >= the usage floor for a meta marginal.
+    # Hazards chip the target at SWITCH-IN (pre-Mega): typing = the BASE species' (a Charizard-X
+    # target takes SR on Fire/Flying, not Fire/Dragon), and immunity uses only the base-phase ability.
     target_base_name = defender.get("base_name") or _base_form_name(b["vs"], dex_fn)
     target_types = list((_dex_facts(target_base_name, dex_fn).get("types")) or [])
     d_haz_abilities = _hazard_abilities_for_modeled_set(defender, d_meta, d_prov)
@@ -1334,13 +1634,19 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     engine_koc: dict[int, dict] = {}
     for h in (1, 2):
         # The rolls don't depend on `hits`, so tier 2 reuses tier 1's batch (mirror of the survive side).
-        mt, _c, koc = _kill_min_sp(calc_member, cur_nature, defender, move, field, off_stat, base_sps,
-                                   eff_hp, h, target, damage_fn=damage_fn, damage_batch_fn=damage_batch_fn,
-                                   precomputed=rolls_cache if h == 2 else None)
+        mt, _c, koc = _kill_min_sp(
+            calc_member, cur_nature, defender, move, field, off_stat, base_sps,
+            eff_hp, h, target, damage_fn=damage_fn, damage_batch_fn=damage_batch_fn,
+            precomputed=rolls_cache if h == 2 else None,
+            precomputed_kochance=engine_koc if h == 2 else None,
+        )
         ko_min[h] = mt
         if h == 1:
             rolls_cache, engine_koc = _c, koc
-        t = {"hits": h, "label": "OHKO" if h == 1 else "2HKO", "ko_exact": h == 1, **_outcome(mt, cur, base_sps)}
+        t = {"hits": h, "label": "OHKO" if h == 1 else "2HKO", "ko_exact": h == 1,
+             "ko_basis": ("engine_recovery_aware" if h >= 2 and engine_koc else
+                          "exact_single_hit" if h == 1 else "static_repeat_fallback"),
+             **_outcome(mt, cur, base_sps, off_stat)}
         if t["result"] == "already" and mt is not None:        # slack = pullable SP while still securing it
             t["slack_sp"] = cur - mt
         # The engine ko_chance rides the batch result (per SP point), which tier 2 reuses from tier 1 —
@@ -1349,34 +1655,48 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         if eng:
             t["engine_ko_chance"] = eng
         tiers[h] = t
-    # No-tuning subsumption: hide the 2HKO ONLY when the OHKO is ALREADY secured without spending SP.
-    # Otherwise show both — a 2HKO reachable at a cheaper SP than an OHKO that needs tuning must not
-    # be buried (the user's 'break the wall' standard is usually the 2HKO).
-    ohko_already = tiers[1]["result"] == "already"
-    ko_tiers = [tiers[1]] if ohko_already else [tiers[1], tiers[2]]
-    headline = tiers[1] if ohko_already else tiers[2]         # cheapest meaningful tier
+    ko_tiers = [tiers[1], tiers[2]]
+    requested_hits = KILL_HITS[kind]
+    headline = tiers[requested_hits]
     hits, label, min_total = headline["hits"], headline["label"], ko_min[headline["hits"]]
+    probability_lanes: list[dict[str, Any]] = []
+    for lane_target in ("guaranteed", "likely", "any"):
+        lane_min, _rc, lane_koc = _kill_min_sp(
+            calc_member, cur_nature, defender, move, field, off_stat, base_sps,
+            eff_hp, hits, lane_target, damage_fn=damage_fn,
+            damage_batch_fn=damage_batch_fn, precomputed=rolls_cache,
+            precomputed_kochance=engine_koc,
+        )
+        probability_lanes.append({
+            "probability": lane_target,
+            "primary": lane_target == target,
+            "stat": off_spread,
+            "scope": "offense_axis",
+            "ko_basis": ("engine_recovery_aware" if hits >= 2 and (lane_koc or engine_koc)
+                         else "exact_single_hit" if hits == 1 else "static_repeat_fallback"),
+            **_outcome(lane_min, cur, base_sps, off_stat),
+        })
 
     card: dict[str, Any] = {
         **base, "category": cat, "stat": off_spread, "hits": hits, "probability": target,
         "stealth_rock": use_sr, "spikes": spikes, "ko_tiers": ko_tiers,
+        "probability_lanes": probability_lanes,
+        "ko_basis": headline["ko_basis"],
         # Only an OHKO is exact. A 2HKO predicate is `ko_roll * 2 >= hp` — static: it repeats the first
         # hit and does NOT model between-turn recovery (Sitrus/Leftovers), ability shifts (Draco Meteor /
         # Stamina / Multiscale), recoil or field changes, so it can claim a KO that a berry denies (audit
         # 2026-06-24). Surfaced as a flag + assumption, not silently sold as a guaranteed 2HKO.
         "ko_exact": hits == 1,
-        "magnitude": 1.0 if hits == 1 else 0.8,
-        # `or` guards an injected meta set carrying an explicit None (would crash score_card).
-        "prevalence": d_prov.get("prevalence") or 0.7,
-        "decisiveness": 0.9,                   # securing a KO flips the exchange
         "confidence": completeness.min_confidence(d_prov.get("confidence", "medium"), mc_conf),
         "defender": {"source": d_prov.get("source"), "ability": defender.get("ability"),
-                     "item": defender.get("item"), "nature": defender.get("nature"), "sps": defender.get("sps")},
-        "assumptions": [f"target = {d_prov.get('source')} defensive set"]
-        + (["both KO tiers solved; the 2HKO is hidden only when the OHKO is already secured without tuning"])
-        + (["STATIC 2HKO approximation: repeats hit 1; ignores between-turn recovery (Sitrus/Leftovers), "
+                     "item": defender.get("item"), "nature": defender.get("nature"),
+                     "sps": defender.get("sps"), "prevalence": d_prov.get("prevalence")},
+        "assumptions": [f"target = {d_prov.get('source')} defensive set",
+                        f"requested {label} is the primary target; the adjacent KO tier is contextual"]
+        + (["STATIC 2HKO fallback: repeats hit 1; ignores between-turn recovery (Sitrus/Leftovers), "
             "ability shifts (Draco Meteor / Stamina / Multiscale), recoil & field changes — a berry/heal "
-            "can deny it. Only OHKO is exact."] if any(t["hits"] >= 2 for t in ko_tiers) else [])
+            "can deny it. Only OHKO is exact."] if tiers[2]["ko_basis"] == "static_repeat_fallback"
+           else ["2HKO uses the engine's recovery-aware KO chance; OHKO remains the exact single-hit tier."])
         + (["defender fields are independent meta marginals — exact ability+item+nature combo may not co-occur"]
            if d_prov.get("source") == "meta" else [])
         + (["our Stealth Rock chip on the target modelled (singles; explicit condition wins, else "
@@ -1406,14 +1726,19 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
         if r == "unreachable":
             return f"cannot {lab} even at {SP_CAP} {off_spread} SP"
         if r == "infeasible":
-            return f"{lab} needs +{t['delta_sp']} {off_spread} SP (to {t['need_total']}) — over the 66 SP budget"
-        return f"{lab} at +{t['delta_sp']} {off_spread} SP (to {t['need_total']})"
+            return f"{lab} needs +{t['delta_sp']} {off_spread} SP (to {t['need_total']}) — no legal donor capacity"
+        funding = t.get("reallocation")
+        suffix = (f", reallocating {funding['required_sp']} SP from other invested stats"
+                  if funding else "")
+        return f"{lab} at +{t['delta_sp']} {off_spread} SP (to {t['need_total']}{suffix})"
 
     card.update(result=headline["result"], delta_sp=headline["delta_sp"])
     if headline.get("need_total") is not None:
         card["need_total"] = headline["need_total"]
     if headline.get("slack_sp") is not None:
         card["slack_sp"] = headline["slack_sp"]
+    if headline.get("reallocation") is not None:
+        card["reallocation"] = headline["reallocation"]
     card["note"] = " | ".join(_tier_phrase(t) for t in ko_tiers)
 
     # Stealth Rock 0/1 dual (§9, mirror of the survive side): when the SR chip is in the KO math, also
@@ -1422,22 +1747,25 @@ def _kill_card(member: dict[str, Any], b: dict[str, Any], prof, *,
     # only the SR chip flips (Spikes stays as conditioned). Rolls don't depend on the chip, so the
     # tier-1 rolls_cache is reused — zero extra engine calls.
     if use_sr:
-        no_sr_min, _rc, _kc = _kill_min_sp(calc_member, cur_nature, defender, move, field, off_stat,
-                                           base_sps, target_hp - spikes_chip, hits, target,
-                                           damage_fn=damage_fn, damage_batch_fn=damage_batch_fn,
-                                           precomputed=rolls_cache)
-        card["stealth_rock_lane"] = {"stealth_rock": False, **_outcome(no_sr_min, cur, base_sps)}
+        no_sr_field = _damage_field(conds, cat, fmt, use_sr=False, spikes=spikes)
+        no_sr_min, _rc, _kc = _kill_min_sp(
+            calc_member, cur_nature, defender, move, no_sr_field, off_stat,
+            base_sps, target_hp - spikes_chip, hits, target,
+            damage_fn=damage_fn, damage_batch_fn=damage_batch_fn,
+            precomputed=rolls_cache if hits == 1 else None,
+        )
+        card["stealth_rock_lane"] = {
+            "stealth_rock": False, **_outcome(no_sr_min, cur, base_sps, off_stat)
+        }
 
-    # Recovery-aware engine verdict at the headline tier's SP (the static multi-hit band over-counts KOs
-    # vs a recovering target; §7). Trust ko_chance over the static 2HKO cliff.
+    # Recovery-aware engine verdict at the headline tier's SP.
     engine_ko = headline.get("engine_ko_chance")
     if engine_ko:
         card["engine_ko_chance"] = engine_ko
     if engine_ko and hits >= 2 and not engine_ko.get("guaranteed"):
         card["assumptions"].append(
             f"engine recovery-aware KO% at {min_total} {off_spread} SP = {engine_ko.get('chance_pct')}% "
-            f"(n={engine_ko.get('n')}, NOT guaranteed): the target's between-turn recovery can deny this "
-            f"static {label} — trust ko_chance over the static cliff.")
+            f"(n={engine_ko.get('n')}); this meets the requested {target} threshold but is not guaranteed.")
 
     # §16.8 nature lanes re-solve the HEADLINE tier's cliff under candidate natures.
     if card["result"] in ("cliff", "infeasible", "unreachable") and not locked:
@@ -1481,12 +1809,74 @@ def _team_has_move(team: dict[str, Any], move: str) -> bool:
     return any(move in (m.get("moves") or []) for m in team.get("pokemon", []))
 
 
+def _apply_benchmark_protections(cards: list[dict[str, Any]],
+                                 members: dict[str, dict[str, Any]]) -> None:
+    """Annotate reallocation donors with floors from other already-met explicit benchmarks.
+
+    This is constraint reporting, not optimization: it says how much of each current investment can
+    move without breaking a benchmark the same tune request already proved. The user may still accept
+    that trade; the facts layer never silently deletes the donor.
+    """
+    floors: dict[str, dict[str, dict[str, Any]]] = {}
+    for card in cards:
+        member = members.get(card.get("member"))
+        stat = card.get("stat")
+        need = card.get("need_total")
+        if not member or card.get("result") != "already" or stat not in SPREAD_TO_SPS \
+                or not isinstance(need, int):
+            continue
+        species = member.get("species")
+        slot = floors.setdefault(species, {}).setdefault(
+            stat, {"min_sp": 0, "benchmark_indices": []}
+        )
+        slot["min_sp"] = max(slot["min_sp"], need)
+        slot["benchmark_indices"].append(card.get("benchmark_index"))
+
+    def annotate(node: Any, protected: dict[str, dict[str, Any]]) -> None:
+        if isinstance(node, list):
+            for value in node:
+                annotate(value, protected)
+            return
+        if not isinstance(node, dict):
+            return
+        plan = node.get("reallocation")
+        if isinstance(plan, dict):
+            available = 0
+            for donor in plan.get("candidate_donors") or []:
+                floor = protected.get(donor.get("stat")) or {}
+                protected_sp = min(int(donor.get("current_sp") or 0),
+                                   int(floor.get("min_sp") or 0))
+                donor["protected_sp"] = protected_sp
+                donor["available_without_breaking"] = max(
+                    0, int(donor.get("current_sp") or 0) - protected_sp
+                )
+                donor["protected_by_benchmarks"] = [
+                    i for i in (floor.get("benchmark_indices") or []) if i is not None
+                ]
+                available += donor["available_without_breaking"]
+            required = int(plan.get("required_sp") or 0)
+            plan["available_without_breaking"] = available
+            plan["preserves_existing_benchmarks"] = available >= required
+            plan["protected_shortfall_sp"] = max(0, required - available)
+        for value in node.values():
+            if value is not plan:
+                annotate(value, protected)
+
+    for card in cards:
+        member = members.get(card.get("member"))
+        if member:
+            annotate(card, floors.get(member.get("species"), {}))
+
+
 def tune(team: dict[str, Any], benchmarks: list[dict[str, Any]], *, fmt: str | None = None,
          damage_fn: Callable, move_fn: Callable, dex_fn: Callable,
          meta_fn: Callable | None = None, nature_dist_fn: Callable | None = None,
          locked: list[str] | None = None, damage_batch_fn: Callable | None = None,
-         item_fn: Callable | None = None) -> dict[str, Any]:
-    prof = get_profile(fmt or team.get("format"))
+         item_fn: Callable | None = None,
+         archetypes_fn: Callable | None = None) -> dict[str, Any]:
+    fmt_battle = str(fmt or team.get("format") or "single").lower()
+    if fmt_battle not in {"single", "double"}:
+        fmt_battle = "single"
     dex_fn = _memoized_batch_lookup(dex_fn) or dex_fn
     move_fn = _memoized_batch_lookup(move_fn) or move_fn
     item_fn = _memoized_batch_lookup(item_fn) if item_fn else None
@@ -1520,10 +1910,10 @@ def tune(team: dict[str, Any], benchmarks: list[dict[str, Any]], *, fmt: str | N
     # Team-level field gates (computed once): our Intimidate provider and our Tailwind / Stealth Rock
     # setters. A field effect is only modelled when we can actually put it up (re-audit 2026-07-07).
     team_flags = {
-        "intimidate": prof.fmt == "double" and _team_provides_intimidate(
+        "intimidate": fmt_battle == "double" and _team_provides_intimidate(
             team, dex_fn, item_fn, eff_by_member=member_effective),
-        "tailwind": prof.fmt == "double" and _team_has_move(team, "Tailwind"),
-        "stealth_rock": prof.fmt == "single" and _team_has_move(team, "Stealth Rock"),
+        "tailwind": fmt_battle == "double" and _team_has_move(team, "Tailwind"),
+        "stealth_rock": fmt_battle == "single" and _team_has_move(team, "Stealth Rock"),
     }
     locked_set = set(locked or [])
     locked_members = {id(m) for m in team.get("pokemon", [])
@@ -1547,7 +1937,7 @@ def tune(team: dict[str, Any], benchmarks: list[dict[str, Any]], *, fmt: str | N
                 dist = {}
                 if nature_dist_fn:
                     for n in names:
-                        dist = nature_dist_fn(n, prof.fmt) or {}
+                        dist = nature_dist_fn(n, fmt_battle) or {}
                         if dist:
                             break
                 nat_cache[key] = dist
@@ -1559,7 +1949,7 @@ def tune(team: dict[str, Any], benchmarks: list[dict[str, Any]], *, fmt: str | N
     notes: list[str] = []
     any_lane = False
     seen_kill_benchmarks: set[str] = set()
-    for b in benchmarks:
+    for benchmark_index, b in enumerate(benchmarks):
         sp = b.get("member")
         member = members.get(sp)
         if not member:
@@ -1567,47 +1957,49 @@ def tune(team: dict[str, Any], benchmarks: list[dict[str, Any]], *, fmt: str | N
             continue
         kind = b.get("kind")
         m_locked, mnat = id(member) in locked_members, _member_natures(member)
+        previous_card_count = len(cards)
         if kind == "survive":
-            cards.append(_survive_card(member, b, prof, damage_fn=damage_fn, move_fn=move_fn,
+            cards.append(_survive_card(member, b, fmt_battle, damage_fn=damage_fn, move_fn=move_fn,
                                        dex_fn=dex_fn, meta_fn=meta_fn, meta_natures=mnat,
                                        locked=m_locked, damage_batch_fn=damage_batch_fn,
                                        item_fn=item_fn, team_flags=team_flags,
                                        effective=member_effective.get(id(member))))
         elif kind == "outspeed":
-            cards.append(_outspeed_card(member, b, prof, damage_fn=damage_fn, move_fn=move_fn,
+            cards.append(_outspeed_card(member, b, fmt_battle, damage_fn=damage_fn, move_fn=move_fn,
                                         dex_fn=dex_fn, meta_fn=meta_fn, meta_natures=mnat, locked=m_locked,
                                         item_fn=item_fn, team_flags=team_flags,
+                                        archetypes_fn=archetypes_fn,
                                         effective=member_effective.get(id(member))))
         elif kind in KILL_HITS:                # ohko / 2hko
-            # A kill card already solves and displays both OHKO and 2HKO tiers. If the caller supplies
-            # the same benchmark twice with only `kind` changed, the second one is a byte-level duplicate
-            # apart from the heading and wastes a second [0..32] batch.
-            kill_key = json.dumps({k: v for k, v in b.items() if k != "kind"},
-                                  sort_keys=True, ensure_ascii=False, default=str)
+            kill_key = json.dumps(b, sort_keys=True, ensure_ascii=False, default=str)
             if kill_key in seen_kill_benchmarks:
                 notes.append(f"duplicate kill benchmark for member '{sp}' vs '{b.get('vs')}' "
                              f"move '{b.get('move')}' skipped; one card already shows OHKO and 2HKO tiers")
                 continue
             seen_kill_benchmarks.add(kill_key)
-            cards.append(_kill_card(member, b, prof, damage_fn=damage_fn, move_fn=move_fn,
+            cards.append(_kill_card(member, b, fmt_battle, damage_fn=damage_fn, move_fn=move_fn,
                                     dex_fn=dex_fn, meta_fn=meta_fn, meta_natures=mnat,
                                     locked=m_locked, damage_batch_fn=damage_batch_fn,
                                     item_fn=item_fn, team_flags=team_flags,
                                     effective=member_effective.get(id(member))))
         else:
             notes.append(f"benchmark kind '{kind}' not supported (survive/outspeed/ohko/2hko)")
-        any_lane = any_lane or bool(cards and cards[-1].get("nature_alternatives"))
+        if len(cards) > previous_card_count:
+            cards[-1]["benchmark_index"] = benchmark_index
+            any_lane = any_lane or bool(cards[-1].get("nature_alternatives"))
 
-    ranked = rank_cards(cards, prof.aspect_weight)
-    notes.append("Cliff cards are objective facts ranked by cheapness x prevalence x magnitude x decisiveness "
-                 "(weighted by the format's aspect_priority). Pick which cliffs to spend the 66 SP budget on — "
-                 "the tool does not choose for you, and competing cliffs share the budget.")
+    _apply_benchmark_protections(cards, members)
+    notes.append("Cliff cards preserve explicit benchmark order; the facts layer assigns no composite score. "
+                 "Pick which cliffs to fund from unused SP or by "
+                 "reallocating other investments — candidate donors expose capacity and opportunity cost, but "
+                 "the tool does not choose a donor or an optimal spread; competing cliffs share the 66 SP budget.")
     if any_lane:
         notes.append("`nature_alternatives` on a card are NATURE LANES: the same cliff solved "
-                     "under a different nature, kept only when it unlocks an unreachable cliff or frees >=8 SP. "
+                     "under a different nature, kept whenever a meta-observed nature saves SP or unlocks "
+                     "an unreachable cliff. "
                      "They are opportunity-cost facts (the penalty stat is shown), NEVER ranked or recommended — "
                      "a nature change is a whole-spread, single-slot commitment that is yours to make.")
-    return {"kind": "tune", "format": prof.fmt, "cards": ranked, "notes": notes}
+    return {"kind": "tune", "format": fmt_battle, "cards": cards, "notes": notes}
 
 
 def format_tune_md(d: dict[str, Any]) -> str:
@@ -1616,7 +2008,7 @@ def format_tune_md(d: dict[str, Any]) -> str:
         lines.append("\n" + i18n.t("tn_no_cards"))
     for c in d["cards"]:
         who = f" {c['member']}" if c.get("member") else ""
-        head = f"- [{c.get('score', 0):.3f}] **{c['aspect']}/{c['kind']}**{who} vs {c.get('vs')}"
+        head = f"- **{c['aspect']}/{c['kind']}**{who} vs {c.get('vs')}"
         if c.get("move"):
             head += f" ({c['move']})"
         if c.get("nature_unlock"):
@@ -1629,6 +2021,16 @@ def format_tune_md(d: dict[str, Any]) -> str:
             note = ("  — " + i18n.t("tn_recovery_note")
                     if not ek.get("guaranteed") and c.get("hits", 1) >= 2 else "")
             lines.append(f"    · {i18n.t('tn_engine_ko')}: {verdict}{note}")
+        realloc = c.get("reallocation")
+        if realloc:
+            donors = ", ".join(
+                f"{d.get('stat')} {d.get('current_sp')} SP"
+                for d in realloc.get("candidate_donors", [])
+            )
+            lines.append(
+                f"    · reallocation: move {realloc.get('required_sp')} SP from other invested "
+                f"stats; candidate donors: {donors or 'none'} (re-check affected benchmarks)"
+            )
 
         # Secondary lanes (0/1 duals, anchored to the headline tier — never crossed with the other tier).
         def _lane_verdict(L: dict[str, Any]) -> str:

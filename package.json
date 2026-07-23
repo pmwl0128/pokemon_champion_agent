@@ -1,0 +1,14 @@
+{
+  "name": "pokemon-champions-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/web"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

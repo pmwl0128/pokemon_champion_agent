@@ -30,8 +30,8 @@ def _combo_check_coverage(members: list[str], grid: list[dict[str, Any]]) -> dic
     `grid` is a matchup `members` grid (rows carrying `member` + `cells` with a derived `check`). We
     restrict it to THIS lineup's members and reuse `checks.coverage_summary` — a pure set operation over
     the already-computed per-member grades (ZERO extra ncp). What we surface per lineup is the same
-    facts the whole-team coverage surfaces: the grade DISTRIBUTION (a count), the HOLES (opponents no
-    lineup member switch-in checks), and the CONTESTED reads. We deliberately do NOT emit any lineup
+    facts the whole-team coverage surfaces: the grade DISTRIBUTION (a count), witnessed observed floors,
+    and the HOLES (opponents no lineup member switch-in checks). We deliberately do NOT emit any lineup
     aggregate or sort lineups by coverage — coverage-maximization is exactly the hidden optimizer the
     facts-only red line forbids (design §1/§16). The AI reads these per-lineup facts; picking a lineup
     stays its judgment, made against the disclosed holes, not a skill-emitted best."""
@@ -42,10 +42,10 @@ def _combo_check_coverage(members: list[str], grid: list[dict[str, Any]]) -> dic
     cov = checks.coverage_summary(rows)
     return {
         "grade_distribution": cov.get("grade_distribution"),   # a COUNT for THIS lineup, never a score
-        "by_opponent": cov.get("by_opponent"),                 # explicit per-opponent best-strict labels
+        "by_opponent": cov.get("by_opponent"),                 # explicit witnessed observed floors
         "holes": cov.get("holes"),                             # opponents with no safe switch-in check
-        "contested": [r["opponent"] for r in cov.get("by_opponent", []) if r.get("contested")],
-        "note": "per-lineup coverage FACTS (best strict grade any lineup member reaches per opponent); "
+        "note": "per-lineup coverage FACTS (strongest member per retained variant, then witnessed "
+                "observed floor per opponent); "
                 "a per-opponent label table + counts, NEVER a lineup score and lineups are NOT ranked "
                 "by it — the hole list is the actionable fact, the pick stays your judgment (design §1).",
     }
@@ -130,6 +130,14 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
             "members": sel,
             "mega_options": mega_options,
             "multiple_mega_brought": len(mega_options) > 1,   # legal to bring; only one may Mega in battle
+            # Explicit battle-state enumeration closes the most common conceptual error: a lineup with
+            # two registered stones does NOT have two active Mega forms.  These states are membership
+            # facts only; matchup/check rows are not yet recomputed per active form (note below).
+            "mega_activation_states": (
+                [{"active_member": None, "active_form": None}]
+                + [{"active_member": o["member"], "active_form": o["form"]}
+                   for o in mega_options]
+            ),
             "speed_order": speed_order,        # as-brought (pre-Mega) base Speed
             "types_present": types_present,    # as-brought (pre-Mega) types
         }
@@ -143,6 +151,33 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
         combos.append(entry)
     # Stable, neutral ordering (by member names) — explicitly NOT a quality ranking.
     combos.sort(key=lambda c: c["members"])
+    for index, combo in enumerate(combos):
+        combo["lineup_index"] = index
+
+    # Per-option route availability across the actual 6-pick-N subsets.  This is the structural fact
+    # that flat six-member evaluation hides: a second registered Mega can own exclusive lineups or be
+    # brought alongside another option for preview-time choice.  Counts only; no route is ranked.
+    registered_options: list[dict[str, Any]] = []
+    seen_options: set[tuple[str, str]] = set()
+    for combo in combos:
+        for opt in combo["mega_options"]:
+            key = (opt["member"], opt["form"])
+            if key not in seen_options:
+                seen_options.add(key)
+                registered_options.append({"member": key[0], "form": key[1]})
+    mega_routes = []
+    for opt in registered_options:
+        lineups = [c for c in combos if any(
+            o["member"] == opt["member"] and o["form"] == opt["form"]
+            for o in c["mega_options"])]
+        exclusive = [c["lineup_index"] for c in lineups if len(c["mega_options"]) == 1]
+        shared = [c["lineup_index"] for c in lineups if len(c["mega_options"]) > 1]
+        mega_routes.append({
+            **opt,
+            "lineup_count": len(lineups),
+            "exclusive_lineup_indices": exclusive,
+            "shared_multi_mega_lineup_indices": shared,
+        })
 
     # The legality note depends on whether a caller already ran `validate` and passed the verdict
     # in: the CLI does (so claiming "run validate first" would contradict the attached legality —
@@ -160,16 +195,20 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
         legality_note,
         "Only ONE member may Mega Evolve per battle: a combo carrying multiple Mega stones is legal to "
         "bring (multiple_mega_brought=true), but you Mega at most one once in battle.",
+        "mega_activation_states enumerates that one-active-Mega choice, and mega_routes counts each "
+        "registered option's exclusive/shared lineup availability. These are structural route facts: "
+        "check_coverage is still lineup-level and is NOT recomputed per active Mega state.",
         "DEFERRED (not modelled in v1): matchup vs a NAMED opponent, lead vs back "
         "constraints, doubles partner synergy and speed-control (tailwind/trick-room) semantics.",
     ]
     if check_grid is not None:
         notes.append(
             "each combo carries `check_coverage` vs the meta top-K (opt-in, ncp-grounded): per-opponent "
-            "the best strict grade any lineup member reaches + the HOLES (opponents no lineup member "
+            "the witnessed observed floor after taking the strongest member per retained build + the "
+            "HOLES (opponents no lineup member "
             "switch-in checks) + a grade COUNT. These are per-lineup FACTS — combos are still listed in a "
             "neutral name order, never ranked by coverage, and no 'best lineup' is emitted (design §1/§16). "
-            "The coverage inherits the matchup battery's confidence (vs-standard-set), not selection's own.")
+            "The coverage inherits the matchup battery's confidence (vs-observed-build), not selection's own.")
     if any_mega_changes:
         notes.insert(3, "speed_order and types_present are the as-brought (pre-Mega) values; if a member Mega Evolves, "
                      "its post-Mega type/Speed are given on its mega_option (form_types / form_base_speed when they differ).")
@@ -188,7 +227,7 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
                          "declaration could not be applied; check the name or the team.")
 
     # With --with-check the output embeds ncp-grounded per-combo check_coverage (whose own lower,
-    # vs-standard-set confidence lives in check_coverage_context — never selection's `high`), so the
+    # vs-observed-build confidence lives in check_coverage_context — never selection's `high`), so the
     # evidence must not still claim "no matchup". Top-level confidence stays high: it qualifies ONLY the
     # dex enumeration facts, not the check coverage.
     assumptions = (["objective enumeration + opt-in ncp-grounded per-combo check_coverage "
@@ -197,6 +236,7 @@ def select(team: dict[str, Any], *, fmt: str | None = None,
                    ["objective enumeration only; no matchup, no ranking"])
     out = {"kind": "selection", "format": fmt, "pick_size": pick,
            "bring_size": len(members), "combos": combos, "notes": notes,
+           "mega_routes": mega_routes,
            "keep_mega": keep_echo,
            "legality_checked": legality_status,
            "confidence": "high", "confidence_reason": None,

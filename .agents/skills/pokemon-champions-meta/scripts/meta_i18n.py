@@ -5,7 +5,8 @@ The canonical JSON contract is NEVER localized (name / slug / panel keys are cro
 `--output json` is identical in every language. Precedence: `--lang` flag > `POKEMON_CHAMPIONS_LANG`
 env > default en. Same one-file pattern as dex_i18n.py (unique module name avoids cross-skill collision).
 
-Not in scope: the xlsx export (a deliberately Chinese facts workbook) and internal data-sheet keys.
+The xlsx export uses its own trilingual workbook catalog in meta_query.py. Internal data-sheet keys
+remain language-invariant.
 """
 from __future__ import annotations
 
@@ -41,6 +42,53 @@ def t(key: str, **fmt: object) -> str:
     return s.format(**fmt) if fmt else s
 
 
+TYPE_NAMES = {
+    "Normal": ("一般", "ノーマル"), "Fire": ("火", "ほのお"), "Water": ("水", "みず"),
+    "Electric": ("电", "でんき"), "Grass": ("草", "くさ"), "Ice": ("冰", "こおり"),
+    "Fighting": ("格斗", "かくとう"), "Poison": ("毒", "どく"), "Ground": ("地面", "じめん"),
+    "Flying": ("飞行", "ひこう"), "Psychic": ("超能力", "エスパー"), "Bug": ("虫", "むし"),
+    "Rock": ("岩石", "いわ"), "Ghost": ("幽灵", "ゴースト"), "Dragon": ("龙", "ドラゴン"),
+    "Dark": ("恶", "あく"), "Steel": ("钢", "はがね"), "Fairy": ("妖精", "フェアリー"),
+}
+CATEGORY_NAMES = {"Physical": ("物理", "物理"), "Special": ("特殊", "特殊"),
+                  "Status": ("变化", "変化")}
+FORMAT_NAMES = {"single": ("单打", "シングル"), "double": ("双打", "ダブル"),
+                "both": ("单打／双打", "シングル／ダブル")}
+STAT_NAMES = {
+    "hp": ("HP", "HP", "HP"), "atk": ("攻击", "攻撃", "Atk"),
+    "def": ("防御", "防御", "Def"), "spa": ("特攻", "特攻", "SpA"),
+    "spd": ("特防", "特防", "SpD"), "spe": ("速度", "素早さ", "Spe"),
+}
+
+
+def value(kind: str, raw: str) -> str:
+    table = {"type": TYPE_NAMES, "category": CATEGORY_NAMES, "format": FORMAT_NAMES}.get(kind, {})
+    key = next((k for k in table if k.lower() == str(raw).lower()), raw)
+    pair = table.get(key)
+    if not pair or _lang == "en":
+        return key
+    return pair[0 if _lang == "zh" else 1]
+
+
+def spread(entry: dict[str, object]) -> str:
+    """Human-readable SP row; the JSON continues to expose six invariant fields."""
+    lang_i = {"zh": 0, "ja": 1, "en": 2}[_lang]
+    return " / ".join(
+        f"{STAT_NAMES[k][lang_i]} {entry.get(k, 0)}"
+        for k in ("hp", "atk", "def", "spa", "spd", "spe")
+        if isinstance(entry.get(k), (int, float)) and entry.get(k) != 0
+    ) or "—"
+
+
+def list_sep() -> str:
+    return "，" if _lang == "zh" else "、" if _lang == "ja" else ", "
+
+
+def parens(value: object) -> str:
+    """A parenthesized suffix with language-appropriate spacing and glyphs."""
+    return f" ({value})" if _lang == "en" else f"（{value}）"
+
+
 MESSAGES: dict[str, dict[str, str]] = {
     # --- report command ---
     "report_update":    {"zh": "更新报告", "ja": "更新レポート", "en": "update report"},
@@ -58,7 +106,11 @@ MESSAGES: dict[str, dict[str, str]] = {
     "name":         {"zh": "名称",     "ja": "名前",       "en": "name"},
     "ja_key":       {"zh": "日文名/键", "ja": "日本語/キー", "en": "ja/key"},
     "usage":        {"zh": "使用率",   "ja": "使用率",     "en": "usage"},
-    "extra":        {"zh": "附加",     "ja": "追加",       "en": "extra"},
+    "extra":        {"zh": "详情",     "ja": "詳細",       "en": "details"},
+    "type":         {"zh": "属性",     "ja": "タイプ",     "en": "type"},
+    "category":     {"zh": "分类",     "ja": "分類",       "en": "category"},
+    "power":        {"zh": "威力",     "ja": "威力",       "en": "power"},
+    "accuracy":     {"zh": "命中",     "ja": "命中",       "en": "accuracy"},
     "format":       {"zh": "赛制",     "ja": "フォーマット", "en": "format"},
     "panel":        {"zh": "面板",     "ja": "パネル",     "en": "panel"},
     "pokemon_rank": {"zh": "宝可梦名次", "ja": "ポケモン順位", "en": "pokemon_rank"},
@@ -66,17 +118,18 @@ MESSAGES: dict[str, dict[str, str]] = {
     # --- phrases ---
     "resolved":     {"zh": "已解析",   "ja": "解決",       "en": "resolved"},
     "distance":     {"zh": "距离",     "ja": "距離",       "en": "distance"},
+    "fuzzy":        {"zh": "模糊匹配", "ja": "あいまい検索", "en": "fuzzy"},
     "not_found":    {"zh": "未找到：{query}（{context}）",
                      "ja": "見つかりません：{query}（{context}）",
                      "en": "not found: {query} in {context}"},
     "nf":           {"zh": "未找到",   "ja": "見つかりません", "en": "not found"},
     # --- panel section names (the `## ...` headers; data keys stay canonical) ---
-    "panel_moves":     {"zh": "招式",   "ja": "技",         "en": "moves"},
+    "panel_moves":     {"zh": "招式",   "ja": "わざ",       "en": "moves"},
     "panel_items":     {"zh": "道具",   "ja": "持ち物",     "en": "items"},
     "panel_abilities": {"zh": "特性",   "ja": "特性",       "en": "abilities"},
     "panel_natures":   {"zh": "性格",   "ja": "性格",       "en": "natures"},
     "panel_partners":  {"zh": "队友",   "ja": "パートナー", "en": "partners"},
-    "panel_spreads":   {"zh": "努力值", "ja": "努力値",     "en": "spreads"},
+    "panel_spreads":   {"zh": "SP 分配", "ja": "SP配分",     "en": "SP spreads"},
 }
 
 

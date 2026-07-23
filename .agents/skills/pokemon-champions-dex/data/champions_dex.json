@@ -1,5 +1,5 @@
 {
-  "built_at": "2026-07-03T05:01:23+00:00",
+  "built_at": "2026-07-19T15:42:01+00:00",
   "counts": {
     "abilities": 201,
     "items": 148,
@@ -4548,7 +4548,7 @@
         "isSpread": true,
         "statChange": [
           "special attack",
-          -1,
+          -2,
           "user"
         ],
         "type": "Steel"

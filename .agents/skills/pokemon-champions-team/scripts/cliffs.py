@@ -5,7 +5,8 @@ Everything in this module is deterministic and unit-testable in isolation:
   - Champions speed is a closed form (verified against ncp), so speed cliffs need no calculator.
   - Survival cliffs are solved by a monotonic min-SP search over a damage predicate the caller
     supplies (tune.py wires that to ncp); the search logic itself is pure.
-  - headroom + ranking are pure scoring helpers.
+  - Nature candidates are bounded by stat semantics and observed nature usage.
+  - Diagnostic bulk headroom is a coarse stat-derived label used outside Tune.
 """
 from __future__ import annotations
 
@@ -275,66 +276,17 @@ def solve_min_sp(predicate: Callable[[int], bool], *, cap: int = SP_CAP) -> int 
 
 
 # --------------------------------------------------------------------------- #
-# Per-mon headroom (objective, stat-derived prior — NOT a role label)
+# Per-mon diagnostic headroom (stat-derived, not a Tune priority or score)
 # --------------------------------------------------------------------------- #
 
 def defensive_headroom(stats: dict[str, int]) -> str:
-    """Rough 'is defensive tuning even worth probing' signal from base stats.
-
-    Low = bulk so low that small SP rarely crosses a survival cliff (e.g. Mega Raichu); the tune
-    operator still does a shallow pass to catch the rare cheap-cliff-vs-common-threat exception.
-    Heuristic and only used for ranking/annotation — it never suppresses a computed cliff.
-    """
+    """Coarse bulk label used by diagnose; Tune does not rank or filter cards with it."""
     hp = stats.get("hp", 0)
     df = stats.get("df", stats.get("def", 0))
     sd = stats.get("sd", stats.get("spd", 0))
-    # Effective-bulk proxy (HP weighted with the better defense); thresholds are deliberate, coarse.
     bulk = hp + max(df, sd) * 0.7 + min(df, sd) * 0.3
     if bulk < 150:
         return "low"
     if bulk < 230:
         return "medium"
     return "high"
-
-
-# --------------------------------------------------------------------------- #
-# Ranking: value = magnitude x prevalence x decisiveness x cheapness,
-# weighted by the format's aspect_priority. Transparent score, multi-view — never a single pick.
-# --------------------------------------------------------------------------- #
-
-def cheapness(delta_sp: int, *, cap: int = SP_CAP) -> float:
-    """1.0 for a free cliff, decaying toward 0 as the SP cost approaches the cap."""
-    if delta_sp <= 0:
-        return 1.0
-    return max(0.0, 1.0 - delta_sp / (cap + 1))
-
-
-def _reachable_delta(card: dict) -> int:
-    """Cheapest SP cost across the card's REACHABLE lanes. A survive card whose Def/SpD lane is
-    unreachable but whose HP lane is a reachable cliff must rank by the HP cost, not the unreachable
-    SP_CAP+1 — else a cheap, achievable cliff is mis-ranked to ~0 (audit 2026-06-23)."""
-    deltas = []
-    if card.get("result") in ("cliff", "already"):
-        deltas.append(card.get("delta_sp", 0))
-    hp = card.get("hp_lane")
-    if isinstance(hp, dict) and hp.get("result") in ("cliff", "already"):
-        deltas.append(hp.get("delta_sp", 0))
-    return min(deltas) if deltas else card.get("delta_sp", 0)
-
-
-def score_card(card: dict, aspect_weight: float) -> float:
-    return round(
-        aspect_weight
-        * card.get("magnitude", 0.5)
-        * card.get("prevalence", 0.5)
-        * card.get("decisiveness", 0.5)
-        * cheapness(_reachable_delta(card)),
-        4,
-    )
-
-
-def rank_cards(cards: list[dict], aspect_weight_of: Callable[[str], float]) -> list[dict]:
-    """Attach a transparent `score` to each card and sort high-to-low. Pure ordering, no facts dropped."""
-    for c in cards:
-        c["score"] = score_card(c, aspect_weight_of(c.get("aspect", "")))
-    return sorted(cards, key=lambda c: (-c["score"], c.get("delta_sp", 0), c.get("aspect", "")))

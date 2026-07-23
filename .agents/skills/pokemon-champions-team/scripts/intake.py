@@ -88,7 +88,7 @@ CATALOG: list[dict[str, Any]] = [
              "maps_to": {"target": "context", "set": {"meta_conformance": "proven"}}},
             {"id": "around_favorite",
              "label": {"zh": "围绕我喜欢的宝可梦或主题来建", "ja": "好きなポケモンやテーマを軸に組みたい",
-                       "en": "Build around a favourite Pokemon or theme"},
+                       "en": "Build around a favourite Pokémon or theme"},
              "maps_to": {"target": "draft", "set": {"request_expressive": True}},
              "note": {"zh": "表达型请求：锚点问题（宝可梦锚点/主题锚点）升为必问——缺锚点即阻断，默认会抹掉本意。",
                       "ja": "自己表現型のリクエスト：アンカー質問（ポケモン/テーマ）が必須になります——"
@@ -135,7 +135,7 @@ CATALOG: list[dict[str, Any]] = [
         "text": {
             "zh": "有没有必须带、或尽量想带的宝可梦？想用某只的 Mega 形态也一起说。",
             "ja": "必ず入れたい、またはできれば入れたいポケモンはいますか？メガシンカさせたい場合も教えてください。",
-            "en": "Any Pokemon you MUST bring, or would like to bring? Mention if you want its Mega form.",
+            "en": "Any Pokémon you MUST bring, or would like to bring? Mention if you want its Mega form.",
         },
         "free_form": {
             "resolvers": ["dex:pokemon"],
@@ -194,7 +194,7 @@ CATALOG: list[dict[str, Any]] = [
                  "ja": "ポケモン以外のアンカー：戦法/テーマは wants に、コンビは prefer/locked に入ります。"
                        "表現型の場合は request_expressive（draft 側）も立てます。ギミック軸の本格的な"
                        "モデリングは未定です——該当時は正直にその旨を伝えます。",
-                 "en": "The non-Pokemon anchor: plans/themes land in `wants` (honored when composing), "
+                 "en": "The non-Pokémon anchor: plans/themes land in `wants` (honored when composing), "
                        "combo members in prefer/locked; expressive theme requests also mark "
                        "request_expressive (draft level). True gimmick-anchor modeling is still an "
                        "open item — say so honestly when it comes up."},
@@ -246,7 +246,7 @@ CATALOG: list[dict[str, Any]] = [
         "text": {
             "zh": "有没有绝对不用、或者尽量不想用的宝可梦或道具？另外有没有你不想围绕着打的风格？",
             "ja": "絶対に使わない、またはなるべく避けたいポケモンや道具はありますか？軸にしたくない戦い方はありますか？",
-            "en": "Anything you absolutely won't use — or would rather avoid — Pokemon or items? Any style you don't want to build around?",
+            "en": "Anything you absolutely won't use — or would rather avoid — Pokémon or items? Any style you don't want to build around?",
         },
         "free_form": {
             "resolvers": ["dex:pokemon", "dex:item", "tactic_classifier"],
@@ -458,6 +458,21 @@ CONFLICT_QUESTIONS: list[dict[str, Any]] = [
                       "en": "Re-ask for the new keep_mega (dex-resolved)."}},
         ],
         "triggers_on": ["conflict:keep_mega_not_in_pool"], **_CONFLICT_COMMON,
+    },
+    {
+        "id": "conflict_keep_mega_with_none_posture",
+        "text": {"zh": "你既指定保留 Mega 人选 {member}，又要求队伍不登记 Mega——以哪边为准？",
+                 "ja": "メガ枠 {member} を残す指定と、メガを登録しない指定が両方あります——どちらを優先しますか？",
+                 "en": "You asked to keep Mega option {member} but also register no Mega options — which one stands?"},
+        "options": [
+            {"id": "keep_mega", "label": {"zh": "保留 Mega 人选", "ja": "メガ枠を残す",
+                                             "en": "Keep the Mega option"},
+             "maps_to": {"target": "context", "set": {"mega_posture": "environment"}}},
+            {"id": "keep_none", "label": {"zh": "不登记 Mega", "ja": "メガを登録しない",
+                                             "en": "Register no Mega options"},
+             "maps_to": {"target": "context", "set": {"keep_mega": None}}},
+        ],
+        "triggers_on": ["conflict:keep_mega_with_none_posture"], **_CONFLICT_COMMON,
     },
     {
         "id": "conflict_benchmark_member_not_in_team",

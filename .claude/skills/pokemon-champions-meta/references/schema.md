@@ -1,4 +1,4 @@
-# Pokemon Champions Meta Cache Schema
+# Pokémon Champions Meta Cache Schema
 
 This reference documents the bundled cache files and their stored rows. For the public CLI contract,
 run `python scripts/meta_query.py schema`; its executable self-description and actual output are
@@ -11,6 +11,8 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
 
 - `ranking_<season>_<format>.json`
 - `details_<season>_<format>.json`
+- `report_<season>_<format>.json`
+- `trend_<season>_<format>.json` (current season only; rolling refresh history for chart export)
 - `current.json`
 
 `format` is `single` or `double`.
@@ -65,12 +67,15 @@ per-pokemon update time; the file-level `updated_at` is the refresh stamp for ev
 {
   "current": {"season": "M-4", "rule": "M-B"},
   "seasons": {
-    "M-1": {"rule": "M-A", "label": "Pokemon Champions M-1 / Regulation M-A"},
-    "M-2": {"rule": "M-A", "label": "Pokemon Champions M-2 / Regulation M-A"},
-    "M-3": {"rule": "M-B", "label": "Pokemon Champions M-3 / Regulation M-B"},
-    "M-4": {"rule": "M-B", "label": "Pokemon Champions M-4 / Regulation M-B"}
+    "M-1": {"rule": "M-A", "label": "Pokémon Champions M-1 / Regulation M-A"},
+    "M-2": {"rule": "M-A", "label": "Pokémon Champions M-2 / Regulation M-A"},
+    "M-3": {"rule": "M-B", "label": "Pokémon Champions M-3 / Regulation M-B"},
+    "M-4": {"rule": "M-B", "label": "Pokémon Champions M-4 / Regulation M-B"}
   }
 }
 ```
 
-Queries with no `--season` or `--rule` resolve through `current`. Historical seasons remain queryable as long as their data files remain under `data/`.
+Queries with no `--season` or `--rule` resolve through `current`. Same-rule historical seasons remain
+queryable while their files are retained. On a rule rollover, the update pipeline prunes stale-rule
+meta snapshots; entries can remain in `current.json` as known season/rule mappings without implying
+that their ranking/detail files still ship.

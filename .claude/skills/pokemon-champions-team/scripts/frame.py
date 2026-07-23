@@ -47,7 +47,7 @@ import team_profile
 import team_i18n as i18n
 from canonhash import content_hash as _content_hash
 from landscape import THIN_BAR, _matches, _team_species, _filter_label
-from mega_facts import mega_slot_distribution
+from mega_facts import OBSERVED_NORM_MIN_SAMPLE, mega_slot_distribution
 from repset import MIN_SAMPLE, representative_sets_from_teams
 
 # A species must co-occur in at least this share of a structural GROUP's teams to be a core candidate
@@ -144,6 +144,7 @@ def _grounding_for(species: str, fmt: str, group_teams: list[dict[str, Any]],
 
 def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
               pool_size: int, pool_cooccur: dict[str, int],
+              pool_mega_distribution: dict[str, Any],
               anchor_members: list[dict[str, Any]], all_teams: list[dict[str, Any]],
               meta_fn: Callable[[str], dict | None] | None) -> dict[str, Any]:
     """Build one grounded skeleton over a structural group. `group` = [(team, profile), ...]; `sig` is
@@ -215,8 +216,21 @@ def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
     fillers = sorted(((sp, c) for sp, c in cooccur.items()
                       if c >= MIN_SAMPLE and sp not in core_species),
                      key=lambda kv: (-kv[1], kv[0]))
+    group_mega_distribution = mega_slot_distribution(g_profs)
+    use_group_mega = group_mega_distribution["sample_count"] >= OBSERVED_NORM_MIN_SAMPLE
+    mega_reference_distribution = (group_mega_distribution if use_group_mega
+                                   else pool_mega_distribution)
     observed_facts = {
-        "observed_mega_slots": mega_slot_distribution(g_profs),
+        "observed_mega_slots": group_mega_distribution,
+        # The local structural group is the first authority.  A thin group falls back to the whole
+        # frame pool (same anchor/format) instead of asking the AI to infer a norm from anecdotes.
+        # This object lives inside the fingerprinted skeleton, so slate can trust it as a gate input.
+        "mega_registration_reference": {
+            "basis": "frame_group" if use_group_mega else "frame_pool",
+            "distribution": mega_reference_distribution,
+            "confidence": ("medium" if mega_reference_distribution["sample_count"]
+                            >= OBSERVED_NORM_MIN_SAMPLE else "low"),
+        },
         "observed_fillers": [{"species": sp, "count": c, "within_group_share": round(c / n, 3)}
                              for sp, c in fillers],
         "role_composition_norms": structural_profile["role_composition_norms"],
@@ -267,6 +281,7 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
     pool = [t for t in teams if all(_matches(t, f) for f in filter_members)] if filter_members else list(teams)
     pool_size = len(pool)
     profiles = [team_profile.profile(t, dex_fn=dex_fn, move_fn=move_fn, item_fn=item_fn) for t in pool]
+    pool_mega_distribution = mega_slot_distribution(profiles)
     pool_cooccur = _cooccurrence(pool, anchor_species)
 
     # Partition by speed_control signature; a group qualifies at MIN_SAMPLE. >=2 qualifying groups ->
@@ -300,6 +315,7 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         shown = frame_groups[:max_frames]
 
     skeletons = [_skeleton(sig, g, fmt=fmt, pool_size=pool_size, pool_cooccur=pool_cooccur,
+                           pool_mega_distribution=pool_mega_distribution,
                            anchor_members=anchor_members, all_teams=teams, meta_fn=meta_fn)
                  for sig, g in shown]
 

@@ -28,7 +28,7 @@ from typing import Any, Callable
 from canonhash import content_hash
 from libsearch import base_key
 from mega import base_of_form_name
-from mega_facts import mega_plan_from_profile
+from mega_facts import assess_registration, mega_plan_from_profile
 from frame import frame_fingerprint as _frame_fingerprint  # P4.5 chain: recompute the frame receipt
 
 
@@ -67,7 +67,8 @@ def parse_evidence_id(eid: Any) -> dict[str, Any] | None:
 
 
 def slate_fingerprint(audit_fp: str | None, teams: list, survivors: list[int], battery_fmt: str,
-                      matchup_risks: dict[int, Any], frame_fp: str | None = None) -> str:
+                      matchup_risks: dict[int, Any], frame_fp: str | None = None,
+                      candidate_facts: dict[Any, Any] | None = None) -> str:
     """The slate_receipt fingerprint construction, extracted so the answer-audit RECOMPUTES the same
     thing from (slate input, saved slate output) instead of re-deriving its own — binding audit fp +
     team content + survivors + the battery facts (a different top-K or edited matchup_risk must
@@ -79,6 +80,11 @@ def slate_fingerprint(audit_fp: str | None, teams: list, survivors: list[int], b
                             "survivors": survivors, "format": battery_fmt, "risk": risk_digest}
     if frame_fp is not None:                     # omit when absent so pre-frame receipts still reproduce
         body["frame"] = frame_fp
+    if candidate_facts is not None:
+        body["candidate_facts"] = {
+            str(i): content_hash(candidate_facts.get(i), 12) for i in survivors}
+        if "_slate" in candidate_facts:
+            body["candidate_set_facts"] = content_hash(candidate_facts["_slate"], 12)
     return content_hash(body, 24)
 
 
@@ -101,6 +107,10 @@ def _matchup_digest(mres: dict[str, Any], fmt: str) -> dict[str, Any]:
     we_faster = pairs = 0
     for row in mres.get("members") or []:
         me = row.get("member")
+        # ``member`` remains the registered/base name used to bind the row back to team-json.
+        # Evidence coordinates name the actual run form because that is whose stats and ability
+        # produced the fact (notably base + Mega Stone registrations).
+        calc_me = row.get("member_run_form") or me
         for c in row.get("cells") or []:
             opp = c.get("opponent")
             off = c.get("offense") or {}
@@ -109,23 +119,26 @@ def _matchup_digest(mres: dict[str, Any], fmt: str) -> dict[str, Any]:
             if off.get("ko_guaranteed") == 1 and off.get("move"):
                 we_g.setdefault(opp, []).append(
                     {"member": me, "move": off["move"],
-                     "evidence_id": evidence_id(fmt, me, opp, off["move"])})
+                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"])})
             elif off.get("ko_possible") == 1 and off.get("move"):
                 we_p.setdefault(opp, []).append(
                     {"member": me, "move": off["move"],
-                     "evidence_id": evidence_id(fmt, me, opp, off["move"])})
+                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"])})
             worst = (c.get("defense_damage") or {}).get("worst") or {}
             if worst.get("ko_guaranteed") == 1 and worst.get("move"):
                 them_g.setdefault(opp, []).append(
                     {"member": me, "move": worst["move"],
-                     "evidence_id": evidence_id(fmt, opp, me, worst["move"])})
+                     "evidence_id": evidence_id(fmt, opp, calc_me, worst["move"]),
+                     "meta_position": c.get("usage_rank"),
+                     "opponent_variant": c.get("opponent_variant"),
+                     "opponent_is_modal": c.get("opponent_is_modal")})
             faster = (c.get("speed") or {}).get("faster")
             if faster in ("member", "opponent", "tie"):
                 pairs += 1
                 if faster == "member":
                     we_faster += 1
     return {
-        "top_k": len((mres.get("members") or [{}])[0].get("cells") or []) if mres.get("members") else 0,
+        "top_k": mres.get("top_k") or 0,
         "opponents_we_ohko_guaranteed": {k: v for k, v in sorted(we_g.items())},
         "opponents_we_ohko_possible": {k: v for k, v in sorted(we_p.items())},
         "opponents_with_guaranteed_ohko_on_us": {k: v for k, v in sorted(them_g.items())},
@@ -133,7 +146,7 @@ def _matchup_digest(mres: dict[str, Any], fmt: str) -> dict[str, Any]:
         "speed_pairs_total": pairs,
         "check_coverage": _check_digest(mres.get("check_coverage")),
         "confidence": mres.get("confidence"),
-        "note": "counting facts over the matchup grid (modal opponent sets — see matchup for the "
+        "note": "counting facts over the matchup grid (retained observed builds — see matchup for the "
                 "full band/caveats); each extreme carries a re-runnable evidence_id.",
     }
 
@@ -145,8 +158,12 @@ def _check_digest(cov: dict[str, Any] | None) -> dict[str, Any] | None:
     reads them as gaps an archetype may accept (design §1/§17)."""
     if not isinstance(cov, dict) or not cov.get("by_opponent"):
         return None
-    contested = [{"opponent": r["opponent"], "by": r.get("contested")}
-                 for r in cov.get("by_opponent", []) if r.get("contested")]
+    contested = []
+    for row in cov.get("by_opponent", []):
+        variants = [{"variant_id": v.get("variant_id"), "by": v.get("contested_by") or []}
+                    for v in row.get("variants") or [] if v.get("contested_by")]
+        if variants:
+            contested.append({"opponent": row["opponent"], "variants": variants})
     return {
         "grade_distribution": cov.get("grade_distribution"),
         # pass the hole rows through wholesale — they are already a small facts-only label table, so a
@@ -154,8 +171,8 @@ def _check_digest(cov: dict[str, Any] | None) -> dict[str, Any] | None:
         # refinement) and quietly coarsen matchup_risk with no error.
         "holes": cov.get("holes") or [],
         "contested": contested,
-        "note": "no safe switch-in check = a HOLE; `contested` = a positive read the opponent's DETECTED "
-                "setup/recovery undermines; `wall_no_ko_by` walls it but can't KO. Ordinal labels, no score.",
+        "note": "observed floor C1/C0 = a HOLE; `contested` names concrete retained variants whose "
+                "positive read is undermined by DETECTED setup/recovery. Ordinal labels, no score.",
     }
 
 
@@ -338,12 +355,68 @@ def frame_binding(team_c: dict[str, Any], binding: Any, skeletons_by_id: dict[st
     return info, red
 
 
+def _declared_mega_deviation(binding: Any) -> tuple[bool, Any]:
+    """Return whether frame_bindings[i].mega_deviation carries a substantive declared basis."""
+    b = binding if isinstance(binding, dict) else {}
+    raw = b.get("mega_deviation")
+    if isinstance(raw, str):
+        return bool(raw.strip()), raw
+    if isinstance(raw, dict):
+        reason = raw.get("reason")
+        return isinstance(reason, str) and bool(reason.strip()), raw
+    return False, raw
+
+
+def _mega_reference(skeleton: dict[str, Any] | None) -> tuple[dict[str, Any] | None, str | None]:
+    if not isinstance(skeleton, dict):
+        return None, None
+    facts = (skeleton or {}).get("observed_facts") or {}
+    ref = facts.get("mega_registration_reference")
+    if isinstance(ref, dict) and isinstance(ref.get("distribution"), dict):
+        return ref["distribution"], ref.get("basis")
+    # Back-compat for a verified frame produced before mega_registration_reference existed.
+    legacy = facts.get("observed_mega_slots")
+    return ((legacy, "frame_group_legacy") if isinstance(legacy, dict) else (None, None))
+
+
+def _mega_slate_summary(ctx: dict[str, Any], candidates: list[dict[str, Any]],
+                        survivors: list[int]) -> dict[str, Any]:
+    """Candidate-set coverage of observed modal registration lanes — a fact, never a winner."""
+    posture = ctx.get("mega_posture") or "environment"
+    if posture != "environment":
+        return {"status": "explicit_user_posture", "mega_posture": posture,
+                "assessed_survivors": survivors, "modal_lane_indices": []}
+    if ctx.get("meta_conformance") == "off_meta":
+        return {"status": "off_meta_view", "mega_posture": posture,
+                "assessed_survivors": survivors, "modal_lane_indices": []}
+    assessed = [i for i in survivors
+                if (candidates[i].get("mega_registration_assessment") or {}).get("reliable")
+                and (candidates[i].get("mega_registration_assessment") or {}).get("source")
+                == "observed_distribution"]
+    modal = [i for i in assessed
+             if (candidates[i].get("mega_registration_assessment") or {}).get("relation") == "modal"]
+    if not assessed:
+        status = "unassessed"
+    else:
+        status = "covered" if modal else "missing_modal_lane"
+    return {
+        "status": status,
+        "mega_posture": posture,
+        "assessed_survivors": assessed,
+        "modal_lane_indices": modal,
+        "note": "whether at least one survivor is modal relative to its own bound frame's observed "
+                "Mega-registration distribution; "
+                "a descriptive conformance gate, never a strength ranking",
+    }
+
+
 def evaluate_slate(slate: dict[str, Any], *,
                    recompute_receipt_fn: Callable[[dict], str],
                    check_team_fn: Callable[[dict], list],
                    validate_fn: Callable[[dict], dict],
                    profile_fn: Callable[[dict], dict],
                    matchup_fn: Callable[[dict], dict | None],
+                   selection_fn: Callable[[dict, dict | None, str | None], dict] | None = None,
                    canon_team_fn: Callable[[dict], dict] | None = None,
                    constraints_ctx: dict[str, Any] | None = None,
                    fmt: str | None = None,
@@ -470,15 +543,41 @@ def evaluate_slate(slate: dict[str, Any], *,
         ai_check = entry["constraint_satisfaction"].get("avoid_items")
         if ai_check and not ai_check["satisfied"]:
             reasons.append("avoided items held: " + ", ".join(ai_check["violations"]))
+        binding = bindings[i] if i < len(bindings) else None
+        bound_skeleton: dict[str, Any] | None = None
         if frame_active:
             # P4.5: bind this candidate against the frame it declares. A RED core-bearer deviation
             # (ungrounded set, no rationale/off_meta) eliminates in the funnel (design §19.10 correction:
             # 严重时淘汰); yellow deviations + off-frame advisories survive and are surfaced for the
             # answer-audit disclosure check.
-            binfo, red = frame_binding(team_c, bindings[i] if i < len(bindings) else None,
+            binfo, red = frame_binding(team_c, binding,
                                        skeletons_by_id, repset_fn)
             entry["frame_binding"] = binfo
             reasons += red
+            bound_skeleton = skeletons_by_id.get(binfo.get("frame_id"))
+
+        deviation_declared, deviation_payload = _declared_mega_deviation(binding)
+        distribution, reference_basis = _mega_reference(bound_skeleton)
+        effective_conformance = ("off_meta" if isinstance(binding, dict) and binding.get("off_meta_build")
+                                 else ctx.get("meta_conformance"))
+        assessment = assess_registration(
+            entry["mega_plan"]["registered_mega_count"], distribution,
+            mega_posture=ctx.get("mega_posture"), meta_conformance=effective_conformance,
+            deviation_declared=deviation_declared)
+        assessment["reference_basis"] = reference_basis
+        if deviation_payload is not None:
+            assessment["declared_deviation"] = deviation_payload
+        entry["mega_registration_assessment"] = assessment
+        if assessment.get("hard_conflict"):
+            if assessment.get("source") == "user_posture":
+                reasons.append(
+                    f"registered Mega count {assessment['registered_mega_count']} conflicts with explicit "
+                    f"mega_posture={assessment.get('mega_posture')!r}")
+            else:
+                reasons.append(
+                    f"registered Mega bucket {assessment['bucket']!r} is an observed "
+                    f"{assessment.get('relation')} lane (share={assessment.get('observed_share')}) for "
+                    "the bound frame and no frame_bindings[i].mega_deviation reason was declared")
         if reasons:
             # Funnel: a definitive cheap-stage failure never bills the expensive battery.
             entry["eliminated"] = {"stage": "cheap", "reasons": reasons}
@@ -490,6 +589,11 @@ def evaluate_slate(slate: dict[str, Any], *,
         mres = matchup_fn(canon_teams[i])
         candidates[i]["matchup_risk"] = (_matchup_digest(mres, battery_fmt) if mres
                                          else {"skipped": "matchup battery unavailable (ncp/meta down)"})
+        if selection_fn is not None:
+            candidates[i]["selection"] = selection_fn(
+                canon_teams[i], mres, (candidates[i].get("legality") or {}).get("status"))
+
+    mega_registration_slate = _mega_slate_summary(ctx, candidates, survivors)
 
     grid = []
     for c in candidates:
@@ -507,6 +611,7 @@ def evaluate_slate(slate: dict[str, Any], *,
             "avoid_ok": (cs.get("avoid") or {}).get("satisfied"),
             "prefer_present": len((cs.get("prefer") or {}).get("present") or []),
             "registered_mega_count": (c.get("mega_plan") or {}).get("registered_mega_count"),
+            "mega_registration_relation": (c.get("mega_registration_assessment") or {}).get("relation"),
             "hard_gap_types": len(next((f["types"] for f in c.get("flags") or []
                                         if f["kind"] == "hard_gap"), [])),
             "weakness_concentrations": sum(1 for f in c.get("flags") or []
@@ -519,9 +624,15 @@ def evaluate_slate(slate: dict[str, Any], *,
     # The receipt binds the WHOLE evaluation, battery facts included: the same slate evaluated with
     # a different top-K (or a changed battery result) must re-fingerprint, or P6 could bind a claim
     # to a receipt whose matchup facts it never saw (external audit 2026-07-02).
+    candidate_facts = {
+        i: {"mega_plan": candidates[i].get("mega_plan"),
+            "mega_registration_assessment": candidates[i].get("mega_registration_assessment"),
+            "selection": candidates[i].get("selection")}
+        for i in survivors}
+    candidate_facts["_slate"] = mega_registration_slate
     fingerprint = slate_fingerprint(provided, slate["teams"], survivors, battery_fmt,
                                     {i: candidates[i].get("matchup_risk") for i in survivors},
-                                    frame_fp)
+                                    frame_fp, candidate_facts)
     return {
         "kind": "slate-evaluate",
         "format": battery_fmt,
@@ -530,6 +641,7 @@ def evaluate_slate(slate: dict[str, Any], *,
         "survivors": survivors,
         "candidates": candidates,
         "grid": grid,
+        "mega_registration_slate": mega_registration_slate,
         "evidence_id_grammar": EVIDENCE_ID_GRAMMAR,
         "slate_receipt": {
             "kind": "slate_receipt",
@@ -537,6 +649,7 @@ def evaluate_slate(slate: dict[str, Any], *,
             "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "audit_fingerprint": provided,
             "frame_fingerprint": frame_fp,   # P4.5 chain link (None on a non-build slate); answer-audit re-binds it
+            "candidate_facts_bound": True,
             "format": battery_fmt,
             "candidates": len(candidates), "survivors": len(survivors),
         },
@@ -550,6 +663,10 @@ def evaluate_slate(slate: dict[str, Any], *,
             "their reasons and no matchup_risk.",
             "quantitative extremes carry evidence_id (" + EVIDENCE_ID_GRAMMAR + "); the answer-audit "
             "binds claims to these.",
+            "Mega registration is compared with the verified frame's observed distribution. Reliable "
+            "minority/rare lanes need frame_bindings[i].mega_deviation under the proven view; the slate "
+            "also reports whether survivors cover an observed modal lane. This is conformance evidence, "
+            "not a legality rule or strength score.",
         ] + ([
             "FRAME-BOUND (build flow): each candidate's core-bearer sets were checked against the "
             "frame's repset clusters. A RED core-bearer deviation (ungrounded set, no rationale/"
@@ -558,3 +675,53 @@ def evaluate_slate(slate: dict[str, Any], *,
             "(moves/nature/spread) is NOT checked here — only (item,ability) cluster membership.",
         ] if frame_active else []),
     }
+
+
+def project_slate(result: dict[str, Any], view: str = "full") -> dict[str, Any]:
+    """Compact the P5 slate output for a DISPLAY consumer (the local web panel's SlateCard).
+
+    view='summary' drops the two payload-heavy surfaces the panel never reads — the top-level `grid`
+    (the full per-cell battery) and each candidate's per-opponent evidence lists inside `matchup_risk`
+    (opponents_we_ohko_*/opponents_with_guaranteed_ohko_on_us and check_coverage.holes[].variants) —
+    while KEEPING survivors, each candidate's legality/flags/mega/structural facts, the
+    check_coverage.grade_distribution the card renders, mega_registration_slate, and slate_receipt.
+    A 3 MB+ full slate exceeds the bridge's 2 MiB body gate; the summary lands well under it.
+
+    DISPLAY ONLY: the receipt is preserved so the panel can show it, but answer-audit must receive the
+    FULL output (not this) — its claim recompute re-hashes the untrimmed matchup_risk. view='full'
+    (default) returns the result unchanged, so nothing that omits the flag is affected."""
+    if view != "summary" or not isinstance(result, dict):
+        return result
+    out = dict(result)
+    out.pop("grid", None)
+    trimmed: list[Any] = []
+    for cand in out.get("candidates", []) or []:
+        if not isinstance(cand, dict):
+            trimmed.append(cand)
+            continue
+        cand = dict(cand)
+        mr = cand.get("matchup_risk")
+        if isinstance(mr, dict):
+            mr = {k: v for k, v in mr.items()
+                  if k not in ("opponents_we_ohko_guaranteed", "opponents_we_ohko_possible",
+                               "opponents_with_guaranteed_ohko_on_us")}
+            cc = mr.get("check_coverage")
+            if isinstance(cc, dict):
+                cc = dict(cc)
+                cc["holes"] = [{"opponent": h.get("opponent"), "usage_rank": h.get("usage_rank"),
+                                "grade": (h.get("representative") or {}).get("grade"),
+                                "best_by": (h.get("representative") or {}).get("best_by")}
+                               for h in (cc.get("holes") or []) if isinstance(h, dict)]
+                cc.pop("contested", None)
+                mr["check_coverage"] = cc
+            cand["matchup_risk"] = mr
+        sel = cand.get("selection")
+        if isinstance(sel, dict) and isinstance(sel.get("combos"), list):
+            sel = dict(sel)
+            sel["combos_count"] = len(sel["combos"])
+            sel.pop("combos", None)      # 6-pick-N lineup enumeration (the summary's real bulk) — the
+            cand["selection"] = sel      # panel renders none of it; keep the count + mega_routes/notes
+        trimmed.append(cand)
+    out["candidates"] = trimmed
+    out["view"] = "summary"
+    return out

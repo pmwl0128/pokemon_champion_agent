@@ -27,6 +27,7 @@ from typechart import effectiveness, effectiveness_for_member  # noqa: E402
 from diagnose import _ROLE_MOVES, _ROLE_LABELS  # noqa: E402  (reuse the functional-move taxonomy)
 import repset  # noqa: E402
 import team_i18n as i18n  # noqa: E402
+from sources import mega_run_form  # noqa: E402  (stone -> Mega form; memoized, dex-authoritative)
 
 POOL_K = 60                       # how deep into the usage ranking we draw the candidate pool from
 
@@ -222,6 +223,68 @@ def fill(team: dict[str, Any], need: dict[str, Any], *, fmt: str | None = None,
                     co += 1
         return sample, co
 
+    # Mega forms reached by a candidate's real builds. `facts` only covers the ranked base species, so
+    # without this a stone build would be priced on its BASE Speed — the very error the opponent cache
+    # had (Staraptor 100 vs Mega Staraptor 110). Resolved once, in one batch.
+    _mega_facts: dict[str, dict[str, Any]] = {}
+    _arches_by_species: dict[str, list[dict[str, Any]]] = {}
+    if teams:
+        _wanted: set[str] = set()
+        for _nm in names:
+            try:
+                _arches = repset.representative_sets_from_teams(_nm, fmt, teams) or []
+                _arches_by_species[_nm] = _arches
+                for _a in _arches:
+                    _mf = mega_run_form(_nm, _a.get("item")) if _a.get("item") else None
+                    if _mf and _mf not in facts:
+                        _wanted.add(_mf)
+            except Exception:
+                _arches_by_species[_nm] = []
+                continue
+        if _wanted:
+            try:
+                _mega_facts = dex_fn(sorted(_wanted)) or {}
+            except Exception:
+                _mega_facts = {}
+
+    def _builds(species: str) -> list[dict[str, Any]]:
+        """The candidate's REAL (item,ability) builds, from the same team pool `_counts` scans.
+
+        A candidate is not a species, it is a species running a particular build: recommending
+        "add Staraptor" is not actionable when its Scarf build (Speed 250, no Mega slot) and its
+        stone build (Speed 178, spends the team's Mega slot) are different answers to different
+        problems. Reads the pool already in memory, so this costs no extra IO and no damage calc —
+        whether a build actually CLOSES a given hole still needs a matchup battery and is
+        deliberately not claimed here.
+        """
+        if not teams:
+            return []
+        arches = _arches_by_species.get(species, [])
+        out = []
+        for a in arches:
+            item = a.get("item")
+            mega_form = mega_run_form(species, item) if item else None
+            spe_sp = int((a.get("sps") or {}).get("sp") or 0)
+            # The build's OWN speed, not the species' theoretical ceiling: a 0-Speed bulky build and
+            # a max-Speed Scarf build of one species sit nowhere near each other.
+            b_base = (((facts.get(species) or {}).get("stats") or {}).get("spe"))
+            if mega_form:
+                mf = facts.get(mega_form) or _mega_facts.get(mega_form) or {}
+                b_base = (mf.get("stats") or {}).get("spe") or b_base
+            out.append({
+                "item": item, "ability": a.get("ability"), "nature": a.get("nature"),
+                "sps": a.get("sps"), "coverage": a.get("coverage"),
+                "confidence": a.get("confidence"),
+                "speed": champ_speed(b_base, spe_sp, a.get("nature")) if b_base is not None else None,
+                # Spends the team-level Mega resource (few stones registered, one evolution per
+                # battle), so this build is not a free pick the way an item swap is. The
+                # registration slate stays the authority on whether the lane is conformant.
+                "occupies_mega_slot": bool(mega_form),
+                **({"run_form": mega_form} if mega_form else {}),
+            })
+        out.sort(key=lambda b: -(b.get("coverage") or 0))
+        return out
+
     candidates: list[dict[str, Any]] = []
     for nm in names:
         fact = facts.get(nm) or {}
@@ -241,6 +304,7 @@ def fill(team: dict[str, Any], need: dict[str, Any], *, fmt: str | None = None,
             "co_occurrence": co,
             "tournament_sample": sample,
             "owned": _norm(nm) in owned_n if owned_n else None,
+            **({"builds": builds} if (builds := _builds(nm)) else {}),
         })
 
     # Explicit, SEPARATE orderings — never merged into one score. usage = common-first; off_meta =

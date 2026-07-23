@@ -11,7 +11,7 @@ calculation/query results are identical. Each `schema` truthfully names its own 
 ## Contents
 
 - [Commands](#commands)
-- [Pokemon Object](#pokémon-object)
+- [Pokémon Object](#pokémon-object)
 - [Field Object](#field-object)
 - [Damage Example](#example-mega-staraptor-vs-archaludon)
 - [Damage Output](#output)

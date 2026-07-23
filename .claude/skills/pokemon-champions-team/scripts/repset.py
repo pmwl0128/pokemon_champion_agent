@@ -55,15 +55,19 @@ _SEASON_RULE = rules.SEASON_RULE          # single source (rules.py); do not re-
 # own sample clears MIN_SAMPLE, and confidence is folded from BOTH sample size and modal share — a
 # thin or fragmented species reads `low`, never silently masquerading as solid. The future cache layer
 # (M5 step 2) builds a cell ONLY for species clearing MIN_SAMPLE and stamps every cell
-# `low` (reason=vs-standard-set) regardless, so this same per-species bar governs cache admission.
+# `low` (reason=vs-observed-build) regardless, so this same per-species bar governs cache admission.
 # --------------------------------------------------------------------------- #
 # A species/archetype seen in fewer than this many real teams is too thin to trust as
 # "representative" — the resolver falls back to meta below it. Tunable; deliberately conservative for
 # early M-B samples.
 MIN_SAMPLE = 3
-# Up to this many (item, ability) archetypes are surfaced per species. A species
-# often runs genuinely distinct builds; collapsing to one global modal hides that bimodality.
-MAX_CLUSTERS = 3
+# A cluster also needs material support within its species pool. The current M-B library shows that
+# the old fixed top-3 ceiling retained only ~87-88% of Top-60 observations, while a 3% share floor and
+# five-row ceiling retains ~89% singles / ~92% doubles without admitting the sub-percent noise that a
+# fixed count of three permits in the much larger doubles sample. Keep admission and capacity separate:
+# MIN_SAMPLE rejects tiny absolute samples; MIN_CLUSTER_COVERAGE rejects tiny relative tails.
+MIN_CLUSTER_COVERAGE = 0.03
+MAX_CLUSTERS = 5
 # Sample-size -> confidence (crude tiers, honest about small samples; not a Wilson interval because
 # we are choosing a modal set, not estimating a win rate).
 _CONF_TIERS = ((10, "high"), (5, "medium"), (MIN_SAMPLE, "low"))
@@ -313,6 +317,27 @@ def _template_eligible_member(m: dict[str, Any], *, team_has_item: bool) -> bool
     )
 
 
+def library_forms(species: str, teams: list[dict[str, Any]]) -> list[str]:
+    """Every library species-name that IS `species`, including its Mega forms.
+
+    The two partitions store a registered Mega differently: doubles as base species + stone (one
+    name), singles as 'Mega X' under its own name. Archetype clustering works inside ONE name, so on
+    the singles shape a species' base builds and its Mega builds live in separate pools and a caller
+    asking about "Greninja" could only ever see one of them. Returns the names in the order
+    [base, Mega...], base first, and only those actually present in `teams`.
+    """
+    present: set[str] = set()
+    for t in teams:
+        for m in t.get("pokemon", []):
+            sp = m.get("species")
+            if isinstance(sp, str) and sp:
+                present.add(sp)
+    forms = [species] if species in present else []
+    forms += sorted(sp for sp in present
+                    if sp != species and sp.startswith("Mega ") and base_of_form_name(sp) == species)
+    return forms
+
+
 def _members_of(species: str, teams: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for t in teams:
@@ -439,16 +464,28 @@ def representative_sets_from_teams(species: str, fmt: str, teams: list[dict[str,
     clusters: dict[tuple, list[dict[str, Any]]] = {}
     for m in members:
         clusters.setdefault((m.get("item"), m.get("ability")), []).append(m)
-    ranked = sorted(clusters.items(), key=lambda kv: len(kv[1]), reverse=True)
+    ranked = sorted(clusters.items(),
+                    key=lambda kv: (-len(kv[1]), str(kv[0][0] or ""), str(kv[0][1] or "")))
     out: list[dict[str, Any]] = []
     for (c_item, ability), cms in ranked:
         if len(out) >= max_clusters:      # checked BEFORE building so max_clusters is an exact ceiling
             break
-        if len(cms) < min_sample:
+        coverage = len(cms) / sample
+        if len(cms) < min_sample or coverage < MIN_CLUSTER_COVERAGE:
             continue
         s = _build_modal_set(species, fmt, cms)
         s["cluster"] = {"item": c_item, "ability": ability}
-        s["coverage"] = round(len(cms) / sample, 3)
+        s["coverage"] = round(coverage, 4)
+        speed_rows = [(m.get("spread") or {}).get("spe") for m in cms
+                      if isinstance((m.get("spread") or {}).get("spe"), int)]
+        speed_natures = sorted({str(m.get("nature")) for m in cms if m.get("nature")})
+        s["speed_profile"] = {
+            "sample": len(speed_rows),
+            "min_spe_sp": min(speed_rows) if speed_rows else None,
+            "max_spe_sp": max(speed_rows) if speed_rows else None,
+            "natures": speed_natures,
+            "heterogeneous": (len(set(speed_rows)) > 1 or len(speed_natures) > 1),
+        }
         s["species_sample"] = sample                  # the queried pool (filtered subpool when item-filtered)
         s["species_sample_total"] = species_total     # the whole-species count (== species_sample if no filter)
         s["item_filter"] = item

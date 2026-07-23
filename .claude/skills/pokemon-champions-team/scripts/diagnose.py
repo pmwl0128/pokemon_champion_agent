@@ -164,21 +164,61 @@ def diagnose_defense(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, 
     }
 
 
+def _report_heading(title_key: str, d: dict[str, Any], *, reason: bool = False) -> str:
+    count_key = "team_count_partial" if d["partial"] else "team_count"
+    confidence = i18n.t(f"confidence_{d['confidence']}")
+    suffix = ""
+    if reason and d.get("confidence_reason"):
+        why = i18n.t(f"confidence_reason_{d['confidence_reason']}")
+        suffix = i18n.t("confidence_reason_suffix", reason=why)
+    cjk = i18n.lang() in ("zh", "ja")
+    return (f"# {i18n.t(title_key)}{'' if cjk else ' '}{i18n.t(count_key, n=d['team_size'])} — "
+            f"{i18n.t('confidence')}{'：' if cjk else ': '}{confidence}{suffix}")
+
+
+def _join(values: list[str] | tuple[str, ...]) -> str:
+    return ("、" if i18n.lang() in ("zh", "ja") else ", ").join(values)
+
+
+def _paren(value: str) -> str:
+    return f"（{value}）" if i18n.lang() in ("zh", "ja") else f"({value})"
+
+
+def _colon() -> str:
+    return "：" if i18n.lang() in ("zh", "ja") else ": "
+
+
+def _semicolon() -> str:
+    return "；" if i18n.lang() in ("zh", "ja") else "; "
+
+
+def _period() -> str:
+    return "。" if i18n.lang() in ("zh", "ja") else "."
+
+
+def _completeness_label(value: str) -> str:
+    key = f"completeness_{value}"
+    rendered = i18n.t(key)
+    return value if rendered == key else rendered
+
+
 def format_defense_md(d: dict[str, Any]) -> str:
-    lines = [f"# {i18n.t('def_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — {i18n.t('confidence')} {d['confidence']}"]
+    lines = [_report_heading("def_title", d, reason=True)]
     conc = d["weakness_concentration"]
     if conc:
         lines.append(f"\n## {i18n.t('def_weak_conc')}")
         for c in conc:
-            lines.append(f"- **{c['type']}**: {c['weak_count']}/{d['team_size']} {i18n.t('def_weak')} "
-                         f"({c['severity']}) — {', '.join(c['weak_members'])}")
+            severity = i18n.t(f"def_severity_{c['severity']}")
+            lines.append(f"- **{c['type']}**{_colon()}{c['weak_count']}/{d['team_size']} {i18n.t('def_weak')} "
+                         f"{_paren(severity)} — {_join(c['weak_members'])}")
     else:
         lines.append(f"\n{i18n.t('def_spread')}")
     lines.append(f"\n## {i18n.t('per_member')}")
     for name, pm in d["per_member"].items():
-        weak = ", ".join(pm["weak"]) or "—"
-        immune = ", ".join(pm["immune"])
-        lines.append(f"- **{name}**: {i18n.t('def_weak')} {weak}" + (f"; {i18n.t('def_immune')} {immune}" if immune else ""))
+        weak = _join(pm["weak"]) or "—"
+        immune = _join(pm["immune"])
+        lines.append(f"- **{name}**{_colon()}{i18n.t('def_weak')} {weak}" +
+                     (f"{_semicolon()}{i18n.t('def_immune')} {immune}" if immune else ""))
     if d["notes"]:
         lines.append(f"\n## {i18n.t('notes')}")
         lines += [f"- {n}" for n in d["notes"]]
@@ -368,40 +408,41 @@ def _src_str(s: dict[str, Any]) -> str:
     tag = "STAB" if s["stab"] else "non-STAB"
     if s.get("ate"):
         tag += ", -ate"
-    return f"{s['mon']} ({s['move']}, {tag})"
+    return i18n.t("off_source", mon=s["mon"], move=s["move"], tag=tag)
 
 
 def format_offense_md(d: dict[str, Any]) -> str:
     # Every type below is a DEFENDING type the team is (or isn't) able to hit super-effectively.
-    lines = [f"# {i18n.t('off_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
-             f"{i18n.t('confidence')} {d['confidence']} ({d['confidence_reason']})",
+    lines = [_report_heading("off_title", d, reason=True),
              f"_{i18n.t('off_intro')}_"]
     if d.get("incomplete_members"):
-        names = ", ".join(f"{m['species']} ({m['completeness']})" for m in d["incomplete_members"])
-        lines.append(f"\n> ⚠️ {i18n.t('off_gaps_unconfirmed_warn')}: {names}.")
+        names = _join([f"{m['species']}{_paren(_completeness_label(m['completeness']))}"
+                       for m in d["incomplete_members"]])
+        lines.append(f"\n> ⚠️ {i18n.t('off_gaps_unconfirmed_warn')}{_colon()}{names}{_period()}")
     if d["hard_gaps"]:
         head = i18n.t('off_hard_gaps') if d.get("gaps_confirmed", True) else i18n.t('off_possible_gaps')
         lines.append(f"\n## {head} — {i18n.t('off_gaps_suffix')}")
-        lines.append("- " + ", ".join(d["hard_gaps"]))
+        lines.append("- " + _join(d["hard_gaps"]))
     if d["thin"]:
         lines.append(f"\n## {i18n.t('off_thin')}")
         for D in d["thin"]:
-            srcs = ", ".join(_src_str(s) for s in d["by_defense_type"][D]["sources"])
-            lines.append(f"- vs **{D}**-types: {srcs}")
+            srcs = _join([_src_str(s) for s in d["by_defense_type"][D]["sources"]])
+            lines.append(i18n.t("off_vs_types", type=D, sources=srcs))
     if d["centralized"]:
         lines.append(f"\n## {i18n.t('off_centralized')}")
         for c in d["centralized"]:
             tag = "STAB" if c["stab"] else "non-STAB"
-            lines.append(f"- vs **{c['type']}**-types: only {c['mon']} ({tag})")
+            lines.append(i18n.t("off_vs_types_only", type=c["type"], mon=c["mon"], tag=tag))
     covered = [D for D, v in d["by_defense_type"].items() if v["class"] == "covered"]
     if covered:
-        lines.append(f"\n## {i18n.t('off_covered')} " + ", ".join(covered))
+        lines.append(f"\n## {i18n.t('off_covered')} " + _join(covered))
     luck = d.get("luck_lines") or {}
     if luck.get("moves"):
         flag = " ⚑" if luck.get("flagged") else ""
         lines.append(f"\n## {i18n.t('off_luck_lines')}{flag}")
         for l in luck["moves"]:
-            lines.append(f"- {l['species']} — {l['move']} ({l['accuracy']}%)")
+            accuracy = f"{l['accuracy']}%"
+            lines.append(f"- {l['species']} — {l['move']} {_paren(accuracy)}")
     lines.append(f"\n## {i18n.t('notes')}")
     lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)
@@ -620,37 +661,85 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
     }
 
 
+_SPEED_EFFECT_I18N = {
+    "doubles your side's Speed": "spd_effect_double_side",
+    "reverses the turn order (slower acts first)": "spd_effect_trick_room",
+    "lowers foes' Speed": "spd_effect_lower_foes",
+    "lowers foe Speed": "spd_effect_lower_foe",
+    "sharply lowers foe Speed": "spd_effect_sharply_lower_foe",
+    "sharply lowers foes' Speed": "spd_effect_sharply_lower_foes",
+    "paralysis (halves Speed)": "spd_effect_paralysis",
+    "lowers grounded switch-ins' Speed": "spd_effect_sticky_web",
+    "moves a foe last": "spd_effect_quash",
+    "moves an ally next": "spd_effect_after_you",
+}
+_OTHER_SPEED_TRIGGER_I18N = {
+    "Unburden": "spd_trigger_unburden",
+    "Protosynthesis": "spd_trigger_protosynthesis",
+    "Quark Drive": "spd_trigger_quark_drive",
+}
+
+
+def _speed_trigger(source: str, raw: str) -> str:
+    if source == "Choice Scarf":
+        return i18n.t("spd_trigger_scarf")
+    if source in _WEATHER_SPEED_ABILITIES:
+        trigger_tokens, _ = _WEATHER_SPEED_ABILITIES[source]
+        translated = [i18n.t(f"spd_trigger_{token}") for token in sorted(trigger_tokens)]
+        return "/".join(dict.fromkeys(translated))
+    if source in _OTHER_SPEED_TRIGGER_I18N:
+        return i18n.t(_OTHER_SPEED_TRIGGER_I18N[source])
+    return raw
+
+
+def _speed_modifier_md(md: dict[str, Any]) -> str:
+    trigger = _speed_trigger(md["source"], md["trigger"])
+    key = "spd_modifier" if md.get("speed") is not None else "spd_modifier_no_value"
+    return i18n.t(key, source=md["source"], speed=md.get("speed"), trigger=trigger)
+
+
+def _speed_control_effect(c: dict[str, Any], kind: str) -> str:
+    if kind == "move":
+        key = _SPEED_EFFECT_I18N.get(c["effect"])
+        return i18n.t(key) if key else c["effect"]
+    source = c["ability"]
+    if source in _WEATHER_SPEED_ABILITIES:
+        _triggers, mult = _WEATHER_SPEED_ABILITIES[source]
+        return i18n.t("spd_effect_ability", mult=f"{mult:g}", trigger=_speed_trigger(source, ""))
+    key = _OTHER_SPEED_TRIGGER_I18N.get(source)
+    if key:
+        _trigger, mult = _OTHER_SPEED_ABILITIES[source]
+        return i18n.t("spd_effect_ability", mult=f"{mult:g}", trigger=i18n.t(key))
+    return c.get("effect", "")
+
+
 def format_speed_md(d: dict[str, Any]) -> str:
-    lines = [f"# {i18n.t('spd_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
-             f"{i18n.t('confidence')} {d['confidence']}"]
+    lines = [_report_heading("spd_title", d, reason=True)]
     if d["order"]:
         lines.append(f"\n## {i18n.t('spd_order')}")
         for i, e in enumerate(d["order"], 1):
             member = next(m for m in d["members"] if m["species"] == e["species"])
-            tag = " *(assumed neutral)*" if member["assumed_neutral"] else ""
-            mods = "".join(
-                f" — {md['source']} {md['speed']} ({md['trigger']})" if md.get("speed") is not None
-                else f" — {md['source']} ({md['trigger']})"
-                for md in member["modifiers"])
+            tag = f" *{i18n.t('spd_assumed_neutral')}*" if member["assumed_neutral"] else ""
+            mods = "".join(_speed_modifier_md(md) for md in member["modifiers"])
             lines.append(f"{i}. **{e['species']}** {e['speed']}{tag}{mods}")
     unknown = [m["species"] for m in d["members"] if m["speed"] is None]
     if unknown:
-        lines.append(f"- {i18n.t('spd_base_unknown')} " + ", ".join(unknown))
+        lines.append(f"- {i18n.t('spd_base_unknown')} " + _join(unknown))
     prio = [m for m in d["members"] if m.get("priority_moves")]
     if prio:
         lines.append(f"\n## {i18n.t('spd_priority')}")
         for m in prio:
-            moves = ", ".join(f"{pm['move']} (+{pm['priority']})" for pm in m["priority_moves"])
-            lines.append(f"- **{m['species']}**: {moves}")
+            moves = _join([f"{pm['move']} (+{pm['priority']})" for pm in m["priority_moves"]])
+            lines.append(f"- **{m['species']}**{_colon()}{moves}")
     sc = d["speed_control"]
     if sc["moves"] or sc["abilities"] or sc["items"]:
         lines.append(f"\n## {i18n.t('spd_control')}")
         for c in sc["moves"]:
-            lines.append(f"- {c['species']}: **{c['move']}** — {c['effect']}")
+            lines.append(f"- {c['species']}{_colon()}**{c['move']}** — {_speed_control_effect(c, 'move')}")
         for c in sc["abilities"]:
-            lines.append(f"- {c['species']}: **{c['ability']}** — {c['effect']}")
+            lines.append(f"- {c['species']}{_colon()}**{c['ability']}** — {_speed_control_effect(c, 'ability')}")
         for c in sc["items"]:
-            lines.append(f"- {c['species']}: **{c['item']}**")
+            lines.append(f"- {c['species']}{_colon()}**{c['item']}**")
     else:
         lines.append(f"\n## {i18n.t('spd_control')}\n- {i18n.t('spd_control_none')}")
     lines.append(f"\n## {i18n.t('notes')}")
@@ -677,27 +766,71 @@ _ROLE_MOVES: dict[str, set[str]] = {
         "shell smash", "work up", "coil", "hone claws", "agility", "rock polish", "autotomize",
         "tail glow", "growth", "shift gear", "victory dance", "clangorous soul", "no retreat",
         "belly drum", "geomancy", "cosmic power", "iron defense", "acid armor", "curse",
+        "tidy up", "acupressure", "torch song", "electro shot", "meteor beam", "psyshield bash",
+        "aura wheel", "coaching", "decorate", "howl", "aqua step",
     },
-    "pivot": {"u-turn", "volt switch", "flip turn", "teleport", "parting shot", "baton pass"},
-    "hazard_set": {"stealth rock", "spikes", "toxic spikes", "sticky web"},
+    "pivot": {"u-turn", "volt switch", "flip turn", "teleport", "parting shot", "baton pass",
+              "memento", "healing wish", "shed tail", "chilly reception"},
+    # HARD setup answers (maintainer meta call 2026-07-16): phazing, boost-clearing, and the
+    # boost-copy/ignore abilities below (_ABILITY_COVERAGE). On 36% of real singles teams —
+    # a core singles need: a team can win without setup of its own, but without anti-setup
+    # it lacks a whole answer class. SOFT pressure (Toxic/Yawn forcing boosters out) stays
+    # under `status` — it is not a hard answer and must not make this box tick.
+    "anti_setup": {"whirlwind", "roar", "dragon tail", "circle throw", "haze", "clear smog",
+                   "topsy-turvy"},
+    "hazard_set": {"stealth rock", "spikes", "toxic spikes", "sticky web",
+                   "stone axe", "ceaseless edge"},
     "hazard_control": {"rapid spin", "defog", "mortal spin", "tidy up", "court change"},
     "recovery": {
         "recover", "roost", "synthesis", "moonlight", "morning sun", "slack off", "soft-boiled",
         "milk drink", "rest", "wish", "shore up", "strength sap", "life dew", "jungle healing",
-        "lunar blessing", "heal order", "purify",
+        "lunar blessing", "heal order", "purify", "healing wish",
     },
     "speed_control": {
         "tailwind", "trick room", "icy wind", "electroweb", "thunder wave", "glare", "nuzzle",
         "sticky web", "scary face", "bulldoze", "rock tomb", "low sweep", "cotton spore",
-        "string shot", "quash", "after you",
+        "string shot", "quash", "after you", "flame charge", "trailblaze", "rapid spin",
+        "aqua step",
     },
     "redirection": {"follow me", "rage powder", "spotlight", "ally switch"},
     "screens": {"reflect", "light screen", "aurora veil"},
     "status": {
         "will-o-wisp", "toxic", "thunder wave", "glare", "spore", "sleep powder", "stun spore",
-        "yawn", "taunt", "encore", "disable", "haze", "clear smog", "roar", "whirlwind",
-        "perish song", "heal bell", "aromatherapy", "fake out",
+        "yawn", "zap cannon", "nuzzle", "mortal spin",
     },
+    # Plan-interruption tools, split out of `status` (survey 2026-07-16: carried by ~36%
+    # of M-B singles / ~33% of doubles — an answer class of its own, and `status` mixing
+    # ailments with Taunt blurred both).
+    "disruption": {"taunt", "encore", "disable", "quash", "imprison", "torment",
+                   "trick", "knock off", "perish song", "destiny bond", "psychic noise",
+                   "throat chop", "switcheroo", "final gambit"},
+    # Opening pressure (doubles staple: 58% of real doubles teams; singles ~8% — there it
+    # is a per-mon tactic, not a team slot, so the singles checklist omits it entirely).
+    "fake_out": {"fake out"},
+    # Damage-pressure reduction on the OPPONENT (Intimidate joins via ability coverage):
+    # 64% of real doubles teams, ~28% singles.
+    "damage_mitigation": {
+        "snarl", "will-o-wisp", "parting shot", "eerie impulse", "growl", "charm",
+        "feather dance", "tearful look", "knock off", "breaking swipe", "skitter smack",
+        "trop kick", "chilling water", "struggle bug", "mystical fire", "spirit break",
+        "memento", "noble roar",
+    },
+    # Priority ATTACKS — the endgame-finisher asset (carried by ~75% singles / ~69%
+    # doubles, stable across rules). NOT simply priority>0 damaging moves: utility
+    # priority is excluded — Fake Out (opening flinch), Feint (protect-breaking), Upper
+    # Hand (fires only against the foe's own priority — a counter, not a finisher).
+    # First Impression stays: a real 90BP kill line, resettable by switching.
+    "priority_attack": {
+        "accelerock", "aqua jet", "bullet punch", "extreme speed",
+        "first impression", "ice shard", "jet punch", "mach punch", "quick attack",
+        "shadow sneak", "sucker punch", "vacuum wave", "water shuriken",
+    },
+    # Weather REWRITE capability (maintainer call 2026-07-16): most setters on real teams
+    # are weather-INDEPENDENT (single 35%/double 32% of all teams carry a setter with no
+    # weather-benefit ability in the team) — the setter's value is overwriting the
+    # opponent's weather. Setter ABILITIES join via ability coverage.
+    "weather_rewrite": {"rain dance", "sunny day", "sandstorm", "snowscape", "hail",
+                        "chilly reception"},
     "protect": {
         "protect", "detect", "spiky shield", "king's shield", "baneful bunker", "silk trap",
         "burning bulwark",
@@ -708,16 +841,34 @@ _ROLE_MOVES: dict[str, set[str]] = {
     "partner_support": {
         "helping hand", "coaching", "decorate", "aromatic mist", "gear up", "magnetic flux",
         "heal pulse", "pollen puff", "life dew", "jungle healing", "after you",
+        "acupressure", "baton pass", "psych up", "instruct", "gravity", "feint",
     },
     # Side-wide protection (doubles): guards the WHOLE side for a turn, distinct from single self-protect.
     "side_protect": {"wide guard", "quick guard", "mat block"},
+    # AOE / spread damage (doubles level-1 role): every damaging move that hits multiple
+    # targets -- both "hits both foes" and "hits all-except-self" ranges (authoritative
+    # move-category lists, damaging entries only, then validated present in the M-B dex). A move may
+    # also live in speed_control / damage_mitigation (Icy Wind, Snarl, Struggle Bug, Bulldoze)
+    # -- both signals report. Doubles-only: a singles team never needs spread by definition.
+    "spread": {
+        "air cutter", "blizzard", "boomburst", "breaking swipe", "brutal swing", "bulldoze",
+        "burning jealousy", "clanging scales", "dazzling gleam", "discharge", "earthquake",
+        "electroweb", "eruption", "explosion", "heat wave", "hyper voice", "icy wind",
+        "lava plume", "make it rain", "matcha gotcha", "misty explosion", "mortal spin",
+        "muddy water", "parabolic charge", "petal blizzard", "rock slide", "self-destruct",
+        "sludge wave", "snarl", "sparkling aria", "struggle bug", "surf", "water spout",
+    },
 }
 _ROLE_LABELS = {
-    "setup": "setup", "pivot": "pivot", "hazard_set": "hazard setter",
+    "setup": "setup", "anti_setup": "anti-setup", "pivot": "pivot",
+    "hazard_set": "hazard setter",
     "hazard_control": "hazard control", "recovery": "recovery", "speed_control": "speed control",
     "redirection": "redirection (doubles)", "screens": "screens", "status": "status/utility",
     "protect": "protect", "partner_support": "partner support (doubles)",
     "side_protect": "side protection (doubles)",
+    "disruption": "disruption", "fake_out": "Fake Out pressure (doubles)",
+    "damage_mitigation": "damage mitigation", "priority_attack": "priority attack",
+    "weather_rewrite": "weather rewrite", "spread": "spread damage (doubles)",
 }
 # Item signals (objective: the item is declared). Mega stones are intentionally omitted — Mega is
 # handled by validate/selection, not a role signal.
@@ -740,6 +891,27 @@ _ABILITY_SIGNALS = {
     "Levitate": "Ground immunity (defensive)", "Eelevate": "Ground immunity (defensive)",
     "Magic Bounce": "reflects status/hazards",
     "Unaware": "ignores stat changes (wall)", "Multiscale": "halves damage at full HP (wall)",
+    "Imposter": "transforms into the foe incl. boosts (setup answer)",
+}
+_ITEM_SIGNAL_I18N = {
+    "Choice Band": "role_signal_choice_band", "Choice Specs": "role_signal_choice_specs",
+    "Choice Scarf": "role_signal_choice_scarf", "Assault Vest": "role_signal_assault_vest",
+    "Eviolite": "role_signal_eviolite", "Focus Sash": "role_signal_focus_sash",
+    "Life Orb": "role_signal_life_orb", "Leftovers": "role_signal_passive_recovery",
+    "Black Sludge": "role_signal_passive_recovery_poison", "Sitrus Berry": "role_signal_one_time_recovery",
+    "Rocky Helmet": "role_signal_contact_chip", "Mental Herb": "role_signal_mental_herb",
+    "Safety Goggles": "role_signal_safety_goggles",
+}
+_ABILITY_SIGNAL_I18N = {
+    "Intimidate": "role_signal_intimidate", "Regenerator": "role_signal_regenerator",
+    "Prankster": "role_signal_prankster", "Drizzle": "role_signal_rain_setter",
+    "Drought": "role_signal_sun_setter", "Sand Stream": "role_signal_sand_setter",
+    "Snow Warning": "role_signal_snow_setter", "Electric Surge": "role_signal_electric_terrain",
+    "Grassy Surge": "role_signal_grassy_terrain", "Misty Surge": "role_signal_misty_terrain",
+    "Psychic Surge": "role_signal_psychic_terrain", "Levitate": "role_signal_ground_immunity",
+    "Eelevate": "role_signal_ground_immunity", "Magic Bounce": "role_signal_magic_bounce",
+    "Unaware": "role_signal_unaware", "Multiscale": "role_signal_multiscale",
+    "Imposter": "role_signal_imposter",
 }
 # Items / abilities that ALSO fulfil a checklist category, so team coverage agrees with the
 # per-member item/ability signals instead of contradicting them ("Leftovers — passive recovery"
@@ -748,11 +920,77 @@ _ITEM_COVERAGE = {
     "Choice Scarf": {"speed_control"},
     "Leftovers": {"recovery"}, "Black Sludge": {"recovery"}, "Sitrus Berry": {"recovery"},
 }
-# Field-speed abilities (weather + terrain, from the shared cliffs maps) all count as speed control.
+# Field-speed abilities (weather + terrain, from the shared cliffs maps) all count as speed
+# control; Unaware/Imposter are HARD setup answers by ability (see anti_setup above).
 _ABILITY_COVERAGE = {ab: {"speed_control"} for ab in _WEATHER_SPEED_ABILITIES}
-# The functional categories shown in the team checklist (present vs not-detected, neutral framing).
-_CHECKLIST = ["speed_control", "hazard_set", "hazard_control", "pivot", "recovery",
-              "redirection", "screens", "status", "setup", "protect"]
+_ABILITY_COVERAGE.update({"Unaware": {"anti_setup"}, "Imposter": {"anti_setup"}})
+_ABILITY_COVERAGE.update({"Intimidate": {"damage_mitigation"}})
+_ABILITY_COVERAGE.update({ab: {"weather_rewrite"}
+                          for ab in ("Drizzle", "Drought", "Sand Stream", "Snow Warning")})
+# Additional ability->role coverage (maintainer meta call 2026-07-16). Multi-role abilities
+# carry a multi-element set; base+Mega union is handled by diagnose_roles via ability_tag_via.
+_ABILITY_COVERAGE.update({
+    "Speed Boost": {"speed_control"}, "Prankster": {"speed_control"},
+    "Hospitality": {"recovery", "partner_support"}, "Regenerator": {"recovery"},
+    "Shadow Tag": {"disruption"}, "Magic Bounce": {"disruption"},
+    "Armor Tail": {"disruption", "side_protect"},
+    "Queenly Majesty": {"disruption", "side_protect"},
+    "Spicy Spray": {"status"},
+    "Moxie": {"setup"}, "Moody": {"setup"}, "Contrary": {"setup"},
+    "Telepathy": {"partner_support"},
+    # Lightning Rod redirects single-target Electric moves away from allies (a doubles
+    # ally-protection lane); Flash Fire is NOT here — it only grants the HOLDER Fire immunity
+    # and self-boost, it neither guards nor draws attacks aimed at partners (audit 2026-07-16).
+    "Lightning Rod": {"side_protect"},
+    "Toxic Debris": {"hazard_set"},
+})
+# Canonical display order for the coverage checklist (required tier first, then optional,
+# each in this order). Roles not in a format's tier map are NOT_CHECKED (omitted).
+_ROLE_ORDER = ["speed_control", "priority_attack", "anti_setup", "protect", "fake_out",
+               "spread", "damage_mitigation", "redirection", "hazard_set", "hazard_control",
+               "pivot", "recovery", "screens", "disruption", "weather_rewrite", "status",
+               "setup", "partner_support", "side_protect"]
+# Per-format THREE-LEVEL ATTENTION calibration (maintainer meta call, grounded in the M-B
+# real-team library carry rates AND functional necessity). The tiers are ATTENTION levels for
+# a MISSING role, NOT "required vs optional":
+#   required  (LEVEL 1 需重点注意) -> a gap worth focused attention: flagged (not_detected),
+#                                     the online AI reading MAY raise it.
+#   optional  (LEVEL 2 有条件注意) -> conditional: shown as a neutral note, never a hard problem.
+#   <omitted> (LEVEL 3 无需注意)   -> not applicable to this format, never listed.
+# (wire values stay required/optional so consumers/protocol are unchanged; the levels are the
+#  user-facing framing.)
+_ROLE_TIERS = {
+    "single": {
+        # level 1 gained hazard_set (maintainer call): 57% carry, a real tempo/chip axis.
+        "required": {"speed_control", "anti_setup", "priority_attack", "hazard_set"},
+        "optional": {"pivot", "recovery", "screens", "disruption",
+                     "damage_mitigation", "weather_rewrite", "status", "setup"},
+        # level 3 (omitted): hazard_control, protect (doubles mechanic), redirection,
+        # fake_out, partner_support / side_protect, spread (a doubles-only AOE role).
+    },
+    "double": {
+        # level 1 gained priority_attack / fake_out / weather_rewrite / spread (maintainer call).
+        "required": {"speed_control", "protect", "damage_mitigation", "priority_attack",
+                     "fake_out", "weather_rewrite", "spread"},
+        "optional": {"redirection", "pivot", "recovery", "screens", "disruption",
+                     "status", "setup", "partner_support", "side_protect"},
+        # level 3 (omitted): hazard_set / hazard_control (0% in doubles), anti_setup (~5%).
+    },
+}
+# Reason text for LEVEL-2 absences (the AI reads it; the panel shows a generic note).
+_OPTIONAL_REASONS = {
+    "single": {
+        "damage_mitigation": "carried by ~28% of real M-B singles teams",
+        "disruption": "carried by ~36% of real M-B singles teams",
+        "weather_rewrite": "~42% of real M-B singles teams carry a setter; weather also "
+                           "expires on its own — an asset, not a hole",
+        "screens": "carried by ~16% of real M-B singles teams",
+    },
+    "double": {
+        "disruption": "carried by ~33% of real M-B doubles teams",
+        "screens": "carried by ~30% of real M-B doubles teams",
+    },
+}
 
 
 def _stat_orientation(stats: dict[str, Any]) -> dict[str, Any]:
@@ -781,6 +1019,13 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
     members: list[dict[str, Any]] = []
     skipped: list[str] = []
     incomplete_members: list[dict[str, str]] = []
+    # A Mega-stone holder battles as its Mega form, whose sole ability is what actually fires
+    # (team.py augments `facts` with those forms). Keyed by base species; used only when the
+    # held item IS that form's Mega stone — Froslass+Froslassite -> Mega Froslass / Snow
+    # Warning, a real snow setter the declared Cursed Body hides.
+    mega_by_base = {ff["base_species"]: ff for ff in facts.values()
+                    if isinstance(ff, dict) and ff.get("found") and ff.get("is_mega")
+                    and ff.get("base_species")}
     for m in team.pokemon:
         f = facts.get(m.species)
         if not f or not f.get("found"):
@@ -800,27 +1045,47 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
                 "species": m.species or "(blank)",
                 "completeness": completeness.effective_level(m.completeness, has_moves=bool(m.moves)),
             })
-        ability, ability_unknown = _certain_ability(m.ability, f.get("abilities"))
+        base_ability, ability_unknown = _certain_ability(m.ability, f.get("abilities"))
+        # A Mega-stone holder plays its BASE ability first (turn 0 — Intimidate fires on
+        # entry) and its MEGA ability after evolving: BOTH grant capabilities, so UNION their
+        # coverage rather than replacing (Salamence keeps Intimidate mitigation AND gains
+        # Aerilate; Froslass keeps nothing pre-Mega but gains Snow Warning / weather rewrite).
+        mega_ability = None
+        mf = mega_by_base.get(m.species)
+        if mf and m.item and mf.get("required_item") == m.item:
+            mabils = [a for a in (mf.get("abilities") or []) if a]
+            mega_ability = mabils[0] if mabils else None    # Megas have exactly one ability
         item_signal = _ITEM_SIGNALS.get(m.item) if m.item else None
-        ability_signal = _ABILITY_SIGNALS.get(ability) if ability else None
+        base_ability_signal = _ABILITY_SIGNALS.get(base_ability) if base_ability else None
+        mega_ability_signal = _ABILITY_SIGNALS.get(mega_ability) if mega_ability else None
         # Functional categories this member contributes to via its item / ability (not just moves),
         # so the coverage checklist agrees with the per-member signals shown (audit 2026-06-22 / P2-b).
         item_tags = _ITEM_COVERAGE.get(m.item, set()) if m.item else set()
-        ability_tags = _ABILITY_COVERAGE.get(ability, set()) if ability else set()
+        # tag -> the specific ability that grants it, so a bearer names Snow Warning (Mega) vs
+        # the base ability. Base wins ties (it acts first in the battle).
+        ability_tag_via: dict[str, str] = {}
+        for ab in (base_ability, mega_ability):
+            if ab:
+                for tg in _ABILITY_COVERAGE.get(ab, set()):
+                    ability_tag_via.setdefault(tg, ab)
+        ability_tags = set(ability_tag_via)
         # Distinct functional signals this member carries (for compression counting).
         signal_tags = set(tags)
         if item_signal:
             signal_tags.add("item:" + (m.item or ""))
-        if ability_signal:
-            signal_tags.add("ability:" + (ability or ""))
+        for ab, sig in ((base_ability, base_ability_signal), (mega_ability, mega_ability_signal)):
+            if sig:
+                signal_tags.add("ability:" + ab)
         members.append({
             "species": m.species,
             "stat_orientation": _stat_orientation(f.get("stats") or {}),
             "move_signals": {t: tags[t] for t in tags},
             "moves_authoritative": moves_authoritative,
             "item": m.item, "item_signal": item_signal, "item_tags": sorted(item_tags),
-            "ability": ability, "ability_unknown": ability_unknown, "ability_signal": ability_signal,
-            "ability_tags": sorted(ability_tags),
+            "ability": base_ability, "mega_ability": mega_ability,
+            "ability_unknown": ability_unknown,
+            "ability_signal": base_ability_signal, "mega_ability_signal": mega_ability_signal,
+            "ability_tag_via": ability_tag_via, "ability_tags": sorted(ability_tags),
             "signal_count": len(signal_tags),
         })
 
@@ -830,30 +1095,45 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
     # framing — a not-detected category is an objective absence, NOT a prescription to add one.
     # Doubles also checklists the partner-support + side-protection categories (singles don't run them,
     # so they'd be phantom 'not detected' gaps there — §16.3 doubles aspect).
-    checklist = list(_CHECKLIST)
-    if (team.format or "").lower() == "double":
-        checklist += ["partner_support", "side_protect"]
+    fmt = (team.format or "").lower()
+    tiers = _ROLE_TIERS.get(fmt, _ROLE_TIERS["single"])
+    req, opt = tiers["required"], tiers["optional"]
+    # required tier first, then optional — each in canonical order. NOT_CHECKED roles (in
+    # neither set for this format) are simply never listed.
+    checklist = ([t for t in _ROLE_ORDER if t in req]
+                 + [t for t in _ROLE_ORDER if t in opt])
+    reasons = _OPTIONAL_REASONS.get(fmt, {})
     coverage: dict[str, dict[str, Any]] = {}
     for tag in checklist:
         bearers: list[dict[str, str]] = []
         for mm in members:
             srcs = []
             if tag in mm["move_signals"]:
-                srcs.append("move")
+                srcs.extend(f"move:{move}" for move in mm["move_signals"][tag])
             if tag in mm["item_tags"]:
                 srcs.append(f"item:{mm['item']}")
             if tag in mm["ability_tags"]:
-                srcs.append(f"ability:{mm['ability']}")
+                srcs.append(f"ability:{mm['ability_tag_via'][tag]}")
             if srcs:
                 bearers.append({"species": mm["species"], "via": ", ".join(srcs)})
-        coverage[tag] = {"label": _ROLE_LABELS[tag], "present": bool(bearers), "bearers": bearers}
-    not_detected = [coverage[t]["label"] for t in checklist if not coverage[t]["present"]]
+        tier = "required" if tag in req else "optional"
+        entry: dict[str, Any] = {"label": _ROLE_LABELS[tag], "present": bool(bearers),
+                                 "bearers": bearers, "expectation": tier}
+        if tier == "optional" and tag in reasons:
+            entry["expectation_reason"] = reasons[tag]
+        coverage[tag] = entry
+    # not_detected = the REQUIRED absences (the real gaps). Optional absences are normal and
+    # stay only in `coverage` (shown as a neutral note, never a flagged hole).
+    not_detected = [coverage[t]["label"] for t in checklist
+                    if not coverage[t]["present"] and coverage[t]["expectation"] == "required"]
 
     # Compression: members carrying multiple distinct functional signals (objective count).
     compression = sorted(
         [{"species": mm["species"], "signal_count": mm["signal_count"],
           "signals": (sorted(mm["move_signals"]) + ([f"item:{mm['item']}"] if mm["item_signal"] else [])
-                      + ([f"ability:{mm['ability']}"] if mm["ability_signal"] else []))}
+                      + [f"ability:{ab}" for ab, sig in
+                         ((mm["ability"], mm["ability_signal"]),
+                          (mm["mega_ability"], mm["mega_ability_signal"])) if sig])}
          for mm in members if mm["signal_count"] >= 2],
         key=lambda x: (-x["signal_count"], x["species"]))
 
@@ -904,27 +1184,61 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
     }
 
 
+def _role_label(tag: str) -> str:
+    key = f"role_label_{tag}"
+    rendered = i18n.t(key)
+    return _ROLE_LABELS.get(tag, tag) if rendered == key else rendered
+
+
+def _role_via(raw: str) -> str:
+    parts: list[str] = []
+    for part in raw.split(", "):
+        if part == "move":
+            parts.append(i18n.t("role_via_move"))
+        elif part.startswith("move:"):
+            parts.append(i18n.t("role_via_move_name", name=part.split(":", 1)[1]))
+        elif part.startswith("item:"):
+            parts.append(i18n.t("role_via_item", name=part.split(":", 1)[1]))
+        elif part.startswith("ability:"):
+            parts.append(i18n.t("role_via_ability", name=part.split(":", 1)[1]))
+        else:
+            parts.append(part)
+    return _join(parts)
+
+
+def _compression_signal(raw: str) -> str:
+    if raw.startswith("item:"):
+        return i18n.t("role_via_item", name=raw.split(":", 1)[1])
+    if raw.startswith("ability:"):
+        return i18n.t("role_via_ability", name=raw.split(":", 1)[1])
+    return _role_label(raw)
+
+
 def format_roles_md(d: dict[str, Any]) -> str:
-    lines = [f"# {i18n.t('role_title')} ({d['team_size']} Pokemon{(', ' + i18n.t('partial')) if d['partial'] else ''}) — "
-             f"{i18n.t('confidence')} {d['confidence']} ({d['confidence_reason']})",
+    lines = [_report_heading("role_title", d, reason=True),
              f"_{i18n.t('role_intro')}_"]
     if d.get("incomplete_members"):
-        names = ", ".join(f"{m['species']} ({m['completeness']})" for m in d["incomplete_members"])
-        lines.append(f"\n> ⚠️ {i18n.t('role_moves_uncounted_warn')}: {names}.")
+        names = _join([f"{m['species']}{_paren(_completeness_label(m['completeness']))}"
+                       for m in d["incomplete_members"]])
+        lines.append(f"\n> ⚠️ {i18n.t('role_moves_uncounted_warn')}{_colon()}{names}{_period()}")
     lines.append(f"\n## {i18n.t('per_member')}")
     for mm in d["members"]:
         so = mm["stat_orientation"]
         sig = []
         for tag, mvs in mm["move_signals"].items():
-            sig.append(f"{_ROLE_LABELS.get(tag, tag)} ({', '.join(mvs)})")
+            sig.append(f"{_role_label(tag)}{_paren(_join(mvs))}")
         if mm["item_signal"]:
-            sig.append(f"item: {mm['item']} — {mm['item_signal']}")
+            text = i18n.t(_ITEM_SIGNAL_I18N.get(mm["item"], "role_signal_unknown"))
+            sig.append(f"{i18n.t('role_item')}{_colon()}{mm['item']} — {text if text != 'role_signal_unknown' else mm['item_signal']}")
         if mm["ability_signal"]:
-            sig.append(f"ability: {mm['ability']} — {mm['ability_signal']}")
+            text = i18n.t(_ABILITY_SIGNAL_I18N.get(mm["ability"], "role_signal_unknown"))
+            sig.append(f"{i18n.t('role_ability')}{_colon()}{mm['ability']} — {text if text != 'role_signal_unknown' else mm['ability_signal']}")
         if mm.get("ability_unknown"):
             sig.append(i18n.t('role_ability_unspecified'))
-        sig_str = "; ".join(sig) if sig else i18n.t('role_no_signals')
-        lines.append(f"- **{mm['species']}** [{so['offense_lean']} lean, {so['bulk']} bulk]: {sig_str}")
+        sig_str = ("；" if i18n.lang() in ("zh", "ja") else "; ").join(sig) if sig else i18n.t('role_no_signals')
+        lines.append(i18n.t("role_member_orientation", species=mm["species"],
+                            lean=i18n.t(f"role_lean_{so['offense_lean']}"),
+                            bulk=i18n.t(f"role_bulk_{so['bulk']}"), signals=sig_str))
     lines.append(f"\n## {i18n.t('role_coverage')}")
     # Iterate the coverage dict itself (insertion-ordered: singles checklist, then the doubles-only
     # partner_support / side_protect when present) so the doubles categories actually render here — not
@@ -932,14 +1246,19 @@ def format_roles_md(d: dict[str, Any]) -> str:
     for tag in d["coverage"]:
         c = d["coverage"][tag]
         if c["present"]:
-            bearers = ", ".join(f"{b['species']} ({b['via']})" for b in c["bearers"])
-            lines.append(f"- [x] {c['label']}: {bearers}")
+            bearers = _join([f"{b['species']}{_paren(_role_via(b['via']))}" for b in c["bearers"]])
+            lines.append(f"- [x] {_role_label(tag)}{_colon()}{bearers}")
+        elif c.get("expectation") == "optional":
+            # a normal absence in this format — labelled so, never a flagged gap
+            lines.append(f"- [ ] {_role_label(tag)}{_colon()}{i18n.t('role_not_detected')} "
+                         f"{_paren(i18n.t('role_situational'))}")
         else:
-            lines.append(f"- [ ] {c['label']}: {i18n.t('role_not_detected')}")
+            lines.append(f"- [ ] {_role_label(tag)}{_colon()}{i18n.t('role_not_detected')}")
     if d["compression"]:
         lines.append(f"\n## {i18n.t('role_compression')}")
         for c in d["compression"]:
-            lines.append(f"- **{c['species']}** ({c['signal_count']}): {', '.join(c['signals'])}")
+            signals = _join([_compression_signal(s) for s in c["signals"]])
+            lines.append(f"- **{c['species']}** {_paren(str(c['signal_count']))}{_colon()}{signals}")
     lines.append(f"\n## {i18n.t('notes')}")
     lines += [f"- {n}" for n in d["notes"]]
     return "\n".join(lines)

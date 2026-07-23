@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-13</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-22</b>
 </p>
 
 <p align="center">
@@ -38,12 +38,21 @@ Queries read the data shipped with the package. The goal is not to manufacture a
 
 | What it is | What it is not |
 |---|---|
-| A local skill set for Claude Code, Codex, and compatible agents | A hosted web team builder or account-based service |
+| A local skill set for Claude Code, Codex, and compatible agents | A web account or visual interface required to use the skills |
 | Structured access to dex, metagame, calculation, and real-team evidence | A chatbot expected to answer from model memory |
 | A team-building workflow with legality checks, evidence, confidence, and audit gates | A black-box optimizer that produces an objectively best team |
 | An updatable snapshot tied to a season and regulation | A permanently live database that never needs a date stamp |
 
 Scripts own facts, arithmetic, and deterministic checks. The model interprets your goal, designs candidates, weighs trade-offs, and explains the recommendation. That division of responsibility is the core design of the project.
+
+### Optional visual interface
+
+All four skills are fully usable through an agent CLI. To make the data, configurations, and generation process easier to inspect, the project also provides an optional companion browser front end. It lets you browse the dex and metagame snapshots visually and assists with matchup, damage, Speed, tuning, and team-diagnosis work:
+
+- **Online:** open [champion.mpan.top:1025](https://champion.mpan.top:1025) with no installation required. Because the online edition has limited resources, some features are simplified compared with the local edition.
+- **Local:** download [`pokemon-champions-ui.zip`](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/pokemon-champions-ui.zip) from the [`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest). The prebuilt bundle requires neither Node.js nor an account or model API key.
+
+The interface is not a prerequisite for the skills and does not replace the complete local collaboration workflow with an AI assistant. See [Optional Visual Interface](#optional-visual-interface) for feature differences, dependencies, and usage instructions.
 
 > [!NOTE]
 > **The supported data domain is Pokémon Champions only.**
@@ -241,7 +250,93 @@ free-form user request
                                                  └─ calls the other three as needed
 ```
 
-For example, “build M-B Doubles around Mega Metagross and make it survive this Garchomp Earthquake” needs name and legality facts, current usage, real-team structures, candidate evaluation, and an exact survival threshold. “Can Bullet Punch from the current metagame's standard Mega Metagross set OHKO a common Alolan Ninetales set?” combines the dex, meta, and calculator skills but does not enter the team workflow.
+For example, “build a Doubles team around Mega Metagross and make it survive Earthquake from a common Life Orb Garchomp” needs name and legality facts, current usage, real-team structures, candidate evaluation, and an exact survival threshold. “Can Bullet Punch from the current metagame's standard Mega Metagross set OHKO a common Alolan Ninetales set?” combines the dex, meta, and calculator skills but does not enter the team workflow.
+
+## Optional Visual Interface
+
+The companion front end turns the facts and calculations supplied by the four skills into a workspace
+that is easier to browse, compare, and verify. It is useful for quickly surveying the metagame,
+researching a Pokemon, comparing damage and Speed in batches, checking standard or custom matchups,
+and carrying team-analysis results into other pages for verification. Zh/en/ja names are localized
+only at the display boundary. The current season, rule, and snapshot date appear at the top of the
+page; use that version information when interpreting metagame results.
+
+| Capability | Online | Local bundle |
+|---|---|---|
+| Singles/Doubles rankings, details, and rank trends | Yes | Yes |
+| Pokémon, move, item, and ability dex with zh/en/ja search | Yes | Yes |
+| Batch damage, rolls, KO ranges, and Speed lines | In-browser | Local bridge |
+| Standard-set matrix and actual-team KO/CHECK grid | Yes | Yes |
+| Quick survival calculation | Yes | Yes |
+| Exact `team.tune` cliff analysis | Deployment capability and workload quota | Yes |
+| One-shot Q&A, simplified builder, diagnosis, optional AI explanation | Deployment capabilities and daily quotas | Replaced by the complete local-agent workflow |
+| UEP session/artifact panel | Not supported | Yes, for collaboration with a local AI assistant already working on the task |
+
+The online builder is a fixed-form, single-result workflow. It does not replace the full local UEP
+conversation, candidate comparison, revision loop, or file collaboration.
+
+### Use the online edition
+
+Open [https://champion.mpan.top:1025](https://champion.mpan.top:1025). Static environment and dex
+browsing plus browser calculations require no account. Q&A, builder, diagnosis, and AI explanation are
+shown only when the deployment advertises those capabilities; quota status comes from the service.
+Standard-set matchup pages are low-confidence references. Paste or enter the actual set when judging
+your own team, and carry generated/diagnosed teams into the calculator for verification.
+
+### Download the prebuilt local edition
+
+Download `pokemon-champions-ui.zip` from the
+[`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest).
+The bundle binds one SPA, projection, bridge, four skills, runtime configuration, and manifest. It
+requires Python 3.10+ and the locked `requirements-runtime.txt`, but not Node.js. After extracting it
+and entering the front-end directory:
+
+Windows PowerShell:
+
+```powershell
+python -m pip install -r requirements-runtime.txt
+.\start-local.ps1
+```
+
+Linux / macOS:
+
+```bash
+python3 -m pip install -r requirements-runtime.txt
+chmod +x start-local.sh
+./start-local.sh
+```
+
+Open the complete one-time `http://127.0.0.1:<port>/#bootstrap=...` URL printed by the launcher. The
+service listens on loopback by default. Set `PCUI_LOCAL_PORT` in
+`~/.pokemon-champions-ui/pcui.env` to change the default port.
+
+### Build from source
+
+Use Python 3.10+ and the Node.js version used by release verification (currently Node.js 22). The
+platform `build-ui` script runs `npm ci`, creates the projection from the checked-out skills, and
+performs one Vite build; the matching `start-ui` script launches it. Do not combine `dist`, projection,
+bridge, or skill trees from different snapshots—the identity checks reject that assembly.
+
+```powershell
+git clone https://github.com/pmwl0128/pokemon_champion_agent.git
+Set-Location .\pokemon_champion_agent
+python -m pip install -r requirements-ui.txt
+.\build-ui.ps1
+.\start-ui.ps1
+```
+
+On Linux/macOS use `build-ui.sh` and `start-ui.sh` after making them executable.
+
+### Privacy and updates
+
+- Local mode listens on `127.0.0.1`, stores session/artifact state under
+  `~/.pokemon-champions-ui/`, and needs no hosted-model key for normal data and calculation tools.
+- Online Q&A, builder, diagnosis, actual-team matchup, or AI explanation sends the corresponding input
+  to the online service. Keep private rosters and review notes in the local bundle if they should not be
+  submitted.
+- To update the prebuilt edition, download the complete rolling zip into a new directory and verify it
+  before removing the previous copy. For a source checkout, pull and rerun the platform build/start
+  scripts; do not overwrite only selected generated subdirectories.
 
 ## Installation
 
@@ -412,7 +507,7 @@ Each workbook uses one primary language; the Chinese and Japanese versions inclu
 
 The workbooks are facts-only reports and contain no AI interpretation of the metagame.
 
-Rank-trend line charts `trend_{single,double}_{zh,ja,en}.png` (Singles / Doubles × three languages) ship on the same release. They cover the last up to 10 refreshes on a rolling basis: any Pokemon that entered the Top 30 in any period is tracked across the whole window, plus big movers that reached the top 60. The axis keeps ranks 1–30 uniform and compresses everything deeper; rising / falling / stable lines are color-coded with Pokemon names labeled at both ends.
+Rank-trend line charts `trend_{single,double}_{zh,ja,en}.png` (Singles / Doubles × three languages) ship on the same release. They cover the last up to 10 refreshes on a rolling basis: any Pokémon that entered the Top 30 in any period is tracked across the whole window, plus big movers that reached the top 60. The axis keeps ranks 1–30 uniform and compresses everything deeper; rising / falling / stable lines are color-coded with Pokémon names labeled at both ends.
 
 ![Singles rank trend](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/trend_single_en.png)
 

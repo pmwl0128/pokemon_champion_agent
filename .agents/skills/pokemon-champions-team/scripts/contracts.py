@@ -42,12 +42,15 @@ TEAM_FIELDS = {"schema_version", "format", "season", "rule", "pokemon", "decklis
 MEMBER_FIELDS = {"species", "name", "item", "ability", "moves", "attacks", "nature",
                  "spread", "tera", "completeness"}
 CONTEXT_FIELDS = {"season", "rule", "format", "locked", "owned_only", "owned", "wants",
-                  "keep_mega", "avoid", "avoid_soft", "prefer", "exclude_tactics", "meta_conformance", "style_lean",
+                  "keep_mega", "mega_posture", "avoid", "avoid_soft", "prefer", "exclude_tactics", "meta_conformance", "style_lean",
                   "variance_tolerance", "benchmarks", "need", "replace", "direct_final", "skip_checkpoint",
                   "frame_required"}
 # The posture knob's values (proven = common-first views, off_meta = rare-first). A VIEW ordering
 # consumed by landscape; never a score.
 META_CONFORMANCE = {"proven", "off_meta"}
+# Registration posture.  ``environment`` consumes the observed frame distribution; the other values
+# are explicit user composition constraints.  This is separate from keep_mega (which names an option).
+MEGA_POSTURE = {"environment", "none", "single", "multi"}
 # The structural-posture trichotomy in professional battle vocabulary (主动进攻/平衡轮换/稳健防守).
 # A USER intent lens over the emergent profile vector — the skill itself never labels a team.
 STYLE_LEAN = {"offense", "balance", "defense"}
@@ -55,7 +58,10 @@ STYLE_LEAN = {"offense", "balance", "defense"}
 # FLAGS the team's sub-100%-accuracy damaging moves; tolerant = fine with them. A disclosure flag over
 # dex accuracy facts — diagnose surfaces the luck-line list either way, the knob only flags it. Never a score.
 VARIANCE_TOLERANCE = {"averse", "tolerant"}
-BENCHMARK_FIELDS = {"member", "kind", "vs", "move", "conditions", "probability", "attacker_set"}
+BENCHMARK_FIELDS = {
+    "member", "kind", "vs", "move", "conditions", "probability",
+    "attacker_set", "opponent_set",
+}
 
 
 # --- error model ------------------------------------------------------------
@@ -204,6 +210,10 @@ def check_context(d: Any) -> list[ContractError]:
     if mc is not None and (not _is_str(mc) or mc not in META_CONFORMANCE):
         _err(out, Code.ENUM, "meta_conformance",
              i18n.Msg('ct_meta_conformance_enum', got=mc, allowed=sorted(META_CONFORMANCE)))
+    mp = d.get("mega_posture")
+    if mp is not None and (not _is_str(mp) or mp not in MEGA_POSTURE):
+        _err(out, Code.ENUM, "mega_posture",
+             i18n.Msg('ct_mega_posture_enum', got=mp, allowed=sorted(MEGA_POSTURE)))
     sl = d.get("style_lean")
     if sl is not None and (not _is_str(sl) or sl not in STYLE_LEAN):
         _err(out, Code.ENUM, "style_lean",
@@ -304,6 +314,9 @@ def check_benchmark(b: Any, path: str = "benchmark") -> list[ContractError]:
     prob = b.get("probability")
     if prob is not None and (not _is_str(prob) or prob not in PROBABILITIES):
         _err(out, Code.ENUM, f"{path}.probability", i18n.Msg('ct_probability_enum', allowed=sorted(PROBABILITIES)))
+    for set_field in ("attacker_set", "opponent_set"):
+        if b.get(set_field) is not None and not isinstance(b.get(set_field), dict):
+            _err(out, Code.TYPE, f"{path}.{set_field}", f"{set_field} must be an object")
     conds = b.get("conditions")
     if conds is not None:
         if not isinstance(conds, dict):

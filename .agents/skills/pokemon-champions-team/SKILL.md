@@ -1,11 +1,11 @@
 ---
 name: pokemon-champions-team
-description: Pokemon Champions single/double team building, legality validation, and team diagnostics. Use when the whole request is about producing, completing, changing, reviewing, or evaluating a Pokemon Champions team; do not trigger from isolated generic words like core/style/include. Chinese examples include "帮我组一队", "配一套双打", "带X组一队", "围绕X做一队", "这队怎么改", "这队怎么选". English examples include "build me a team", "make a doubles team", "team around X", "include X in the team", "rework this team", "review/evaluate my team". Japanese examples include "チームを組んで", "ダブルの構築を作って", "X入りで組んで", "Xを軸にした構築", "この構築を直して", "選出を見て". The mandatory UEP flow uses context-audit, intake, frame, slate-evaluate, checkpoint, and answer-audit receipt gates before presenting build results. Also use to parse or validate a team, diagnose coverage/speed/role gaps, analyze 6v6 selection, compare matchups, fine-tune SP spreads, and retrieve factual real-team evidence.
+description: Pokémon Champions single/double team building, legality validation, and team diagnostics. Use when the whole request is about producing, completing, changing, reviewing, or evaluating a Pokémon Champions team; do not trigger from isolated generic words like core/style/include. Chinese examples include "帮我组一队", "配一套双打", "带X组一队", "围绕X做一队", "这队怎么改", "这队怎么选". English examples include "build me a team", "make a doubles team", "team around X", "include X in the team", "rework this team", "review/evaluate my team". Japanese examples include "チームを組んで", "ダブルの構築を作って", "X入りで組んで", "Xを軸にした構築", "この構築を直して", "選出を見て". The mandatory UEP flow uses context-audit, intake, frame, slate-evaluate, checkpoint, and answer-audit receipt gates before presenting build results. Also use to parse or validate a team, diagnose coverage/speed/role gaps, analyze 6v6 selection, compare matchups, fine-tune SP spreads, and retrieve factual real-team evidence.
 ---
 
-# Pokemon Champions Team
+# Pokémon Champions Team
 
-Build, validate, diagnose, tune, and review Pokemon Champions teams. This skill is an orchestrator:
+Build, validate, diagnose, tune, and review Pokémon Champions teams. This skill is an orchestrator:
 its scripts emit deterministic facts, legality verdicts, and auditable evidence; the model makes and
 explains strategic trade-offs. Never invent a composite team-strength score or an objective "best"
 team.
@@ -39,8 +39,9 @@ It is the authoritative reasoning and routing protocol. The non-negotiable seque
    as-is fact questions; they do not replace cliff detection for SP tuning.
 8. Initialize the response with `draft-init`, fill its substantive fields, and run `answer-audit` with
    the original slate and saved slate output. Fix violations and present only a passing draft.
-9. Validate every team before presenting it. Doubles six-member evaluation also requires `select`;
-   team-level matchup claims require the full `matchup` table, not hand-picked calculations.
+9. Validate every team before presenting it. Slate survivors carry `select` facts for the actual
+   6-pick-3 (single) / 6-pick-4 (double) object; inspect them before making lineup or Mega-route claims.
+   Team-level matchup claims require the full `matchup` table, not hand-picked calculations.
 
 At entry, state the phases that will run and track them with the host's available plan/checklist tool.
 If a phase is later dropped, disclose why. The receipt chain is
@@ -77,6 +78,7 @@ Selection, matchup, and tuning:
 ```bash
 python scripts/team.py select team.json --context ctx.json --format json
 python scripts/team.py matchup team.json --top-k 20 --context ctx.json --format json
+python scripts/team.py matchup actual-sets.json --top-k 60 --matchup-view summary --format json
 python scripts/team.py tune team.json --context ctx.json --format json
 ```
 
@@ -141,7 +143,8 @@ by `answer-audit`. Never silently reproduce a stored team.
   response through the dex.
 - Pass `--lang zh|ja|en` for human-readable CLI output. JSON remains canonical and language-independent.
 - Keep single and double evidence separate. Keep historical regulations explicitly labeled.
-- A six-member doubles roster is a toolbox selected 4-of-6; do not judge it as a flat six-member set.
+- A six-member roster is a preview toolbox: singles selects 3-of-6 and doubles 4-of-6. Do not judge it
+  as a flat six-member battle lineup; only zero or one brought Mega option can be active per battle.
 - Expose assumptions, confidence, evidence, trade-offs, and omitted alternatives.
 - Do not infer strength from usage, sample performance tags, or provenance tier alone.
 

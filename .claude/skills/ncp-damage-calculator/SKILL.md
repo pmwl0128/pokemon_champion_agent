@@ -1,11 +1,11 @@
 ---
 name: ncp-damage-calculator
-description: Run Pokémon Champions damage and speed-line calculations using the bundled NCP VGC Damage Calculator formulas. Use when the request asks for a concrete damage, KO, survival, or speed-order calculation between specified Pokemon, moves, spreads, field states, items, abilities, or stat stages. For broad team-building or tuning, use the team skill first and let it delegate exact calc checks. Chinese examples include "X用Y打Z多少", "X能确一/二确Z吗", "Z吃得下X的Y吗", "X快过Z吗", "多少SP能快过/抗住". English examples include "calc X's move into Y", "does this OHKO/2HKO", "can Y survive this hit", "does X outspeed Y", "what spread reaches this benchmark". Japanese examples include "XのYでZにどれくらい入る？", "確定一発/二発？", "ZはYを耐える？", "XはZを抜ける？", "このラインに必要なSPは？".
+description: Run Pokémon Champions damage and speed-line calculations using the bundled NCP VGC Damage Calculator formulas. Use when the request asks for a concrete damage, KO, survival, or speed-order calculation between specified Pokémon, moves, spreads, field states, items, abilities, or stat stages. For broad team-building or tuning, use the team skill first and let it delegate exact calc checks. Chinese examples include "X用Y打Z多少", "X能确一/二确Z吗", "Z吃得下X的Y吗", "X快过Z吗", "多少SP能快过/抗住". English examples include "calc X's move into Y", "does this OHKO/2HKO", "can Y survive this hit", "does X outspeed Y", "what spread reaches this benchmark". Japanese examples include "XのYでZにどれくらい入る？", "確定一発/二発？", "ZはYを耐える？", "XはZを抜ける？", "このラインに必要なSPは？".
 ---
 
 # NCP Damage Calculator
 
-Compute Pokemon Champions damage ranges and speed lines with the bundled NCP VGC Damage Calculator
+Compute Pokémon Champions damage ranges and speed lines with the bundled NCP VGC Damage Calculator
 core. Use exact calculations whenever a claim depends on damage, KO, survival, or move order.
 
 ## Workflow
@@ -14,7 +14,7 @@ core. Use exact calculations whenever a claim depends on damage, KO, survival, o
    English calculator keys.
 2. Run the wrapper's `resolve` command to align canonical English names to exact NCP keys.
 3. Supply the actual item, ability, nature, SP spread, stat stages, status, and relevant field state.
-4. Use the damage API for a concrete attack, or the speed API for one Pokemon, a table, or a direct
+4. Use the damage API for a concrete attack, or the speed API for one Pokémon, a table, or a direct
    comparison.
 5. Report assumptions with the result. A successful calculation does not establish Champions legality.
 
@@ -106,7 +106,7 @@ needed. It is explanatory documentation, not a second contract.
   so no Node runtime is needed. If quickjs-ng is not installed, those same Python entries automatically
   delegate to the Node CLIs (`node scripts\ncp-calc-api.js` / `ncp-speedline-api.js`); calculation and
   query results are identical.
-- It targets Pokemon Champions at level 50 with Champions stat points; canonical keys are
+- It targets Pokémon Champions at level 50 with Champions stat points; canonical keys are
   `hp/atk/def/spa/spd/spe`.
 - NCP contains entries beyond the Champions-legal roster. Use `$pokemon-champions-team` or the dex for
   legality.

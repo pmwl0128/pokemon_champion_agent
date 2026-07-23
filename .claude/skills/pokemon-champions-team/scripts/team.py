@@ -22,8 +22,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from team_io import load_team, load_context, team_from_dict, context_from_dict  # noqa: E402
@@ -31,13 +32,16 @@ import context_audit  # noqa: E402  (UEP P2: front gate + field_status single so
 import landscape  # noqa: E402  (UEP P4: structural distributions over the real library)
 from landscape import landscape_from_teams as run_landscape  # noqa: E402
 import frame  # noqa: E402  (UEP P4.5: assembly front-door — grounded skeletons before assembly)
-from slate import evaluate_slate as run_slate, slate_shape_error  # noqa: E402  (UEP P5 gate)
+from slate import evaluate_slate as run_slate, slate_shape_error, project_slate  # noqa: E402  (UEP P5 gate)
+from rules import get_ruleset  # noqa: E402  (registration hard caps surfaced in `schema`)
 import answer_audit  # noqa: E402  (UEP P6: the back gate — draft checklist + claim recompute)
 import checkpoint as checkpoint_mod  # noqa: E402  (post-slate, pre-tune pause contract)
 import team_profile  # noqa: E402  (UEP S: the shared structural vector, slate's cheap stage)
 from validate_team import validate, format_report  # noqa: E402
 from dexlink import lookup_pokemon, lookup_moves, canonicalize_species, resolve_names, DexUnavailable  # noqa: E402
-from matchup import member_actor, set_actor, pair_speed, dmg_fact, run_form_name  # noqa: E402  (P6)
+from matchup import (  # noqa: E402  (P6)
+    effective_member, member_actor, set_actor, pair_speed, dmg_fact, run_form_name,
+)
 from diagnose import (  # noqa: E402
     diagnose_defense, format_defense_md, diagnose_offense, format_offense_md,
     diagnose_speed, format_speed_md, diagnose_roles, format_roles_md,
@@ -48,7 +52,10 @@ from metalink import (  # noqa: E402
     nature_distribution, usage_top_k, MetaUnavailable,   # opponent SETS now resolve via sources (M4)
 )
 from selection import select as run_select, format_selection_md  # noqa: E402
-from matchup import matchup as run_matchup, format_matchup_md, format_check_coverage_md  # noqa: E402
+from matchup import (  # noqa: E402
+    matchup as run_matchup, format_matchup_md, format_check_coverage_md, project_matchup,
+    normalize_top_k, MATCHUP_TOP_K_MIN, MATCHUP_TOP_K_MAX, MATCHUP_TOP_K_DEFAULT,
+)
 from fill import fill as run_fill, format_fill_md  # noqa: E402  (M3: L3 candidate retrieval)
 from replace_impact import replace_impact as run_replace, format_replace_impact_md  # noqa: E402  (M3)
 from dexlink import lookup_items  # noqa: E402
@@ -57,7 +64,7 @@ import repset  # noqa: E402  (real-team library for fill's co-occurrence / sampl
 import libsearch  # noqa: E402  (sample-library search: combined-condition query + content-id fetch)
 import observed  # noqa: E402  (UEP P7: observed-team retrieval, AI-facing evidence)
 import intake as intake_catalog_mod  # noqa: E402  (UEP P3: static question catalog)
-import oppcache  # noqa: E402  (M5 step 2: opponent standard-set matchup cache)
+import oppcache  # noqa: E402  (M5 step 2: opponent observed-build matchup cache)
 import contracts  # noqa: E402
 import environment  # noqa: E402
 import worker  # noqa: E402
@@ -233,7 +240,13 @@ def _validate_json(team_c: dict, context) -> dict:
     P6 copies had already drifted on that within one commit; self-audit 2026-07-03)."""
     r = validate(team_from_dict(team_c), context)
     return {"status": r.status, "valid": r.valid, "confidence": r.confidence,
-            "errors": i18n.jsonify(list(r.errors))}
+            "errors": i18n.jsonify(list(r.errors)),
+            # Unknown is a first-class legality verdict, not an empty-error mystery.  Preserve the
+            # same skipped-check reasons and warnings exposed by the standalone validate command so
+            # slate/checkpoint consumers can explain why certification was incomplete.
+            "warnings": i18n.jsonify(list(r.warnings)),
+            "skipped": i18n.jsonify(list(r.skipped)),
+            "messages": r.message_details()}
 
 
 def _emit_name_flags(flags: list[dict]) -> None:
@@ -354,21 +367,24 @@ def _make_sets_fn(season: str | None = None, rule: str | None = None):
     return sets_fn
 
 
-def _make_archetypes_fn(season: str | None = None, rule: str | None = None):
-    """Memoized repset (item,ability) archetype resolver — the strict-floor archetype lane (matchup
-    item ①). Returns the up-to-3 real-team archetypes for a species from the SAME rule-scoped library
-    the modal resolver reads, so an opponent's Choice Band build can drop the pessimistic floor."""
-    cache: dict[tuple[str, str], list] = {}
+def _make_variants_fn(season: str | None = None, rule: str | None = None):
+    """Memoized per-species build resolver: every real (item,ability) build as a FULL opponent set.
 
-    def archetypes_fn(species: str, fmt_: str) -> list:
-        key = (species, fmt_)                        # keyed by format too: a single-vs-double session must
-        if key not in cache:                         # never floor a double lineup on single-format archetypes
-            teams = (repset.cached_teams_for_rule(fmt_, rule) if rule
-                     else repset.cached_teams(fmt_, season))
-            cache[key] = repset.representative_sets_from_teams(species, fmt_, teams)
+    This is what turns a ranked species into one matrix column per build, so a cell names a concrete
+    set on both sides instead of a species standing in for all of its builds."""
+    cache: dict[tuple[str, str | None], list] = {}
+
+    def variants_fn(species: str, fmt_: str | None) -> list:
+        key = (species, fmt_)
+        if key not in cache:
+            try:
+                cache[key] = sources.resolve_opponent_variants(
+                    species, fmt_ or "single", season=season, rule=rule)
+            except Exception:
+                cache[key] = []
         return cache[key]
 
-    return archetypes_fn
+    return variants_fn
 
 
 def _make_damage_fn(base_fn=damage_batch):
@@ -377,8 +393,8 @@ def _make_damage_fn(base_fn=damage_batch):
     `{attacker, defender, move, field}` calcs per candidate; this issues each unique calc at most once.
     Mirrors `_make_sets_fn`'s per-run memo. Damage is a pure function of (actors, move, field) —
     season/rule independent and the actors already pin species/set — so the key is exact, never stale,
-    and cross-format-safe. The archetype lane (matchup re-prices both directions per archetype) makes
-    the shared-member redundancy ~3x costlier, so this is where that absolute cost is recovered.
+    and cross-format-safe. Variant-expanded batteries repeat many shared-member calculations, so this
+    is where that absolute cost is recovered.
 
     Preserves damage_batch's index contract: returns a list aligned 1:1 with `requests`. A calc the
     underlying batch could not run (short/empty return) reads back as None for that slot — the same
@@ -547,13 +563,14 @@ def _run_check_battery(team: Team, context, top_k: int) -> tuple[dict[str, Any],
     opponent ncp run + its check_coverage / members grid. Extracted so the two share ONE setup path (they
     were byte-for-byte twins). Raises the sibling-unavailable errors for each caller to disclose as a note.
     Returns (matchup result, battle format)."""
+    top_k = normalize_top_k(top_k)
     fmt_battle = (context.format if context and context.format else None) or team.format
     stamp, _ = _stamp(context, team)
     rule = stamp.get("rule")
     rows = usage_top_k(fmt_battle, top_k)
     mres = run_matchup(team.to_dict(), rows, fmt=fmt_battle, dex_fn=lookup_pokemon,
                        sets_fn=_make_sets_fn(rule=rule), damage_fn=damage_batch, move_fn=lookup_moves,
-                       archetypes_fn=_make_archetypes_fn(rule=rule))
+                       variants_fn=_make_variants_fn(rule=rule), item_fn=lookup_items)
     return mres, fmt_battle
 
 
@@ -569,6 +586,10 @@ def _diagnose_check_coverage(team: Team, context, top_k: int = 8) -> dict[str, o
             return {"unavailable": i18n.Msg('chk_cov_none')}
         return {"format": fmt_battle, "top_k": top_k, "confidence": mres.get("confidence"),
                 "check_coverage": cov,
+                # the per-member cells behind the roll-up (offense/incoming/speed/check per
+                # opponent) — consumers that render a clickable detail need the same facts
+                # the matchup grid exposes; the roll-up alone cannot answer "why C0?"
+                "members": mres.get("members"),
                 "note": "opt-in ncp-grounded complement to the type-layer defense above (--with-check)"}
     except (NcpUnavailable, MetaUnavailable, DexUnavailable) as e:
         return {"unavailable": i18n.Msg('chk_cov_skipped', kind=type(e).__name__, e=e)}
@@ -612,6 +633,17 @@ def cmd_diagnose(path: str, fmt: str, aspect: str, context_path: str | None = No
     want_roles = aspect in ("roles", "all")
     try:
         facts = lookup_pokemon([m.species for m in team.pokemon if m.species])
+        # A member holding a Mega stone battles as its Mega form; resolve those forms so the
+        # role/defense signals can read the BATTLE ability (Froslass+Froslassite -> Mega
+        # Froslass / Snow Warning — a snow setter the declared ability hides). Best-effort:
+        # base facts stand even if the item/form lookup misses.
+        held = sorted({m.item for m in team.pokemon if m.item})
+        if held:
+            ifacts = lookup_items(held)
+            forms = sorted({fm for it in held
+                            for fm in (ifacts.get(it, {}).get("required_by") or [])})
+            if forms:
+                facts.update(lookup_pokemon(forms))
         move_facts = (lookup_moves(sorted({mv for m in team.pokemon for mv in m.moves}))
                       if (want_off or want_spd) else {})
     except DexUnavailable as e:
@@ -691,7 +723,10 @@ def cmd_tune(path: str, fmt: str, context_path: str | None) -> int:
         out = run_tune(team.to_dict(), context.benchmarks, fmt=fmt_battle,
                        damage_fn=damage_vs, move_fn=lookup_moves, dex_fn=lookup_pokemon,
                        meta_fn=meta_fn, nature_dist_fn=nature_distribution,
-                       locked=context.locked, damage_batch_fn=damage_batch, item_fn=lookup_items)
+                       locked=context.locked, damage_batch_fn=damage_batch, item_fn=lookup_items,
+                       # The same retained observed builds as matchup/slate: one speed line per build,
+                       # so Scarf and Mega configurations remain independently actionable.
+                       archetypes_fn=_make_variants_fn(rule=rule_scope))
     except NcpInputError as e:
         # The calculator ran but rejected a benchmark input (e.g. an off-roster Pokemon or unknown
         # move) — a parameter problem, NOT the skill being down. Say so, don't mislabel it.
@@ -763,7 +798,8 @@ def cmd_select(path: str, fmt: str, context_path: str | None,
 
 
 def cmd_matchup(path: str, fmt: str, context_path: str | None, top_k: int,
-                as_checks: bool = False) -> int:
+                as_checks: bool = False, view: str = "full") -> int:
+    top_k = normalize_top_k(top_k)
     contract_errs = _check_contracts(path, context_path)
     _emit_contract_errs(contract_errs, fmt)
     if contracts.fatal(contract_errs):
@@ -784,15 +820,16 @@ def cmd_matchup(path: str, fmt: str, context_path: str | None, top_k: int,
     # ⊕ the meta modal SPREAD, in ONE batched meta call (handoff §5.1). With an empty real-team library
     # this is byte-identical to the bare meta path. Memoized so the no-ncp fallback reuses it.
     sets_fn = _make_sets_fn(rule=rule_scope)
-    archetypes_fn = _make_archetypes_fn(rule=rule_scope)
-
     try:
         out = run_matchup(team.to_dict(), rows, fmt=fmt_battle, dex_fn=lookup_pokemon,
                           sets_fn=sets_fn, damage_fn=damage_batch, move_fn=lookup_moves,
-                          archetypes_fn=archetypes_fn)
+                          item_fn=lookup_items,
+                          # One column per real build (see _make_variants_fn).
+                          variants_fn=_make_variants_fn(rule=rule_scope))
     except NcpUnavailable as e:
         out = run_matchup(team.to_dict(), rows, fmt=fmt_battle, dex_fn=lookup_pokemon,
-                          sets_fn=sets_fn, damage_fn=None, move_fn=lookup_moves)
+                          sets_fn=sets_fn, damage_fn=None, move_fn=lookup_moves,
+                          item_fn=lookup_items)
         out["warnings"] = (out.get("warnings") or []) + [i18n.Msg('team_ncp_unavailable_damage_skipped', e=e)]
     except MetaUnavailable as e:
         print(i18n.t('team_sibling_meta_unavailable', e=e), file=sys.stderr)
@@ -804,6 +841,7 @@ def cmd_matchup(path: str, fmt: str, context_path: str | None, top_k: int,
     if env_warn:
         out["warnings"] = (out.get("warnings") or []) + env_warn
     if fmt == "json":
+        out = project_matchup(out, view)
         print(json.dumps(i18n.jsonify(out), ensure_ascii=False, indent=2))
     else:
         print(_env_header(stamp, env_warn) + "\n")
@@ -1221,12 +1259,17 @@ def cmd_observed(fmt: str, game_format: str | None, season: str | None, context_
     return 0
 
 
-def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str | None = None) -> int:
+def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str | None = None,
+                       view: str = "full") -> int:
     """UEP P5: the candidate fact-matrix gate. `path` = slate.json {context, audit_receipt,
     teams:[team-json…], frame_bindings?}. Consumes the context-audit receipt (recomputed here, mismatch
     refuses); runs the cheap funnel for every candidate and the matchup battery for survivors only;
     emits the order-preserving no-winner grid + slate_receipt for the answer-audit. `--frame-output`
     activates the P4.5 build-flow binding (core-bearer sets vs their repset clusters)."""
+    if view not in ("full", "summary"):
+        print(i18n.t("team_slate_bad_view", got=view), file=sys.stderr)
+        return 2
+    top_k = normalize_top_k(top_k)
     raw, errs = _raw_json(path, json_only=True)
     if raw is None:
         _emit_contract_errs(errs, fmt)
@@ -1280,7 +1323,7 @@ def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str |
     rule_scope = stamp.get("rule")
     rows_cache: list = []                          # the top-K ranking is loop-invariant: fetch once
     sets_fn = _make_sets_fn(rule=rule_scope)
-    archetypes_fn = _make_archetypes_fn(rule=rule_scope)
+    variants_fn = _make_variants_fn(rule=rule_scope)
     damage_fn = _make_damage_fn()                   # per-run calc memo: candidates share most members,
                                                     # so a shared (attacker,defender,move) is calc'd once
 
@@ -1290,9 +1333,28 @@ def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str |
                 rows_cache.extend(usage_top_k(fmt_battle, top_k))
             return run_matchup(team_c, rows_cache, fmt=fmt_battle, dex_fn=lookup_pokemon,
                                sets_fn=sets_fn, damage_fn=damage_fn, move_fn=lookup_moves,
-                               archetypes_fn=archetypes_fn)
+                               variants_fn=variants_fn, item_fn=lookup_items)
         except (NcpUnavailable, MetaUnavailable, DexUnavailable):
             return None
+
+    def selection_fn(team_c: dict, matchup_result: dict | None,
+                     legality_status: str | None) -> dict:
+        """Reuse the survivor's already-paid matchup grid for 6-pick-N lineup facts.
+
+        This adds no second ncp battery: selection restricts the existing member rows to each lineup.
+        The selection operator remains facts-only and neutral-order; it now travels inside the slate
+        receipt instead of being an optional afterthought outside the build gate.
+        """
+        mres = matchup_result if isinstance(matchup_result, dict) else {}
+        check_grid = mres.get("members") if isinstance(mres.get("members"), list) else None
+        check_context = ({"confidence": mres.get("confidence"),
+                          "confidence_reason": mres.get("confidence_reason"),
+                          "top_k": mres.get("top_k")}
+                         if check_grid is not None else None)
+        return run_select(
+            team_c, fmt=fmt_battle, dex_fn=lookup_pokemon, item_fn=lookup_items,
+            legality_status=legality_status, keep_mega=context.keep_mega,
+            check_grid=check_grid, check_context=check_context)
 
     # P4.5 frame binding (only when --frame-output is passed): load the saved frame + a best-effort
     # own-repset lookup for the off-frame advisory (never eliminates; core-bearers use the frame's own
@@ -1329,6 +1391,7 @@ def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str |
     try:
         out = run_slate(raw, recompute_receipt_fn=recompute_receipt_fn, check_team_fn=check_team_fn,
                         validate_fn=validate_fn, profile_fn=profile_fn, matchup_fn=matchup_fn,
+                        selection_fn=selection_fn,
                         canon_team_fn=_canon_team_json, constraints_ctx=constraints_ctx,
                         fmt=fmt_battle,
                         library_copy_fn=_library_copy_fn(fmt_battle, rule=rule_scope),
@@ -1343,6 +1406,9 @@ def cmd_slate_evaluate(path: str, fmt: str, top_k: int, frame_output_path: str |
     out["environment"] = stamp
     if env_warn:
         out["warnings"] = env_warn
+    # DISPLAY projection only — the FULL output must still be fed to answer-audit (it re-hashes the
+    # untrimmed matchup_risk). `view=summary` keeps the slate under the bridge's 2 MiB artifact gate.
+    out = project_slate(out, view)
     print(json.dumps(i18n.jsonify(out), ensure_ascii=False, indent=2))
     return 0
 
@@ -1406,9 +1472,31 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
                 else:
                     need.add(b["opponent"])
             sets_map = sources.resolve_opponent_sets(sorted(need), fmt_b, rule=rule_scope) if need else {}
-            speed_names = {n for b in bindings if b["kind"] == "speed"
-                           for n in (b["member"], run_form_name(b["opponent"], sets_map.get(b["opponent"])))}
-            facts = lookup_pokemon(sorted(speed_names)) if speed_names else {}
+            bound_members = [
+                member for b in bindings
+                for member in (b.get("attacker_member"), b.get("defender_member"),
+                               b.get("member_member"))
+                if isinstance(member, dict)
+            ]
+            member_names = {m["species"] for m in bound_members if m.get("species")}
+            speed_opp_names = {
+                run_form_name(b["opponent"], sets_map.get(b["opponent"]))
+                for b in bindings if b["kind"] == "speed"
+            }
+            facts = lookup_pokemon(sorted(member_names | speed_opp_names)) \
+                if member_names or speed_opp_names else {}
+            held_items = sorted({m.get("item") for m in bound_members if m.get("item")})
+            item_info = (lookup_items(held_items) or {}) if held_items else {}
+            form_names = {
+                form for info in item_info.values()
+                for form in ((info or {}).get("required_by") or [])
+            }
+            missing_forms = sorted(form_names - set(facts))
+            if missing_forms:
+                facts.update(lookup_pokemon(missing_forms) or {})
+
+            def effective(member: dict[str, Any]) -> dict[str, Any]:
+                return effective_member(member, facts, item_info)
 
             def base_spe(name: str) -> int | None:
                 return ((facts.get(name) or {}).get("stats") or {}).get("spe")
@@ -1427,14 +1515,17 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
                                    "reason": f"no resolvable modal set for defender {b['defender']!r}"}
                     else:
                         pending.append(bi)
+                        atk_effective = effective(atk_m) if atk_m else None
+                        def_effective = effective(def_m) if def_m else None
                         requests.append({
-                            "attacker": member_actor(atk_m) if atk_m
+                            "attacker": member_actor(atk_effective) if atk_effective
                             else set_actor(b["attacker"], sets_map[b["attacker"]]),
-                            "defender": member_actor(def_m) if def_m
+                            "defender": member_actor(def_effective) if def_effective
                             else set_actor(b["defender"], sets_map[b["defender"]]),
                             "move": b["move"]})
                 else:
-                    m_base = base_spe(b["member"])
+                    member_effective = effective(b["member_member"])
+                    m_base = base_spe(member_effective["species"])
                     opp_set = sets_map.get(b["opponent"])
                     o_base = base_spe(run_form_name(b["opponent"], opp_set))
                     if m_base is None or o_base is None:
@@ -1443,7 +1534,7 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
                                    "reason": f"dex has no base Speed for {missing!r}"}
                     else:
                         out[bi] = {"computed": True,
-                                   **pair_speed(b["member_member"], m_base, opp_set, o_base)}
+                                   **pair_speed(member_effective, m_base, opp_set, o_base)}
             results = damage_batch(requests) if requests else []
             for bi, r in zip(pending, results):
                 r = r or {}
@@ -1565,6 +1656,11 @@ def cmd_draft_init(fmt: str, slate_path: str | None, slate_out_path: str | None,
         if (mega_plan.get("registered_mega_count") or 0) > 1:
             rec["mega_registration_rationale"] = {
                 "primary": "", "alternative_plan": "", "opportunity_cost": ""}
+        mega_assessment = (cand.get("mega_registration_assessment")
+                           if isinstance(cand.get("mega_registration_assessment"), dict) else {})
+        if mega_assessment.get("requires_deviation_ack"):
+            rec["mega_registration_deviation"] = {
+                "reason": "", "evidence": "", "opportunity_cost": ""}
         if cand.get("library_overlap"):
             rec["observed_provenance"] = ""
             overlap = cand.get("library_overlap") if isinstance(cand.get("library_overlap"), dict) else {}
@@ -1652,7 +1748,8 @@ def _dispatch_session_op(cmd: dict) -> int:
         return cmd_frame("json", cmd.get("game_format") or cmd.get("format"), cmd.get("season"),
                          ctx, cmd.get("audit_receipt"))
     if op in ("slate-evaluate", "slate_evaluate"):
-        return cmd_slate_evaluate(f, "json", int(cmd.get("top_k", 8)), cmd.get("frame_output"))
+        return cmd_slate_evaluate(f, "json", normalize_top_k(cmd.get("top_k")), cmd.get("frame_output"),
+                                  view=cmd.get("view", "full"))
     if op == "checkpoint":
         return cmd_checkpoint(f, "json", cmd.get("slate"))
     if op in ("answer-audit", "answer_audit"):
@@ -1683,14 +1780,16 @@ def _dispatch_session_op(cmd: dict) -> int:
         return cmd_validate(f, "json", ctx)
     if op == "diagnose":
         return cmd_diagnose(f, "json", cmd.get("aspect", "all"), ctx,
-                            with_check=bool(cmd.get("with_check")), top_k=int(cmd.get("top_k", 8)))
+                            with_check=bool(cmd.get("with_check")),
+                            top_k=normalize_top_k(cmd.get("top_k")))
     if op == "tune":
         return cmd_tune(f, "json", ctx)
     if op == "select":
         return cmd_select(f, "json", ctx, with_check=bool(cmd.get("with_check")),
-                          top_k=int(cmd.get("top_k", 8)))
+                          top_k=normalize_top_k(cmd.get("top_k")))
     if op == "matchup":
-        return cmd_matchup(f, "json", ctx, int(cmd.get("top_k", 8)))
+        return cmd_matchup(f, "json", ctx, normalize_top_k(cmd.get("top_k")),
+                           view=cmd.get("view", "full"))
     if op == "fill":
         return cmd_fill(f, "json", ctx)
     if op == "replace":
@@ -1726,7 +1825,7 @@ def cmd_session(spec_path: str) -> int:
 
     `spec_path` is a JSON list of commands, e.g.
       [{"op":"validate","file":"team.json","context":"ctx.json"},
-       {"op":"matchup","file":"team.json","top_k":8}]
+       {"op":"matchup","file":"team.json","top_k":8,"view":"summary"}]
     Output is a JSON list aligned to the input, each {op, rc, result} (or {op, error}). The sibling
     skills (dex/meta/ncp) stay resident for the whole list, so their startup is paid once."""
     import io
@@ -1967,8 +2066,8 @@ def cmd_repset(species: str, fmt: str | None, season: str | None, max_clusters: 
 
 def cmd_oppmatrix(species: str | None, fmt: str | None, season: str | None,
                   vs: str | None, out_fmt: str, as_checks: bool = False) -> int:
-    """Read the precomputed opponent standard-set matchup cache (M5 step 2). FACTS ONLY —
-    a standard-vs-standard reference grid, every cell `low` confidence (reason=vs-standard-set); it is
+    """Read the precomputed opponent observed-build matchup cache (M5 step 2). FACTS ONLY —
+    a retained-build reference grid, every cell `low` confidence (reason=vs-observed-build); it is
     NOT your team (match a real team LIVE via `matchup`). Format is REQUIRED (metagames never mixed);
     season defaults to the current base. With no `species` the whole matrix prints; with `species` only
     that attacker's row; with `--vs` only the one ordered (attacker -> defender) cell. The cache is
@@ -1977,7 +2076,11 @@ def cmd_oppmatrix(species: str | None, fmt: str | None, season: str | None,
         print(i18n.t('team_oppmatrix_needs_format'), file=sys.stderr)
         return 2
     season = season or environment.CURRENT_SEASON
-    cache = oppcache.load_cache(fmt, season)
+    # The cache is keyed by RULE. `--season` stays accepted (it is how users think about the
+    # environment) but resolves to its regulation first: seasons sharing a rule share one matrix,
+    # so `--season M-3` and `--season M-4` under M-B correctly read the same file.
+    rule = environment.rule_for_season(season) or environment.CURRENT_RULE
+    cache = oppcache.load_cache(fmt, rule)
     built_for = (cache or {}).get("built_for") or {}
     stamp, env_warn = environment.resolve(
         season, None,
@@ -1985,38 +2088,49 @@ def cmd_oppmatrix(species: str | None, fmt: str | None, season: str | None,
         data_seasons=built_for.get("data_seasons"),
     )
     if cache is None:
-        msg = i18n.Msg('team_oppmatrix_no_cache', season=season, fmt=fmt)
+        msg = i18n.Msg('team_oppmatrix_no_cache', rule=rule, fmt=fmt)
         if out_fmt == "json":
-            print(json.dumps(i18n.jsonify({"ok": False, "query": {"format": fmt, "season": season},
+            print(json.dumps(i18n.jsonify({"ok": False, "query": {"format": fmt, "season": season,
+                                                                  "rule": rule},
                               "environment": stamp,
                               "error": {"code": "no_cache", "message": msg}}), ensure_ascii=False, indent=2))
         else:
             print(_env_header(stamp, env_warn) + "\n\n" + msg)
         return 0
-    # Canonicalize raw species/defender (alias / Mega) to the cache's keys (meta canonical English),
-    # then map to the actual matrix key: a singles Mega is keyed under its meta BASE name with
-    # run_form='Mega X', so a 'Mega Staraptor' query must resolve to the 'Staraptor' row (audit).
+    # Canonicalize aliases / Mega display names. The check view intentionally keeps a species query
+    # as a species so it expands to every retained build; the raw KO view still resolves a plain name
+    # to its representative row for its compact historical CLI behavior.
     warns: list[str] = list(env_warn)
-    atk = _resolve_cache_key(cache, _canonicalize_oppmatrix_name(species, warns)) if species else None
-    dfd = _resolve_cache_key(cache, _canonicalize_oppmatrix_name(vs, warns)) if vs else None
+    canonical_atk = _canonicalize_oppmatrix_name(species, warns) if species else None
+    canonical_dfd = _canonicalize_oppmatrix_name(vs, warns) if vs else None
+    atk = canonical_atk if as_checks else (_resolve_cache_key(cache, canonical_atk)
+                                           if canonical_atk else None)
+    dfd = canonical_dfd if as_checks else (_resolve_cache_key(cache, canonical_dfd)
+                                           if canonical_dfd else None)
     if dfd and not atk:
         print(i18n.t('team_oppmatrix_vs_needs_attacker'), file=sys.stderr)
         return 2
     if as_checks:
-        # Derived check-grade view over the standard-vs-standard grid (design §17). A REFERENCE grid,
+        # Derived check-grade view over the retained observed-build grid (design §17). A REFERENCE grid,
         # not your team; `species` restricts the row and `--vs` restricts its opponent.
         derived = oppcache.derive_checks(cache, atk, dfd)
         if out_fmt == "json":
-            payload = {"query": {"species": species, "resolved_attacker": atk,
-                                 "vs": vs, "resolved_defender": dfd, "format": fmt,
-                                 "season": season, "as_checks": True},
+            query = {"species": species, "resolved_attacker": atk,
+                     "vs": vs, "resolved_defender": dfd, "format": fmt,
+                     "season": season, "as_checks": True}
+            payload = {"query": query,
                        "built_for": cache.get("built_for"), "environment": stamp, **derived}
             if warns:
                 payload["warnings"] = warns
             print(json.dumps(i18n.jsonify(payload), ensure_ascii=False, indent=2))
         else:
             print(_env_header(stamp, warns) + "\n")
-            print(format_check_coverage_md(derived))
+            blocks = []
+            for attacker_key, coverage in (derived.get("summaries") or {}).items():
+                blocks.append(f"## {attacker_key}\n\n" + format_check_coverage_md(
+                    {**derived, "check_coverage": coverage}))
+            print("\n\n".join(blocks) if blocks else format_check_coverage_md(
+                {**derived, "check_coverage": None}))
         return 0
     if out_fmt == "json":
         if atk and dfd:
@@ -2041,6 +2155,8 @@ def cmd_oppmatrix(species: str | None, fmt: str | None, season: str | None,
 def _canonicalize_oppmatrix_name(name: str, warns: list[str]) -> str:
     """Resolve a raw alias / Mega display name to the cache's key (the meta canonical English name).
     On a dex miss, keep the raw name (the lookup just won't match — reported, not fatal)."""
+    if name.startswith("variant:"):
+        return name
     try:
         info = lookup_pokemon([name]).get(name, {})
     except DexUnavailable:
@@ -2055,19 +2171,26 @@ def _canonicalize_oppmatrix_name(name: str, warns: list[str]) -> str:
 def _resolve_cache_key(cache: dict, canonical: str) -> str:
     """Map a dex-canonical name to the matrix key it actually lives under.
 
-    A singles Mega is ranked by meta under its BASE name (e.g. 'Staraptor') with the row's
-    ``run_form`` set to the Mega ('Mega Staraptor'); the matrix is keyed by that base name. So a
-    'Mega Staraptor' query — already a valid dex canonical — must reverse-resolve to the 'Staraptor'
-    row. Direct hit wins first; otherwise look for the species whose run_form == the query."""
+    The variant-expanded matrix is keyed by `variant_id` (`<species>#<item>|<ability>`), so a plain
+    species query resolves to that species' MODAL build — the one a reader means by default. Passing
+    a `variant_id` verbatim still wins outright, which is how you ask for a specific build.
+
+    A Mega is ranked by meta under its BASE name (e.g. 'Staraptor') while the row's ``run_form`` is
+    the Mega ('Mega Staraptor'), so a 'Mega Staraptor' query — itself a valid dex canonical — must
+    reverse-resolve to the build that actually runs as it."""
     if canonical is None:
         return canonical
     sets = cache.get("sets") or {}
-    if canonical in sets:
+    if canonical in sets:                       # exact variant_id, or a legacy species-keyed cache
         return canonical
+    modal = first = None
     for key, s in sets.items():
-        if (s or {}).get("run_form") == canonical:
-            return key
-    return canonical
+        s = s or {}
+        if s.get("species") == canonical or s.get("run_form") == canonical:
+            first = first or key
+            if s.get("is_modal"):
+                modal = modal or key
+    return modal or first or canonical
 
 
 def _build_search_query(query_arg: str | None, species: list[str] | None, has_move: list[str] | None,
@@ -2244,20 +2367,42 @@ TEAM_SCHEMA = {
     "input": "team-json or Showdown-text file; member: {species|name, ability, item, nature, "
              "spread:{hp,atk,def,spa,spd,spe}, moves:[str], tera, completeness}",
     "stat_keys": ["hp", "atk", "def", "spa", "spd", "spe"],
+    "ruleset": (lambda rs: {
+        "rule": rs.rule,
+        "sp_per_stat_cap": rs.sp_per_stat_cap,
+        "sp_total_cap": rs.sp_total_cap,
+        "team_size": [rs.team_min, rs.team_max],
+        "species_clause": rs.species_clause,
+        "item_clause": rs.item_clause,
+        "moves_per_pokemon": rs.moves_per_pokemon,
+        "_note": "Champions registration HARD CAPS that `validate` enforces — build spreads/teams to "
+                 "these BEFORE validating. SP is NOT the EV system: each stat's SP <= sp_per_stat_cap "
+                 "and the six-stat total <= sp_total_cap (so 32/32 in two stats + 2 = the 66 budget, "
+                 "never 252/508). item_clause=each held item at most once across the team; "
+                 "species_clause=each base species at most once; team_size=[min,max] registered.",
+    })(get_ruleset()),
     "commands": {
         "parse": "<file> -> {schema_version, format, season, rule, pokemon:[member], provenance}",
         "validate": "<file> [--context] -> {status: valid|invalid|unknown, valid, confidence, errors, warnings}",
-        "diagnose": "<file> [--aspect defense|offense|speed|roles|all] [--context] [--with-check [--top-k N]] -> per-aspect "
+        "diagnose": "<file> [--aspect defense|offense|speed|roles|all] [--context] "
+                    f"[--with-check [--top-k N ({MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX})]] -> per-aspect "
                     "objective signals + evidence. offense carries luck_lines (the team's <100%-accuracy moves, "
                     "dex accuracy); context variance_tolerance=averse FLAGS them (surfaced either way, never a "
                     "score). --with-check adds ncp-grounded check_coverage as a complement to the type-layer "
                     "defense (default off keeps diagnose ncp-free)",
-        "select": "<file> [--with-check [--top-k N]] -> 6->3 (single) / ->4 (double) objective facts "
-                  "(no strength score); --with-check adds per-lineup CHECK coverage vs meta top-K "
-                  "(opt-in, ncp-grounded, per-opponent facts — lineups NOT ranked)",
-        "matchup": "<file> [--top-k N] [--as-checks] -> member x meta top-K speed/type/damage matrix; "
+        "select": f"<file> [--with-check [--top-k N ({MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX})]] -> "
+                   "6->3 (single) / ->4 (double) objective facts "
+                   "(no strength score); --with-check adds per-lineup CHECK coverage vs meta top-K "
+                   "(opt-in, ncp-grounded, per-opponent facts — lineups NOT ranked). Each lineup "
+                   "enumerates zero-or-one active Mega states; mega_routes counts each registered "
+                   "option's exclusive/shared lineup availability without selecting a preferred route",
+        "matchup": "<file> [--top-k N] [--as-checks] [--matchup-view full|summary] -> 1..N actual "
+                   "member configurations x meta top-K speed/type/damage battery; top_k is caller-selected "
+                   f"within {MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX} (default {MATCHUP_TOP_K_DEFAULT}). "
                    "each cell carries a derived CHECK grade (C2/C1/C0), + a check_coverage roll-up "
-                   "(holes = opponents with no safe switch-in check). --as-checks renders the map",
+                   "(holes = opponents with no safe switch-in check). JSON full keeps the complete evidence "
+                   "surface; summary keeps stable source/target/cell ids + KO/incoming/speed/atomic checks. "
+                   "--as-checks renders the map",
         "tune": "<file> --context <benchmarks.json> -> SP cliff cards (multi-view, never a single best)",
         "fill": "<file> --context <need.json> -> candidate pool for a structured gap "
                 "(need: resist/offense_type/role/min_speed/coverage_move_type) in multiple explicit views "
@@ -2271,9 +2416,9 @@ TEAM_SCHEMA = {
                   "Default reads the current rule pool (M-B can include M-3+M-4); --season is an exact "
                   "season partition query.",
         "oppmatrix": "[species] --game-format single|double [--vs <defender>] [--season] [--as-checks] -> "
-                     "precomputed standard-set matchup matrix over meta top-K (offense band/KO + speed "
+                     "precomputed observed-build matchup matrix over meta top-K (offense band/KO + speed "
                      "line per ordered pair); attacker rows only for real-team-backed species; EVERY cell "
-                     "low confidence (vs-standard-set); a reference grid, NOT your team (match live). "
+                     "low confidence (vs-observed-build); a reference grid, NOT your team (match live). "
                      "--as-checks derives the C2/C1/C0 grid (attacker x attacker reference view)",
         "search": "--game-format single|double [--season|--season all] [--limit N] [--collapse] + EITHER --query "
                   "'<json>' OR convenience flags (--species A B / --has-move / --has-item / --has-ability). "
@@ -2311,26 +2456,37 @@ TEAM_SCHEMA = {
                  "each skeleton = {frame_id (mechanical hash), structural_profile (speed_control "
                  "modes / role norms — FACTS, never a team-type label), prevalence, core_candidates "
                  "[each with its REAL repset (item,ability) clusters + set_guidance (moves/nature/sps "
-                 "= reference, NOT a lock) + within_group_share/pool_share], flex_slots{open_count}, "
-                 "observed_facts (observed_mega_slots is a FACT not a reserved second-Mega slot; "
+                 "= reference, NOT a lock) + within_group_share/pool_share; a CORE-BEARER's (item,ability) "
+                 "must be chosen from ITS clusters HERE — this is the frame-GROUP view, NARROWER than a "
+                 "standalone `repset <species>`, and slate RED-eliminates an off-cluster core-bearer], "
+                 "flex_slots{open_count}, "
+                  "observed_facts (mega_registration_reference selects the frame-group distribution "
+                  "when reliable, otherwise the whole frame pool; it is a descriptive registration "
+                  "prior, not a reserved second-Mega slot; "
                  "fillers describe how real teams vary — not a to-fill list)}. Anchor = context "
                  "locked+prefer; ordered by prevalence under meta_conformance (an ANCHOR build shows "
                  "ALL frames so an off-meta one is never dropped). Grounded sets come ONLY from repset "
                  "(real joint); grounding=null means thin/off-meta (build it yourself + disclose, "
                  "never stitch from meta). Emits frame_receipt the slate binds against. FACTS only, "
                  "no strength score, no best-archetype.",
-        "slate-evaluate": "<slate.json> [--top-k N] [--frame-output <saved frame output.json>] -> UEP "
+        "slate-evaluate": f"<slate.json> [--top-k N ({MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX})] [--slate-view full|summary] "
+                          "[--frame-output <saved frame output.json>] -> UEP "
                           "P5 candidate fact-matrix gate (JSON only, AI-facing). Input {context:"
                           "<build-context>, audit_receipt:<the FULL "
                           "receipt OBJECT {kind:'audit_receipt', fingerprint, audited_at, ...} "
                           "copied from context-audit's --format json output on the SAME context — a "
                           "bare fingerprint string refuses (bad_audit_receipt); the fingerprint is "
                           "recomputed here, mismatch refuses>, teams:[team-json, ...], frame_bindings?:"
-                          "[{frame_id, off_meta?:[species], deviations?:[{species,reason}], "
-                          "off_meta_build?:bool}]}. Funnel: "
+                           "[{frame_id, off_meta?:[species], deviations?:[{species,reason}], "
+                           "mega_deviation?:str|{reason,...}, "
+                           "off_meta_build?:bool}]}. Funnel: "
                           "cheap stage for every candidate "
                           "(contract + validate + constraint_satisfaction + structural_profile + "
-                          "objective flags); matchup-vs-top-K battery for SURVIVORS only. "
+                           "objective flags + Mega-registration relation); reliable observed "
+                           "minority/rare registration lanes require mega_deviation under the proven "
+                           "view; explicit mega_posture is a hard count constraint. The survivor set "
+                           "must retain an observed modal registration lane unless posture/off_meta "
+                           "explicitly says otherwise. Matchup-vs-top-K battery for SURVIVORS only. "
                           "--frame-output activates the P4.5 BUILD-FLOW binding: frame_bindings[i] "
                           "declares which frame teams[i] builds on; each core-bearer (a member in "
                           "that frame's core_candidates) must carry an (item,ability) in its repset "
@@ -2341,7 +2497,8 @@ TEAM_SCHEMA = {
                           "ability). A broken frame_receipt refuses the run. Output "
                           "preserves input order: per-candidate facts (incl. library_overlap — verbatim/"
                           "same-composition matches vs the stored library, a FACT not an "
-                          "elimination; frame_binding when bound) + a sortable grid (NO aggregate, "
+                           "elimination; frame_binding and neutral 6-pick-N selection facts when bound) "
+                           "+ a sortable grid (NO aggregate, "
                           "NO winner) + slate_receipt (for the future answer-audit). Quantitative "
                           "extremes carry evidence_id 'ncp:{fmt}:{attacker}|{defender}|{move}' "
                           "(re-runnable coordinates).",
@@ -2350,8 +2507,10 @@ TEAM_SCHEMA = {
                       "candidate_frames, open_decisions, questions_to_ask, and pause:true|false. "
                       "Run after EVERY build-flow slate-evaluate and before tune/final answer; if "
                       "pause:true, pause unless the slate context explicitly set direct_final:true "
-                      "or skip_checkpoint:true. It does NOT include 6v6 pick/selection advice by "
-                      "default; run select only when the user asks for a pick plan.",
+                       "or skip_checkpoint:true. Slate survivors already carry neutral 6-pick-N "
+                       "selection facts; checkpoint does not pause merely because multiple Mega "
+                       "options are registered, but it does pause when the candidate set misses the "
+                       "bound frame's observed modal Mega-registration lane.",
         "answer-audit": "<draft.json> --slate <slate.json> --slate-output <saved slate-evaluate "
                         "output.json> -> UEP P6 back gate (JSON only, AI-facing). Refuses (exit 2) on "
                         "a broken receipt chain: the draft's slate_receipt must equal the saved "
@@ -2360,7 +2519,9 @@ TEAM_SCHEMA = {
                         "Then reports pass/violations: structural checklist (recommended re-validated "
                         "+ hash-matched to a slated SURVIVOR, >=1 tradeoff each, single-team "
                         "declared, convergence_rationale filled for every survivor, blocking gaps "
-                        "and low-confidence facts disclosed, banned absolute-strength wordlist) + "
+                         "and low-confidence facts disclosed, observed-registration deviations carry "
+                         "reason/evidence/opportunity_cost, a slate or recommended set missing every "
+                         "modal registration lane cannot pass, banned absolute-strength wordlist) + "
                         "library guardrail: a recommended team whose joint set IS a stored "
                         "observed team needs observed_provenance on its entry (adoption is "
                         "legitimate; silence is the violation) + "
@@ -2411,13 +2572,14 @@ TEAM_SCHEMA = {
                   "re-audit + iterate (<=3 is a batch size, NOT a total cap); --onboarding for a NEW "
                   "open-ended build (per build task) — guided_walk = the base set to COMPLETE once, "
                   "minus what --context answers (already_answered); --next to actually ASK it, "
-                  "returning the next batch of 1-3 related questions (numbered menu) one step at a "
-                  "time — loop with --answered <resolved ids so far> (holds asked ids AND dims the "
+                  "returning the next 1-3 related questions under key `batch` (with group/remaining_after; "
+                  "NOTE: --onboarding lists the overview under `questions`, --next uses `batch`) one step "
+                  "at a time — loop with --answered <resolved ids so far> (holds asked ids AND dims the "
                   "request resolved via draft/answer-shape; unknown ids -> rc2) until done:true. "
                   "--game-format narrows format-tagged options (no Tailwind in singles, no hazards).",
         "session": "<spec.json> -> batched ops in one process",
         "vocab": "-> queryable vocabulary + field-consumption surface (no file): {roles (need.role "
-                 "taxonomy), exclude_tactics, style_lean, meta_conformance, variance_tolerance, "
+                  "taxonomy), exclude_tactics, style_lean, meta_conformance, mega_posture, variance_tolerance, "
                  "field_status (which build-context field is mechanically consumed by what — the single "
                  "source shared with context-audit), derived_fields}. Facts only.",
         "schema": "this contract",
@@ -2431,8 +2593,12 @@ TEAM_SCHEMA = {
         "build_context": "{season, rule, format:single|double, owned:[species], owned_only:bool, "
                          "locked:[species], avoid:[species and/or items — split by dex kind on load], "
                          "avoid_soft:[soft excludes — prefer's mirror, never mechanically filtered], "
-                         "prefer:[species], keep_mega:<species-or-Mega-form>, wants, "
-                         "exclude_tactics:[str], meta_conformance:proven|off_meta (fill+landscape view order), "
+                          "prefer:[species], keep_mega:<species-or-Mega-form>, "
+                          "mega_posture:environment|none|single|multi (default environment consumes "
+                          "the frame's reliable observed registration distribution; explicit other "
+                          "values hard-constrain the registered-Mega count), wants, "
+                          "exclude_tactics:[str], meta_conformance:proven|off_meta (fill+landscape view order; "
+                          "off_meta disables observed-registration deviation gates), "
                          "style_lean:offense|balance|defense (posture lens, AI-side), "
                          "variance_tolerance:averse|tolerant (averse flags diagnose luck_lines), need:<need>, "
                          "benchmarks:[<benchmark>], replace:<replace>, direct_final:bool, "
@@ -2445,8 +2611,10 @@ TEAM_SCHEMA = {
                      "move:<name> (required for survive/ohko/2hko), conditions:{weather,terrain,"
                      "stealth_rock:bool,spikes:true|false|0|1|2|3,tailwind:bool,"
                      "opponent_tailwind:bool,trickroom:bool,screens,...}, "
-                     "probability:guaranteed|likely|any, attacker_set:{ability,item,nature,sps|spread,moves}}]} "
-                     "— one SP cliff card per benchmark.",
+                     "probability:guaranteed|likely|any, "
+                     "opponent_set:{ability,item,nature,sps|spread,moves} "
+                     "(attacker_set is a survive-only compatibility alias)}]} "
+                     "— benchmark-ordered SP frontier cards; no composite score.",
         "replace": "replace --context {\"replace\": {member:<species-in-team>, with:<member-object>}} "
                    "— objective before/after diff of one swap.",
         "draft_spec": "answer-audit <draft.json> = {environment:{season,rule}, context_summary, "
@@ -2465,10 +2633,13 @@ TEAM_SCHEMA = {
                       "(one of its species, or 'candidate <i>')], "
                       "recommended:[{slate_index:int (into the slated teams), team:<the team-json "
                       "presented — must hash-equal the slated one>, tradeoffs:[str], "
-                      "mega_registration_rationale?:{primary,alternative_plan,opportunity_cost} "
+                       "mega_registration_rationale?:{primary,alternative_plan,opportunity_cost} "
                       "(REQUIRED when the slate says this recommended candidate registers multiple "
                       "Mega options; primary may be a canonical string or {member/form/option/...} "
-                      "object naming one of them), "
+                       "object naming one of them), "
+                       "mega_registration_deviation?:{reason,evidence,opportunity_cost} "
+                       "(REQUIRED when this survivor's mega_registration_assessment says "
+                       "requires_deviation_ack — an observed minority/rare registration lane), "
                       "replacement_rationale?:{out,in,reason,benefit,cost,evidence}|list "
                       "(REQUIRED by the workflow when a previously user-visible/checkpointed "
                       "frame was changed; answer-audit validates completeness when present), "
@@ -2493,7 +2664,7 @@ TEAM_SCHEMA = {
                       "verbatim (the audit re-binds their member/modal direction from the saved "
                       "output); the spd opponent side is ALWAYS the modal set, "
                       "expect:{ko_guaranteed|ko_possible|min_percent|max_percent} or "
-                      "{faster|member|opponent|opponent_fast}, team?:int (required when the same "
+                      "{faster|member|opponent}, team?:int (required when the same "
                       "evidence coordinates match multiple recommended teams)}], "
                       "slate_receipt:<from the saved slate-evaluate output>}.",
         "session_spec": "session <spec.json> = [{op, ...}] -> [{op, rc, result}]. Team ops "
@@ -2508,7 +2679,8 @@ TEAM_SCHEMA = {
                         "observed{game_format, season?, context?, species?, order?, limit?}, "
                         "intake{game_format?, onboarding?:bool, next?:bool, context?:<ctx.json>, "
                         "answered?:[base-question id...]}, vocab{}, "
-                        "slate-evaluate{file:<slate.json>, top_k?}, "
+                        f"slate-evaluate{{file:<slate.json>, top_k?, view?:full|summary (summary = compact panel projection)}}, matchup top_k range="
+                        f"{MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX}; matchup may set view=full|summary, "
                         "checkpoint{file:<saved slate-evaluate output>, slate:<slate.json>} "
                         "(build flows should include this op after slate-evaluate; inspect pause), "
                         "answer-audit{file:<draft.json>, slate:<slate.json>, slate_output:<saved output>}, "
@@ -2518,6 +2690,14 @@ TEAM_SCHEMA = {
     "note": "member identity accepts `name` or the Showdown `species` (normalized to species). validate's "
             "three-state result is a domain result, NOT the uniform error shape (conventions §3).",
 }
+
+
+def _matchup_top_k(s: str) -> int:
+    """argparse adapter for the shared 1..60 matchup-battery scope."""
+    try:
+        return normalize_top_k(s)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(str(e)) from e
 
 
 def _positive_int(s: str) -> int:
@@ -2567,13 +2747,20 @@ def main() -> int:
     p.add_argument("--aspects", nargs="+", choices=list(landscape.ASPECTS), default=None,
                    help="landscape: opt into the full offense/defense presence distributions "
                         "(view opt-in; e.g. --aspects offense defense)")
-    p.add_argument("--top-k", type=int, default=8,
-                   help="matchup: how many most-used Pokemon to compare against (default 8)")
+    p.add_argument("--top-k", type=_matchup_top_k, default=MATCHUP_TOP_K_DEFAULT,
+                   help=f"matchup battery scope, freely chosen per consumer "
+                        f"({MATCHUP_TOP_K_MIN}..{MATCHUP_TOP_K_MAX}; default {MATCHUP_TOP_K_DEFAULT})")
+    p.add_argument("--matchup-view", choices=["full", "summary"], default="full",
+                   help="matchup JSON projection: full evidence surface or compact grid summary")
+    p.add_argument("--slate-view", dest="slate_view", choices=["full", "summary"], default="full",
+                   help="slate-evaluate JSON projection: full evidence surface, or a compact summary "
+                        "that drops the per-cell grid + per-opponent evidence lists (for the local UI "
+                        "panel / artifact put). Feed the FULL output to answer-audit; summary is display-only")
     p.add_argument("--as-checks", dest="as_checks", action="store_true",
                    help="matchup: render the derived CHECK coverage map (per-opponent best grade + "
                         "holes) instead of the verbose per-cell dump (JSON always carries both). "
-                        "oppmatrix: derive the standard-vs-standard CHECK grid (attacker x attacker "
-                        "reference view, low/vs-standard-set) instead of the raw damage matrix")
+                        "oppmatrix: derive the retained observed-build CHECK grid (build x build "
+                        "reference view, low/vs-observed-build) instead of the raw damage matrix")
     p.add_argument("--with-check", dest="with_check", action="store_true",
                    help="diagnose/select: opt into ncp-grounded CHECK coverage (runs the matchup battery; "
                         "default off keeps them ncp-free). diagnose: complements the type-layer defense; "
@@ -2598,7 +2785,8 @@ def main() -> int:
                    "excluded). For `search`, `--season all` opts into the cross-season library.")
     p.add_argument("--max-clusters", type=_positive_int, default=3,
                    help="repset: max (item,ability) archetypes to surface (default 3; must be >= 1). "
-                        "Values > 3 expand the long tail — a debug/exploration view, not the M5 'up to 3'.")
+                        "Values above the cache's retained-build cap expand the long tail for "
+                        "debug/exploration only.")
     p.add_argument("--query", help="search: a JSON query (authoritative form). Either a list of member "
                    "slots or {members:[...], game_format, season, limit, collapse}. Each slot is a "
                    'conjunction, e.g. \'[{"species":"耿鬼"},{"item":"剧毒宝珠","move":"灭亡之歌"}]\'.')
@@ -2660,7 +2848,8 @@ def main() -> int:
     if ns.command == "select":
         return cmd_select(ns.file, ns.format, ns.context, with_check=ns.with_check, top_k=ns.top_k)
     if ns.command == "matchup":
-        return cmd_matchup(ns.file, ns.format, ns.context, ns.top_k, as_checks=ns.as_checks)
+        return cmd_matchup(ns.file, ns.format, ns.context, ns.top_k, as_checks=ns.as_checks,
+                           view=ns.matchup_view)
     if ns.command == "fill":
         return cmd_fill(ns.file, ns.format, ns.context)
     if ns.command == "context-audit":
@@ -2668,7 +2857,7 @@ def main() -> int:
     if ns.command == "frame":
         return cmd_frame(ns.format, ns.game_format, ns.season, ns.context, ns.audit_receipt)
     if ns.command == "slate-evaluate":
-        return cmd_slate_evaluate(ns.file, ns.format, ns.top_k, ns.frame_output)
+        return cmd_slate_evaluate(ns.file, ns.format, ns.top_k, ns.frame_output, view=ns.slate_view)
     if ns.command == "checkpoint":
         return cmd_checkpoint(ns.file, ns.format, ns.slate)
     if ns.command == "answer-audit":

@@ -179,8 +179,9 @@ def lookup_abilities(names: list[str]) -> dict[str, dict[str, Any]]:
 
 def lookup_moves(names: list[str]) -> dict[str, dict[str, Any]]:
     """Resolve moves to dex facts. Returns query-name -> {found, name, type, category, power,
-    accuracy, priority}. accuracy is int|None straight from the dex (None = no accuracy roll:
-    must-hit moves and no-check status moves).
+    accuracy, priority, is_ohko}. accuracy is int|None straight from the dex (None = no accuracy roll:
+    must-hit moves and no-check status moves); is_ohko is the authoritative mechanical flag rather
+    than an accuracy/power heuristic.
 
     Used by offense diagnosis to tell attacking moves (physical/special) from status, get each move's
     type, and judge STAB; `priority` (signed speed-priority stage, 0 == normal) feeds the speed
@@ -195,14 +196,20 @@ def lookup_moves(names: list[str]) -> dict[str, dict[str, Any]]:
         rows = [rows]
     out: dict[str, dict[str, Any]] = {}
     for name, row in zip(names, rows):
+        found = not row.get("error")
         out[name] = {
-            "found": not row.get("error"),
+            "found": found,
             "name": row.get("name"),
             "type": row.get("type"),
             "category": row.get("category"),
             "power": row.get("power"),
             "accuracy": row.get("accuracy"),   # int|None — the dex emits ONE numeric surface
             "priority": row.get("priority"),
+            # TRI-STATE: True/False from the resolved move, None when the move did NOT resolve
+            # (strict-dex miss). Never ASSERT "not OHKO" for an unresolved move — the consumer
+            # keys off `is True` for exclusion, so None (unknown) leaves the move where it was
+            # rather than falsely certifying it as a normal deterministic KO.
+            "is_ohko": (row.get("is_ohko") is True) if found else None,
         }
     return out
 

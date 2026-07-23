@@ -109,9 +109,28 @@ class ValidationResult:
     def warnings(self) -> list[str]:
         return [m.en() for m in self.warnings_msg()]
 
+    @staticmethod
+    def _message_detail(severity: str, key: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Language-invariant message coordinates for presentation boundaries.
+
+        Canonical JSON keeps its English strings for existing skill consumers.  The extra
+        code + params representation lets the web bridge localize without reverse-parsing
+        those strings.  Params are facts/join keys; stringify exceptional objects so this
+        extension can never make an otherwise valid result non-serializable.
+        """
+        safe = {k: (v if v is None or isinstance(v, (str, int, float, bool)) else str(v))
+                for k, v in params.items() if k != "_prefix"}
+        return {"severity": severity, "code": key, "params": safe}
+
+    def message_details(self) -> list[dict[str, Any]]:
+        return ([self._message_detail("error", k, kw) for k, kw in self._errors]
+                + [self._message_detail("warning", k, kw) for k, kw in self._warnings]
+                + [self._message_detail("skipped", k, kw) for k, kw in self._skipped])
+
     def to_dict(self) -> dict[str, Any]:
         return {"status": self.status, "valid": self.valid, "confidence": self.confidence,
-                "errors": self.errors, "warnings": self.warnings, "skipped": self.skipped}
+                "errors": self.errors, "warnings": self.warnings, "skipped": self.skipped,
+                "messages": self.message_details()}
 
 
 def _norm(s: str | None) -> str:

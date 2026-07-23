@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """Mid-build checkpoint for AI orchestration.
 
-This is not a recommendation gate and not a selection planner. It exposes a structured pause point
-after slate-evaluate has established viable team frames, before expensive tuning and the final
-answer. The caller decides whether to show the compact summary to the user.
+This is not a recommendation gate.  Slate already attaches neutral 6-pick-N selection facts; this
+operator exposes unresolved user-steering decisions after viable frames are known and before tuning.
 """
 from __future__ import annotations
 
@@ -89,14 +88,15 @@ def build_checkpoint(slate_input: Any, slate_output: Any) -> dict[str, Any]:
             "candidate_indices": survivors,
             "reason": "multiple slate survivors remain; the user can steer which frame to tune further",
         })
-    multi_mega = [f["index"] for f in frames if f["survivor"]
-                  and ((f.get("mega_plan") or {}).get("registered_mega_count") or 0) > 1]
-    if multi_mega:
+    mega_slate = (slate_output.get("mega_registration_slate")
+                  if isinstance(slate_output.get("mega_registration_slate"), dict) else {})
+    if mega_slate.get("status") == "missing_modal_lane":
         open_decisions.append({
-            "kind": "mega_registration_shape",
-            "candidate_indices": multi_mega,
-            "reason": "one or more surviving frames register multiple Mega options; this is legal, "
-                      "but the intended Mega-use plan should be visible before finalizing",
+            "kind": "mega_registration_coverage",
+            "candidate_indices": mega_slate.get("assessed_survivors") or survivors,
+            "reason": "no survivor is modal relative to its bound frame's observed Mega-registration "
+                      "distribution; add an observed-mainline lane or explicitly choose a "
+                      "different mega_posture before finalizing",
         })
     if not ctx.get("benchmarks"):
         open_decisions.append({
@@ -135,11 +135,11 @@ def build_checkpoint(slate_input: Any, slate_output: Any) -> dict[str, Any]:
             "zh": "要继续推进哪些候选框架，还是先调整必须保留/避免的成员？",
             "ja": "どの候補フレームを進めますか？それとも先に必須／回避メンバーを調整しますか？",
             "en": "Which candidate frames should we carry forward, or adjust the must-keep / must-avoid members first?"}})
-    if pause and any(d["kind"] == "mega_registration_shape" for d in open_decisions):
-        questions.append({"id": "mega_registration_shape", "text": {
-            "zh": "是否接受多 Mega 登记但每局只开一个，还是希望收敛到单 Mega 登记？",
-            "ja": "複数のメガ枠を登録（対戦ごとにメガ進化は1体のみ）でよいですか？それとも単一のメガ登録に絞りますか？",
-            "en": "Accept registering multiple Mega options (only one may Mega per game), or converge to a single registered Mega?"}})
+    if pause and any(d["kind"] == "mega_registration_coverage" for d in open_decisions):
+        questions.append({"id": "mega_registration_coverage", "text": {
+            "zh": "当前候选没有覆盖其框架中观察最常见的 Mega 登记数量；补一条该路线，还是明确选择单/多/无 Mega 的其他登记姿态？",
+            "ja": "現在の候補には各フレームで最頻のメガ登録数が含まれていません。そのルートを追加しますか、それとも単一・複数・メガなしの別方針を明示しますか？",
+            "en": "No survivor is modal relative to its bound frame's observed Mega-registration distribution. Add a modal lane, or explicitly choose a different single/multi/none Mega posture?"}})
     if pause and any(d["kind"] == "observed_team_overlap" for d in open_decisions):
         questions.append({"id": "observed_team_overlap", "text": {
             "zh": "有候选与库中某支真实队完全一致——直接采用（会标注来源出处），还是据此另作一支更贴合你需求的？",
@@ -170,7 +170,7 @@ def build_checkpoint(slate_input: Any, slate_output: Any) -> dict[str, Any]:
         "trigger_policy": {
             "pause_when": [
                 "a build request has one or more slate survivors and unresolved candidate-frame, "
-                "Mega-registration, confidence, or provenance decisions (missing tuning benchmarks "
+                "Mega-registration coverage, confidence, or provenance decisions (missing tuning benchmarks "
                 "ALONE do not pause — see do_not_pause_when; every pausing decision carries a matching "
                 "questions_to_ask entry, so pause=true never comes back with an empty question list)",
                 "run after context-audit/landscape or observed grounding/slate-evaluate and before "
@@ -183,8 +183,8 @@ def build_checkpoint(slate_input: Any, slate_output: Any) -> dict[str, Any]:
                 "there are zero survivors; revise the slate instead of asking for frame confirmation",
                 "there is exactly one survivor and the only open decision is absent tuning benchmarks "
                 "(continue and disclose not_run in tuning_summary)",
-                "6v6 pick/selection advice is not default checkpoint content; run select only when "
-                "the user asks for a pick plan",
+                "neutral 6-pick-N selection facts are already attached to slate survivors; checkpoint "
+                "does not pause merely because a team registers multiple Mega options",
             ],
         },
         "slate_receipt": slate_output.get("slate_receipt"),

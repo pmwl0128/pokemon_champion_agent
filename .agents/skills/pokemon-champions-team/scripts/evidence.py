@@ -26,7 +26,7 @@ CONFIDENCE_REASONS = {
     "spread-or-nature-inferred",       # speed: Spe SP / nature assumed neutral where unspecified
     "heuristic-role",                  # roles: signals are move/stat/item/ability heuristics, not role labels
     "type-chart-unverified",           # type chart assumed standard Gen6+ (Champions not verified to differ)
-    "vs-standard-set",                 # computed against a standard/modal opponent set, not the real one
+    "vs-observed-build",               # computed against a retained observed build, not the user's board
     "meta-modal-set",                  # attacker/opponent set is the meta marginal mode (not a real joint set)
     "synthetic-attacker",              # no meta set; synthetic max-offense attacker (abilities/items NOT modelled)
     "nature-fixed",                    # tune: nature held fixed; SP-only tuning (no joint nature search)

@@ -119,6 +119,10 @@ def _parse_member_block(block: str) -> TeamMember | None:
         low = ln.lower()
         if low.startswith("ability:"):
             m.ability = ln.split(":", 1)[1].strip()
+        elif low.startswith("nature:"):
+            # Champions community exports often use the field-style `Nature: Timid`
+            # alongside `SP:` instead of Showdown's `Timid Nature`. Accept both forms.
+            m.nature = ln.split(":", 1)[1].strip()
         elif low.startswith("evs:") or low.startswith("sp:"):
             m.spread = _parse_spread(ln.split(":", 1)[1])
         elif low.startswith("ivs:") or low.startswith("level:") or low.startswith("tera type:"):
@@ -171,6 +175,7 @@ class BuildContext:
     #                                                      canonical or dex-resolvable names; no fixed file
     wants: list[str] = field(default_factory=list)       # tactics: weather/trickroom/tailwind/...
     keep_mega: str | None = None                         # species/form whose Mega the user wants kept
+    mega_posture: str | None = None                      # environment|none|single|multi registration intent
     avoid: list[str] = field(default_factory=list)       # raw input: species AND/OR items, mixed
     prefer: list[str] = field(default_factory=list)      # soft species preference (anchor's soft half);
     #                                                      AI-side intent — no operator filters on it yet
@@ -206,6 +211,7 @@ def context_from_dict(d: dict[str, Any]) -> BuildContext:
         owned=list(d.get("owned") or []),
         wants=list(d.get("wants") or []),
         keep_mega=d.get("keep_mega"),
+        mega_posture=d.get("mega_posture"),
         avoid=list(d.get("avoid") or []),
         avoid_species=list(d.get("avoid") or []),   # dex-free default; _load_context refines the split
         prefer=list(d.get("prefer") or []),

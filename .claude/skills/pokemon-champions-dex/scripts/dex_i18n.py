@@ -47,6 +47,41 @@ def t(key: str, **fmt: object) -> str:
     return s.format(**fmt) if fmt else s
 
 
+TYPE_NAMES = {
+    "Normal": ("一般", "ノーマル"), "Fire": ("火", "ほのお"), "Water": ("水", "みず"),
+    "Electric": ("电", "でんき"), "Grass": ("草", "くさ"), "Ice": ("冰", "こおり"),
+    "Fighting": ("格斗", "かくとう"), "Poison": ("毒", "どく"), "Ground": ("地面", "じめん"),
+    "Flying": ("飞行", "ひこう"), "Psychic": ("超能力", "エスパー"), "Bug": ("虫", "むし"),
+    "Rock": ("岩石", "いわ"), "Ghost": ("幽灵", "ゴースト"), "Dragon": ("龙", "ドラゴン"),
+    "Dark": ("恶", "あく"), "Steel": ("钢", "はがね"), "Fairy": ("妖精", "フェアリー"),
+}
+CATEGORY_NAMES = {
+    "Physical": ("物理", "物理"), "Special": ("特殊", "特殊"), "Status": ("变化", "変化"),
+}
+STAT_NAMES = {
+    "hp": ("HP", "HP"), "atk": ("攻击", "攻撃"), "def": ("防御", "防御"),
+    "spa": ("特攻", "特攻"), "spd": ("特防", "特防"), "spe": ("速度", "素早さ"),
+}
+
+
+def value(kind: str, raw: str) -> str:
+    """Localize a small closed vocabulary for human-readable Markdown only."""
+    table = {"type": TYPE_NAMES, "category": CATEGORY_NAMES, "stat": STAT_NAMES}.get(kind, {})
+    pair = table.get(raw)
+    if not pair or _lang == "en":
+        return raw
+    return pair[0 if _lang == "zh" else 1]
+
+
+def list_sep() -> str:
+    return "，" if _lang == "zh" else "、" if _lang == "ja" else ", "
+
+
+def parens(value: object) -> str:
+    """A parenthesized suffix with language-appropriate spacing and glyphs."""
+    return f" ({value})" if _lang == "en" else f"（{value}）"
+
+
 MESSAGES: dict[str, dict[str, str]] = {
     # --- entity-panel field labels (the colon-prefixed md bullets) ---
     "types":         {"zh": "属性",     "ja": "タイプ",       "en": "Types"},
@@ -59,13 +94,14 @@ MESSAGES: dict[str, dict[str, str]] = {
     "known_users":   {"zh": "可学宝可梦", "ja": "覚えるポケモン", "en": "Known users"},
     "required_by":   {"zh": "对应宝可梦", "ja": "対象ポケモン",   "en": "Required by"},
     # move-panel inline field labels (emitted dynamically by key)
-    "type":          {"zh": "属性",     "ja": "タイプ",       "en": "type"},
-    "category":      {"zh": "分类",     "ja": "分類",         "en": "category"},
-    "power":         {"zh": "威力",     "ja": "威力",         "en": "power"},
-    "accuracy":      {"zh": "命中",     "ja": "命中",         "en": "accuracy"},
-    "pp":            {"zh": "PP",       "ja": "PP",           "en": "pp"},
-    "priority":      {"zh": "先制度",   "ja": "優先度",       "en": "priority"},
-    "nature_effect": {"zh": "性格修正", "ja": "性格補正",     "en": "effect"},
+    "type":          {"zh": "属性",     "ja": "タイプ",       "en": "Type"},
+    "category":      {"zh": "分类",     "ja": "分類",         "en": "Category"},
+    "power":         {"zh": "威力",     "ja": "威力",         "en": "Power"},
+    "accuracy":      {"zh": "命中",     "ja": "命中",         "en": "Accuracy"},
+    "pp":            {"zh": "PP",       "ja": "PP",           "en": "PP"},
+    "priority":      {"zh": "优先度",   "ja": "優先度",       "en": "Priority"},
+    "effect":        {"zh": "效果",     "ja": "効果",         "en": "Effect"},
+    "nature_effect": {"zh": "性格修正", "ja": "性格補正",     "en": "Nature effect"},
     # --- find/reverse panel ---
     "conditions":    {"zh": "条件",     "ja": "条件",         "en": "Conditions"},
     "count":         {"zh": "数量",     "ja": "件数",         "en": "Count"},
@@ -75,8 +111,14 @@ MESSAGES: dict[str, dict[str, str]] = {
     "resolved":      {"zh": "已解析",   "ja": "解決",         "en": "resolved"},
     "distance":      {"zh": "距离",     "ja": "距離",         "en": "distance"},
     "score":         {"zh": "得分",     "ja": "スコア",       "en": "score"},
+    "fuzzy":         {"zh": "模糊匹配", "ja": "あいまい検索", "en": "fuzzy"},
     "none_cached":   {"zh": "（无缓存）", "ja": "（キャッシュなし）", "en": "(none cached)"},
     "none":          {"zh": "（无）",   "ja": "（なし）",     "en": "(none)"},
+    "yes":           {"zh": "是",       "ja": "はい",         "en": "yes"},
+    "no":            {"zh": "否",       "ja": "いいえ",       "en": "no"},
+    "error_not_found": {"zh": "未找到：{query}", "ja": "見つかりません：{query}", "en": "not found: {query}"},
+    "error_ambiguous": {"zh": "名称有多个可能结果：{query}", "ja": "候補を1つに絞れません：{query}", "en": "ambiguous name: {query}"},
+    "error_bad_input": {"zh": "输入格式不正确，请检查参数。", "ja": "入力形式が正しくありません。引数を確認してください。", "en": "invalid input; check the arguments."},
     "note_unrecognized": {
         "zh": "注意：未识别的条件关键词——不是已知别名，按字面匹配（0 结果可能源于关键词而非数据）：{bad}",
         "ja": "注意：未認識の条件キーワード — 既知のエイリアスではなく字面一致（0 件はキーワードが原因かもしれません）：{bad}",
@@ -84,8 +126,8 @@ MESSAGES: dict[str, dict[str, str]] = {
               "(a 0 count may be the keyword, not the data): {bad}",
     },
     "note_no_learnset": {
-        "zh": "注意：无学习集行匹配；此宝可梦可能没有缓存的学习集覆盖。",
-        "ja": "注意：習得データの行が一致しません。このポケモンはキャッシュされた習得データがない可能性があります。",
-        "en": "Note: no learnset rows matched; this Pokemon may have no cached learnset coverage.",
+        "zh": "注意：没有找到可学招式数据；当前缓存可能未覆盖此宝可梦。",
+        "ja": "注意：覚えるわざデータが見つかりません。現在のキャッシュではこのポケモンを網羅していない可能性があります。",
+        "en": "Note: no learnset data was found. The current cache may not cover this Pokémon.",
     },
 }

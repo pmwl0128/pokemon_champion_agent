@@ -1,4 +1,4 @@
-# Pokemon Champions Team Public Data Contracts
+# Pokémon Champions Team Public Data Contracts
 
 This reference documents durable domain objects and the bundled facts-only caches needed by an
 installed skill. It intentionally excludes source adapters, refresh procedures, tests, and private
@@ -11,7 +11,7 @@ payload contract; run `python scripts/team.py vocab` for enumerated intent field
 - [`provenance`](#2-provenance-real-team-fact-tags--never-a-strength-score)
 - [Shipped library layout](#3-shipped-library-layout)
 - [Representative sets](#4-representative-sets)
-- [Opponent matchup cache](#5-opponent-standard-set-matchup-cache)
+- [Opponent matchup cache](#5-opponent-observed-build-matchup-cache)
 - [`build-context`](#6-build-context-intent-layer)
 - [Evidence](#7-evidence-output-side-lightweight)
 - [Frame](#8-frame-assembly-front-door)
@@ -150,29 +150,56 @@ fields. Presence-only rows, `inferred_set` rows, and mislabeled rows with missin
 available to presence/co-occurrence consumers but do not inflate `sample`, do not trigger singles Mega
 run-form remapping, and do not create opponent-cache attacker rows.
 
-## 5. Opponent Standard-Set Matchup Cache
+## 5. Opponent Observed-Build Matchup Cache
 
 `team.py oppmatrix [species] --game-format single|double [--vs defender] [--as-checks]` reads a
-precomputed standard-vs-standard grid over the meta top-K from
-`data/opponent_cache/<season>_<format>.json`.
+precomputed observed-build reference grid over the meta top-K from
+`data/opponent_cache/<rule>_<format>.json` (keyed by rule: the universe is the current usage
+ranking and the sets span the whole rule pool, so seasons sharing a rule share one matrix).
 
-The **live cache shape** — the matrix is keyed by dex-canonical **species** (not synthetic set_ids):
+The grid is **variant-expanded**: one row/column per retained real (item, ability) cluster, keyed by
+the lossless canonical form `variant:<pct-species>|item=<pct-item>|ability=<pct-ability>`. A species
+that runs both a Mega stone and a Choice item
+is two different opponents (different typing, stats, ability, speed tier), so each gets its own row.
+Every ordered pair is computed, including two builds of one species AND the mirror (a build against
+itself). Each set carries `is_modal` (the highest-coverage default), `coverage` (sample share), a
+`speed_profile`, and represented/unrepresented sample coverage. Cluster admission requires both
+absolute sample support and relative coverage; a global per-species ceiling bounds calculation and
+presentation cost.
+
+`--as-checks` preserves these build axes. Every cell has one atomic `grade` for exactly the two builds
+it names; there is no hidden modal/headline/strict or synthetic fast lane. A plain species selector
+expands to all retained variants, while an exact `variant_id` selects one. The species portfolio first
+keeps the strongest team/member answer for each variant, then exposes `observed_floor` as the weakest
+of those answers together with `witness_variant_ids`. `coverage.represented` and
+`calculation_complete` are separate facts: an observed floor never claims to cover omitted sample mass.
+
+The **live cache shape** — the matrix is keyed by `variant_id`:
 
 ```json
 {
   "kind": "opponent-cache",
   "built_for": {"season": "M-4", "rule": "M-B", "format": "single",
                 "data_rule": "M-B", "data_seasons": ["M-3", "M-4"],
-                "built_at": "2026-07-08T...Z", "top_k": 20},
-  // Queries use the shipped environment stamp; no multi-version staleness check runs at query time.
-  "species": [{"rank": 7, "species": "Staraptor", "real_team_backed": true,
+                "built_at": "...", "top_k": 60, "variant_count": 201,
+                "cache_schema_version": 2,
+                "source_fingerprints": {"meta": "sha256...", "team_library": "sha256..."}},
+  "species": [{"rank": 7, "species": "Staraptor",
+               "variant_id": "variant:Staraptor|item=Staraptite|ability=Intimidate",
+               "real_team_backed": true,
                "set_source": "real-team", "set_confidence": "low",
                "run_form": "Mega Staraptor"}],     // run_form: present when the form actually run differs
                                                     // from the meta key (singles Mega ranked under base)
-  "sets": {"Staraptor": {"species": "Mega Staraptor",  // the REAL run form (calc used its stats)
+  "sets": {"variant:Staraptor|item=Staraptite|ability=Intimidate": {
+                        "species": "Staraptor", "run_form": "Mega Staraptor",
                         "ability": "...", "item": "...", "nature": "...",
                         "moves": ["..."],          // the real joint set — null for defender-only species
                         "sps": {"hp": 32, "df": 25}, "source": "real-team",
+                        "coverage": 0.72, "represented_coverage": 0.91,
+                        "unrepresented_coverage": 0.09,
+                        "speed_profile": {"sample": 20, "min_spe_sp": 0,
+                                          "max_spe_sp": 32, "natures": ["Jolly"],
+                                          "heterogeneous": true},
                         "confidence": "low", "real_team_backed": true, "note": "..."}},
   "matrix": {                                       // matrix[attacker][defender] = ordered-pair cell
     "Garchomp": {
@@ -189,14 +216,22 @@ The **live cache shape** — the matrix is keyed by dex-canonical **species** (n
       }
     }
   },
-  "confidence": "low", "confidence_reason": "vs-standard-set",   // EVERY cell, stated once at top
+  "check_matrix": {                              // precomputed offline; no first-request derivation
+    "variant:...": {"variant:...": {"grade": "C1", "c0_kind": null,
+                                      "contested": false}}
+  },
+  "confidence": "low", "confidence_reason": "vs-observed-build", // EVERY cell, stated once at top
   "notes": ["..."]
 }
 ```
 
-- One file per `(season, format)` cache target; the two metagames are never mixed. Built from the meta
+- `built_for.top_k` is the ranked-species scope; `built_for.variant_count` is the number of expanded
+  build rows/columns. Multiple variants of one species never inflate `top_k`.
+- One file per `(rule, format)` cache target; `built_for.season` is provenance for the current ranking
+  snapshot and does not select the file. The two metagames are never mixed. Built from the meta
   usage ranking (the opponent universe), the same-rule real-team library pool, dex facts, and one batched
-  ncp call. Per-format top-k (single 50 / double 60) — the libraries differ ~50x in density.
+  ncp call. The shipped single and double reference grids both cover the Top 60; per-row confidence
+  still reflects the formats' different real-team density.
 - **Singles Mega names are resolved to the form actually run** by the shared form resolver: meta ranks
   a singles Mega under the BASE name but the
   library stores `Mega X`, so the resolved set keeps `species` = the meta label and adds `run_form` =
@@ -206,13 +241,29 @@ The **live cache shape** — the matrix is keyed by dex-canonical **species** (n
   meeting the configured minimum sample size. A meta-only species has no real joint move set — meta marginals can't be stitched into
   one — so it appears as a **defender only** (`real_team_backed:false`, `moves:null`).
   It therefore appears only as a defender.
+- Source fingerprints cover the season-scoped meta ranking/details and every same-rule team-library
+  partition. A mismatch refuses the cache and requires rebuild; a refreshed local data snapshot is
+  never silently paired with older calculations.
 - `offense` reuses the live `matchup` damage fact (full roll band + possible/guaranteed KO buckets;
-  only OHKO exact, 2+ turn KO is a static approximation flagged `ko_caveat`). `speed` is the modal line.
-- **Cells are ALWAYS `low` confidence** (`vs-standard-set`): a reference grid of standard sets, NOT the
+  only a damage-based one-turn KO is exact, 2+ turn KO is a static approximation flagged
+  `ko_caveat`). `speed` is the modal line.
+- Accuracy-based one-hit-KO moves are excluded from the static KO baseline and never upgrade a derived
+  check's C2/C1/C0. An applicable route only marks the read `contested`, like setup/recovery; the static
+  operator does not simulate its probability. Detection uses the dex `is_ohko` mechanic flag rather
+  than a power/accuracy heuristic.
+- **Cells are ALWAYS `low` confidence** (`vs-observed-build`): a reference grid of retained observed builds, NOT the
   user's team. The user's own matchup is always computed LIVE via `team.py matchup` on actual sets.
-- `--as-checks` derives an attacker×attacker C2/C1/C0 reference grid: the forward cell is our offense,
-  the reverse cell is the incoming move. Meta-only defenders have no reverse attacker row and are
-  excluded. `species` and `--vs` retain their normal row/cell filtering semantics in this view.
+- `--as-checks` reads the offline-precomputed attacker-build×attacker-build C2/C1/C0 reference grid:
+  the forward cell is our offense and the reverse cell is incoming. Meta-only defenders have no
+  reverse attacker row and are excluded. A species query expands; an exact build key narrows.
+
+The live actual-set battery is a separate L2 contract: `team.py matchup` accepts any non-empty
+collection of 1–N member objects using the same member shape as `team-json`, and evaluates each actual
+configuration against a caller-selected meta Top-K in the shared range `1..60`. It does not certify
+that the collection is a legal registered team; call `validate` for that higher-level question.
+Every source row and target cell carries request-stable `source_id` / `target_id` / `cell_id`, so two
+configurations of the same species remain distinct. JSON callers may request `full` (complete evidence)
+or `summary` (KO/incoming/speed/atomic CHECK facts); both are projections of the same calculation.
 
 ## 6. build-context (Intent Layer)
 
@@ -229,6 +280,9 @@ It is **structured constraints, not natural language** — the skill never parse
                                           // via the dex — there is no required input file
   "wants": ["tailwind"],                  // desired tactics: weather/trickroom/tailwind/...
   "keep_mega": "Garchomp",                // a Mega to preserve, if any
+  "mega_posture": "environment",           // environment | none | single | multi. Default environment:
+                                          //   use a reliable frame-observed registration distribution;
+                                          //   the other values are hard registered-Mega-count constraints
   "avoid": [],                            // species/items the user wants excluded
   "prefer": ["Mimikyu"],                  // SOFT includes — "想尽量带". The AI tries to honor these but
                                           //   may drop one (with a stated reason) when it does not fit;
@@ -243,7 +297,8 @@ It is **structured constraints, not natural language** — the skill never parse
                                           //   operator mechanically filters on it yet
   "meta_conformance": "proven",           // posture knob proven | off_meta: flips the landscape
                                           //   observed_cores VIEW to rare-first (an ordering, never a
-                                          //   score; landscape is the only mechanical consumer)
+                                          //   score) and disables slate's observed-registration
+                                          //   deviation gate for deliberate off-meta builds
   "style_lean": "defense",                // posture knob offense | balance | defense (主动进攻/平衡轮换/
                                           //   稳健防守) — the USER's stated structural posture, a lens the
                                           //   AI reads profile/landscape FACTS through. AI-side intent: no
@@ -265,8 +320,11 @@ It is **structured constraints, not natural language** — the skill never parse
   },
   "benchmarks": [                         // SP fine-tuning targets; AI translates intent
     {"member": "Incineroar", "kind": "survive",  "vs": "Garchomp", "move": "Earthquake",
-     "conditions": {"stealth_rock": false, "spikes": 0}, "probability": "guaranteed"},
-    {"member": "Garchomp",   "kind": "outspeed", "vs": "Dragapult", "conditions": {"tailwind": false}}
+     "conditions": {"stealth_rock": false, "spikes": 0}, "probability": "guaranteed",
+     "opponent_set": {"ability": "Rough Skin", "item": "Life Orb", "nature": "Jolly",
+                      "spread": {"atk": 32, "spe": 32}}},
+    {"member": "Garchomp",   "kind": "outspeed", "vs": "Dragapult", "conditions": {"tailwind": false},
+     "opponent_set": {"nature": "Timid", "spread": {"spe": 20}}}
     // kind: survive | outspeed | ohko | 2hko ; vs = canonical species (or a raw Speed number for outspeed);
     // conditions are applied when set explicitly here; probability: guaranteed | likely | any
   ],
@@ -279,11 +337,24 @@ It is **structured constraints, not natural language** — the skill never parse
 
 `benchmarks` is the entry point for the `tune` operator. Each is a declarative
 **cliff target**; `tune` reports the minimum SP to cross it (or the slack if already past), never a
-single "optimal spread". `conditions` keys (stealth_rock / spikes / tailwind / opponent_tailwind /
+single "optimal spread". A full 66-SP spread does not make an otherwise reachable cliff infeasible:
+the card keeps the target-stat `delta_sp` and adds a `reallocation` envelope with the amount that
+must move, available capacity, and invested-stat donor candidates. Donors are opportunity-cost facts,
+not an automatic instruction; floors proven by other already-met benchmarks are annotated as protected
+capacity. Cards preserve benchmark input order and have no cross-benchmark score.
+
+`kind`, `probability`, `conditions`, and `opponent_set` define the primary request. `opponent_set`
+accepts the opponent's ability/item/nature plus `spread` or NCP-keyed `sps`; it is used consistently
+for damage and speed. When absent, Tune resolves a real joint set first, then a disclosed meta/synthetic
+fallback. Survival cards compare HP, relevant Def/SpD, and bounded mixed allocations for the same
+objective; `probability_lanes` are explicitly scoped to their single stat axis. Speed cards use the
+resolved set as the main target and keep the max-SP positive-nature target in `ceiling_lane`. Adjacent
+survival/KO tiers and probability lanes are context, not silent replacements for the requested target.
+
+`conditions` keys
+(stealth_rock / spikes / tailwind / opponent_tailwind /
 trickroom / weather / terrain / screens) are **applied only when explicitly set here** — the user's
-request always wins over any default gate. The format's `context_profile` informs ranking and which
-contexts are worth probing by default, but it never silently turns a condition on or off in a
-damage/speed calc. Two field effects also have TEAM-CARRIES defaults when the condition is absent
+request always wins over any default gate. Two field effects also have TEAM-CARRIES defaults when the condition is absent
 (explicit values still override them): my Tailwind (doubles + a team Tailwind setter -> a raw/x2 dual
 lane on outspeed cards) and my Stealth Rock on kill cards (singles + a team SR setter -> the chip is
 applied, with a no-SR dual lane). Notes:
@@ -323,7 +394,7 @@ protocol (no forced AI output format, no retry loop) — it is the skill attachi
 {
   "result": "...",                        // the fact/verdict
   "confidence": "low",                    // high | medium | low
-  "confidence_reason": "vs-standard-set", // small-sample | sp-inferred | cache | heuristic-role | vs-standard-set | null
+  "confidence_reason": "vs-observed-build", // small-sample | sp-inferred | cache | heuristic-role | vs-observed-build | null
   "evidence": {
     "facts": [{"source": "dex", "ref": "Garchomp.types", "value": ["Dragon", "Ground"]}],
     "calc": {"source": "ncp", "inputs": {"attacker": "...", "defender": "...", "move": "..."}, "result": "..."}
@@ -360,7 +431,11 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
       // yourself + disclose; NEVER stitch a joint set from meta marginals
     }],
     "flex_slots": {"open_count": 5},           // 2nd Mega / coverage / utility are YOURS (>=1 always open)
-    "observed_facts": {"observed_mega_slots": {...},   // a FACT, NOT a reserved second-Mega slot
+    "observed_facts": {"observed_mega_slots": {...},
+                       "mega_registration_reference": { // group distribution when sample>=30,
+                         "basis": "frame_group|frame_pool", // else whole-pool fallback
+                         "distribution": {...}, "confidence": "medium|low"
+                       },                                // descriptive prior, NOT a reserved Mega slot
                        "observed_fillers": [...],      // how real teams vary here — not a to-fill list
                        "role_composition_norms": {...}}
   }],
@@ -378,11 +453,13 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 
 **The two fields the AI PRODUCES for the binding:**
 - `slate.frame_bindings[i]` (aligned with `teams[i]`): `{frame_id, off_meta?:[species], deviations?:
-  [{species, reason}], off_meta_build?:bool}`. `frame_id` declares which skeleton the candidate builds
+  [{species, reason}], mega_deviation?:str|{reason,...}, off_meta_build?:bool}`. `frame_id` declares which skeleton the candidate builds
   on; a core-bearer (member ∈ that frame's `core_candidates`) whose `(item,ability)` is outside its
   repset `clusters` is a deviation — RED (no `off_meta`/`deviations` ack) eliminates in the funnel,
   YELLOW (acknowledged) survives. `off_meta_build:true` = a deliberate off-meta build (no core-bearer
-  binding). Only `(item,ability)` is checked — `set_guidance` is soft.
+  binding). Only `(item,ability)` is checked — `set_guidance` is soft. Independently,
+  `mega_deviation` acknowledges a deliberate Mega-registration count outside a reliable frame's
+  common lanes; without it, an observed minority/rare lane is eliminated under `proven`.
 - `draft.frame_deviations`: `[str | {species, note}]` — REQUIRED disclosure when a frame-bound slate
   flagged a YELLOW deviation / off-frame advisory on a recommended SURVIVOR (name the species). A
   filled-check at answer-audit, never a veto.
@@ -390,4 +467,11 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 For the final answer shape, initialize the draft with
 `team.py draft-init --slate slate.json --slate-output slate_out.json [--recommended I J]`, then fill
 the substantive empty fields before `answer-audit`. The helper copies selected survivor teams and
-the saved `slate_receipt`; it does not choose winners or write the convergence judgment.
+the saved `slate_receipt`; it does not choose winners or write the convergence judgment. A recommended
+survivor whose `mega_registration_assessment.requires_deviation_ack` is true needs
+`mega_registration_deviation:{reason,evidence,opportunity_cost}`. The slate itself must also contain at
+least one survivor that is modal relative to its own bound frame unless the context explicitly selects
+`mega_posture` or `meta_conformance:off_meta`; the final `recommended[]` set must retain at least one of
+those modal survivors. Samples below 30 remain visible but are not load-bearing;
+in reliable samples, share >=20% is common, at least 5% but below 20% is minority, and <5% is rare (modal is tracked
+separately and may tie). These labels describe observations; they do not score team strength.

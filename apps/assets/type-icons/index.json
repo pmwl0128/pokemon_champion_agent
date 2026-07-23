@@ -1,0 +1,118 @@
+{
+  "schema_version": "1",
+  "note": "Original SVG icon set for types and move categories. Keys are lowercase canonical English (meta data is lowercase; dex is Title-case — resolvers must lowercase). Artwork carries no text; localized names come from the dex.",
+  "types": {
+    "normal": {
+      "file": "types/normal.svg",
+      "color": "#9FA19F",
+      "dex_canonical": "Normal"
+    },
+    "fire": {
+      "file": "types/fire.svg",
+      "color": "#E62829",
+      "dex_canonical": "Fire"
+    },
+    "water": {
+      "file": "types/water.svg",
+      "color": "#2980EF",
+      "dex_canonical": "Water"
+    },
+    "electric": {
+      "file": "types/electric.svg",
+      "color": "#FAC000",
+      "dex_canonical": "Electric"
+    },
+    "grass": {
+      "file": "types/grass.svg",
+      "color": "#3FA129",
+      "dex_canonical": "Grass"
+    },
+    "ice": {
+      "file": "types/ice.svg",
+      "color": "#3DCEF3",
+      "dex_canonical": "Ice"
+    },
+    "fighting": {
+      "file": "types/fighting.svg",
+      "color": "#FF8000",
+      "dex_canonical": "Fighting"
+    },
+    "poison": {
+      "file": "types/poison.svg",
+      "color": "#9141CB",
+      "dex_canonical": "Poison"
+    },
+    "ground": {
+      "file": "types/ground.svg",
+      "color": "#915121",
+      "dex_canonical": "Ground"
+    },
+    "flying": {
+      "file": "types/flying.svg",
+      "color": "#81B9EF",
+      "dex_canonical": "Flying"
+    },
+    "psychic": {
+      "file": "types/psychic.svg",
+      "color": "#EF4179",
+      "dex_canonical": "Psychic"
+    },
+    "bug": {
+      "file": "types/bug.svg",
+      "color": "#91A119",
+      "dex_canonical": "Bug"
+    },
+    "rock": {
+      "file": "types/rock.svg",
+      "color": "#AFA981",
+      "dex_canonical": "Rock"
+    },
+    "ghost": {
+      "file": "types/ghost.svg",
+      "color": "#704170",
+      "dex_canonical": "Ghost"
+    },
+    "dragon": {
+      "file": "types/dragon.svg",
+      "color": "#5060E1",
+      "dex_canonical": "Dragon"
+    },
+    "dark": {
+      "file": "types/dark.svg",
+      "color": "#624D4E",
+      "dex_canonical": "Dark"
+    },
+    "steel": {
+      "file": "types/steel.svg",
+      "color": "#60A1B8",
+      "dex_canonical": "Steel"
+    },
+    "fairy": {
+      "file": "types/fairy.svg",
+      "color": "#EF70EF",
+      "dex_canonical": "Fairy"
+    },
+    "typeless": {
+      "file": "types/typeless.svg",
+      "color": "#68A090",
+      "dex_canonical": "Typeless"
+    }
+  },
+  "move_categories": {
+    "physical": {
+      "file": "categories/physical.svg",
+      "color": "#EB5628",
+      "dex_canonical": "Physical"
+    },
+    "special": {
+      "file": "categories/special.svg",
+      "color": "#2F6DC1",
+      "dex_canonical": "Special"
+    },
+    "status": {
+      "file": "categories/status.svg",
+      "color": "#8A8A8A",
+      "dex_canonical": "Status"
+    }
+  }
+}

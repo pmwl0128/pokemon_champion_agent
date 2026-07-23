@@ -5,7 +5,8 @@ The two CLIs (`ncp-calc-api.py` / `ncp-speedline-api.py`) run the SAME vendored 
 CLIs run (`ncp-calc-api.js` + `script_res/**`), but host it in a quickjs-ng context instead of Node,
 so the skill needs no external Node runtime — only `pip install quickjs-ng` (a 500 KB wheel, far
 lighter than a Node install; the Node `.js` CLIs remain as an automatic fallback for environments
-without quickjs). The vendored engine is byte-identical NCP (see conventions.md §1) and is validated
+without quickjs). The vendored engine is upstream-synchronized NCP plus the declared Champions patch
+(see conventions.md §1) and is validated
 against Node and the independent EXO oracle by the calc contract/online tests.
 
 How the JS is hosted (all shims are load-time only; the on-disk vendored files are never modified):

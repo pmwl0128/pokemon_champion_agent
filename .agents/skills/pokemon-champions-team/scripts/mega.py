@@ -47,3 +47,44 @@ def mega_form_from_maps(species: str | None, item: str | None, own_fact: dict[st
         if base == species:
             return form
     return None
+
+
+def effective_form_ability(ability: str | None,
+                           form_fact: dict[str, Any] | None) -> str | None:
+    """Resolve an authored ability onto the actual run form.
+
+    A base-form ability carried beside ``run_form`` or a Mega Stone is registration metadata, not the
+    ability used by the damage/speed actor. Preserve it only when the run form can actually have it;
+    otherwise use that form's first dex ability.
+    """
+    abilities = list((form_fact or {}).get("abilities") or [])
+    if ability in abilities or not abilities:
+        return ability
+    return abilities[0]
+
+
+def effective_member_from_maps(member: dict[str, Any],
+                               facts: dict[str, dict[str, Any]],
+                               item_info: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Return a registered member rewritten to its actual calculation form.
+
+    This is the shared base+stone rule for matchup, answer-audit (through matchup), and tune. Rich
+    callers may retain additional pre-Mega facts, but the actor's species/ability must come from this
+    same pure resolution.
+    """
+    effective = dict(member)
+    species = member["species"]
+    items = item_info or {}
+    run_form = mega_form_from_maps(
+        species, member.get("item"), facts.get(species), items, facts
+    ) if items else (species if (facts.get(species) or {}).get("is_mega") else None)
+    if run_form and run_form != species:
+        effective["species"] = run_form
+        effective["ability"] = effective_form_ability(
+            effective.get("ability"), facts.get(run_form)
+        )
+    elif run_form == species:
+        effective["ability"] = effective_form_ability(
+            effective.get("ability"), facts.get(species)
+        )
+    return effective

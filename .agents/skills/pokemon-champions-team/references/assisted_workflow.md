@@ -66,8 +66,13 @@ Two standing assumptions (do not relax them):
    `(item,ability)` leaves its repset clusters with no `off_meta`/`deviations` declaration is RED and
    is eliminated in the funnel. `core_candidates` is a starting point, NOT a roster — substitute
    freely, but a substitute needs its OWN repset basis or an off_meta declaration; the flex slots
-   (second Mega / coverage / utility) are entirely yours (frame only surfaces `observed_facts` —
-   `observed_mega_slots` is a FACT, never a reserved second-Mega slot). Skipping frame on a build
+   (second Mega / coverage / utility) are assembled by you. Frame's `observed_facts` never reserves a
+   slot, but its reliable `mega_registration_reference` is load-bearing at slate time: under the
+   default `mega_posture:environment`, observed minority/rare registration counts need a declared
+   `mega_deviation`, and the surviving candidate set retains at least one candidate that is modal
+   relative to its own frame. An explicit `mega_posture:none|single|multi` replaces that prior with a
+   hard composition constraint;
+   `meta_conformance:off_meta` disables the observed-lane deviation gate. Skipping frame on a build
    leaves the one uncovered creative step ungrounded — the exact place mode-collapse lives. Mark build
    contexts/slates with `frame_required:true`; then `slate-evaluate` refuses a missing `--frame-output`
    and `answer-audit` backstops any old/manual slate output with no frame fingerprint.
@@ -81,8 +86,10 @@ Two standing assumptions (do not relax them):
    feasibility). Hand-running ncp calcs and eyeballing percentages is not tuning. A pure FACT
    question with no adjustment intent ("does X survive Y's Earthquake as-is?") stays a single-point
    threshold — bare `ncp` is the right tool there, and for spot-checking a tune result.
-4. **Doubles six-member evaluation needs `select`.** A doubles team is a toolbox picked 4-of-6;
-   role/coverage conclusions about the registered six without running `select` are unsound (63 ≠ 66).
+4. **Six-member evaluation needs the actual selection object.** Singles is 6-pick-3 and doubles is
+   6-pick-4; a registered six is a preview toolbox, not the battle lineup. `slate-evaluate` attaches
+   `select` facts to every survivor, including each Mega option's exclusive/shared lineup routes and
+   zero-or-one active-Mega states. Read those facts before making role/coverage or Mega-route claims.
 5. **Multi-operator runs go through `session`.** One process, siblings resident (~70% wall-clock
    saved). Cost is a skip incentive — remove it.
 6. **Diagnose before advising.** For "fix/review/improve my team" requests, run `diagnose` (and
@@ -102,12 +109,12 @@ phase stays. When one of these crosses your mind, that IS the signal to run the 
 | "I know this meta, I can skip grounding" | `landscape` is the distribution your candidates are built AGAINST your training prior; the more you trust your own read, the harder you mode-collapse to a generic balanced team. Run it. |
 | "I grounded the anchor with repset — I'll hand-write the rest" | That is still mode-collapse: the anchor is grounded while the remaining members come from prior assumptions. `frame` grounds every core candidate's real `(item, ability)` set and slate red-eliminates an ungrounded core-bearer. Run frame and build on it. |
 | "The team's clearly legal / has no real problems — skip slate" | `slate-evaluate` doesn't check legality (`validate` does) — it is the candidate fact-matrix + survivor battery, and the only source of the `evidence_id`s you quote when you converge. |
-| "checkpoint is a beginner pause, just push on" | It is the build-flow post-slate pause contract, deriving `pause` from candidate-frame / multi-Mega / low-confidence / observed-overlap decisions. Unless the context already encoded `direct_final` / `skip_checkpoint`, a `pause:true` must be surfaced — skipping it makes a steering call that was the user's to make. |
+| "checkpoint is a beginner pause, just push on" | It is the build-flow post-slate pause contract, deriving `pause` from candidate-frame / missing modal Mega-registration coverage / low-confidence / observed-overlap decisions. Multi-Mega by itself is not a pause reason: the slate already carries selection routes. Unless the context already encoded `direct_final` / `skip_checkpoint`, a `pause:true` must be surfaced. |
 | "There's a stored team that fits perfectly — just hand it over" | Adopting an observed team is legitimate (as the library grows it often IS the best-fitting answer) — but only WITH `observed_provenance` (the overlap fact + why it fits this intent) and, for an exact joint-set copy, `adoption_review` (what reasonable forks were considered). Silent verbatim netdecking is the banned thing; answer-audit flags it as a violation. |
 | "It's one swap / a tiny change — no need to re-run answer-audit" | `answer-audit` re-binds the whole receipt chain and recomputes every number; even a small change can stop an old `evidence_id` from reproducing. Run it. |
 | "I'll validate everything at the end" | It is validate BEFORE presenting, not a wrap-up step — a team you haven't validated is not a recommendation. |
 | "The user didn't say how many — I'll just give one final team" | Default is 2–3 distinct teams; converging to one needs an explicit `single_team_requested`. Fewer is a declared choice, not the low-effort default. |
-| "They want the team tuned against a threat — a few hand-run ncp calcs will do" | `tune` is the operator built for adjustment intent: benchmarks[] → cliff cards (survive/outspeed/ohko/2hko, nature lanes, 66-SP feasibility). Hand-read percentages skip cliff detection and the budget math. Bare ncp answers "does it, as-is?" fact questions and spot-checks tune output — it never replaces the tune run when the ask is to CHANGE the team. |
+| "They want the team tuned against a threat — a few hand-run ncp calcs will do" | `tune` is the operator built for adjustment intent: benchmarks[] → cliff cards (survive/outspeed/ohko/2hko, nature lanes, unused-SP/reallocation funding). Hand-read percentages skip cliff detection and the budget math. Bare ncp answers "does it, as-is?" fact questions and spot-checks tune output — it never replaces the tune run when the ask is to CHANGE the team. |
 
 **Spirit over letter**: rephrasing a phase away — "this isn't really a build", "it's just a quick
 tweak" — doesn't exempt it. If the request assembles or changes a team the user will act on, the
@@ -153,16 +160,19 @@ fact base         ranking · landscape · repset/search/observed · oppmatrix ·
   ▼
 [assemble 2–5 candidates]   the ONLY creative step — yours, built ON the frame's grounded evidence
                   (deviate from a core_candidate only with a declared repset/off_meta basis); flex
-                  slots (2nd Mega / coverage / utility) are entirely yours. Tag each with its frame_id.
+                  slots (2nd Mega / coverage / utility) are yours, but under the environment posture
+                  carry at least one candidate modal relative to its frame; tag deliberate
+                  minority/rare lanes with mega_deviation. Tag each candidate with its frame_id.
   ▼
 [pressure test]   `team.py slate-evaluate slate.json [--frame-output frame_out.json]` — {context
                   (include `frame_required:true` for BUILD flows),
                   audit_receipt, teams:[2–5 candidates], frame_bindings:[{frame_id, off_meta?,
-                  deviations?}]}. REFUSES without a receipt matching this context / a broken
+                  deviations?, mega_deviation?}]}. REFUSES without a receipt matching this context / a broken
                   frame_receipt / a build-flow `frame_required:true` missing `--frame-output`
                   (the chain is live). Cheap funnel for all (a RED core-bearer
-                  deviation eliminates here); matchup battery for survivors; order-preserving
-                  no-winner grid; quantitative extremes carry re-runnable evidence_ids — quote
+                  deviation eliminates here); reliable Mega-registration conformance at candidate and
+                  candidate-set level; matchup battery plus 6-pick-N selection/activation facts for
+                  survivors; order-preserving no-winner grid; quantitative extremes carry re-runnable evidence_ids — quote
                   them when you converge. SAVE the output JSON (answer-audit re-binds it).
                   Never present a candidate that was never slated.
   ▼
@@ -172,8 +182,8 @@ fact base         ranking · landscape · repset/search/observed · oppmatrix ·
                   slate context already encoded an explicit delegation (`direct_final:true`) or
                   explicit no-pause request (`skip_checkpoint:true`). Missing benchmarks alone do
                   not force a pause; disclose `not_run` in tuning_summary if no targeted tuning
-                  happens. It does NOT include 6v6 pick/selection advice by default; run `select`
-                  only when the user asks for a pick plan or the request needs it.
+                  happens. Survivor selection facts are already present. Multiple registered Mega
+                  options alone do not pause; missing observed modal registration coverage does.
   ▼
 [converge transparently]    trade-offs per candidate, against the user's stated intent
   ▼
@@ -225,8 +235,8 @@ iterate). Route every incoming message first:
    is already answered, then ask what the walk still surfaces.
 0a. **Natural-language build trigger** — route by the whole utterance, not isolated words. A zh/en/ja
    message is a BUILD request when it asks for a team to be produced/completed/changed OR asks for an
-   existing team to be reviewed/evaluated, and the object is clearly a Pokemon Champions team, roster,
-   format, candidate list, or Pokemon-centered constraint. Language-specific examples:
+   existing team to be reviewed/evaluated, and the object is clearly a Pokémon Champions team, roster,
+   format, candidate list, or Pokémon-centered constraint. Language-specific examples:
    - zh: "帮我组一队", "配一套双打", "带X组一队", "围绕X做一队", "这队怎么改", "这队怎么选".
    - en: "build me a team", "make a doubles team", "team around X", "include X in the team",
      "rework this team", "review/evaluate my team".
@@ -298,7 +308,7 @@ question worth asking; tier = onboarding base vs conflict template).
 ## Hard boundaries (unchanged, from the skill's principles)
 
 - **No composite scores, no winners**: never merge facts into a strength number or auto-crown one
-  team/Pokemon; the only permitted ordering is the evidence tier of real-team provenance.
+  team/Pokémon; the only permitted ordering is the evidence tier of real-team provenance.
 - **Library guardrail (transparency, not prohibition)**: real stored teams are AI-facing
   evidence — decompose them into facts and trade-offs. ADOPTING an observed build as a
   recommendation is legitimate (as the library grows it often IS the best-fitting answer) — but
@@ -350,6 +360,14 @@ is the structured skeleton of your answer. Machine-enforced (violations):
   language-independent object such as `{form: "Mega Blastoise"}`; pure English strings are checked
   against the candidate's registered Mega options, while non-English prose should use the object form
   when mechanical matching matters. The checker also verifies that all three fields are filled.
+- Mega-registration conformance — under the default environment posture, reliable frame samples are
+  descriptive but load-bearing: the slate must retain a modal registration-count lane. A recommended
+  set must include at least one of the slate's modal survivors; selecting only nonmodal survivors
+  requires an explicit posture/off-meta intent upstream and a fresh receipt chain. A recommended
+  survivor on an acknowledged minority/rare lane also needs
+  `mega_registration_deviation:{reason,evidence,opportunity_cost}`. Sample <30 is thin and cannot gate;
+  with a reliable sample, >=20% is common, at least 5% but below 20% is minority, and <5% is rare. This is not a claim that
+  common is stronger; it prevents the AI's prior from silently replacing the observed team structure.
 - Replacement transparency — when you change a previously user-visible/checkpointed candidate frame,
   run `replace` (or an equivalent before/after fact diff) and add `replacement_rationale` to the
   affected recommended entry: `{out, in, reason, benefit, cost, evidence}`. The checker validates

@@ -1,11 +1,11 @@
 ---
 name: pokemon-champions-dex
-description: Offline-first Pokemon Champions battle dex lookup with trilingual aliases (Chinese / English / Japanese), batch queries, and multi-condition reverse search. Use when the request asks for a canonical dex fact about a Pokemon/form/move/ability/item/nature/name, not for popularity trends or damage arithmetic. Chinese examples include "X能学Y吗", "谁会Y", "X是什么属性/种族值/特性", "X的中文/日文/英文名", "这个名字对应谁", "这个Mega石给谁用". English examples include "can X learn Y", "who learns Y", "what are X's types/stats/abilities", "resolve this name", "which form/item is this". Japanese examples include "XはYを覚える？", "Yを覚えるポケモン", "Xのタイプ/種族値/特性", "この名前はどのポケモン？", "このメガストーンの対応先は？". Use it while building or reviewing teams whenever a factual dex claim or name normalization is needed.
+description: Offline-first Pokémon Champions battle dex lookup with trilingual aliases (Chinese / English / Japanese), batch queries, and multi-condition reverse search. Use when the request asks for a canonical dex fact about a Pokémon/form/move/ability/item/nature/name, not for popularity trends or damage arithmetic. Chinese examples include "X能学Y吗", "谁会Y", "X是什么属性/种族值/特性", "X的中文/日文/英文名", "这个名字对应谁", "这个Mega石给谁用". English examples include "can X learn Y", "who learns Y", "what are X's types/stats/abilities", "resolve this name", "which form/item is this". Japanese examples include "XはYを覚える？", "Yを覚えるポケモン", "Xのタイプ/種族値/特性", "この名前はどのポケモン？", "このメガストーンの対応先は？". Use it while building or reviewing teams whenever a factual dex claim or name normalization is needed.
 ---
 
-# Pokemon Champions Dex
+# Pokémon Champions Dex
 
-Query the bundled Pokemon Champions battle dex before making factual claims about a Pokemon, form,
+Query the bundled Pokémon Champions battle dex before making factual claims about a Pokémon, form,
 move, ability, item, nature, or learnset. This skill answers "what exists and what can it learn?";
 metagame popularity belongs to `$pokemon-champions-meta`, and damage arithmetic belongs to
 `$ncp-damage-calculator`.
@@ -39,7 +39,7 @@ python scripts/champdex.py nature 固执 Adamant
 python scripts/champdex.py batch pokemon 姆克鹰 巨金怪 弃世猴 洗衣机
 ```
 
-Reverse-search Pokemon or moves:
+Reverse-search Pokémon or moves:
 
 ```bash
 python scripts/champdex.py find move 近身战 type 飞行

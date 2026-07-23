@@ -55,13 +55,14 @@ FIELD_STATUS: dict[str, dict[str, str]] = {
     "avoid_species": {"status": "enforced_by_skill", "consumer": "fill candidate filter"},
     "avoid_items":   {"status": "enforced_by_skill", "consumer": "observed excludes teams holding one; slate eliminates candidates holding one; fill candidates are species-level (item n/a — echoes avoid_items_not_enforced)"},
     "keep_mega":     {"status": "enforced_by_skill", "consumer": "select marks the matching mega_option user_keep + echoes matched:false"},
+    "mega_posture":  {"status": "enforced_by_skill", "consumer": "slate-evaluate checks candidate registered-Mega count against explicit none/single/multi intent; environment uses the frame's observed registration distribution"},
     "benchmarks":    {"status": "enforced_by_skill", "consumer": "tune SP cliffs (the viability floor — height is the user's)"},
     "need":          {"status": "enforced_by_skill", "consumer": "fill gap spec"},
     "replace":       {"status": "enforced_by_skill", "consumer": "replace impact diff"},
     "direct_final":   {"status": "enforced_by_skill", "consumer": "checkpoint suppresses the pause contract when the user explicitly delegated final convergence"},
     "skip_checkpoint": {"status": "enforced_by_skill", "consumer": "checkpoint suppresses the pause contract when the user explicitly requested no mid-build pause"},
     "frame_required": {"status": "enforced_by_skill", "consumer": "slate-evaluate refuses a build-flow slate without --frame-output; answer-audit backstops missing frame receipts"},
-    "meta_conformance": {"status": "enforced_by_skill", "consumer": "landscape observed_cores + fill candidate VIEW order (proven=common-first / off_meta=rare-first) — an ordering, never a score"},
+    "meta_conformance": {"status": "enforced_by_skill", "consumer": "landscape observed_cores + fill candidate VIEW order; slate disables observed-registration deviation gates for off_meta — never a score"},
     "variance_tolerance": {"status": "enforced_by_skill", "consumer": "diagnose luck_lines fact (sub-100%-accuracy damaging moves from dex accuracy) — surfaced either way; averse FLAGS them, never a score"},
     "style_lean": {"status": "ai_side_only", "consumer": "the AI reads the axis-2 structural FACTS (profile role_composition / offense lean / landscape norms) through the user's stated posture (offense=主动进攻 / balance=平衡轮换 / defense=稳健防守); no operator filters or orders by it — the skill never labels a team"},
     "wants":         {"status": "ai_side_only", "consumer": "free-form tactic intent; honored when composing"},
@@ -91,6 +92,7 @@ TRIGGER_VOCABULARY = frozenset({
     "conflict:locked_not_owned", "conflict:prefer_and_avoid", "conflict:locked_and_avoid",
     "conflict:benchmark_member_not_in_team", "conflict:replace_member_not_in_team",
     "conflict:need_unsolvable", "conflict:keep_mega_not_in_pool",
+    "conflict:keep_mega_with_none_posture",
     "conflict:ambiguous_name", "conflict:unresolved_name",
 })
 
@@ -134,6 +136,7 @@ def vocab() -> dict[str, Any]:
         "exclude_tactics": sorted(contracts.EXCLUDE_TACTICS),                 # negative-tactic enum (playstyle)
         "style_lean": sorted(contracts.STYLE_LEAN),                           # posture knob (AI-side lens)
         "meta_conformance": sorted(contracts.META_CONFORMANCE),              # view-order knob
+        "mega_posture": sorted(contracts.MEGA_POSTURE),                      # registration intent / observed default
         "variance_tolerance": sorted(contracts.VARIANCE_TOLERANCE),          # luck-line flag knob
         "field_status": {k: dict(v) for k, v in FIELD_STATUS.items()},
         "derived_fields": sorted(DERIVED_FIELDS),
@@ -169,7 +172,7 @@ def _safe(ctx: Any) -> dict[str, Any]:
         v = ctx.get(key)
         out[key] = [n for n in v if isinstance(n, str)] if isinstance(v, list) else []
     out["keep_mega"] = ctx.get("keep_mega") if isinstance(ctx.get("keep_mega"), str) else None
-    for key in ("meta_conformance", "style_lean"):
+    for key in ("meta_conformance", "style_lean", "mega_posture"):
         # posture knobs classify as str-or-absent: a garbage-typed value must not suppress the
         # gray-zone safe_default nor launder into constraints_not_enforced as a "stated" posture
         # (self-audit 2026-07-03); contracts reports the type/enum error in the same output.
@@ -352,6 +355,12 @@ def audit(ctx: dict[str, Any], team: dict[str, Any] | None, *,
                                     f"allowed: {', '.join(sorted(_ROLE_MOVES))}."})
 
     keep = ctx["keep_mega"]
+    if keep and ctx.get("mega_posture") == "none":
+        conflicts.append({
+            "kind": "keep_mega_with_none_posture",
+            "member": keep,
+            "detail": "keep_mega requests a Mega option while mega_posture='none' requires no "
+                      "registered Mega options."})
     if keep:
         r = _rec(records, keep)
         keep_canon = _canon(records, keep)
