@@ -82,6 +82,30 @@ skill's `references/assisted_workflow.md`. Its Universal Evaluation Protocol (UE
 The receipt chain is `context-audit -> frame -> slate-evaluate -> answer-audit`. Save the exact JSON
 artifacts so later gates can rebind them. Use `team.py session` for multiple operators on one team.
 
+## Local Visual Interface
+
+A companion browser front end turns the skills' facts and calculations into a browsable workspace. It
+is optional — the four CLIs fully cover every workflow — and it never replaces the UEP flow the agent
+drives. When the user asks to set up, download, or start the local front end (phrases like "帮我下载并启动前端",
+"フロントエンドをダウンロードして起動して", "download and start the local UI"), do the full flow yourself instead of
+handing the user a command list.
+
+Recommended path — the prebuilt bundle (no Node.js needed):
+
+1. Fetch `pokemon-champions-ui.zip` from the [`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest).
+2. Extract it into the project directory (or a sibling folder the user designates). Verify the extracted folder contains `dist/`, `projection/`, `bridge/`, `skills/`, `requirements-runtime.txt`, and a platform start script.
+3. Install the locked runtime deps with `python -m pip install -r requirements-runtime.txt` (Python 3.10+; no Node.js).
+4. Launch the platform start script — `start-local.ps1` on Windows, `start-local.sh` on Linux/macOS (mark it executable first). Do not pass `--port`; read `~/.pokemon-champions-ui/pcui.env` for `PCUI_LOCAL_PORT` if the user has set one.
+5. Surface the full URL printed by the launcher, including its `#bootstrap=...` fragment — a bare `/` is rejected by the local auth check. Tell the user to open that complete URL once.
+
+From a source checkout (when the user wants to build or modify the SPA), run `build-ui.ps1` / `build-ui.sh`
+then `start-ui.ps1` / `start-ui.sh`; this path needs Node.js 22 and `requirements-ui.txt`.
+
+The local UI is a verification and browsing aid. It does not produce new facts the agent did not already
+compute through the skills, and UEP session/artifact state under `~/.pokemon-champions-ui/` is a mirror
+of the agent's own receipts — do not present a UI-rendered team as if it came from a source the agent
+did not audit. For the online edition, point the user at the URL in the README; it shares no local state.
+
 ## Recommendation Boundaries
 
 - Tools emit facts, legality results, evidence, and multiple explicit views. They never produce a

@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-22</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-07-24</b>
 </p>
 
 <p align="center">
@@ -261,6 +261,10 @@ and carrying team-analysis results into other pages for verification. Zh/en/ja n
 only at the display boundary. The current season, rule, and snapshot date appear at the top of the
 page; use that version information when interpreting metagame results.
 
+If an agent with shell access is already set up in this project, you can ask it to download, install and
+start the local edition in one sentence — see "Method A — Ask an Agent to Set It Up" below. The agent
+follows the instructions in `AGENTS.md` / `CLAUDE.md` under "Local Visual Interface".
+
 | Capability | Online | Local bundle |
 |---|---|---|
 | Singles/Doubles rankings, details, and rank trends | Yes | Yes |
@@ -288,8 +292,23 @@ your own team, and carry generated/diagnosed teams into the calculator for verif
 Download `pokemon-champions-ui.zip` from the
 [`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest).
 The bundle binds one SPA, projection, bridge, four skills, runtime configuration, and manifest. It
-requires Python 3.10+ and the locked `requirements-runtime.txt`, but not Node.js. After extracting it
-and entering the front-end directory:
+requires Python 3.10+ and the locked `requirements-runtime.txt`, but not Node.js.
+
+#### Method A — Ask an Agent to Set It Up (Recommended)
+
+If an agent with shell access is already in this project (because you installed the skills with the
+agent-assisted Method A above, or you placed this repo's `AGENTS.md` / `CLAUDE.md` in the project
+directory), just ask it directly:
+
+> Download the prebuilt local visual interface from the `data-latest` release of `pmwl0128/pokemon_champion_agent`, install its `requirements-runtime.txt`, and start it. Then give me the local URL.
+
+The agent fetches the zip, extracts it, installs the runtime deps, launches the platform start script,
+and returns the one-time `http://127.0.0.1:<port>/#bootstrap=...` URL. The full step list it follows is
+in `AGENTS.md` / `CLAUDE.md` under "Local Visual Interface", so you do not have to remember the commands.
+
+#### Method B — Manual
+
+After extracting the zip and entering the front-end directory:
 
 Windows PowerShell:
 
@@ -554,6 +573,13 @@ The release contains transformed, validated query data and scrubbed facts-only p
 Thank you to the projects, sites, tournament organizers, and community contributors who make these data and tools available. Rankings, records, and published teams are used as factual evidence only and do not imply a strength endorsement by this project.
 
 Special thanks to [PokeChamp DB](https://pokechamdb.com/) for its strong support during skill development.
+
+## TODO
+
+- **Faster team-building flow** — The full team-building workflow does several rounds of skill calls and context-audit round trips, which is slow end-to-end. We plan to collapse steps and cut redundant calls without changing the facts-layer contract, so the agent's path from intent to a finished team is noticeably shorter.
+- **Turn simulator** — Matchup tables and KO predictions today extrapolate from single-turn damage; recovery loops, status progression, PP, switch-in triggers, stalling, and branching choices don't evolve across turns, so multi-turn conclusions can diverge from real play. We plan to adopt Pokémon Showdown as the underlying engine, replacing the calculator-extrapolated matchup tables and making true multi-turn simulation an available path.
+- **Local frontend as an MCP server** — The local frontend is currently hosted by a bridge CLI, with agents collaborating indirectly through session and artifact files. We plan to expose the bridge as an MCP server, turning skill calls, session reads/writes, and team-building workflow actions into protocol-native actions that any agent client can orchestrate directly.
+- **Online service expansion and quota tuning** — The online frontend runs on a single VPS with static assets and docs shipped from the repo. We plan to move static assets to object storage behind a CDN to shed server load, and then raise the AI call quota based on observed usage so more compute-heavy routes (QA, team-building, tuning) open up.
 
 ## License
 

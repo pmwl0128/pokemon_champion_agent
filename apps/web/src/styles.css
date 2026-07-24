@@ -512,7 +512,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .matchup-grid { border-collapse: separate; border-spacing: 0; }
 .matchup-grid th { background: var(--panel); font-weight: 600; }
 .matchup-grid thead th { position: sticky; top: 0; z-index: 3; border-bottom: 1px solid var(--line); }
-.matchup-grid th.corner { position: sticky; left: 0; top: 0; z-index: 4; font-size: 11px; color: var(--sub);
+.matchup-grid th.corner { position: sticky; left: 0; top: 0; z-index: 7; font-size: 11px; color: var(--sub);
   padding: 4px 8px; border-right: 1px solid var(--line); vertical-align: middle; }
 .matchup-grid th.col-head { min-width: 30px; width: 30px; padding: 3px 1px; text-align: center; }
 .matchup-grid th.col-head img.mini { width: 22px; height: 22px; image-rendering: auto; display: block; margin: 0 auto; }

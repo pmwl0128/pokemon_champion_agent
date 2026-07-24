@@ -155,7 +155,7 @@ def cmd_online_serve(ns) -> int:
 
     from .online.jobs import JobStore
     from .online.limits import OnlineLimits, QaLimitConfig
-    from .online.provider import (EchoProvider, OpenAIChatConfig,
+    from .online.provider import (EchoProvider, FallbackProvider, OpenAIChatConfig,
                                   OpenAICompatibleProvider)
     from .online.server import create_online_app
     from .worker import WorkerPool
@@ -176,14 +176,23 @@ def cmd_online_serve(ns) -> int:
     if ns.provider == "echo":
         provider = EchoProvider()
         thinking_provider = provider
-    elif ns.provider in {"openai-compatible", "deepseek"}:
+    elif ns.provider in {"openai-compatible", "opencode", "deepseek"}:
         try:
-            llm_config = OpenAIChatConfig.from_env(os.environ)
+            llm_config = OpenAIChatConfig.from_env(os.environ, provider=ns.provider)
+            fallback_config = (OpenAIChatConfig.from_env(os.environ, provider="deepseek")
+                               if ns.provider == "opencode" else None)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
         base_provider = OpenAICompatibleProvider(llm_config) if llm_config.api_key else None
         provider = base_provider.with_thinking(False) if base_provider else None
         thinking_provider = base_provider.with_thinking(True) if base_provider else None
+        if fallback_config and fallback_config.api_key:
+            fallback_base = OpenAICompatibleProvider(fallback_config)
+            fallback = fallback_base.with_thinking(False)
+            thinking_fallback = fallback_base.with_thinking(True)
+            provider = FallbackProvider(provider, fallback) if provider else fallback
+            thinking_provider = (FallbackProvider(thinking_provider, thinking_fallback)
+                                 if thinking_provider else thinking_fallback)
         if provider is None:
             print(i18n.t("llm_key_missing"))
     else:
@@ -210,9 +219,10 @@ def cmd_online_serve(ns) -> int:
         # web_jobs (§7.3): transient builder-job rows share online.db — same retention
         # discipline as the limits tables, swept on traffic.
         jobs=JobStore(data_dir() / "online.db"))
-    provider_text = ((f"{provider.config.api_style}, model={provider.model}, "
+    provider_summary = getattr(provider, "safe_summary", None)
+    provider_text = ((f"{provider_summary()}, "
                       "qa=non-thinking, diagnose/builder=optional high-effort thinking")
-                     if isinstance(provider, OpenAICompatibleProvider)
+                     if provider_summary
                      else ns.provider if provider else "none")
     print(f"pcui online API: http://127.0.0.1:{ns.port}/ "
           f"(provider: {provider_text}"
@@ -419,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
     online.add_argument("--port", type=int, default=runtime_config.online_port)
     online.add_argument("--host", default="127.0.0.1")
     online.add_argument("--provider",
-                        choices=["openai-compatible", "deepseek", "echo", "none"],
+                        choices=["openai-compatible", "opencode", "deepseek", "echo", "none"],
                         default=runtime_config.llm_provider
                         if runtime_config.online_use_api_key else "none",
                         help=i18n.t("provider_help"))

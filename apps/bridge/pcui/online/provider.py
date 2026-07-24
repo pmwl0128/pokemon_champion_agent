@@ -4,6 +4,7 @@ async while provider + skill-tool calls stay simple synchronous code."""
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field, replace
 from typing import Mapping, Protocol
 
@@ -63,6 +64,7 @@ class OpenAIChatConfig:
     """
 
     api_key: str
+    provider: str = "openai-compatible"
     base_url: str = "https://api.deepseek.com"
     api_path: str = "/chat/completions"
     model: str = "deepseek-v4-flash"
@@ -77,7 +79,10 @@ class OpenAIChatConfig:
     extra_body: dict = field(default_factory=dict)
 
     @classmethod
-    def from_env(cls, values: Mapping[str, str]) -> "OpenAIChatConfig":
+    def from_env(cls, values: Mapping[str, str], *,
+                 provider: str = "openai-compatible") -> "OpenAIChatConfig":
+        if provider not in {"openai-compatible", "opencode", "deepseek"}:
+            raise ValueError(f"unsupported OpenAI-compatible provider: {provider}")
         api_style = values.get("PCUI_LLM_API_STYLE", "openai-chat-completions").strip()
         if api_style != "openai-chat-completions":
             raise ValueError("PCUI_LLM_API_STYLE currently supports only openai-chat-completions")
@@ -101,17 +106,45 @@ class OpenAIChatConfig:
         if overlap:
             raise ValueError("PCUI_LLM_EXTRA_BODY_JSON cannot override: "
                              + ", ".join(sorted(overlap)))
-        base_url = values.get("PCUI_LLM_BASE_URL",
-                              values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
-        model = values.get("PCUI_LLM_MODEL",
-                           values.get("DEEPSEEK_MODEL", "deepseek-v4-flash")).strip()
-        api_key = values.get("PCUI_LLM_API_KEY",
-                             values.get("DEEPSEEK_API_KEY", "")).strip()
-        api_path = values.get("PCUI_LLM_API_PATH", "/chat/completions").strip()
+        if provider == "opencode":
+            base_url = values.get(
+                "PCUI_OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1").strip()
+            model = values.get(
+                "PCUI_OPENCODE_MODEL",
+                values.get("PCUI_LLM_MODEL", "deepseek-v4-flash")).strip()
+            api_key = values.get("PCUI_OPENCODE_API_KEY", "").strip()
+            api_path = values.get(
+                "PCUI_OPENCODE_API_PATH", "/chat/completions").strip()
+        elif provider == "deepseek":
+            base_url = values.get(
+                "PCUI_DEEPSEEK_BASE_URL",
+                values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
+            model = values.get(
+                "PCUI_DEEPSEEK_MODEL",
+                values.get("DEEPSEEK_MODEL", "deepseek-v4-flash")).strip()
+            api_key = values.get(
+                "PCUI_DEEPSEEK_API_KEY",
+                values.get("PCUI_LLM_API_KEY",
+                           values.get("DEEPSEEK_API_KEY", ""))).strip()
+            api_path = values.get(
+                "PCUI_DEEPSEEK_API_PATH", "/chat/completions").strip()
+        else:
+            base_url = values.get(
+                "PCUI_LLM_BASE_URL",
+                values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
+            model = values.get(
+                "PCUI_LLM_MODEL",
+                values.get("DEEPSEEK_MODEL", "deepseek-v4-flash")).strip()
+            api_key = values.get(
+                "PCUI_LLM_API_KEY",
+                values.get("DEEPSEEK_API_KEY", "")).strip()
+            api_path = values.get("PCUI_LLM_API_PATH", "/chat/completions").strip()
         if not base_url or not model or not api_path.startswith("/"):
-            raise ValueError("PCUI_LLM_BASE_URL/model must be non-empty and API_PATH must start with /")
+            raise ValueError(
+                f"{provider} base URL/model must be non-empty and API path must start with /")
         return cls(
-            api_key=api_key, base_url=base_url, api_path=api_path, model=model,
+            api_key=api_key, provider=provider, base_url=base_url,
+            api_path=api_path, model=model,
             api_style=api_style,
             temperature=_optional_float(values, "PCUI_LLM_TEMPERATURE")
             if "PCUI_LLM_TEMPERATURE" in values else 0.3,
@@ -127,7 +160,7 @@ class OpenAIChatConfig:
     def safe_summary(self) -> str:
         thinking = self.thinking or "provider-default"
         effort = self.reasoning_effort if self.thinking == "enabled" else "n/a"
-        return (f"{self.api_style}, model={self.model}, thinking={thinking}, "
+        return (f"{self.provider}/{self.api_style}, model={self.model}, thinking={thinking}, "
                 f"reasoning_effort={effort}")
 
 
@@ -141,6 +174,9 @@ class OpenAICompatibleProvider:
     @property
     def thinking_enabled(self) -> bool:
         return self.config.thinking == "enabled"
+
+    def safe_summary(self) -> str:
+        return self.config.safe_summary()
 
     def with_thinking(self, enabled: bool) -> "OpenAICompatibleProvider":
         """Return an isolated surface-specific client without mutating shared config."""
@@ -197,6 +233,46 @@ class OpenAICompatibleProvider:
                           int(usage.get("completion_tokens") or 0),
                           int(usage.get("prompt_cache_hit_tokens") or 0),
                           int(usage.get("prompt_cache_miss_tokens") or 0))
+
+
+class FallbackProvider:
+    """Retry one failed chat call on a separately configured backup provider."""
+
+    def __init__(self, primary: LlmProvider, fallback: LlmProvider):
+        self.primary = primary
+        self.fallback = fallback
+        self.model = getattr(primary, "model", "unknown")
+
+    @property
+    def thinking_enabled(self) -> bool:
+        return bool(getattr(self.primary, "thinking_enabled", False))
+
+    def chat(self, messages: list[dict], tools: list[dict], *, max_tokens: int,
+             tool_choice: str, timeout: float) -> ChatResult:
+        started = time.monotonic()
+        try:
+            return self.primary.chat(
+                messages, tools, max_tokens=max_tokens,
+                tool_choice=tool_choice, timeout=timeout)
+        except LlmUnavailable as primary_error:
+            remaining = timeout - (time.monotonic() - started)
+            if remaining <= 0:
+                raise primary_error
+            try:
+                return self.fallback.chat(
+                    messages, tools, max_tokens=max_tokens,
+                    tool_choice=tool_choice, timeout=remaining)
+            except LlmUnavailable as fallback_error:
+                raise LlmUnavailable(
+                    "primary and fallback LLM providers unavailable "
+                    f"({primary_error}; {fallback_error})") from fallback_error
+
+    def safe_summary(self) -> str:
+        primary = getattr(getattr(self.primary, "config", None), "safe_summary", None)
+        fallback = getattr(getattr(self.fallback, "config", None), "safe_summary", None)
+        primary_text = primary() if primary else type(self.primary).__name__
+        fallback_text = fallback() if fallback else type(self.fallback).__name__
+        return f"{primary_text}; fallback={fallback_text}"
 
 
 class DeepSeekProvider(OpenAICompatibleProvider):

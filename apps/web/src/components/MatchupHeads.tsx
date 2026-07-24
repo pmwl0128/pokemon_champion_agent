@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GameImage } from "./GameImage.tsx";
 import { displayName, useT, type Lang } from "../i18n.ts";
+import { localName, useNameMaps } from "../lib/names.ts";
 
 export const pct = (n: number | null | undefined) => (n == null ? null : `${Math.round(n * 100)}%`);
 
@@ -56,6 +57,7 @@ function VariantPicker({ s, picks, onPick, onClose, lang, anchorRef, hintKey }: 
   hintKey?: "matchup.variantPick" | "matchup.variantPickCol";
 }) {
   const t = useT();
+  const maps = useNameMaps();
   const current = activeKey(s, picks);
   const ref = useRef<HTMLDivElement>(null);
   // The panel is position:fixed (it must escape the grid's overflow clip), so it is placed from the
@@ -117,15 +119,15 @@ function VariantPicker({ s, picks, onPick, onClose, lang, anchorRef, hintKey }: 
                 <span className={`variant-tag v-${buildLabel(i).toLowerCase()}`}>{buildLabel(i)}</span>
                 <span className="variant-main">
                   <span className="variant-item">
-                    {v.item ?? "—"}
+                    {v.item ? localName(maps.item, v.item, lang) : "—"}
                     {v.runForm && <span className="mega-badge" title={v.runForm}>MEGA</span>}
                   </span>
                   <span className="variant-ability">
-                    {v.ability ?? "—"}
+                    {v.ability ? localName(maps.ability, v.ability, lang) : "—"}
                     {v.baseAbility && v.baseAbility !== v.ability && (
                       <span className="variant-base-ability"
-                            title={t("matchup.variantBaseAbility").replace("{n}", v.baseAbility)}>
-                        ← {v.baseAbility}
+                            title={t("matchup.variantBaseAbility").replace("{n}", localName(maps.ability, v.baseAbility, lang))}>
+                        ← {localName(maps.ability, v.baseAbility, lang)}
                       </span>
                     )}
                     {v.runForm && (
@@ -160,6 +162,7 @@ export function ColHead({ s, lang, picks = {}, open = false, onToggle, onPick, o
   const v = activeVariant(s, picks);
   const multi = (s.variants?.length ?? 0) > 1 && !!onToggle;
   const headRef = useRef<HTMLTableCellElement>(null);
+  const maps = useNameMaps();
   // No usage rank under the sprite: with a build badge alongside it, two small numbers in one
   // narrow head read as a confusing pair. Rank stays in the tooltip and on the row head.
   const inner = (
@@ -169,7 +172,7 @@ export function ColHead({ s, lang, picks = {}, open = false, onToggle, onPick, o
   );
   return (
     <th ref={headRef} className={`col-head${v && !v.isModal ? " variant-active" : ""}${open ? " picking" : ""}`}
-        title={`#${s.rank ?? "—"} ${displayName(s, lang)}${v?.item ? ` · ${v.item}` : ""}`}>
+        title={`#${s.rank ?? "—"} ${displayName(s, lang)}${v?.item ? ` · ${localName(maps.item, v.item, lang)}` : ""}`}>
       {multi ? (
         <button type="button" className="head-pick" aria-expanded={open} onClick={onToggle}>
           {inner}
@@ -193,6 +196,7 @@ export function RowHead({ s, lang, picks = {}, open = false, onToggle, onPick, o
   const v = activeVariant(s, picks);
   const multi = (s.variants?.length ?? 0) > 1 && !!onToggle;
   const headRef = useRef<HTMLTableCellElement>(null);
+  const maps = useNameMaps();
   // No usage-rank digit here either: it sat right beside the A/B/C build badge and the two small
   // numbers read as one confusing pair. Rank stays in the row's tooltip.
   const inner = (
@@ -204,7 +208,7 @@ export function RowHead({ s, lang, picks = {}, open = false, onToggle, onPick, o
   );
   return (
     <th ref={headRef} className={`row-head${v && !v.isModal ? " variant-active" : ""}${open ? " picking" : ""}`}
-        title={`#${s.rank ?? "—"} ${displayName(s, lang)}${build ? ` · ${build}` : v?.item ? ` · ${v.item}` : ""}`}>
+        title={`#${s.rank ?? "—"} ${displayName(s, lang)}${build ? ` · ${build}` : v?.item ? ` · ${localName(maps.item, v.item, lang)}` : ""}`}>
       {multi ? (
         <button type="button" className="head-pick" aria-expanded={open} onClick={onToggle}>
           {inner}
