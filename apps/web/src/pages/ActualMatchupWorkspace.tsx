@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EntityHover } from "../components/EntityHover.tsx";
+import { AdaptiveCombobox } from "../components/AdaptiveCombobox.tsx";
 import { GameImage } from "../components/GameImage.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import {
@@ -144,8 +145,15 @@ function LocalizedInput({ list, rows, value, onChange, placeholder }: {
   onChange: (value: string) => void; placeholder?: string;
 }) {
   const { lang } = useLang();
-  return <input list={list} value={displayInputValue(rows, value, lang)}
-    onChange={(event) => onChange(canonicalInputValue(rows, event.target.value))}
+  const options = useMemo(() => rows.map((row) => ({
+    key: row.name,
+    value: localizedOption(row, lang),
+    secondary: row.name,
+    searchText: `${row.nameZh ?? ""} ${row.nameJa ?? ""}`,
+  })), [rows, lang]);
+  return <AdaptiveCombobox nativeListId={list}
+    value={displayInputValue(rows, value, lang)} options={options}
+    onValueChange={(next) => onChange(canonicalInputValue(rows, next))}
     placeholder={placeholder} />;
 }
 

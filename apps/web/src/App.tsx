@@ -102,8 +102,10 @@ function Shell() {
           )}
         </nav>
         <span className="env num" title={capabilities.deploymentId}>
-          {capabilities.environment.season} · {capabilities.environment.rule}
-          {capabilities.environment.asOf ? ` · ${capabilities.environment.asOf}` : ""}
+          <span>{capabilities.environment.season} · {capabilities.environment.rule}</span>
+          {capabilities.environment.asOf && (
+            <span className="env-date"> · {capabilities.environment.asOf}</span>
+          )}
         </span>
         <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("a11y.language")}>
           <option value="zh">中文</option>

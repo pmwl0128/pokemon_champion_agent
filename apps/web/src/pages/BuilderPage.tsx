@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FormatId } from "@pokemon-champions/protocol";
 import { EntityHover } from "../components/EntityHover.tsx";
+import { AdaptiveCombobox } from "../components/AdaptiveCombobox.tsx";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { SegmentedControl, segmentedPanelId, segmentedTabId }
@@ -498,14 +499,15 @@ export function BuilderPage() {
           </div>
           <div className="builder-field">
             <label htmlFor="builder-anchor">{t("builder.anchor")}</label>
-            <input id="builder-anchor" list="builder-anchor-options" value={anchor}
-                   maxLength={100} onChange={(e) => setAnchor(e.target.value)}
-                   placeholder={t("builder.anchorHint")} />
-            <datalist id="builder-anchor-options">
-              {dex.status === "ready" && dex.data.map((entry) => (
-                <option key={entry.slug} value={displayName(entry, lang)} />
-              ))}
-            </datalist>
+            <AdaptiveCombobox id="builder-anchor" value={anchor}
+              maxLength={100} onValueChange={setAnchor}
+              placeholder={t("builder.anchorHint")}
+              options={dex.status === "ready" ? dex.data.map((entry) => ({
+                key: entry.slug,
+                value: displayName(entry, lang),
+                secondary: entry.name,
+                searchText: `${entry.nameZh ?? ""} ${entry.nameJa ?? ""} ${entry.slug}`,
+              })) : []} />
           </div>
           <div className="builder-field">
             <label htmlFor="builder-owned">{t("builder.owned")}</label>

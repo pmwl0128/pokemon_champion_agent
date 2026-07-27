@@ -3,6 +3,7 @@
    brand blue reserved for links/focus. Numbers everywhere -> tabular-nums is the house rule. */
 :root {
   color-scheme: light dark;
+  --topbar-offset: 62px;
   --bg: #f6f8fc;
   --panel: #ffffff;
   --panel-2: #f0f3f8;
@@ -100,6 +101,7 @@ button, input, select {
 .topbar nav { display: flex; gap: 4px; flex: 1; }
 .topbar nav a {
   position: relative; padding: 9px 12px; border-radius: 7px; color: var(--sub); font-weight: 600;
+  white-space: nowrap;
 }
 .topbar nav a::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 1px;
   height: 2px; border-radius: 2px; background: var(--brand); transform: scaleX(0); opacity: 0;
@@ -117,9 +119,11 @@ button, input, select {
   padding: 5px 28px 5px 10px;
 }
 @media (max-width: 720px) {
+  :root { --topbar-offset: 101px; }
   .topbar { flex-wrap: wrap; gap: 8px 10px; padding: 8px 10px; }
   .topbar .logo { flex: none; }
   .topbar .env { margin-left: auto; white-space: nowrap; }
+  .topbar .env-date { display: none; }
   .topbar select { max-width: 88px; }
   .topbar nav {
     order: 2; flex: 0 0 100%; min-width: 0; overflow-x: auto; padding-bottom: 2px;
@@ -127,6 +131,16 @@ button, input, select {
   }
   .topbar nav::-webkit-scrollbar { display: none; }
   .topbar nav a { flex: none; padding: 5px 10px; white-space: nowrap; }
+}
+@media (min-width: 721px) and (max-width: 980px) {
+  .topbar { gap: 10px; padding: 8px 12px; }
+  .topbar .logo { gap: 7px; font-size: 15px; }
+  .topbar .logo img { width: 27px; height: 27px; }
+  .topbar nav { min-width: 0; gap: 0; overflow-x: auto; scrollbar-width: none; }
+  .topbar nav::-webkit-scrollbar { display: none; }
+  .topbar nav a { flex: none; padding: 7px 8px; }
+  .topbar .env { flex: none; padding: 5px 7px; font-size: 10.5px; }
+  .topbar select { flex: none; max-width: 94px; padding-left: 8px; }
 }
 main.content {
   flex: 1; width: min(1240px, 100% - 48px); margin: 0 auto; padding: 28px 0 72px;
@@ -672,12 +686,12 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .matchup-detail .md-lines { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: var(--sub); }
 .grade-pill, .matchup-detail .grade-pill { border-radius: 6px; padding: 1px 10px; font-weight: 700; font-size: 13px; }
 .matchup-page-header {
-  position: sticky; top: 62px; z-index: 8; margin: -8px -10px 14px; padding: 8px 10px 9px;
+  position: sticky; top: var(--topbar-offset); z-index: 8; margin: -8px -10px 14px; padding: 8px 10px 9px;
   background: color-mix(in srgb, var(--bg) 91%, transparent); border-bottom: 1px solid var(--line);
   backdrop-filter: blur(12px);
 }
 @media (max-width: 720px) {
-  .matchup-page-header { top: 104px; }
+  .matchup-page-header { top: var(--topbar-offset); }
 }
 
 /* ---- actual-set matchup workspace ---------------------------------------------------- */
@@ -1085,7 +1099,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .uep-result-block { padding: 4px 16px 12px; font-size: 13.5px; }
 .uep-result-block h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sub); margin: 8px 0 6px; }
 .uep-result-block ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.5; }
-.party-box { container-type: inline-size; }
+.party-box { min-width: 0; max-width: 100%; container-type: inline-size; }
 .party-copy-row {
   display: flex; justify-content: flex-end; align-items: center; gap: 8px;
   padding: 8px 16px 0; font-size: 12px;
@@ -1739,7 +1753,7 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 .diag-table tbody tr.diag-row-click { cursor: pointer; }
 .diag-table tbody tr.diag-row-click.on { background: var(--panel-2); }
 .diag-checks-table thead th {
-  position: sticky; top: 62px; z-index: 4; background: var(--panel);
+  position: sticky; top: var(--topbar-offset); z-index: 4; background: var(--panel);
   box-shadow: 0 1px 0 var(--line);
 }
 .diag-checks-table { table-layout: fixed; }
@@ -1831,6 +1845,20 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
   outline: none;
 }
+.adaptive-listbox {
+  position: fixed; z-index: 2000; overflow-y: auto; overscroll-behavior: contain;
+  padding: 4px; border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised);
+}
+.adaptive-listbox button {
+  width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 8px 10px; border: 0; border-radius: 7px;
+  background: transparent; color: inherit; text-align: left; cursor: pointer;
+}
+.adaptive-listbox button.active, .adaptive-listbox button:active { background: var(--brand-soft); }
+.adaptive-listbox button span { min-width: 0; overflow-wrap: anywhere; }
+.adaptive-listbox button small { flex: none; max-width: 45%; color: var(--sub); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
 .form-panel input:not([type="checkbox"]):not([type="radio"]), .form-panel select,
 .builder-field > input, .builder-field > textarea,
 .qa-form textarea, .uep-form textarea, .uep-checkpoint textarea,
@@ -1919,7 +1947,7 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px);
   box-shadow: var(--shadow);
 }
-.dex-search-row { position: sticky; top: 74px; z-index: 5; }
+.dex-search-row { position: sticky; top: calc(var(--topbar-offset) + 12px); z-index: 5; }
 .dex-item-card { min-height: 76px; border-color: var(--line); }
 .dex-item-card:hover {
   border-color: color-mix(in srgb, var(--brand) 52%, var(--line));
@@ -1989,6 +2017,7 @@ input:focus, select:focus, textarea:focus {
 
 /* charts + matrices */
 .trend-chart { padding: 10px; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.trend-mobile { display: none; }
 .matchup-scroll { border-color: var(--line); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
 .matchup-grid thead th, .matchup-grid th.row-head { background: color-mix(in srgb, var(--panel) 96%, var(--panel-2)); }
 .matchup-grid td:not(.diag):hover {
@@ -2072,7 +2101,7 @@ input:focus, select:focus, textarea:focus {
   .topbar nav a::after { left: 10px; right: 10px; }
   .page-title { font-size: 23px; }
   .page-header { margin-bottom: 16px; }
-  .dex-search-row { top: 124px; }
+  .dex-search-row { top: calc(var(--topbar-offset) + 12px); }
   .dex-grid.dense { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .dex-card { min-height: 126px; padding: 16px 6px 11px; }
   .dex-card img.sprite { width: 54px; height: 54px; }
@@ -2106,7 +2135,61 @@ input:focus, select:focus, textarea:focus {
   .tune-ai > .tune-cards { margin-left: 16px; margin-right: 16px; }
   .session-card-head .session-id { width: 100%; max-width: 100%; margin-left: 0; }
   .session-hero { padding: 16px; }
-  .diag-checks-table thead th { top: 137px; }
+  .diag-checks-table thead th { top: var(--topbar-offset); }
+}
+
+@media (max-width: 1080px) {
+  .session-table-head { display: none; }
+  .sessions-index .session-card {
+    grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; padding: 14px 16px;
+  }
+  .session-intent { align-self: center; }
+  .session-info, .session-kinds { grid-column: 1 / -1; }
+  .session-info { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+}
+
+@media (max-width: 900px) {
+  .session-page { grid-template-columns: minmax(0, 1fr); }
+  .session-page, .uep-card, .uep-result, .artifact-row { min-width: 0; max-width: 100%; }
+  .uep-card, .uep-slate-cand, .uep-frame-row { grid-template-columns: minmax(0, 1fr); }
+  .uep-flag { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+  .matchup-grid th.col-head { width: 40px; min-width: 40px; padding: 3px; }
+  .matchup-grid th.col-head .head-pick { min-height: 40px; }
+  .matchup-grid th.row-head { height: 40px; min-width: 132px; max-width: 132px; }
+  .matchup-grid td { width: 40px; min-width: 40px; height: 40px; }
+  .mini-x { width: 36px; height: 36px; font-size: 14px; }
+  .party-calc { width: 34px; height: 34px; opacity: 1; }
+  .party-copy-row .second-btn { min-height: 36px; }
+  .speed-presets button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
+  .tune-add-move { min-height: 40px; }
+  .linkish { min-height: 36px; display: inline-flex; align-items: center; padding: 6px 4px; }
+  .actual-topk-presets > button, .actual-topk-presets input { min-height: 36px; height: 36px; }
+}
+
+@media (max-width: 520px) and (orientation: portrait) {
+  .trend-chart { display: none; }
+  .trend-mobile { display: block; overflow: hidden; }
+  .trend-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+  .trend-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0;
+    font-variant-numeric: tabular-nums; }
+  .trend-table th, .trend-table td { height: 42px; padding: 6px 11px; border-bottom: 1px solid var(--line);
+    text-align: center; white-space: nowrap; }
+  .trend-table thead th { color: var(--sub); background: var(--panel-2); font-size: 11px;
+    font-weight: 700; }
+  .trend-table tbody td { min-width: 76px; color: var(--sub); font: 12px var(--font-mono); }
+  .trend-table tbody td.current { color: var(--ink); font-weight: 750; }
+  .trend-table .trend-identity { position: sticky; left: 0; z-index: 1; width: 146px; min-width: 146px;
+    max-width: 146px; text-align: left; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
+  .trend-table thead .trend-identity { z-index: 2; background: var(--panel-2); }
+  .trend-table .trend-identity a { display: flex; align-items: center; justify-content: space-between;
+    gap: 7px; color: var(--ink); }
+  .trend-table .trend-identity a:hover { text-decoration: none; }
+  .trend-table .trend-identity span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .trend-table .trend-identity small { flex: none; font: 700 10.5px var(--font-mono); }
+  .trend-table .trend-identity small.up { color: var(--success); }
+  .trend-table .trend-identity small.down { color: var(--danger); }
+  .trend-table .trend-identity small.flat { color: var(--sub); }
+  .trend-table tbody tr:last-child th, .trend-table tbody tr:last-child td { border-bottom: 0; }
 }
 
 @media (max-width: 420px) {

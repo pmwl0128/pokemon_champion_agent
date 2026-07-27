@@ -10,6 +10,7 @@ import {
   type Dispatch, type ReactNode, type SetStateAction,
 } from "react";
 import { GameImage } from "../../components/GameImage.tsx";
+import { AdaptiveCombobox } from "../../components/AdaptiveCombobox.tsx";
 import { displayName, useLang, useT } from "../../i18n.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { HttpError, type DexIndexEntry } from "../../runtime/adapter.ts";
@@ -228,9 +229,9 @@ export function itemOrder(a: { category?: string; name: string },
   return ca - cb || a.name.localeCompare(b.name);
 }
 
-/** Typeable trilingual item input (datalist), mirroring MonPicker: free text in any of the
+/** Typeable trilingual item input, mirroring MonPicker: free text in any of the
  * three languages resolves to the English canonical; empty clears. */
-export function ItemCombo({ idKey, value, onChange, items, disabled }: {
+export function ItemCombo({ value, onChange, items, disabled }: {
   idKey: string;
   value: string;
   onChange: (canonical: string) => void;
@@ -239,7 +240,6 @@ export function ItemCombo({ idKey, value, onChange, items, disabled }: {
   disabled?: boolean;
 }) {
   const { lang } = useLang();
-  const listId = `items-${idKey}`;
   const [text, setText] = useState("");
   useEffect(() => {
     const cur = items.find((i) => i.name === value);
@@ -248,7 +248,7 @@ export function ItemCombo({ idKey, value, onChange, items, disabled }: {
   }, [value, lang, items.length]);
   const options = useMemo(() => [...items].sort(itemOrder).map((i) => ({
     key: i.key, value: displayName(i, lang),
-    text: lang === "en" || !i.nameZh ? i.name : `${i.name}`,
+    secondary: i.name,
   })), [items, lang]);
   const resolve = (q: string): string | null => {
     const needle = q.trim().toLowerCase();
@@ -271,29 +271,23 @@ export function ItemCombo({ idKey, value, onChange, items, disabled }: {
     }
   };
   return (
-    <>
-      <input list={listId} value={text} disabled={disabled}
-        onChange={(e) => {
-          setText(e.target.value);
-          const q = e.target.value.trim();
+    <AdaptiveCombobox value={text} disabled={disabled} options={options}
+        onValueChange={(next) => {
+          setText(next);
+          const q = next.trim();
           const exact = items.find((i) =>
             displayName(i, lang) === q || i.name === q || i.nameZh === q || i.nameJa === q);
           if (exact) onChange(exact.name);
           else if (!q) onChange("");
         }}
-        onBlur={() => commit(text)}
-        onKeyDown={(e) => { if (e.key === "Enter") commit(text); }} />
-      <datalist id={listId}>
-        {options.map((o) => <option key={o.key} value={o.value}>{o.text}</option>)}
-      </datalist>
-    </>
+        onCommit={commit} />
   );
 }
 
-/** Trilingual mon input with a datalist + sprite; resolves zh/ja/en (and fuzzy via the adapter)
+/** Trilingual mon input with suggestions + sprite; resolves zh/ja/en (and fuzzy via the adapter)
  * to a dex slug. Reused by SideForm and the speed-ladder rows. `displayEntry` overrides the
  * sprite (the Mega form when the held stone activates). */
-export function MonPicker({ idKey, slug, onSlug, dex, placeholder, displayEntry }: {
+export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
   idKey: string;
   slug: string;
   onSlug: (slug: string) => void;
@@ -305,7 +299,6 @@ export function MonPicker({ idKey, slug, onSlug, dex, placeholder, displayEntry 
   const t = useT();
   const { adapter } = useRuntime();
   const entry = dex.find((e) => e.slug === slug);
-  const listId = `mons-${idKey}`;
   const [text, setText] = useState("");
   const resolveToken = useRef(0);
 
@@ -316,7 +309,7 @@ export function MonPicker({ idKey, slug, onSlug, dex, placeholder, displayEntry 
 
   const monOptions = useMemo(() => dex.map((e) => ({
     key: e.key, value: displayName(e, lang),
-    text: `${e.name}${e.nameZh && lang !== "zh" ? ` · ${e.nameZh}` : ""}`,
+    secondary: `${e.name}${e.nameZh && lang !== "zh" ? ` · ${e.nameZh}` : ""}`,
   })), [dex, lang]);
 
   const pick = (value: string) => {
@@ -343,11 +336,8 @@ export function MonPicker({ idKey, slug, onSlug, dex, placeholder, displayEntry 
     <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
       {shown && <GameImage assetKey={shown.key} role="card" alt={shown.name}
         className="mini mon-picker-img" />}
-      <input list={listId} value={text} onChange={(e) => pick(e.target.value)}
-        placeholder={placeholder ?? t("calc.pickHint")} />
-      <datalist id={listId}>
-        {monOptions.map((o) => <option key={o.key} value={o.value}>{o.text}</option>)}
-      </datalist>
+      <AdaptiveCombobox value={text} options={monOptions}
+        onValueChange={pick} placeholder={placeholder ?? t("calc.pickHint")} />
     </span>
   );
 }

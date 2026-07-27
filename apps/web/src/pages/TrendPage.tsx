@@ -2,6 +2,7 @@ import type { FormatId } from "@pokemon-champions/protocol";
 import { lazy, Suspense, useState } from "react";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
+import { TrendTable } from "../components/TrendTable.tsx";
 import { useTrend } from "../hooks.ts";
 import { useT } from "../i18n.ts";
 
@@ -28,6 +29,7 @@ export function TrendPage() {
       {trend.status === "ready" && (
         <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
           <TrendChart trend={trend.data} />
+          <TrendTable trend={trend.data} />
         </Suspense>
       )}
     </>

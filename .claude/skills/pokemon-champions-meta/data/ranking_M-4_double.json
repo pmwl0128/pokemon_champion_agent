@@ -2,7 +2,7 @@
   "season": "M-4",
   "rule": "M-B",
   "format": "double",
-  "updated_at": "2026-07-24T07:00:47+00:00",
+  "updated_at": "2026-07-27T09:24:30+00:00",
   "rows": [
     {
       "rank": 1,
@@ -39,22 +39,22 @@
     },
     {
       "rank": 4,
-      "pokemon": "喷火龙",
-      "alt_name": "喷火龙",
-      "slug": "charizard",
-      "pokemon_en": "Charizard",
-      "pokemon_ja": "リザードン",
+      "pokemon": "来悲粗茶",
+      "alt_name": "来悲粗茶",
+      "slug": "sinistcha",
+      "pokemon_en": "Sinistcha",
+      "pokemon_ja": "ヤバソチャ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 5,
-      "pokemon": "来悲粗茶",
-      "alt_name": "来悲粗茶",
-      "slug": "sinistcha",
-      "pokemon_en": "Sinistcha",
-      "pokemon_ja": "ヤバソチャ",
+      "pokemon": "喷火龙",
+      "alt_name": "喷火龙",
+      "slug": "charizard",
+      "pokemon_en": "Charizard",
+      "pokemon_ja": "リザードン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -116,22 +116,22 @@
     },
     {
       "rank": 11,
-      "pokemon": "铝钢桥龙",
-      "alt_name": "铝钢桥龙",
-      "slug": "archaludon",
-      "pokemon_en": "Archaludon",
-      "pokemon_ja": "ブリジュラス",
+      "pokemon": "姆克鹰",
+      "alt_name": "姆克鹰",
+      "slug": "staraptor",
+      "pokemon_en": "Staraptor",
+      "pokemon_ja": "ムクホーク",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 12,
-      "pokemon": "姆克鹰",
-      "alt_name": "姆克鹰",
-      "slug": "staraptor",
-      "pokemon_en": "Staraptor",
-      "pokemon_ja": "ムクホーク",
+      "pokemon": "铝钢桥龙",
+      "alt_name": "铝钢桥龙",
+      "slug": "archaludon",
+      "pokemon_en": "Archaludon",
+      "pokemon_ja": "ブリジュラス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -171,17 +171,6 @@
     },
     {
       "rank": 16,
-      "pokemon": "长毛巨魔",
-      "alt_name": "长毛巨魔",
-      "slug": "grimmsnarl",
-      "pokemon_en": "Grimmsnarl",
-      "pokemon_ja": "オーロンゲ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 17,
       "pokemon": "班基拉斯",
       "alt_name": "班基拉斯",
       "slug": "tyranitar",
@@ -192,23 +181,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 17,
+      "pokemon": "长毛巨魔",
+      "alt_name": "长毛巨魔",
+      "slug": "grimmsnarl",
+      "pokemon_en": "Grimmsnarl",
+      "pokemon_ja": "オーロンゲ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 18,
-      "pokemon": "雷丘",
-      "alt_name": "雷丘",
-      "slug": "raichu",
-      "pokemon_en": "Raichu",
-      "pokemon_ja": "ライチュウ",
+      "pokemon": "美纳斯",
+      "alt_name": "美纳斯",
+      "slug": "milotic",
+      "pokemon_en": "Milotic",
+      "pokemon_ja": "ミロカロス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 19,
-      "pokemon": "美纳斯",
-      "alt_name": "美纳斯",
-      "slug": "milotic",
-      "pokemon_en": "Milotic",
-      "pokemon_ja": "ミロカロス",
+      "pokemon": "雷丘",
+      "alt_name": "雷丘",
+      "slug": "raichu",
+      "pokemon_en": "Raichu",
+      "pokemon_ja": "ライチュウ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -248,17 +248,6 @@
     },
     {
       "rank": 23,
-      "pokemon": "巨金怪",
-      "alt_name": "巨金怪",
-      "slug": "metagross",
-      "pokemon_en": "Metagross",
-      "pokemon_ja": "メタグロス",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 24,
       "pokemon": "赛富豪",
       "alt_name": "赛富豪",
       "slug": "gholdengo",
@@ -269,23 +258,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 24,
+      "pokemon": "巨金怪",
+      "alt_name": "巨金怪",
+      "slug": "metagross",
+      "pokemon_en": "Metagross",
+      "pokemon_ja": "メタグロス",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 25,
-      "pokemon": "妖火红狐",
-      "alt_name": "妖火红狐",
-      "slug": "delphox",
-      "pokemon_en": "Delphox",
-      "pokemon_ja": "マフォクシー",
+      "pokemon": "一家鼠",
+      "alt_name": "一家鼠",
+      "slug": "maushold",
+      "pokemon_en": "Maushold",
+      "pokemon_ja": "イッカネズミ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 26,
-      "pokemon": "一家鼠",
-      "alt_name": "一家鼠",
-      "slug": "maushold",
-      "pokemon_en": "Maushold",
-      "pokemon_ja": "イッカネズミ",
+      "pokemon": "妖火红狐",
+      "alt_name": "妖火红狐",
+      "slug": "delphox",
+      "pokemon_en": "Delphox",
+      "pokemon_ja": "マフォクシー",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -336,22 +336,22 @@
     },
     {
       "rank": 31,
-      "pokemon": "花叶蒂（永恒之花）",
-      "alt_name": "花叶蒂（永恒之花）",
-      "slug": "floette-eternal",
-      "pokemon_en": "Floette-Eternal",
-      "pokemon_ja": "フラエッテ(永遠)",
+      "pokemon": "雪妖女",
+      "alt_name": "雪妖女",
+      "slug": "froslass",
+      "pokemon_en": "Froslass",
+      "pokemon_ja": "ユキメノコ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 32,
-      "pokemon": "雪妖女",
-      "alt_name": "雪妖女",
-      "slug": "froslass",
-      "pokemon_en": "Froslass",
-      "pokemon_ja": "ユキメノコ",
+      "pokemon": "花叶蒂（永恒之花）",
+      "alt_name": "花叶蒂（永恒之花）",
+      "slug": "floette-eternal",
+      "pokemon_en": "Floette-Eternal",
+      "pokemon_ja": "フラエッテ(永遠)",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -369,17 +369,6 @@
     },
     {
       "rank": 34,
-      "pokemon": "苍炎刃鬼",
-      "alt_name": "苍炎刃鬼",
-      "slug": "ceruledge",
-      "pokemon_en": "Ceruledge",
-      "pokemon_ja": "ソウブレイズ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 35,
       "pokemon": "烈箭鹰",
       "alt_name": "烈箭鹰",
       "slug": "talonflame",
@@ -390,23 +379,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 35,
+      "pokemon": "苍炎刃鬼",
+      "alt_name": "苍炎刃鬼",
+      "slug": "ceruledge",
+      "pokemon_en": "Ceruledge",
+      "pokemon_ja": "ソウブレイズ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 36,
-      "pokemon": "清洗洛托姆",
-      "alt_name": "清洗洛托姆",
-      "slug": "rotom-wash",
-      "pokemon_en": "Rotom-Wash",
-      "pokemon_ja": "ウォッシュロトム",
+      "pokemon": "弃世猴",
+      "alt_name": "弃世猴",
+      "slug": "annihilape",
+      "pokemon_en": "Annihilape",
+      "pokemon_ja": "コノヨザル",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 37,
-      "pokemon": "弃世猴",
-      "alt_name": "弃世猴",
-      "slug": "annihilape",
-      "pokemon_en": "Annihilape",
-      "pokemon_ja": "コノヨザル",
+      "pokemon": "清洗洛托姆",
+      "alt_name": "清洗洛托姆",
+      "slug": "rotom-wash",
+      "pokemon_en": "Rotom-Wash",
+      "pokemon_ja": "ウォッシュロトム",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -490,22 +490,22 @@
     },
     {
       "rank": 45,
-      "pokemon": "蚊香蛙皇",
-      "alt_name": "蚊香蛙皇",
-      "slug": "politoed",
-      "pokemon_en": "Politoed",
-      "pokemon_ja": "ニョロトノ",
+      "pokemon": "沙奈朵",
+      "alt_name": "沙奈朵",
+      "slug": "gardevoir",
+      "pokemon_en": "Gardevoir",
+      "pokemon_ja": "サーナイト",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 46,
-      "pokemon": "沙奈朵",
-      "alt_name": "沙奈朵",
-      "slug": "gardevoir",
-      "pokemon_en": "Gardevoir",
-      "pokemon_ja": "サーナイト",
+      "pokemon": "蚊香蛙皇",
+      "alt_name": "蚊香蛙皇",
+      "slug": "politoed",
+      "pokemon_en": "Politoed",
+      "pokemon_ja": "ニョロトノ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -600,17 +600,6 @@
     },
     {
       "rank": 55,
-      "pokemon": "头巾混混",
-      "alt_name": "头巾混混",
-      "slug": "scrafty",
-      "pokemon_en": "Scrafty",
-      "pokemon_ja": "ズルズキン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 56,
       "pokemon": "巨钳螳螂",
       "alt_name": "巨钳螳螂",
       "slug": "scizor",
@@ -621,18 +610,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 57,
-      "pokemon": "象牙猪",
-      "alt_name": "象牙猪",
-      "slug": "mamoswine",
-      "pokemon_en": "Mamoswine",
-      "pokemon_ja": "マンムー",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 58,
+      "rank": 56,
       "pokemon": "钢铠鸦",
       "alt_name": "钢铠鸦",
       "slug": "corviknight",
@@ -643,7 +621,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 59,
+      "rank": 57,
       "pokemon": "喷火驼",
       "alt_name": "喷火驼",
       "slug": "camerupt",
@@ -654,23 +632,45 @@
       "rule": "M-B"
     },
     {
+      "rank": 58,
+      "pokemon": "头巾混混",
+      "alt_name": "头巾混混",
+      "slug": "scrafty",
+      "pokemon_en": "Scrafty",
+      "pokemon_ja": "ズルズキン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 59,
+      "pokemon": "象牙猪",
+      "alt_name": "象牙猪",
+      "slug": "mamoswine",
+      "pokemon_en": "Mamoswine",
+      "pokemon_ja": "マンムー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 60,
-      "pokemon": "智挥猩",
-      "alt_name": "智挥猩",
-      "slug": "oranguru",
-      "pokemon_en": "Oranguru",
-      "pokemon_ja": "ヤレユータン",
+      "pokemon": "杖尾鳞甲龙",
+      "alt_name": "杖尾鳞甲龙",
+      "slug": "kommo-o",
+      "pokemon_en": "Kommo-o",
+      "pokemon_ja": "ジャラランガ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 61,
-      "pokemon": "杖尾鳞甲龙",
-      "alt_name": "杖尾鳞甲龙",
-      "slug": "kommo-o",
-      "pokemon_en": "Kommo-o",
-      "pokemon_ja": "ジャラランガ",
+      "pokemon": "智挥猩",
+      "alt_name": "智挥猩",
+      "slug": "oranguru",
+      "pokemon_en": "Oranguru",
+      "pokemon_ja": "ヤレユータン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -699,22 +699,22 @@
     },
     {
       "rank": 64,
-      "pokemon": "鬃岩狼人（黄昏的样子）",
-      "alt_name": "鬃岩狼人（黄昏的样子）",
-      "slug": "lycanroc-dusk",
-      "pokemon_en": "Lycanroc-Dusk",
-      "pokemon_ja": "ルガルガン(黄昏)",
+      "pokemon": "多龙巴鲁托",
+      "alt_name": "多龙巴鲁托",
+      "slug": "dragapult",
+      "pokemon_en": "Dragapult",
+      "pokemon_ja": "ドラパルト",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 65,
-      "pokemon": "火炎狮",
-      "alt_name": "火炎狮",
-      "slug": "pyroar",
-      "pokemon_en": "Pyroar",
-      "pokemon_ja": "カエンジシ",
+      "pokemon": "鬃岩狼人（黄昏的样子）",
+      "alt_name": "鬃岩狼人（黄昏的样子）",
+      "slug": "lycanroc-dusk",
+      "pokemon_en": "Lycanroc-Dusk",
+      "pokemon_ja": "ルガルガン(黄昏)",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -732,28 +732,17 @@
     },
     {
       "rank": 67,
-      "pokemon": "多龙巴鲁托",
-      "alt_name": "多龙巴鲁托",
-      "slug": "dragapult",
-      "pokemon_en": "Dragapult",
-      "pokemon_ja": "ドラパルト",
+      "pokemon": "火炎狮",
+      "alt_name": "火炎狮",
+      "slug": "pyroar",
+      "pokemon_en": "Pyroar",
+      "pokemon_ja": "カエンジシ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 68,
-      "pokemon": "墓扬犬",
-      "alt_name": "墓扬犬",
-      "slug": "houndstone",
-      "pokemon_en": "Houndstone",
-      "pokemon_ja": "ハカドッグ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 69,
       "pokemon": "暴鲤龙",
       "alt_name": "暴鲤龙",
       "slug": "gyarados",
@@ -764,18 +753,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 70,
-      "pokemon": "万针鱼",
-      "alt_name": "万针鱼",
-      "slug": "overqwil",
-      "pokemon_en": "Overqwil",
-      "pokemon_ja": "ハリーマン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 71,
+      "rank": 69,
       "pokemon": "甲贺忍蛙",
       "alt_name": "甲贺忍蛙",
       "slug": "greninja",
@@ -786,7 +764,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 72,
+      "rank": 70,
       "pokemon": "巨锻匠",
       "alt_name": "巨锻匠",
       "slug": "tinkaton",
@@ -797,7 +775,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 73,
+      "rank": 71,
       "pokemon": "大竺葵",
       "alt_name": "大竺葵",
       "slug": "meganium",
@@ -808,29 +786,29 @@
       "rule": "M-B"
     },
     {
+      "rank": 72,
+      "pokemon": "万针鱼",
+      "alt_name": "万针鱼",
+      "slug": "overqwil",
+      "pokemon_en": "Overqwil",
+      "pokemon_ja": "ハリーマン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 73,
+      "pokemon": "墓扬犬",
+      "alt_name": "墓扬犬",
+      "slug": "houndstone",
+      "pokemon_en": "Houndstone",
+      "pokemon_ja": "ハカドッグ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 74,
-      "pokemon": "玛狃拉",
-      "alt_name": "玛狃拉",
-      "slug": "weavile",
-      "pokemon_en": "Weavile",
-      "pokemon_ja": "マニューラ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 75,
-      "pokemon": "霸王花",
-      "alt_name": "霸王花",
-      "slug": "vileplume",
-      "pokemon_en": "Vileplume",
-      "pokemon_ja": "ラフレシア",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 76,
       "pokemon": "皮可西",
       "alt_name": "皮可西",
       "slug": "clefable",
@@ -841,18 +819,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 77,
-      "pokemon": "加热洛托姆",
-      "alt_name": "加热洛托姆",
-      "slug": "rotom-heat",
-      "pokemon_en": "Rotom-Heat",
-      "pokemon_ja": "ヒートロトム",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 78,
+      "rank": 75,
       "pokemon": "麻麻鳗鱼王",
       "alt_name": "麻麻鳗鱼王",
       "slug": "eelektross",
@@ -863,7 +830,18 @@
       "rule": "M-B"
     },
     {
-      "rank": 79,
+      "rank": 76,
+      "pokemon": "玛狃拉",
+      "alt_name": "玛狃拉",
+      "slug": "weavile",
+      "pokemon_en": "Weavile",
+      "pokemon_ja": "マニューラ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 77,
       "pokemon": "布莉姆温",
       "alt_name": "布莉姆温",
       "slug": "hatterene",
@@ -874,7 +852,18 @@
       "rule": "M-B"
     },
     {
-      "rank": 80,
+      "rank": 78,
+      "pokemon": "加热洛托姆",
+      "alt_name": "加热洛托姆",
+      "slug": "rotom-heat",
+      "pokemon_en": "Rotom-Heat",
+      "pokemon_ja": "ヒートロトム",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 79,
       "pokemon": "卡比兽",
       "alt_name": "卡比兽",
       "slug": "snorlax",
@@ -885,7 +874,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 81,
+      "rank": 80,
       "pokemon": "超能妙喵",
       "alt_name": "超能妙喵",
       "slug": "meowstic",
@@ -896,7 +885,29 @@
       "rule": "M-B"
     },
     {
+      "rank": 81,
+      "pokemon": "霸王花",
+      "alt_name": "霸王花",
+      "slug": "vileplume",
+      "pokemon_en": "Vileplume",
+      "pokemon_ja": "ラフレシア",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 82,
+      "pokemon": "双倍多多冰",
+      "alt_name": "双倍多多冰",
+      "slug": "vanilluxe",
+      "pokemon_en": "Vanilluxe",
+      "pokemon_ja": "バイバニラ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 83,
       "pokemon": "劈斧螳螂",
       "alt_name": "劈斧螳螂",
       "slug": "kleavor",
@@ -907,23 +918,12 @@
       "rule": "M-B"
     },
     {
-      "rank": 83,
+      "rank": 84,
       "pokemon": "老翁龙",
       "alt_name": "老翁龙",
       "slug": "drampa",
       "pokemon_en": "Drampa",
       "pokemon_ja": "ジジーロン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 84,
-      "pokemon": "大剑鬼（洗翠的样子）",
-      "alt_name": "大剑鬼（洗翠的样子）",
-      "slug": "samurott-hisui",
-      "pokemon_en": "Samurott-Hisui",
-      "pokemon_ja": "ヒスイダイケンキ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -952,17 +952,6 @@
     },
     {
       "rank": 87,
-      "pokemon": "红莲铠骑",
-      "alt_name": "红莲铠骑",
-      "slug": "armarouge",
-      "pokemon_en": "Armarouge",
-      "pokemon_ja": "グレンアルマ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 88,
       "pokemon": "风速狗（洗翠的样子）",
       "alt_name": "风速狗（洗翠的样子）",
       "slug": "arcanine-hisui",
@@ -973,7 +962,29 @@
       "rule": "M-B"
     },
     {
+      "rank": 88,
+      "pokemon": "红莲铠骑",
+      "alt_name": "红莲铠骑",
+      "slug": "armarouge",
+      "pokemon_en": "Armarouge",
+      "pokemon_ja": "グレンアルマ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 89,
+      "pokemon": "大剑鬼（洗翠的样子）",
+      "alt_name": "大剑鬼（洗翠的样子）",
+      "slug": "samurott-hisui",
+      "pokemon_en": "Samurott-Hisui",
+      "pokemon_ja": "ヒスイダイケンキ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 90,
       "pokemon": "电肚蛙",
       "alt_name": "电肚蛙",
       "slug": "bellibolt",
@@ -984,29 +995,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 90,
-      "pokemon": "双倍多多冰",
-      "alt_name": "双倍多多冰",
-      "slug": "vanilluxe",
-      "pokemon_en": "Vanilluxe",
-      "pokemon_ja": "バイバニラ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
       "rank": 91,
-      "pokemon": "宝石海星",
-      "alt_name": "宝石海星",
-      "slug": "starmie",
-      "pokemon_en": "Starmie",
-      "pokemon_ja": "スターミー",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 92,
       "pokemon": "坚盾剑怪",
       "alt_name": "坚盾剑怪",
       "slug": "aegislash",
@@ -1017,23 +1006,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 92,
+      "pokemon": "宝石海星",
+      "alt_name": "宝石海星",
+      "slug": "starmie",
+      "pokemon_en": "Starmie",
+      "pokemon_ja": "スターミー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 93,
-      "pokemon": "幽尾玄鱼（雌性的样子）",
-      "alt_name": "幽尾玄鱼（雌性的样子）",
-      "slug": "basculegion-f",
-      "pokemon_en": "Basculegion-F",
-      "pokemon_ja": "イダイトウ(メス)",
+      "pokemon": "滴蛛霸",
+      "alt_name": "滴蛛霸",
+      "slug": "araquanid",
+      "pokemon_en": "Araquanid",
+      "pokemon_ja": "オニシズクモ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 94,
-      "pokemon": "滴蛛霸",
-      "alt_name": "滴蛛霸",
-      "slug": "araquanid",
-      "pokemon_en": "Araquanid",
-      "pokemon_ja": "オニシズクモ",
+      "pokemon": "幽尾玄鱼（雌性的样子）",
+      "alt_name": "幽尾玄鱼（雌性的样子）",
+      "slug": "basculegion-f",
+      "pokemon_en": "Basculegion-F",
+      "pokemon_ja": "イダイトウ(メス)",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1084,11 +1084,11 @@
     },
     {
       "rank": 99,
-      "pokemon": "长耳兔",
-      "alt_name": "长耳兔",
-      "slug": "lopunny",
-      "pokemon_en": "Lopunny",
-      "pokemon_ja": "ミミロップ",
+      "pokemon": "光电伞蜥",
+      "alt_name": "光电伞蜥",
+      "slug": "heliolisk",
+      "pokemon_en": "Heliolisk",
+      "pokemon_ja": "エレザード",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1106,22 +1106,22 @@
     },
     {
       "rank": 101,
-      "pokemon": "光电伞蜥",
-      "alt_name": "光电伞蜥",
-      "slug": "heliolisk",
-      "pokemon_en": "Heliolisk",
-      "pokemon_ja": "エレザード",
+      "pokemon": "长耳兔",
+      "alt_name": "长耳兔",
+      "slug": "lopunny",
+      "pokemon_en": "Lopunny",
+      "pokemon_ja": "ミミロップ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 102,
-      "pokemon": "大力鳄",
-      "alt_name": "大力鳄",
-      "slug": "feraligatr",
-      "pokemon_en": "Feraligatr",
-      "pokemon_ja": "オーダイル",
+      "pokemon": "摔角鹰人",
+      "alt_name": "摔角鹰人",
+      "slug": "hawlucha",
+      "pokemon_en": "Hawlucha",
+      "pokemon_ja": "ルチャブル",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1139,6 +1139,17 @@
     },
     {
       "rank": 104,
+      "pokemon": "大力鳄",
+      "alt_name": "大力鳄",
+      "slug": "feraligatr",
+      "pokemon_en": "Feraligatr",
+      "pokemon_ja": "オーダイル",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 105,
       "pokemon": "毒藻龙",
       "alt_name": "毒藻龙",
       "slug": "dragalge",
@@ -1149,73 +1160,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 105,
-      "pokemon": "摔角鹰人",
-      "alt_name": "摔角鹰人",
-      "slug": "hawlucha",
-      "pokemon_en": "Hawlucha",
-      "pokemon_ja": "ルチャブル",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
       "rank": 106,
-      "pokemon": "暴雪王",
-      "alt_name": "暴雪王",
-      "slug": "abomasnow",
-      "pokemon_en": "Abomasnow",
-      "pokemon_ja": "ユキノオー",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 107,
-      "pokemon": "波士可多拉",
-      "alt_name": "波士可多拉",
-      "slug": "aggron",
-      "pokemon_en": "Aggron",
-      "pokemon_ja": "ボスゴドラ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 108,
-      "pokemon": "好胜毛蟹",
-      "alt_name": "好胜毛蟹",
-      "slug": "crabominable",
-      "pokemon_en": "Crabominable",
-      "pokemon_ja": "ケケンカニ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 109,
-      "pokemon": "帝王拿波",
-      "alt_name": "帝王拿波",
-      "slug": "empoleon",
-      "pokemon_en": "Empoleon",
-      "pokemon_ja": "エンペルト",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 110,
-      "pokemon": "超能艳鸵",
-      "alt_name": "超能艳鸵",
-      "slug": "espathra",
-      "pokemon_en": "Espathra",
-      "pokemon_ja": "クエスパトラ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 111,
       "pokemon": "重泥挽马",
       "alt_name": "重泥挽马",
       "slug": "mudsdale",
@@ -1226,7 +1171,29 @@
       "rule": "M-B"
     },
     {
-      "rank": 112,
+      "rank": 107,
+      "pokemon": "帝王拿波",
+      "alt_name": "帝王拿波",
+      "slug": "empoleon",
+      "pokemon_en": "Empoleon",
+      "pokemon_ja": "エンペルト",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 108,
+      "pokemon": "波士可多拉",
+      "alt_name": "波士可多拉",
+      "slug": "aggron",
+      "pokemon_en": "Aggron",
+      "pokemon_ja": "ボスゴドラ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 109,
       "pokemon": "月亮伊布",
       "alt_name": "月亮伊布",
       "slug": "umbreon",
@@ -1237,29 +1204,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 113,
-      "pokemon": "狙射树枭（洗翠的样子）",
-      "alt_name": "狙射树枭（洗翠的样子）",
-      "slug": "decidueye-hisui",
-      "pokemon_en": "Decidueye-Hisui",
-      "pokemon_ja": "ヒスイジュナイパー",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 114,
-      "pokemon": "黏美龙（洗翠的样子）",
-      "alt_name": "黏美龙（洗翠的样子）",
-      "slug": "goodra-hisui",
-      "pokemon_en": "Goodra-Hisui",
-      "pokemon_ja": "ヒスイヌメルゴン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 115,
+      "rank": 110,
       "pokemon": "天蝎王",
       "alt_name": "天蝎王",
       "slug": "gliscor",
@@ -1270,7 +1215,51 @@
       "rule": "M-B"
     },
     {
-      "rank": 116,
+      "rank": 111,
+      "pokemon": "超能艳鸵",
+      "alt_name": "超能艳鸵",
+      "slug": "espathra",
+      "pokemon_en": "Espathra",
+      "pokemon_ja": "クエスパトラ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 112,
+      "pokemon": "好胜毛蟹",
+      "alt_name": "好胜毛蟹",
+      "slug": "crabominable",
+      "pokemon_en": "Crabominable",
+      "pokemon_ja": "ケケンカニ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 113,
+      "pokemon": "黏美龙（洗翠的样子）",
+      "alt_name": "黏美龙（洗翠的样子）",
+      "slug": "goodra-hisui",
+      "pokemon_en": "Goodra-Hisui",
+      "pokemon_ja": "ヒスイヌメルゴン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 114,
+      "pokemon": "暴雪王",
+      "alt_name": "暴雪王",
+      "slug": "abomasnow",
+      "pokemon_en": "Abomasnow",
+      "pokemon_ja": "ユキノオー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 115,
       "pokemon": "踏冰人偶",
       "alt_name": "踏冰人偶",
       "slug": "mr-rime",
@@ -1281,40 +1270,18 @@
       "rule": "M-B"
     },
     {
+      "rank": 116,
+      "pokemon": "狙射树枭（洗翠的样子）",
+      "alt_name": "狙射树枭（洗翠的样子）",
+      "slug": "decidueye-hisui",
+      "pokemon_en": "Decidueye-Hisui",
+      "pokemon_ja": "ヒスイジュナイパー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 117,
-      "pokemon": "呆呆王（伽勒尔的样子）",
-      "alt_name": "呆呆王（伽勒尔的样子）",
-      "slug": "slowking-galar",
-      "pokemon_en": "Slowking-Galar",
-      "pokemon_ja": "ガラルヤドキング",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 118,
-      "pokemon": "大钢蛇",
-      "alt_name": "大钢蛇",
-      "slug": "steelix",
-      "pokemon_en": "Steelix",
-      "pokemon_ja": "ハガネール",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 119,
-      "pokemon": "九尾",
-      "alt_name": "九尾",
-      "slug": "ninetales",
-      "pokemon_en": "Ninetales",
-      "pokemon_ja": "キュウコン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 120,
       "pokemon": "君主蛇",
       "alt_name": "君主蛇",
       "slug": "serperior",
@@ -1325,7 +1292,29 @@
       "rule": "M-B"
     },
     {
-      "rank": 121,
+      "rank": 118,
+      "pokemon": "呆呆王（伽勒尔的样子）",
+      "alt_name": "呆呆王（伽勒尔的样子）",
+      "slug": "slowking-galar",
+      "pokemon_en": "Slowking-Galar",
+      "pokemon_ja": "ガラルヤドキング",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 119,
+      "pokemon": "大钢蛇",
+      "alt_name": "大钢蛇",
+      "slug": "steelix",
+      "pokemon_en": "Steelix",
+      "pokemon_ja": "ハガネール",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 120,
       "pokemon": "胡地",
       "alt_name": "胡地",
       "slug": "alakazam",
@@ -1336,18 +1325,18 @@
       "rule": "M-B"
     },
     {
-      "rank": 122,
-      "pokemon": "蜈蚣王",
-      "alt_name": "蜈蚣王",
-      "slug": "scolipede",
-      "pokemon_en": "Scolipede",
-      "pokemon_ja": "ペンドラー",
+      "rank": 121,
+      "pokemon": "九尾",
+      "alt_name": "九尾",
+      "slug": "ninetales",
+      "pokemon_en": "Ninetales",
+      "pokemon_ja": "キュウコン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
-      "rank": 123,
+      "rank": 122,
       "pokemon": "海豚侠",
       "alt_name": "海豚侠",
       "slug": "palafin",
@@ -1358,29 +1347,18 @@
       "rule": "M-B"
     },
     {
+      "rank": 123,
+      "pokemon": "蜈蚣王",
+      "alt_name": "蜈蚣王",
+      "slug": "scolipede",
+      "pokemon_en": "Scolipede",
+      "pokemon_ja": "ペンドラー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 124,
-      "pokemon": "黑鲁加",
-      "alt_name": "黑鲁加",
-      "slug": "houndoom",
-      "pokemon_en": "Houndoom",
-      "pokemon_ja": "ヘルガー",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 125,
-      "pokemon": "盔甲鸟",
-      "alt_name": "盔甲鸟",
-      "slug": "skarmory",
-      "pokemon_en": "Skarmory",
-      "pokemon_ja": "エアームド",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 126,
       "pokemon": "骨纹巨声鳄",
       "alt_name": "骨纹巨声鳄",
       "slug": "skeledirge",
@@ -1391,7 +1369,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 127,
+      "rank": 125,
       "pokemon": "电龙",
       "alt_name": "电龙",
       "slug": "ampharos",
@@ -1402,51 +1380,29 @@
       "rule": "M-B"
     },
     {
+      "rank": 126,
+      "pokemon": "黑鲁加",
+      "alt_name": "黑鲁加",
+      "slug": "houndoom",
+      "pokemon_en": "Houndoom",
+      "pokemon_ja": "ヘルガー",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 127,
+      "pokemon": "盔甲鸟",
+      "alt_name": "盔甲鸟",
+      "slug": "skarmory",
+      "pokemon_en": "Skarmory",
+      "pokemon_ja": "エアームド",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 128,
-      "pokemon": "风速狗",
-      "alt_name": "风速狗",
-      "slug": "arcanine",
-      "pokemon_en": "Arcanine",
-      "pokemon_ja": "ウインディ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 129,
-      "pokemon": "布里卡隆",
-      "alt_name": "布里卡隆",
-      "slug": "chesnaught",
-      "pokemon_en": "Chesnaught",
-      "pokemon_ja": "ブリガロン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 130,
-      "pokemon": "诡角鹿",
-      "alt_name": "诡角鹿",
-      "slug": "wyrdeer",
-      "pokemon_en": "Wyrdeer",
-      "pokemon_ja": "アヤシシ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 131,
-      "pokemon": "冰伊布",
-      "alt_name": "冰伊布",
-      "slug": "glaceon",
-      "pokemon_en": "Glaceon",
-      "pokemon_ja": "グレイシア",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 132,
       "pokemon": "百变怪",
       "alt_name": "百变怪",
       "slug": "ditto",
@@ -1457,7 +1413,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 133,
+      "rank": 129,
       "pokemon": "修建老匠",
       "alt_name": "修建老匠",
       "slug": "conkeldurr",
@@ -1468,12 +1424,56 @@
       "rule": "M-B"
     },
     {
-      "rank": 134,
+      "rank": 130,
       "pokemon": "花岩怪",
       "alt_name": "花岩怪",
       "slug": "spiritomb",
       "pokemon_en": "Spiritomb",
       "pokemon_ja": "ミカルゲ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 131,
+      "pokemon": "布里卡隆",
+      "alt_name": "布里卡隆",
+      "slug": "chesnaught",
+      "pokemon_en": "Chesnaught",
+      "pokemon_ja": "ブリガロン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 132,
+      "pokemon": "风速狗",
+      "alt_name": "风速狗",
+      "slug": "arcanine",
+      "pokemon_en": "Arcanine",
+      "pokemon_ja": "ウインディ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 133,
+      "pokemon": "诡角鹿",
+      "alt_name": "诡角鹿",
+      "slug": "wyrdeer",
+      "pokemon_en": "Wyrdeer",
+      "pokemon_ja": "アヤシシ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 134,
+      "pokemon": "冰伊布",
+      "alt_name": "冰伊布",
+      "slug": "glaceon",
+      "pokemon_en": "Glaceon",
+      "pokemon_ja": "グレイシア",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1491,28 +1491,6 @@
     },
     {
       "rank": 136,
-      "pokemon": "肯泰罗（帕底亚的样子・水澜种）",
-      "alt_name": "肯泰罗（帕底亚的样子・水澜种）",
-      "slug": "tauros-paldea-aqua",
-      "pokemon_en": "Tauros-Paldea-Aqua",
-      "pokemon_ja": "パルデアケンタロス(水)",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 137,
-      "pokemon": "钢炮臂虾",
-      "alt_name": "钢炮臂虾",
-      "slug": "clawitzer",
-      "pokemon_en": "Clawitzer",
-      "pokemon_ja": "ブロスター",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 138,
       "pokemon": "河马兽",
       "alt_name": "河马兽",
       "slug": "hippowdon",
@@ -1523,12 +1501,34 @@
       "rule": "M-B"
     },
     {
-      "rank": 139,
+      "rank": 137,
       "pokemon": "霜奶仙",
       "alt_name": "霜奶仙",
       "slug": "alcremie",
       "pokemon_en": "Alcremie",
       "pokemon_ja": "マホイップ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 138,
+      "pokemon": "肯泰罗（帕底亚的样子・水澜种）",
+      "alt_name": "肯泰罗（帕底亚的样子・水澜种）",
+      "slug": "tauros-paldea-aqua",
+      "pokemon_en": "Tauros-Paldea-Aqua",
+      "pokemon_ja": "パルデアケンタロス(水)",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 139,
+      "pokemon": "钢炮臂虾",
+      "alt_name": "钢炮臂虾",
+      "slug": "clawitzer",
+      "pokemon_en": "Clawitzer",
+      "pokemon_ja": "ブロスター",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1557,17 +1557,6 @@
     },
     {
       "rank": 142,
-      "pokemon": "超甲狂犀",
-      "alt_name": "超甲狂犀",
-      "slug": "rhyperior",
-      "pokemon_en": "Rhyperior",
-      "pokemon_ja": "ドサイドン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 143,
       "pokemon": "赫拉克罗斯",
       "alt_name": "赫拉克罗斯",
       "slug": "heracross",
@@ -1578,23 +1567,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 143,
+      "pokemon": "呆壳兽（伽勒尔的样子）",
+      "alt_name": "呆壳兽（伽勒尔的样子）",
+      "slug": "slowbro-galar",
+      "pokemon_en": "Slowbro-Galar",
+      "pokemon_ja": "ガラルヤドラン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 144,
-      "pokemon": "呆壳兽",
-      "alt_name": "呆壳兽",
-      "slug": "slowbro",
-      "pokemon_en": "Slowbro",
-      "pokemon_ja": "ヤドラン",
+      "pokemon": "超甲狂犀",
+      "alt_name": "超甲狂犀",
+      "slug": "rhyperior",
+      "pokemon_en": "Rhyperior",
+      "pokemon_ja": "ドサイドン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 145,
-      "pokemon": "呆壳兽（伽勒尔的样子）",
-      "alt_name": "呆壳兽（伽勒尔的样子）",
-      "slug": "slowbro-galar",
-      "pokemon_en": "Slowbro-Galar",
-      "pokemon_ja": "ガラルヤドラン",
+      "pokemon": "呆壳兽",
+      "alt_name": "呆壳兽",
+      "slug": "slowbro",
+      "pokemon_en": "Slowbro",
+      "pokemon_ja": "ヤドラン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1612,22 +1612,22 @@
     },
     {
       "rank": 147,
-      "pokemon": "流氓鳄",
-      "alt_name": "流氓鳄",
-      "slug": "krookodile",
-      "pokemon_en": "Krookodile",
-      "pokemon_ja": "ワルビアル",
+      "pokemon": "冰雪巨龙",
+      "alt_name": "冰雪巨龙",
+      "slug": "aurorus",
+      "pokemon_en": "Aurorus",
+      "pokemon_ja": "アマルルガ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 148,
-      "pokemon": "冰雪巨龙",
-      "alt_name": "冰雪巨龙",
-      "slug": "aurorus",
-      "pokemon_en": "Aurorus",
-      "pokemon_ja": "アマルルガ",
+      "pokemon": "流氓鳄",
+      "alt_name": "流氓鳄",
+      "slug": "krookodile",
+      "pokemon_en": "Krookodile",
+      "pokemon_ja": "ワルビアル",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1645,17 +1645,6 @@
     },
     {
       "rank": 150,
-      "pokemon": "芳香精",
-      "alt_name": "芳香精",
-      "slug": "aromatisse",
-      "pokemon_en": "Aromatisse",
-      "pokemon_ja": "フレフワン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 151,
       "pokemon": "太阳伊布",
       "alt_name": "太阳伊布",
       "slug": "espeon",
@@ -1666,7 +1655,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 152,
+      "rank": 151,
       "pokemon": "音波龙",
       "alt_name": "音波龙",
       "slug": "noivern",
@@ -1677,7 +1666,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 153,
+      "rank": 152,
       "pokemon": "烈焰猴",
       "alt_name": "烈焰猴",
       "slug": "infernape",
@@ -1688,40 +1677,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 154,
-      "pokemon": "拖拖蚓",
-      "alt_name": "拖拖蚓",
-      "slug": "orthworm",
-      "pokemon_en": "Orthworm",
-      "pokemon_ja": "ミミズズ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 155,
-      "pokemon": "冰岩怪（洗翠的样子）",
-      "alt_name": "冰岩怪（洗翠的样子）",
-      "slug": "avalugg-hisui",
-      "pokemon_en": "Avalugg-Hisui",
-      "pokemon_ja": "ヒスイクレベース",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 156,
-      "pokemon": "恰雷姆",
-      "alt_name": "恰雷姆",
-      "slug": "medicham",
-      "pokemon_en": "Medicham",
-      "pokemon_ja": "チャーレム",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 157,
+      "rank": 153,
       "pokemon": "水伊布",
       "alt_name": "水伊布",
       "slug": "vaporeon",
@@ -1732,18 +1688,29 @@
       "rule": "M-B"
     },
     {
-      "rank": 158,
-      "pokemon": "火暴兽",
-      "alt_name": "火暴兽",
-      "slug": "typhlosion",
-      "pokemon_en": "Typhlosion",
-      "pokemon_ja": "バクフーン",
+      "rank": 154,
+      "pokemon": "恰雷姆",
+      "alt_name": "恰雷姆",
+      "slug": "medicham",
+      "pokemon_en": "Medicham",
+      "pokemon_ja": "チャーレム",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
-      "rank": 159,
+      "rank": 155,
+      "pokemon": "拖拖蚓",
+      "alt_name": "拖拖蚓",
+      "slug": "orthworm",
+      "pokemon_en": "Orthworm",
+      "pokemon_ja": "ミミズズ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 156,
       "pokemon": "迭失板",
       "alt_name": "迭失板",
       "slug": "runerigus",
@@ -1754,23 +1721,56 @@
       "rule": "M-B"
     },
     {
+      "rank": 157,
+      "pokemon": "芳香精",
+      "alt_name": "芳香精",
+      "slug": "aromatisse",
+      "pokemon_en": "Aromatisse",
+      "pokemon_ja": "フレフワン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 158,
+      "pokemon": "冰岩怪（洗翠的样子）",
+      "alt_name": "冰岩怪（洗翠的样子）",
+      "slug": "avalugg-hisui",
+      "pokemon_en": "Avalugg-Hisui",
+      "pokemon_ja": "ヒスイクレベース",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 159,
+      "pokemon": "火暴兽",
+      "alt_name": "火暴兽",
+      "slug": "typhlosion",
+      "pokemon_en": "Typhlosion",
+      "pokemon_ja": "バクフーン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 160,
-      "pokemon": "结冰洛托姆",
-      "alt_name": "结冰洛托姆",
-      "slug": "rotom-frost",
-      "pokemon_en": "Rotom-Frost",
-      "pokemon_ja": "フロストロトム",
+      "pokemon": "焰后蜥",
+      "alt_name": "焰后蜥",
+      "slug": "salazzle",
+      "pokemon_en": "Salazzle",
+      "pokemon_ja": "エンニュート",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 161,
-      "pokemon": "焰后蜥",
-      "alt_name": "焰后蜥",
-      "slug": "salazzle",
-      "pokemon_en": "Salazzle",
-      "pokemon_ja": "エンニュート",
+      "pokemon": "结冰洛托姆",
+      "alt_name": "结冰洛托姆",
+      "slug": "rotom-frost",
+      "pokemon_en": "Rotom-Frost",
+      "pokemon_ja": "フロストロトム",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1799,17 +1799,6 @@
     },
     {
       "rank": 164,
-      "pokemon": "切割洛托姆",
-      "alt_name": "切割洛托姆",
-      "slug": "rotom-mow",
-      "pokemon_en": "Rotom-Mow",
-      "pokemon_ja": "カットロトム",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 165,
       "pokemon": "狂欢浪舞鸭",
       "alt_name": "狂欢浪舞鸭",
       "slug": "quaquaval",
@@ -1820,7 +1809,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 166,
+      "rank": 165,
       "pokemon": "雷电兽",
       "alt_name": "雷电兽",
       "slug": "manectric",
@@ -1831,7 +1820,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 167,
+      "rank": 166,
       "pokemon": "毒骷蛙",
       "alt_name": "毒骷蛙",
       "slug": "toxicroak",
@@ -1842,18 +1831,18 @@
       "rule": "M-B"
     },
     {
-      "rank": 168,
-      "pokemon": "鬃岩狼人（白昼的样子）",
-      "alt_name": "鬃岩狼人（白昼的样子）",
-      "slug": "lycanroc-midday",
-      "pokemon_en": "Lycanroc-Midday",
-      "pokemon_ja": "ルガルガン(昼)",
+      "rank": 167,
+      "pokemon": "切割洛托姆",
+      "alt_name": "切割洛托姆",
+      "slug": "rotom-mow",
+      "pokemon_en": "Rotom-Mow",
+      "pokemon_ja": "カットロトム",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
-      "rank": 169,
+      "rank": 168,
       "pokemon": "诅咒娃娃",
       "alt_name": "诅咒娃娃",
       "slug": "banette",
@@ -1864,7 +1853,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 170,
+      "rank": 169,
       "pokemon": "呆呆王",
       "alt_name": "呆呆王",
       "slug": "slowking",
@@ -1875,29 +1864,7 @@
       "rule": "M-B"
     },
     {
-      "rank": 171,
-      "pokemon": "盐石巨灵",
-      "alt_name": "盐石巨灵",
-      "slug": "garganacl",
-      "pokemon_en": "Garganacl",
-      "pokemon_ja": "キョジオーン",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 172,
-      "pokemon": "冰鬼护",
-      "alt_name": "冰鬼护",
-      "slug": "glalie",
-      "pokemon_en": "Glalie",
-      "pokemon_ja": "オニゴーリ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 173,
+      "rank": 170,
       "pokemon": "肯泰罗（帕底亚的样子・火炽种）",
       "alt_name": "肯泰罗（帕底亚的样子・火炽种）",
       "slug": "tauros-paldea-blaze",
@@ -1908,12 +1875,45 @@
       "rule": "M-B"
     },
     {
-      "rank": 174,
+      "rank": 171,
+      "pokemon": "鬃岩狼人（白昼的样子）",
+      "alt_name": "鬃岩狼人（白昼的样子）",
+      "slug": "lycanroc-midday",
+      "pokemon_en": "Lycanroc-Midday",
+      "pokemon_ja": "ルガルガン(昼)",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 172,
+      "pokemon": "盐石巨灵",
+      "alt_name": "盐石巨灵",
+      "slug": "garganacl",
+      "pokemon_en": "Garganacl",
+      "pokemon_ja": "キョジオーン",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 173,
       "pokemon": "皮卡丘",
       "alt_name": "皮卡丘",
       "slug": "pikachu",
       "pokemon_en": "Pikachu",
       "pokemon_ja": "ピカチュウ",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 174,
+      "pokemon": "冰鬼护",
+      "alt_name": "冰鬼护",
+      "slug": "glalie",
+      "pokemon_en": "Glalie",
+      "pokemon_ja": "オニゴーリ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1931,28 +1931,6 @@
     },
     {
       "rank": 176,
-      "pokemon": "朽木妖",
-      "alt_name": "朽木妖",
-      "slug": "trevenant",
-      "pokemon_en": "Trevenant",
-      "pokemon_ja": "オーロット",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 177,
-      "pokemon": "莫鲁贝可",
-      "alt_name": "莫鲁贝可",
-      "slug": "morpeko",
-      "pokemon_en": "Morpeko",
-      "pokemon_ja": "モルペコ",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 178,
       "pokemon": "凯罗斯",
       "alt_name": "凯罗斯",
       "slug": "pinsir",
@@ -1963,12 +1941,34 @@
       "rule": "M-B"
     },
     {
-      "rank": 179,
+      "rank": 177,
+      "pokemon": "朽木妖",
+      "alt_name": "朽木妖",
+      "slug": "trevenant",
+      "pokemon_en": "Trevenant",
+      "pokemon_ja": "オーロット",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 178,
       "pokemon": "怪颚龙",
       "alt_name": "怪颚龙",
       "slug": "tyrantrum",
       "pokemon_en": "Tyrantrum",
       "pokemon_ja": "ガチゴラス",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
+      "rank": 179,
+      "pokemon": "莫鲁贝可",
+      "alt_name": "莫鲁贝可",
+      "slug": "morpeko",
+      "pokemon_en": "Morpeko",
+      "pokemon_ja": "モルペコ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -1997,11 +1997,11 @@
     },
     {
       "rank": 182,
-      "pokemon": "大食花",
-      "alt_name": "大食花",
-      "slug": "victreebel",
-      "pokemon_en": "Victreebel",
-      "pokemon_ja": "ウツボット",
+      "pokemon": "梦梦蚀",
+      "alt_name": "梦梦蚀",
+      "slug": "musharna",
+      "pokemon_en": "Musharna",
+      "pokemon_ja": "ムシャーナ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2019,33 +2019,33 @@
     },
     {
       "rank": 184,
-      "pokemon": "列阵兵",
-      "alt_name": "列阵兵",
-      "slug": "falinks",
-      "pokemon_en": "Falinks",
-      "pokemon_ja": "タイレーツ",
+      "pokemon": "叶伊布",
+      "alt_name": "叶伊布",
+      "slug": "leafeon",
+      "pokemon_en": "Leafeon",
+      "pokemon_ja": "リーフィア",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 185,
-      "pokemon": "梦梦蚀",
-      "alt_name": "梦梦蚀",
-      "slug": "musharna",
-      "pokemon_en": "Musharna",
-      "pokemon_ja": "ムシャーナ",
+      "pokemon": "大食花",
+      "alt_name": "大食花",
+      "slug": "victreebel",
+      "pokemon_en": "Victreebel",
+      "pokemon_ja": "ウツボット",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 186,
-      "pokemon": "叶伊布",
-      "alt_name": "叶伊布",
-      "slug": "leafeon",
-      "pokemon_en": "Leafeon",
-      "pokemon_ja": "リーフィア",
+      "pokemon": "列阵兵",
+      "alt_name": "列阵兵",
+      "slug": "falinks",
+      "pokemon_en": "Falinks",
+      "pokemon_ja": "タイレーツ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2162,22 +2162,22 @@
     },
     {
       "rank": 197,
-      "pokemon": "罗丝雷朵",
-      "alt_name": "罗丝雷朵",
-      "slug": "roserade",
-      "pokemon_en": "Roserade",
-      "pokemon_ja": "ロズレイド",
+      "pokemon": "雷丘（阿罗拉的样子）",
+      "alt_name": "雷丘（阿罗拉的样子）",
+      "slug": "raichu-alola",
+      "pokemon_en": "Raichu-Alola",
+      "pokemon_ja": "アローラライチュウ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 198,
-      "pokemon": "雷丘（阿罗拉的样子）",
-      "alt_name": "雷丘（阿罗拉的样子）",
-      "slug": "raichu-alola",
-      "pokemon_en": "Raichu-Alola",
-      "pokemon_ja": "アローラライチュウ",
+      "pokemon": "罗丝雷朵",
+      "alt_name": "罗丝雷朵",
+      "slug": "roserade",
+      "pokemon_en": "Roserade",
+      "pokemon_ja": "ロズレイド",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2239,11 +2239,11 @@
     },
     {
       "rank": 204,
-      "pokemon": "阿利多斯",
-      "alt_name": "阿利多斯",
-      "slug": "ariados",
-      "pokemon_en": "Ariados",
-      "pokemon_ja": "アリアドス",
+      "pokemon": "护城龙",
+      "alt_name": "护城龙",
+      "slug": "bastiodon",
+      "pokemon_en": "Bastiodon",
+      "pokemon_ja": "トリデプス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2261,33 +2261,33 @@
     },
     {
       "rank": 206,
-      "pokemon": "投掷猴",
-      "alt_name": "投掷猴",
-      "slug": "passimian",
-      "pokemon_en": "Passimian",
-      "pokemon_ja": "ナゲツケサル",
+      "pokemon": "阿利多斯",
+      "alt_name": "阿利多斯",
+      "slug": "ariados",
+      "pokemon_en": "Ariados",
+      "pokemon_ja": "アリアドス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 207,
-      "pokemon": "护城龙",
-      "alt_name": "护城龙",
-      "slug": "bastiodon",
-      "pokemon_en": "Bastiodon",
-      "pokemon_ja": "トリデプス",
+      "pokemon": "怖思壶",
+      "alt_name": "怖思壶",
+      "slug": "polteageist",
+      "pokemon_en": "Polteageist",
+      "pokemon_ja": "ポットデス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 208,
-      "pokemon": "怖思壶",
-      "alt_name": "怖思壶",
-      "slug": "polteageist",
-      "pokemon_en": "Polteageist",
-      "pokemon_ja": "ポットデス",
+      "pokemon": "投掷猴",
+      "alt_name": "投掷猴",
+      "slug": "passimian",
+      "pokemon_en": "Passimian",
+      "pokemon_ja": "ナゲツケサル",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2371,22 +2371,22 @@
     },
     {
       "rank": 216,
-      "pokemon": "飘浮泡泡",
-      "alt_name": "飘浮泡泡",
-      "slug": "castform",
-      "pokemon_en": "Castform",
-      "pokemon_ja": "ポワルン",
+      "pokemon": "旋转洛托姆",
+      "alt_name": "旋转洛托姆",
+      "slug": "rotom-fan",
+      "pokemon_en": "Rotom-Fan",
+      "pokemon_ja": "スピンロトム",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 217,
-      "pokemon": "旋转洛托姆",
-      "alt_name": "旋转洛托姆",
-      "slug": "rotom-fan",
-      "pokemon_en": "Rotom-Fan",
-      "pokemon_ja": "スピンロトム",
+      "pokemon": "飘浮泡泡",
+      "alt_name": "飘浮泡泡",
+      "slug": "castform",
+      "pokemon_en": "Castform",
+      "pokemon_ja": "ポワルン",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2415,22 +2415,22 @@
     },
     {
       "rank": 220,
-      "pokemon": "肯泰罗",
-      "alt_name": "肯泰罗",
-      "slug": "tauros",
-      "pokemon_en": "Tauros",
-      "pokemon_ja": "ケンタロス",
+      "pokemon": "佛烈托斯",
+      "alt_name": "佛烈托斯",
+      "slug": "forretress",
+      "pokemon_en": "Forretress",
+      "pokemon_ja": "フォレトス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 221,
-      "pokemon": "佛烈托斯",
-      "alt_name": "佛烈托斯",
-      "slug": "forretress",
-      "pokemon_en": "Forretress",
-      "pokemon_ja": "フォレトス",
+      "pokemon": "肯泰罗",
+      "alt_name": "肯泰罗",
+      "slug": "tauros",
+      "pokemon_en": "Tauros",
+      "pokemon_ja": "ケンタロス",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2448,17 +2448,6 @@
     },
     {
       "rank": 223,
-      "pokemon": "灰尘山",
-      "alt_name": "灰尘山",
-      "slug": "garbodor",
-      "pokemon_en": "Garbodor",
-      "pokemon_ja": "ダストダス",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 224,
       "pokemon": "多丽米亚",
       "alt_name": "多丽米亚",
       "slug": "furfrou",
@@ -2469,23 +2458,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 224,
+      "pokemon": "灰尘山",
+      "alt_name": "灰尘山",
+      "slug": "garbodor",
+      "pokemon_en": "Garbodor",
+      "pokemon_ja": "ダストダス",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 225,
-      "pokemon": "冷水猿",
-      "alt_name": "冷水猿",
-      "slug": "simipour",
-      "pokemon_en": "Simipour",
-      "pokemon_ja": "ヒヤッキー",
+      "pokemon": "爆香猿",
+      "alt_name": "爆香猿",
+      "slug": "simisear",
+      "pokemon_en": "Simisear",
+      "pokemon_ja": "バオッキー",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 226,
-      "pokemon": "爆香猿",
-      "alt_name": "爆香猿",
-      "slug": "simisear",
-      "pokemon_en": "Simisear",
-      "pokemon_ja": "バオッキー",
+      "pokemon": "冷水猿",
+      "alt_name": "冷水猿",
+      "slug": "simipour",
+      "pokemon_en": "Simipour",
+      "pokemon_ja": "ヒヤッキー",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2514,17 +2514,6 @@
     },
     {
       "rank": 229,
-      "pokemon": "南瓜怪人（中颗种）",
-      "alt_name": "南瓜怪人（中颗种）",
-      "slug": "gourgeist-average",
-      "pokemon_en": "Gourgeist-Average",
-      "pokemon_ja": "パンプジン(ちゅうだま)",
-      "format": "double",
-      "season": "M-4",
-      "rule": "M-B"
-    },
-    {
-      "rank": 230,
       "pokemon": "南瓜怪人（大颗种）",
       "alt_name": "南瓜怪人（大颗种）",
       "slug": "gourgeist-large",
@@ -2535,23 +2524,34 @@
       "rule": "M-B"
     },
     {
+      "rank": 230,
+      "pokemon": "南瓜怪人（中颗种）",
+      "alt_name": "南瓜怪人（中颗种）",
+      "slug": "gourgeist-average",
+      "pokemon_en": "Gourgeist-Average",
+      "pokemon_ja": "パンプジン(ちゅうだま)",
+      "format": "double",
+      "season": "M-4",
+      "rule": "M-B"
+    },
+    {
       "rank": 231,
-      "pokemon": "步哨鼠",
-      "alt_name": "步哨鼠",
-      "slug": "watchog",
-      "pokemon_en": "Watchog",
-      "pokemon_ja": "ミルホッグ",
+      "pokemon": "花椰猿",
+      "alt_name": "花椰猿",
+      "slug": "simisage",
+      "pokemon_en": "Simisage",
+      "pokemon_ja": "ヤナッキー",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
     },
     {
       "rank": 232,
-      "pokemon": "花椰猿",
-      "alt_name": "花椰猿",
-      "slug": "simisage",
-      "pokemon_en": "Simisage",
-      "pokemon_ja": "ヤナッキー",
+      "pokemon": "泥巴鱼（伽勒尔的样子）",
+      "alt_name": "泥巴鱼（伽勒尔的样子）",
+      "slug": "stunfisk-galar",
+      "pokemon_en": "Stunfisk-Galar",
+      "pokemon_ja": "ガラルマッギョ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
@@ -2569,11 +2569,11 @@
     },
     {
       "rank": 234,
-      "pokemon": "泥巴鱼（伽勒尔的样子）",
-      "alt_name": "泥巴鱼（伽勒尔的样子）",
-      "slug": "stunfisk-galar",
-      "pokemon_en": "Stunfisk-Galar",
-      "pokemon_ja": "ガラルマッギョ",
+      "pokemon": "步哨鼠",
+      "alt_name": "步哨鼠",
+      "slug": "watchog",
+      "pokemon_en": "Watchog",
+      "pokemon_ja": "ミルホッグ",
       "format": "double",
       "season": "M-4",
       "rule": "M-B"
