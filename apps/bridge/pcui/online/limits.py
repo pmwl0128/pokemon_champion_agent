@@ -59,6 +59,14 @@ class OnlineLimits:
         self._secret = secret
         self._lock = threading.Lock()
         self._con = sqlite3.connect(db_path, check_same_thread=False)
+        # Every quota check, reservation and settlement is a write serialized behind one lock on
+        # one connection. Under the default DELETE journal each of those fsyncs a rollback file,
+        # which on a cheap cloud disk is milliseconds of lock hold per request. WAL keeps the
+        # writes append-only and lets readers proceed without blocking. NORMAL is the right
+        # durability point here: the tables are a 3-day rolling quota window, so the worst case
+        # a host crash can cost is a partial day of counters, never money already spent.
+        self._con.execute("PRAGMA journal_mode=WAL")
+        self._con.execute("PRAGMA synchronous=NORMAL")
         with self._con:
             self._con.execute("CREATE TABLE IF NOT EXISTS qa_quota ("
                               "id TEXT, day TEXT, used INTEGER NOT NULL, "

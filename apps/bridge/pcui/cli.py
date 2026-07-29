@@ -214,6 +214,7 @@ def cmd_online_serve(ns) -> int:
         projection_dir=Path(ns.projection) if ns.projection else None,
         public_origin=public_origin,
         idle_reap_seconds=ns.worker_idle if ns.worker_idle > 0 else None,
+        deterministic_workers=ns.deterministic_workers,
         dev_key=dev_key,
         unmetered=unmetered,
         # web_jobs (§7.3): transient builder-job rows share online.db — same retention
@@ -439,6 +440,16 @@ def main(argv: list[str] | None = None) -> int:
                         help=i18n.t("qa_limit_help"))
     online.add_argument("--qa-token-budget", type=int, default=1_500_000,
                         help=i18n.t("qa_budget_help"))
+    # Host-shaped, so it belongs on the command line. The default tracks core count because
+    # each in-flight request saturates about one core: measured on the 2-vCPU host, throughput
+    # PEAKS at concurrency 2 and then falls (14.2 -> 13.6 -> 12.7 per minute at 2/3/4) while
+    # latency grows proportionally. Overshooting costs throughput AND latency, so this is one
+    # of the few places a cpu_count-derived default is the correct answer rather than a guess
+    # (design §9.1). Memory is the other bound at ~210 MB per in-flight request.
+    online.add_argument("--deterministic-workers", type=int,
+                        default=max(2, min(8, os.cpu_count() or 2)),
+                        help="thread lane width for diagnose/matchup/tune; throughput peaks at "
+                             "about one per core (~210 MB per in-flight request)")
     online.add_argument("--worker-idle", type=float, default=600.0,
                         help=i18n.t("idle_help"))
     online.add_argument("--dist", default=str(_web / "dist") if (_web / "dist").is_dir() else None,

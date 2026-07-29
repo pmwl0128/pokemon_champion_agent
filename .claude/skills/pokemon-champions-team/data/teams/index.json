@@ -39,12 +39,12 @@
     "season": "M-4",
     "rule": "M-B",
     "format": "double",
-    "count": 2621
+    "count": 2827
   },
   "M-4_single": {
     "season": "M-4",
     "rule": "M-B",
     "format": "single",
-    "count": 117
+    "count": 137
   }
 }

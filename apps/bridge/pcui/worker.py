@@ -7,6 +7,7 @@ Any protocol fault kills + lazily restarts the worker and serves THIS request th
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -105,9 +106,28 @@ class _Worker:
                     raise WorkerError(f"{self.cli_id} {argv[:2]} failed: {e}") from e
 
 
+# Memory ceiling for the deterministic lane, not a backstop above the semaphores.
+#
+# A one-shot `team.py session` is a whole process tree (fresh interpreter + skill import + its
+# lazily spawned dex/meta/ncp siblings). design §9.1: concurrent trees share NOTHING, so total
+# RSS is strictly linear in this number, and it is the same limit the lane semaphores and the
+# deterministic executor width are all spending — raising any one of them without raising the
+# others just moves the queue somewhere less visible.
+#
+# Size it from the host with `apps/bridge/tools/capacity_benchmark.py`. On the 2-vCPU host the
+# deterministic optimum is 2 in flight (throughput peaks there and falls past it), and the lane
+# semaphores already hold that line; 4 leaves room for the builder's own tree plus a transient
+# overlap without letting an unbounded fan-out reach the cgroup. Per-request RSS varies with the
+# operator mix — a validate that only touches dex is far cheaper than a tune that loads the calc
+# engine — so re-measure rather than scaling this by core count alone.
+ONESHOT_LIMIT = int(os.environ.get("PCUI_ONESHOT_LIMIT") or 4)
+_ONESHOT_WAIT = 30.0
+
+
 class WorkerPool:
     def __init__(self) -> None:
         self._workers = {cli_id: _Worker(cli_id) for cli_id in WORKER_CLIS}
+        self._oneshot = threading.BoundedSemaphore(ONESHOT_LIMIT)
 
     def request(self, cli_id: str, argv: list[str], stdin: str | None = None,
                 timeout: float = 60.0) -> dict:
@@ -115,7 +135,17 @@ class WorkerPool:
         to a subprocess — resident team workers are an explicit anti-pattern (§4.1 🚩)."""
         w = self._workers.get(cli_id)
         if w is None:
-            return runner.run_cli(cli_id, argv, stdin, timeout=timeout)
+            # Bounded, never indefinite: a caller blocked here is holding one of the event
+            # loop's few `to_thread` slots, so exhaustion must surface as an error rather than
+            # silently converting into unbounded queueing.
+            if not self._oneshot.acquire(timeout=min(timeout, _ONESHOT_WAIT)):
+                raise WorkerError(
+                    f"{cli_id} {argv[:2]} rejected: more than {ONESHOT_LIMIT} concurrent "
+                    f"one-shot skill processes")
+            try:
+                return runner.run_cli(cli_id, argv, stdin, timeout=timeout)
+            finally:
+                self._oneshot.release()
         return w.request(argv, stdin, timeout)
 
     def request_json(self, cli_id: str, argv: list[str], stdin: str | None = None,

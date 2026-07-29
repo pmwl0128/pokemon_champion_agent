@@ -11,13 +11,15 @@ export interface ComboboxOption {
   searchText?: string;
 }
 
+export type ComboboxCommitReason = "selection" | "enter" | "blur";
+
 interface AdaptiveComboboxProps extends Omit<
   InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "list"
 > {
   value: string;
   options: ComboboxOption[];
   onValueChange: (value: string) => void;
-  onCommit?: (value: string) => void;
+  onCommit?: (value: string, reason: ComboboxCommitReason) => void;
   /** Reuse a page-level datalist on desktop instead of duplicating a large option set. */
   nativeListId?: string;
 }
@@ -104,7 +106,7 @@ export function AdaptiveCombobox({
 
   const select = (option: ComboboxOption) => {
     onValueChange(option.value);
-    onCommit?.(option.value);
+    onCommit?.(option.value, "selection");
     setOpen(false);
     inputRef.current?.focus();
   };
@@ -125,7 +127,7 @@ export function AdaptiveCombobox({
       event.preventDefault();
       setOpen(false);
     } else if (event.key === "Enter") {
-      onCommit?.(value);
+      onCommit?.(value, "enter");
     }
     onKeyDown?.(event);
   };
@@ -137,7 +139,7 @@ export function AdaptiveCombobox({
       value={value}
       disabled={disabled}
       list={!mobile && !disabled ? listId : undefined}
-      autoComplete={mobile ? "off" : inputProps.autoComplete}
+      autoComplete={inputProps.autoComplete ?? "off"}
       role={mobile ? "combobox" : inputProps.role}
       aria-autocomplete={mobile ? "list" : undefined}
       aria-expanded={mobile ? open && filtered.length > 0 : undefined}
@@ -153,7 +155,7 @@ export function AdaptiveCombobox({
         onFocus?.(event);
       }}
       onBlur={() => {
-        onCommit?.(value);
+        onCommit?.(value, "blur");
         setOpen(false);
       }}
       onKeyDown={handleKey}

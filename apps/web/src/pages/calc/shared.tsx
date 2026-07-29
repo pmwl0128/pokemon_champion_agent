@@ -10,7 +10,10 @@ import {
   type Dispatch, type ReactNode, type SetStateAction,
 } from "react";
 import { GameImage } from "../../components/GameImage.tsx";
-import { AdaptiveCombobox } from "../../components/AdaptiveCombobox.tsx";
+import {
+  AdaptiveCombobox, type ComboboxCommitReason,
+} from "../../components/AdaptiveCombobox.tsx";
+import { useDexIndex, useItems } from "../../hooks.ts";
 import { displayName, useLang, useT } from "../../i18n.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { HttpError, type DexIndexEntry } from "../../runtime/adapter.ts";
@@ -162,25 +165,60 @@ export function modalSig(m: ModalSet, moves: string[]): string {
 }
 
 /** Cached meta "standard build" loader — the fill auto-applied on a fresh pick. A 404 (unranked
- * this period) resolves to null so the caller just leaves the form empty. */
+ * this period) resolves to null so the caller just leaves the form empty.
+ *
+ * Mega forms are never ranked on their own: the meta folds their usage into the BASE species, so
+ * the base's panels already ARE the Mega build (measured: `charizard`'s top item is Charizardite Y).
+ * A Mega pick therefore retries once against its base species instead of dead-ending on an empty
+ * form. The item is deliberately NOT taken from those panels — a base shared by two stones ranks
+ * only one of them (Charizard X would inherit Charizardite Y) — it is pinned to THIS form's own
+ * required stone. SideForm pins the same stone, but only on a slug change, so an auto-fill landing
+ * afterwards must not reintroduce the wrong item. */
 export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSet | null> {
   const { adapter } = useRuntime();
+  const dexIndex = useDexIndex();
+  const itemVocab = useItems();
   const cache = useRef(new Map<string, Promise<ModalSet | null>>());
   return (slug: string, fmt: FormatId) => {
     const key = `${fmt}:${slug}`;
     let hit = cache.current.get(key);
     if (!hit) {
-      hit = adapter.detail(fmt, slug).then(toModalSet).catch((e) => {
-        // 404 = unranked this period → no standard build; leave the form empty (a DEFINITIVE miss —
-        // cache it so we don't re-hit a known-absent detail every pick).
-        if (e instanceof HttpError && e.status === 404) return null;
-        // Any other failure (network, malformed projection, parse) is transient/real, not a "no build":
-        // surface it, DROP the cache entry so a later re-pick retries (mirrors AsyncOnce's reject-drop —
-        // a flaky load must not poison the slot for the whole session), and degrade to an empty form now.
-        console.error(`meta detail auto-fill failed for ${fmt}/${slug}:`, e);
-        cache.current.delete(key);
-        return null;
-      });
+      const dex = dexIndex.status === "ready" ? dexIndex.data : null;
+      const items = itemVocab.status === "ready" ? itemVocab.data : null;
+      const entry = dex?.find((e) => e.slug === slug);
+      const base = entry?.isMega && entry.baseSpecies
+        ? dex?.find((e) => e.name === entry.baseSpecies) : undefined;
+      const stone = entry?.isMega && items
+        ? items.find((i) => i.requiredBy?.includes(entry.name)) : undefined;
+      // A 404 is only a DEFINITIVE "no build" once we could rule a base fallback in or out. With the
+      // dex vocab still loading we cannot, so that null must not be cached as the answer.
+      const definitive = dex !== null && (!entry || !entry.isMega || !!base);
+      hit = (async () => {
+        try {
+          let dto: MetaDetailDto;
+          try {
+            dto = await adapter.detail(fmt, slug);
+          } catch (e) {
+            if (!(e instanceof HttpError && e.status === 404) || !base) throw e;
+            dto = await adapter.detail(fmt, base.slug);
+          }
+          const modal = toModalSet(dto);
+          return stone ? { ...modal, item: stone.name } : modal;
+        } catch (e) {
+          // 404 = unranked this period → no standard build; leave the form empty (cache it so we
+          // don't re-hit a known-absent detail every pick).
+          if (e instanceof HttpError && e.status === 404) {
+            if (!definitive) cache.current.delete(key);
+            return null;
+          }
+          // Any other failure (network, malformed projection, parse) is transient/real, not a "no build":
+          // surface it, DROP the cache entry so a later re-pick retries (mirrors AsyncOnce's reject-drop —
+          // a flaky load must not poison the slot for the whole session), and degrade to an empty form now.
+          console.error(`meta detail auto-fill failed for ${fmt}/${slug}:`, e);
+          cache.current.delete(key);
+          return null;
+        }
+      })();
       cache.current.set(key, hit);
     }
     return hit;
@@ -284,9 +322,10 @@ export function ItemCombo({ value, onChange, items, disabled }: {
   );
 }
 
-/** Trilingual mon input with suggestions + sprite; resolves zh/ja/en (and fuzzy via the adapter)
- * to a dex slug. Reused by SideForm and the speed-ladder rows. `displayEntry` overrides the
- * sprite (the Mega form when the held stone activates). */
+/** Trilingual mon input with suggestions + sprite. Typing is always literal; exact zh/ja/en names
+ * and explicit option picks resolve locally, while fuzzy adapter resolution requires Enter.
+ * Reused by SideForm and the speed-ladder rows. `displayEntry` overrides the sprite (the Mega form
+ * when the held stone activates). */
 export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
   idKey: string;
   slug: string;
@@ -312,19 +351,44 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
     secondary: `${e.name}${e.nameZh && lang !== "zh" ? ` · ${e.nameZh}` : ""}`,
   })), [dex, lang]);
 
-  const pick = (value: string) => {
+  const localEntry = (value: string) => {
+    const q = value.trim();
+    if (!q) return undefined;
+    return dex.find((candidate) =>
+      candidate.name.toLowerCase() === q.toLowerCase() ||
+      candidate.nameZh === q ||
+      candidate.nameJa === q ||
+      candidate.slug === q.toLowerCase());
+  };
+
+  const edit = (value: string) => {
+    ++resolveToken.current;
     setText(value);
     const q = value.trim();
     if (!q) { onSlug(""); return; }
-    const local = dex.find((e) =>
-      e.name.toLowerCase() === q.toLowerCase() || e.nameZh === q || e.nameJa === q ||
-      e.slug === q.toLowerCase());
+    const local = localEntry(value);
     if (local) { onSlug(local.slug); return; }
+    // Never keep calculating with the previous Pokémon while the visible text names no exact entry.
+    onSlug("");
+  };
+
+  const commit = (value: string, reason: ComboboxCommitReason) => {
+    const q = value.trim();
+    if (!q) { onSlug(""); return; }
+    const local = localEntry(value);
+    if (local) {
+      setText(displayName(local, lang));
+      onSlug(local.slug);
+      return;
+    }
+    // Blur is not a user request to accept the first fuzzy match. Enter is.
+    if (reason === "blur") return;
     const token = ++resolveToken.current;
     adapter.resolve([q], "pokemon").then((entries) => {
       if (token !== resolveToken.current) return;
       const canonical = entries[0]?.ok ? entries[0].canonical : undefined;
       const hit = canonical ? dex.find((e) => e.name === canonical) : undefined;
+      if (hit) setText(displayName(hit, lang));
       onSlug(hit?.slug ?? "");
     }).catch(() => {
       if (token === resolveToken.current) onSlug("");
@@ -337,7 +401,8 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
       {shown && <GameImage assetKey={shown.key} role="card" alt={shown.name}
         className="mini mon-picker-img" />}
       <AdaptiveCombobox value={text} options={monOptions}
-        onValueChange={pick} placeholder={placeholder ?? t("calc.pickHint")} />
+        onValueChange={edit} onCommit={commit}
+        placeholder={placeholder ?? t("calc.pickHint")} />
     </span>
   );
 }

@@ -9,10 +9,12 @@ construction (§7.5)."""
 from __future__ import annotations
 
 import asyncio
+import functools
 import hmac
 import json
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from starlette.middleware.gzip import GZipMiddleware
@@ -52,11 +54,40 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                       projection_dir: Path | None = None,
                       public_origin: str | None = None,
                       qa_concurrency: int = 2,
+                      deterministic_workers: int = 4,
                       idle_reap_seconds: float | None = None,
                       dev_key: str | None = None,
                       unmetered: bool = False,
                       jobs: JobStore | None = None) -> FastAPI:
     app = FastAPI(title="pcui online", docs_url=None, redoc_url=None, openapi_url=None)
+    # Thread lanes. §7.5 says model work and CPU work must not exhaust each other, and the
+    # semaphores below implement that — but every blocking call still went through
+    # `asyncio.to_thread`, i.e. asyncio's implicit default executor, whose size is
+    # `min(32, cpu_count + 4)`: SIX threads on a 2-vCPU host. The lane budget summed to exactly
+    # that, so the separation was real at the semaphore layer and false one layer down: a burst
+    # of QA requests parked on LLM round trips could starve diagnose/matchup even with a free
+    # deterministic slot and an idle CPU. These pools make the split structural.
+    #
+    # Sizing rationale differs per lane and is deliberately NOT cpu_count-derived:
+    #   llm  - pure network wait, costs a thread and no CPU, so it only needs to exceed the
+    #          QA/explanation semaphores.
+    #   det  - each in-flight request is an unshared team.py process tree (~210 MB RSS, about
+    #          one saturated core), so its ceiling is the host, not a thread count. Measured
+    #          on the 2-vCPU host, throughput peaks at concurrency 2 and DECLINES past it
+    #          while latency grows — overshooting this lane is not a safe trade (design §9.1).
+    #   build- one builder pipeline holds its thread for the whole 420 s deadline while
+    #          interleaving LLM waits with team.py batches; it gets its own lane so that long
+    #          hold can never occupy a deterministic slot.
+    llm_pool = ThreadPoolExecutor(max_workers=max(4, qa_concurrency * 2),
+                                  thread_name_prefix="pcui-llm")
+    det_pool = ThreadPoolExecutor(max_workers=max(2, deterministic_workers),
+                                  thread_name_prefix="pcui-det")
+    builder_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pcui-build")
+
+    def _in(pool: ThreadPoolExecutor, fn, *args):
+        """Run a blocking call on an explicit lane. `run_in_executor` takes no kwargs, and the
+        callers below pass positionally, so partial() is enough and keeps the sites readable."""
+        return asyncio.get_running_loop().run_in_executor(pool, functools.partial(fn, *args))
     # See the local bridge: the variant-expanded matchup grids are ~13 MB raw and ~0.8 MB gzipped.
     # This is what makes serving the full grid to a public visitor viable.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -261,7 +292,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             fail_cleanup()
             raise HTTPException(429, _err("busy", "too many concurrent questions — retry"))
         try:
-            result = await asyncio.to_thread(qa.answer, pool, provider, question, lang)
+            result = await _in(llm_pool, qa.answer, pool, provider, question, lang)
         except LlmUnavailable as e:
             fail_cleanup(getattr(e, "tokens", 0))   # earlier rounds' spend settles truthfully
             raise HTTPException(503, _err("llm_unavailable", str(e)))
@@ -295,6 +326,12 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     # -- team diagnose (deterministic report + optional reading, design §7.5) ---------------
     # Deterministic CPU work gets its own semaphore; an optional reading uses the LLM lane.
+    #
+    # These two, `deterministic_workers` and `WorkerPool.ONESHOT_LIMIT` all spend ONE budget
+    # (design §9.1). On the 2-vCPU host the measured optimum for total deterministic concurrency
+    # is 2 — diagnose 1 + matchup/tune 1 is exactly that, so these are calibrated rather than
+    # merely cautious. Raise them together with the core count, never in isolation, and
+    # re-derive with apps/bridge/tools/capacity_benchmark.py on the target host.
     diagnose_slots = asyncio.Semaphore(1)
     matchup_slots = asyncio.Semaphore(1)
 
@@ -394,7 +431,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 raise HTTPException(429, _err("rate_limited", "daily diagnose limit reached"))
         try:
             async with diagnose_slots:
-                report = await asyncio.to_thread(_run_diagnose, text, fmt)
+                report = await _in(det_pool, _run_diagnose, text, fmt)
         except ValueError:
             if not unmetered:
                 limits.refund(ids, quota_day, cost=cost)
@@ -415,8 +452,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             if unmetered:
                 try:
                     async with qa_slots:
-                        explanation, tokens = await asyncio.to_thread(
-                            qa.explain_diagnose, selected_provider, report, lang)
+                        explanation, tokens = await _in(
+                            llm_pool, qa.explain_diagnose, selected_provider, report, lang)
                     limits.record_spent(tokens)
                     report["explanation"] = explanation
                 except Exception as e:
@@ -430,8 +467,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                     raise
                 async with qa_slots:
                     try:
-                        explanation, tokens = await asyncio.to_thread(
-                            qa.explain_diagnose, selected_provider, report, lang)
+                        explanation, tokens = await _in(
+                            llm_pool, qa.explain_diagnose, selected_provider, report, lang)
                     except Exception as e:
                         limits.settle_budget(getattr(e, "tokens", 0), budget_day)
                         raise
@@ -514,8 +551,9 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
         try:
             try:
-                return await asyncio.to_thread(
-                    run_actual_matchup, pool, body, None if unmetered else consume_workload)
+                return await _in(
+                    det_pool, run_actual_matchup, pool, body,
+                    None if unmetered else consume_workload)
             except RateLimited:
                 raise HTTPException(429, _err("rate_limited",
                                               "daily matchup workload limit reached"))
@@ -555,8 +593,9 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
         try:
             try:
-                result = await asyncio.to_thread(
-                    run_team_tune, pool, body, None if unmetered else consume_workload)
+                result = await _in(
+                    det_pool, run_team_tune, pool, body,
+                    None if unmetered else consume_workload)
                 used, limit = ((0, 0) if unmetered else
                                limits.usage(ids[0], limits.cfg.tune_daily_limit))
                 return {**result, "quota": {"used": used, "limit": limit}}
@@ -633,7 +672,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         # Resolve every species input up front — an unresolvable name is the VISITOR's to fix
         # (400 with the misses), never something to silently drop from their constraints.
         pending = ([anchor_raw] if anchor_raw else []) + owned + avoid
-        resolved = await asyncio.to_thread(_resolve_species, pending) if pending else {}
+        resolved = await _in(det_pool, _resolve_species, pending) if pending else {}
         misses = [n for n in pending if n not in resolved]
         if misses:
             raise HTTPException(400, _err("unresolved_names", ", ".join(misses[:10])))
@@ -701,8 +740,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                              raw: dict | None = None) -> None:
                     jobs.set_gate(job_id, gate, status, detail, raw)
                 try:
-                    result = await asyncio.to_thread(
-                        builder.build, pool, selected_provider, form, progress)
+                    result = await _in(
+                        builder_pool, builder.build, pool, selected_provider, form, progress)
                 except LlmUnavailable as e:
                     fail_cleanup(getattr(e, "tokens", 0))
                     jobs.fail(job_id, "llm_unavailable")
@@ -797,7 +836,21 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     @app.on_event("startup")
     async def _capture_loop() -> None:
-        loop_ref["loop"] = asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
+        loop_ref["loop"] = loop
+        # Pin the default executor too. Everything on a request path now names its lane
+        # explicitly, so this only carries the maintenance calls (idle reaping, shutdown) —
+        # but leaving it implicit would silently reintroduce a cpu_count-derived pool whose
+        # size nobody chose.
+        loop.set_default_executor(
+            ThreadPoolExecutor(max_workers=2, thread_name_prefix="pcui-maint"))
+
+    @app.on_event("shutdown")
+    async def _stop_lanes() -> None:
+        # Do not wait: a lane may be holding a 420 s builder or a 240 s matchup, and shutdown
+        # must not block on it. The owned subprocesses are reaped by `pool.shutdown` below.
+        for lane in (llm_pool, det_pool, builder_pool):
+            lane.shutdown(wait=False, cancel_futures=True)
 
     # Optional static hosting: production puts Nginx in front (§8) — these mounts give the
     # SAME layout locally so the online runtime is testable end-to-end before a VPS exists.
