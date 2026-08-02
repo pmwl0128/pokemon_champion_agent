@@ -198,6 +198,11 @@ def map_ranking(raw: dict) -> dict:
         "season": raw["season"], "rule": raw["rule"], "format": raw["format"],
         "rows": [{
             "rank": r["rank"], "slug": r["slug"],
+            # `slug` is the UPSTREAM meta id: it routes and keys the detail cache, and it drifts
+            # with the source (lycanroc-midday -> lycanroc, meowstic-f -> meowstic-female). Ship
+            # the asset-pack key derived from the canonical English name instead — the same single
+            # slug authority item panels use — so the sprite join never rides on that spelling.
+            "key": f"pokemon:{slugify(r['name'])}",
             **named(r["name"], r.get("name_zh"), r.get("name_ja")),
         } for r in raw["rows"]],
     }
@@ -240,6 +245,7 @@ def map_detail(raw: dict) -> dict:
     return {
         "rank": raw.get("rank"),
         "slug": raw["slug"],
+        "key": f"pokemon:{slugify(raw['pokemon_en'])}",
         **named(raw["pokemon_en"], raw.get("pokemon"), raw.get("pokemon_ja")),
         "format": raw["format"], "season": raw["season"], "rule": raw["rule"],
         "panels": {

@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import json
 import secrets
-import sqlite3
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
+
+from .database import connect
 
 JOB_TTL_SECONDS = 15 * 60
 
@@ -33,13 +34,11 @@ class JobStore:
     def __init__(self, db_path: Path, on_change: Callable[[str], None] | None = None):
         self._lock = threading.Lock()
         self._on_change = on_change
-        self._con = sqlite3.connect(db_path, check_same_thread=False)
+        self._con = connect(db_path)
+        # Per-process tiebreaker so two creates landing in the same time.time() tick (.time() can
+        # resolve coarsely on Windows) still order strictly: a sits ahead of b in the queue.
+        self._seq = 0
         with self._con:
-            self._con.execute(
-                "CREATE TABLE IF NOT EXISTS web_jobs ("
-                "id TEXT PRIMARY KEY, created_at REAL NOT NULL, status TEXT NOT NULL, "
-                "gates_json TEXT NOT NULL, result_json TEXT, error_code TEXT, "
-                "expires_at REAL NOT NULL)")
             # A restart orphans queued/running rows (their orchestrator task is gone).
             # web_jobs is not history — drop them instead of surfacing zombie state.
             self._con.execute("DELETE FROM web_jobs WHERE status NOT IN ('done','failed')")
@@ -67,11 +66,17 @@ class JobStore:
     def create(self) -> str:
         job_id = secrets.token_hex(8)
         now = time.time()
+        self._seq += 1
+        # Fractional sequence keeps wall-clock ordering for TTL comparison while guaranteeing a
+        # strict total order across same-tick creations in THIS store. The step (1e-6) clears
+        # float64 ULP at wall-clock magnitude (~2e-7 at 1.7e9s) so successive ties cannot collapse
+        # back onto an identical created_at.
+        created_at = now + self._seq * 1e-6
         with self._lock, self._con:
             self._con.execute(
                 "INSERT INTO web_jobs (id, created_at, status, gates_json, expires_at) "
                 "VALUES (?, ?, 'queued', ?, ?)",
-                (job_id, now, json.dumps(self._fresh_gates()), now + JOB_TTL_SECONDS))
+                (job_id, created_at, json.dumps(self._fresh_gates()), now + JOB_TTL_SECONDS))
         self._notify(job_id)
         return job_id
 

@@ -6785,6 +6785,10 @@
           "type": "string",
           "minLength": 1
         },
+        "key": {
+          "type": "string",
+          "pattern": "^pokemon:[a-z0-9-]+$"
+        },
         "name": {
           "$ref": "#/$defs/MetaDetailDtoSchema/$defs/__schema0"
         },
@@ -9964,6 +9968,10 @@
                 "type": "string",
                 "minLength": 1
               },
+              "key": {
+                "type": "string",
+                "pattern": "^pokemon:[a-z0-9-]+$"
+              },
               "name": {
                 "type": "string",
                 "minLength": 1
@@ -10003,6 +10011,10 @@
         "slug": {
           "type": "string",
           "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^pokemon:[a-z0-9-]+$"
         },
         "name": {
           "type": "string",

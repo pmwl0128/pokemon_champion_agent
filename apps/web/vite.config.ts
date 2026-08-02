@@ -88,6 +88,11 @@ const apiProxy = {
 };
 
 export default defineConfig({
+  // The same dist is mounted below an identity-scoped path in production. A relative build base
+  // makes every generated URL (lazy chunks, modulepreload dependencies, workers, CSS assets)
+  // resolve from the versioned entry module instead of escaping back to the mutable site root.
+  // build_release.py binds only index.html to the final deployment prefix after computing it.
+  base: "./",
   // Projection and runtime config are deployment artifacts mounted by pcui, not public assets.
   // Disabling Vite's public-dir copy keeps dist byte-identical across local and online runtimes.
   publicDir: false,

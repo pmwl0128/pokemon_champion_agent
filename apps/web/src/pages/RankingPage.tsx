@@ -27,9 +27,12 @@ export function RankingPage() {
   const { lang } = useLang();
   const t = useT();
 
-  const typesBySlug = useMemo(() => {
+  // Join the dex by ASSET KEY, not by the row's `slug`: that slug is the upstream meta id and
+  // drifts with the source (lycanroc-midday -> lycanroc), which silently dropped both the sprite
+  // and the type icons for every renamed form. The mapper ships `key` for exactly this.
+  const typesByKey = useMemo(() => {
     const m = new Map<string, string[]>();
-    if (dex.status === "ready") for (const e of dex.data) m.set(e.slug, e.types);
+    if (dex.status === "ready") for (const e of dex.data) m.set(e.key, e.types);
     return m;
   }, [dex]);
 
@@ -44,20 +47,23 @@ export function RankingPage() {
       )}
       {ranking.status === "ready" && (
         <div className="dex-grid dense">
-          {ranking.data.rows.map((row) => (
+          {ranking.data.rows.map((row) => {
+            const assetKey = row.key ?? `pokemon:${row.slug}`;
+            return (
             <Link key={row.slug} to={`/meta/${row.slug}?format=${format}`}
               className="panel dex-card ranked">
               <span className={`rank-badge num tier-${rankTier(row.rank)}`}>{row.rank}</span>
-              <GameImage assetKey={`pokemon:${row.slug}`} role="card"
+              <GameImage assetKey={assetKey} role="card"
                 alt={displayName(row, lang)} className="sprite" />
               <span className="nm">{displayName(row, lang)}</span>
               <span className="types">
-                {(typesBySlug.get(row.slug) ?? []).map((tp) => (
+                {(typesByKey.get(assetKey) ?? []).map((tp) => (
                   <TypeBadge key={tp} type={tp} iconOnly />
                 ))}
               </span>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </>

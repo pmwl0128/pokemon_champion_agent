@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,7 @@ from .worker import WorkerError, WorkerPool
 MAX_BODY = 2 * 1024 * 1024
 QUERY_TIMEOUT = 60.0
 TEAM_TIMEOUT = 600.0
+_DEPLOYMENT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,80}\Z")
 
 DEX_KINDS = ("pokemon", "move", "item", "ability", "nature")
 DEX_MAPPERS = {"pokemon": mappers.map_pokemon, "move": mappers.map_move,
@@ -93,6 +95,8 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
                dist_dir: Path | None = None,
                projection_dir: Path | None = None,
                bind_host: str = "127.0.0.1") -> FastAPI:
+    if deployment_id is not None and not _DEPLOYMENT_ID_RE.fullmatch(deployment_id):
+        raise ValueError(f"invalid deployment id: {deployment_id!r}")
     app = FastAPI(title="pcui bridge", docs_url=None, redoc_url=None, openapi_url=None)
     # The projection's matchup grids are large, highly repetitive JSON (the variant-expanded doubles
     # KO grid is ~13 MB raw) and compress to 6-8% of that. Serving them uncompressed would send
@@ -556,7 +560,16 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
     install_openapi(app, "local")
 
     # Static hosting (mounted last — API routes above resolve first): the projection data
-    # layer and the built SPA. Optional so a headless/API-only bridge still runs.
+    # layer and the built SPA. A packaged release's shared index names its immutable JS/CSS
+    # through the production-scoped URL, so the local release verifier must expose that asset
+    # path too even though local projection reads deliberately remain at /projection.
+    # Optional so a headless/API-only bridge still runs.
+    if deployment_id and dist_dir is not None and (dist_dir / "assets").is_dir():
+        app.mount(
+            f"/releases/{deployment_id}/dist/assets",
+            StaticFiles(directory=str(dist_dir / "assets")),
+            name="release-assets",
+        )
     if projection_dir is not None and projection_dir.is_dir():
         app.mount("/projection", StaticFiles(directory=str(projection_dir)), name="projection")
     else:

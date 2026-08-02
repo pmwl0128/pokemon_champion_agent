@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "dataContract": "pcweb-online.v1",
+  "targetSchema": 1,
+  "readsSchema": {
+    "min": 0,
+    "max": 1
+  },
+  "writesSchema": {
+    "min": 0,
+    "max": 1
+  },
+  "migrationFrom": [
+    0,
+    1
+  ],
+  "jobPayloadContract": 1
+}

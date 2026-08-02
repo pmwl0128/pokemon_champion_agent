@@ -9,9 +9,13 @@ import {
   FormatIdSchema, MoveCategorySchema, SpSpreadSchema, TypeNameSchema, namedFields,
 } from "./common.ts";
 
+/** `slug` is the UPSTREAM meta id (routes + detail-cache key) and drifts with the source, so it
+ * must never be used to find a sprite; `key` is the mapper-derived asset-pack key, same contract
+ * as item panels. Optional so a projection built before this field still parses. */
 export const RankRowDtoSchema = z.object({
   rank: z.number().int().positive(),
   slug: z.string().min(1),
+  key: z.string().regex(/^pokemon:[a-z0-9-]+$/).optional(),
   ...namedFields,
 });
 export type RankRowDto = z.infer<typeof RankRowDtoSchema>;
@@ -69,6 +73,7 @@ export type SpreadEntryDto = z.infer<typeof SpreadEntryDtoSchema>;
 export const MetaDetailDtoSchema = z.object({
   rank: z.number().int().positive().nullable(),
   slug: z.string().min(1),
+  key: z.string().regex(/^pokemon:[a-z0-9-]+$/).optional(),   // see RankRowDtoSchema
   ...namedFields,
   format: FormatIdSchema,
   season: z.string().min(1),

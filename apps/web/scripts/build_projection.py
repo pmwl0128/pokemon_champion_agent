@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -100,14 +101,34 @@ def main() -> int:
                          f"{', '.join(OPTIONAL_CAPABILITIES)}")
     ns = ap.parse_args()
     out = Path(ns.out)
+    # Capabilities gate FRONT-END VISIBILITY, so omitting a flag silently removes working UI
+    # (no `llm.qa`/`llm.builder` => the 问答/建队 entries vanish from a runtime that can serve
+    # them). A bare rebuild dropping what the previous projection advertised is the easiest way
+    # to "break" a local frontend, so say so loudly instead of leaving it to the diff.
+    dropped = [c for c in OPTIONAL_CAPABILITIES if c not in ns.capability]
+    if dropped:
+        flags = " ".join(f"--capability {c}" for c in OPTIONAL_CAPABILITIES)
+        print(f"NOTE: not advertising {', '.join(dropped)} — the SPA will hide those features.\n"
+              f"      A full local projection (what dev/deploy/build_release.py ships) wants:\n"
+              f"      python apps/web/scripts/build_projection.py {flags}")
     # Check the asset pack up front: copytree(PACK) runs last, so a missing pack used to crash
     # AFTER all JSON was written, leaving a partial projection (no assets/) that `pcui serve`
     # auto-mounts and silently serves as all-placeholder images. Fail before touching `out`.
     if not PACK.is_dir():
         raise SystemExit(f"asset pack not found at {PACK} — run apps/assets/build_pack.py "
                          "first (refusing to build a projection without images)")
-    if out.exists():
-        shutil.rmtree(out)
+    # Build into a sibling staging dir and swap at the end. Wiping `out` up front left the
+    # projection ABSENT for the whole build (minutes): a `pcui serve` / `online-serve` already
+    # running keeps serving that path, and the SPA treats a 404 on assets/manifest.json as a
+    # definitive "no pack shipped" and caches an EMPTY asset index for the rest of the page
+    # session — every image not yet resolved turns into permanent placeholder art. The swap
+    # keeps that window down to two renames.
+    final = out
+    staging = final.parent / f".{final.name}.building-{os.getpid()}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.parent.mkdir(parents=True, exist_ok=True)
+    out = staging                      # every write below lands in staging
 
     pool = WorkerPool()
     try:
@@ -294,7 +315,26 @@ def main() -> int:
 
     shutil.copytree(PACK, out / "assets")
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
-    print(f"projection: {total / 1048576:.2f} MiB -> {out} (deployment {caps['deploymentId']})")
+
+    # Swap staging into place. Directory os.replace needs an absent destination on Windows, so
+    # step the old tree aside first and put it back if the install itself fails.
+    previous = final.parent / f".{final.name}.previous-{os.getpid()}"
+    if previous.exists():
+        shutil.rmtree(previous)
+    stepped_aside = False
+    if final.exists():
+        os.replace(final, previous)
+        stepped_aside = True
+    try:
+        os.replace(out, final)
+    except OSError:
+        if stepped_aside:
+            os.replace(previous, final)
+        raise
+    if stepped_aside:
+        shutil.rmtree(previous, ignore_errors=True)
+
+    print(f"projection: {total / 1048576:.2f} MiB -> {final} (deployment {caps['deploymentId']})")
     return 0
 
 

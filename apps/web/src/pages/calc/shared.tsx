@@ -10,6 +10,7 @@ import {
   type Dispatch, type ReactNode, type SetStateAction,
 } from "react";
 import { GameImage } from "../../components/GameImage.tsx";
+import { PLACEHOLDERS } from "../../assets/icons.ts";
 import {
   AdaptiveCombobox, type ComboboxCommitReason,
 } from "../../components/AdaptiveCombobox.tsx";
@@ -367,7 +368,9 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
     const q = value.trim();
     if (!q) { onSlug(""); return; }
     const local = localEntry(value);
-    if (local) { onSlug(local.slug); return; }
+    // Re-resolving the CURRENT mon would re-fire onSlug with the same slug, which (SideForm) resets
+    // to EMPTY_SIDE and wipes the auto-fill the effect won't re-apply (same key). Skip it.
+    if (local) { if (local.slug !== slug) onSlug(local.slug); return; }
     // Never keep calculating with the previous Pokémon while the visible text names no exact entry.
     onSlug("");
   };
@@ -378,7 +381,7 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
     const local = localEntry(value);
     if (local) {
       setText(displayName(local, lang));
-      onSlug(local.slug);
+      if (local.slug !== slug) onSlug(local.slug);
       return;
     }
     // Blur is not a user request to accept the first fuzzy match. Enter is.
@@ -388,8 +391,12 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
       if (token !== resolveToken.current) return;
       const canonical = entries[0]?.ok ? entries[0].canonical : undefined;
       const hit = canonical ? dex.find((e) => e.name === canonical) : undefined;
-      if (hit) setText(displayName(hit, lang));
-      onSlug(hit?.slug ?? "");
+      if (hit) {
+        setText(displayName(hit, lang));
+        if (hit.slug !== slug) onSlug(hit.slug);
+      } else {
+        onSlug("");
+      }
     }).catch(() => {
       if (token === resolveToken.current) onSlug("");
     });
@@ -397,9 +404,14 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
 
   const shown = displayEntry ?? entry;
   return (
-    <span style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      {shown && <GameImage assetKey={shown.key} role="card" alt={shown.name}
-        className="mini mon-picker-img" />}
+    <span className="mon-picker">
+      <span className="mon-picker-slot">
+        {shown
+          ? <GameImage assetKey={shown.key} role="card" alt={shown.name}
+              className="mini mon-picker-img" />
+          : <img className="mini mon-picker-img" src={PLACEHOLDERS.pokemon}
+              alt="" loading="lazy" aria-hidden />}
+      </span>
       <AdaptiveCombobox value={text} options={monOptions}
         onValueChange={edit} onCommit={commit}
         placeholder={placeholder ?? t("calc.pickHint")} />
@@ -448,7 +460,7 @@ export function SideForm({ label, side, setSide, dex, natures, items, onRemove, 
       <label>{t("ranking.pokemon")}
         <MonPicker idKey={label} slug={side.slug} dex={dex}
           displayEntry={mega ?? undefined}
-          onSlug={(slug) => setSide(() => ({ ...EMPTY_SIDE, slug }))} />
+          onSlug={(slug) => setSide((s) => s.slug === slug ? s : { ...EMPTY_SIDE, slug })} />
       </label>
       <div className="mini-fields four">
         <label>{t("calc.ability")}

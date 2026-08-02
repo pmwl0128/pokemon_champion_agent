@@ -326,6 +326,9 @@ main.content:focus { outline: none; }
 
 /* calc form */
 .side-grid { display: grid; gap: 10px; }
+.mon-picker { display: flex; gap: 8px; align-items: center; }
+.mon-picker-slot { width: 64px; height: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+.mon-picker-slot > img[aria-hidden] { opacity: 0.35; }
 .mon-picker-img { width: 64px; height: 64px; flex: none; object-fit: contain; image-rendering: auto; }
 .sp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
 .sp-grid label { font-size: 10.5px; text-transform: uppercase; font-family: var(--font-mono); }

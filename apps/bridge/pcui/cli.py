@@ -212,6 +212,7 @@ def cmd_online_serve(ns) -> int:
         pool, provider, limits, thinking_provider=thinking_provider,
         dist_dir=Path(ns.dist) if ns.dist else None,
         projection_dir=Path(ns.projection) if ns.projection else None,
+        deployment_id=_projection_deployment_id(ns.projection),
         public_origin=public_origin,
         idle_reap_seconds=ns.worker_idle if ns.worker_idle > 0 else None,
         deterministic_workers=ns.deterministic_workers,

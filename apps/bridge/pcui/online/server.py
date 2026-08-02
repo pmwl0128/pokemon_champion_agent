@@ -12,6 +12,7 @@ import asyncio
 import functools
 import hmac
 import json
+import re
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -42,6 +43,7 @@ DIAGNOSE_TOP_K = 30             # independent live battery scope; team skill per
 MATCHUP_QUEUE_WAIT = 20.0        # deterministic lane: bounded wait, never consumes model quota
 MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 12x60 costs 24 units
 TUNE_QUEUE_WAIT = 20.0           # shares the heavy deterministic lane with actual matchup
+_DEPLOYMENT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,80}\Z")
 
 
 def _err(code: str, message: str) -> dict:
@@ -52,6 +54,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                       thinking_provider: LlmProvider | None = None,
                       dist_dir: Path | None = None,
                       projection_dir: Path | None = None,
+                      deployment_id: str | None = None,
                       public_origin: str | None = None,
                       qa_concurrency: int = 2,
                       deterministic_workers: int = 4,
@@ -854,14 +857,56 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     # Optional static hosting: production puts Nginx in front (§8) — these mounts give the
     # SAME layout locally so the online runtime is testable end-to-end before a VPS exists.
+    # A packaged release uses only deployment-scoped immutable paths. The fallback aliases are
+    # retained for ad-hoc source-tree development, where no release identity is available.
+    if deployment_id is not None and not _DEPLOYMENT_ID_RE.fullmatch(deployment_id):
+        raise ValueError(f"invalid deployment id: {deployment_id!r}")
+    release_prefix = f"/releases/{deployment_id}" if deployment_id else None
+    projection_base = f"{release_prefix}/projection" if release_prefix else "/projection"
+    # A `local-*` id is the SOURCE-TREE projection (capabilities.assemble derives it whenever no
+    # release binds a real one), and it is paired with the deployment-NEUTRAL vite build whose
+    # index.html references `./assets/`. Only a packaged release ships an index rebound to the
+    # scoped path, so only a packaged release may retire the stable aliases — otherwise a bare
+    # `online-serve` 404s every asset of a bare `npm run build`, which is exactly the source-tree
+    # case these aliases exist for.
+    packaged_release = bool(deployment_id) and not deployment_id.startswith("local-")
+
     @app.get("/runtime-config.json")
     async def runtime_config():
-        return {"runtime": "online", "apiBase": "/api", "projectionBase": "/projection"}
+        doc = {"runtime": "online", "apiBase": "/api", "projectionBase": projection_base}
+        if deployment_id:
+            doc["deploymentId"] = deployment_id
+        return doc
 
     install_openapi(app, "online")
 
+    if packaged_release:
+        async def removed_stable_static():
+            raise HTTPException(
+                404,
+                _err("not_found", "stable release asset aliases are disabled"),
+                headers={"Cache-Control": "no-store"},
+            )
+
+        for route in ("/projection", "/projection/{path:path}", "/assets", "/assets/{path:path}"):
+            app.add_api_route(
+                route,
+                removed_stable_static,
+                methods=["GET", "HEAD"],
+                include_in_schema=False,
+            )
     if projection_dir is not None and projection_dir.is_dir():
-        app.mount("/projection", StaticFiles(directory=str(projection_dir)), name="projection")
+        app.mount(
+            projection_base,
+            StaticFiles(directory=str(projection_dir)),
+            name="projection",
+        )
+    if release_prefix and dist_dir is not None and (dist_dir / "assets").is_dir():
+        app.mount(
+            f"{release_prefix}/dist/assets",
+            StaticFiles(directory=str(dist_dir / "assets")),
+            name="release-assets",
+        )
     if dist_dir is not None and dist_dir.is_dir():
         from ..server import _SpaStaticFiles
         app.mount("/", _SpaStaticFiles(directory=str(dist_dir), html=True), name="spa")
