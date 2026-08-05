@@ -98,8 +98,9 @@ Recommended path — the prebuilt bundle (no Node.js needed):
 4. Launch the platform start script — `start-local.ps1` on Windows, `start-local.sh` on Linux/macOS (mark it executable first). Do not pass `--port`; read `~/.pokemon-champions-ui/pcui.env` for `PCUI_LOCAL_PORT` if the user has set one.
 5. Surface the full URL printed by the launcher, including its `#bootstrap=...` fragment — a bare `/` is rejected by the local auth check. Tell the user to open that complete URL once.
 
-From a source checkout (when the user wants to build or modify the SPA), run `build-ui.ps1` / `build-ui.sh`
-then `start-ui.ps1` / `start-ui.sh`; this path needs Node.js 22 and `requirements-ui.txt`.
+From a source checkout (when the user wants to build or modify the SPA), run
+`frontend/build-ui.ps1` / `frontend/build-ui.sh`, then the matching `frontend/start-ui.*`;
+this path needs Node.js 22 and `frontend/requirements-ui.txt`.
 
 The local UI is a verification and browsing aid. It does not produce new facts the agent did not already
 compute through the skills, and UEP session/artifact state under `~/.pokemon-champions-ui/` is a mirror

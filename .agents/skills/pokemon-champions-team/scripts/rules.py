@@ -44,7 +44,13 @@ def get_ruleset(season: str | None = None, rule: str | None = None) -> RuleSet:
 
 # season -> its regulation. THE one-place edit for a new season: repset.load_teams_for_rule and the
 # environment season->rule fallback both read this instead of re-declaring their own copy (audit 2026-07-08).
-SEASON_RULE: dict[str, str] = {"M-1": "M-A", "M-2": "M-A", "M-3": "M-B", "M-4": "M-B"}
+SEASON_RULE: dict[str, str] = {
+    "M-1": "M-A",
+    "M-2": "M-A",
+    "M-3": "M-B",
+    "M-4": "M-B",
+    "M-5": "M-B",
+}
 
 
 def rule_for_season(season: str | None) -> str | None:

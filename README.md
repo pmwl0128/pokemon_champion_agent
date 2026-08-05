@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-08-03</b>
+  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-08-05</b>
 </p>
 
 <p align="center">
@@ -339,12 +339,12 @@ bridge, or skill trees from different snapshots—the identity checks reject tha
 ```powershell
 git clone https://github.com/pmwl0128/pokemon_champion_agent.git
 Set-Location .\pokemon_champion_agent
-python -m pip install -r requirements-ui.txt
-.\build-ui.ps1
-.\start-ui.ps1
+python -m pip install -r frontend/requirements-ui.txt
+.\frontend\build-ui.ps1
+.\frontend\start-ui.ps1
 ```
 
-On Linux/macOS use `build-ui.sh` and `start-ui.sh` after making them executable.
+On Linux/macOS use `frontend/build-ui.sh` and `frontend/start-ui.sh` after making them executable.
 
 ### Privacy and updates
 

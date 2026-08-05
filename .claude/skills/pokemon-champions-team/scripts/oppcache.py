@@ -36,7 +36,6 @@ from typing import Any, Callable
 
 import checks
 import repset
-import rules
 import team_i18n as i18n
 
 # Disguise (Mimikyu) breaks on the first damaging hit: it blocks that hit ENTIRELY (0 dmg) and Mimikyu
@@ -74,19 +73,46 @@ def _fingerprint(paths: list[Path]) -> str:
     return h.hexdigest()
 
 
-def source_fingerprints(fmt: str, rule: str, season: str) -> dict[str, str]:
+def team_seasons_for_rule(fmt: str, rule: str) -> list[str]:
+    """Non-empty shipped partitions that currently contribute to a rule-scoped team pool.
+
+    Prefer the shipped index so a newly created partition invalidates the cache before a consumer has
+    to load the full library. Fall back to the rows for custom/test data directories without an index.
+    """
+    index_path = repset.data_dir() / "index.json"
+    if index_path.exists():
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            if isinstance(index, dict):
+                return sorted({
+                    str(entry.get("season"))
+                    for entry in index.values()
+                    if isinstance(entry, dict)
+                    and entry.get("format") == fmt
+                    and entry.get("rule") == rule
+                    and int(entry.get("count") or 0) > 0
+                    and entry.get("season")
+                })
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            pass
+    return repset.seasons_in(repset.load_teams_for_rule(fmt, rule))
+
+
+def source_fingerprints(fmt: str, rule: str, season: str,
+                        data_seasons: list[str] | None = None) -> dict[str, str]:
     """Hashes of every mutable data source that shapes this cache.
 
     Meta ranking and detail panels are season-scoped; real-team evidence is rule-scoped and therefore
-    includes every season partition mapped to that rule. The hashes make a data refresh invalidate the
-    old matrix loudly instead of letting a newer local snapshot silently consume stale calculations.
+    includes every non-empty shipped partition currently contributing to that rule. The hashes make a
+    data refresh invalidate the old matrix loudly instead of letting a newer local snapshot silently
+    consume stale calculations.
     """
     skills_root = SCRIPTS.parent.parent
     meta_data = skills_root / "pokemon-champions-meta" / "data"
     meta_paths = [meta_data / f"ranking_{season}_{fmt}.json",
                   meta_data / f"details_{season}_{fmt}.json"]
-    team_paths = [repset.data_dir() / f"{s}_{fmt}.jsonl"
-                  for s, mapped_rule in rules.SEASON_RULE.items() if mapped_rule == rule]
+    contributing_seasons = sorted(set(data_seasons or team_seasons_for_rule(fmt, rule)))
+    team_paths = [repset.data_dir() / f"{s}_{fmt}.jsonl" for s in contributing_seasons]
     return {"meta": _fingerprint(meta_paths), "team_library": _fingerprint(team_paths)}
 
 
@@ -117,7 +143,12 @@ def load_cache(fmt: str, rule: str) -> dict[str, Any] | None:
     expected = built_for.get("source_fingerprints")
     season = built_for.get("season")
     if isinstance(expected, dict) and isinstance(season, str):
-        actual = source_fingerprints(fmt, rule, season)
+        recorded_seasons = sorted(set(built_for.get("data_seasons") or []))
+        actual_seasons = team_seasons_for_rule(fmt, rule)
+        if recorded_seasons != actual_seasons:
+            raise StaleCacheError(
+                f"opponent cache {rule}/{fmt} is stale for the local team partitions; rebuild it")
+        actual = source_fingerprints(fmt, rule, season, actual_seasons)
         if expected != actual:
             raise StaleCacheError(
                 f"opponent cache {rule}/{fmt} is stale for the local meta/team snapshots; rebuild it")

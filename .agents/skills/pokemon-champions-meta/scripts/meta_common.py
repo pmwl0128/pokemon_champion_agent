@@ -18,7 +18,13 @@ CURRENT_PATH = DATA_DIR / "current.json"
 
 DEFAULT_SEASON = "M-4"
 DEFAULT_RULE = "M-B"
-SEASON_RULE = {"M-1": "M-A", "M-2": "M-A", "M-3": "M-B", "M-4": "M-B"}
+SEASON_RULE = {
+    "M-1": "M-A",
+    "M-2": "M-A",
+    "M-3": "M-B",
+    "M-4": "M-B",
+    "M-5": "M-B",
+}
 
 PANEL_MAP = {
     "moves": "moves",

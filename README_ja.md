@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-08-03</b>
+  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-08-05</b>
 </p>
 
 <p align="center">
@@ -329,12 +329,12 @@ Python 3.10+と、リリース検証で使うNode.js（現在は22）を用意�
 ```powershell
 git clone https://github.com/pmwl0128/pokemon_champion_agent.git
 Set-Location .\pokemon_champion_agent
-python -m pip install -r requirements-ui.txt
-.\build-ui.ps1
-.\start-ui.ps1
+python -m pip install -r frontend/requirements-ui.txt
+.\frontend\build-ui.ps1
+.\frontend\start-ui.ps1
 ```
 
-Linux/macOSでは実行権限を付けた`build-ui.sh`と`start-ui.sh`を使います。
+Linux/macOSでは実行権限を付けた`frontend/build-ui.sh`と`frontend/start-ui.sh`を使います。
 
 ### プライバシーと更新
 

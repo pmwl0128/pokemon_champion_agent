@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-08-03</b>
+  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-08-05</b>
 </p>
 
 <p align="center">
@@ -327,16 +327,16 @@ PCUI_LOCAL_PORT=1025
 
 ### 从源码构建
 
-从源码构建适合需要检查或修改前端的用户。推荐使用项目发布验证所采用的 **Node.js 22**，另需 Python 3.10+ 和 npm。JavaScript 依赖由 `package-lock.json` 固定；`build-ui` 脚本会执行 `npm ci`、生成与当前技能数据一致的公开 projection，再运行一次 Vite build。
+从源码构建适合需要检查或修改前端的用户。推荐使用项目发布验证所采用的 **Node.js 22**，另需 Python 3.10+ 和 npm。JavaScript 依赖由 `frontend/package-lock.json` 固定；`frontend/build-ui` 脚本会执行 `npm ci`、生成与当前技能数据一致的公开 projection，再运行一次 Vite build。
 
 Windows PowerShell：
 
 ```powershell
 git clone https://github.com/pmwl0128/pokemon_champion_agent.git
 Set-Location .\pokemon_champion_agent
-python -m pip install -r requirements-ui.txt
-.\build-ui.ps1
-.\start-ui.ps1
+python -m pip install -r frontend/requirements-ui.txt
+.\frontend\build-ui.ps1
+.\frontend\start-ui.ps1
 ```
 
 Linux / macOS：
@@ -344,10 +344,10 @@ Linux / macOS：
 ```bash
 git clone https://github.com/pmwl0128/pokemon_champion_agent.git
 cd pokemon_champion_agent
-python3 -m pip install -r requirements-ui.txt
-chmod +x build-ui.sh start-ui.sh
-./build-ui.sh
-./start-ui.sh
+python3 -m pip install -r frontend/requirements-ui.txt
+chmod +x frontend/build-ui.sh frontend/start-ui.sh
+./frontend/build-ui.sh
+./frontend/start-ui.sh
 ```
 
 构建生成的 `dist`、projection 与本地 bridge 必须来自同一份仓库快照。不要把旧版 `dist`、新版 projection 或另一版技能目录手工拼在一起；启动时的协议、计算引擎摘要和 deployment ID 检查会拒绝不一致的组合。
@@ -369,7 +369,7 @@ chmod +x build-ui.sh start-ui.sh
 git pull
 ```
 
-然后重新执行对应平台的 `build-ui` 和 `start-ui` 脚本。页面显示的 season／rule／as-of 和发行包内 `manifest.json` 可用于确认当前数据与运行包身份。
+然后重新执行 `frontend/` 下对应平台的 `build-ui` 和 `start-ui` 脚本。页面显示的 season／rule／as-of 和发行包内 `manifest.json` 可用于确认当前数据与运行包身份。
 
 ## 安装
 

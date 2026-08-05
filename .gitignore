@@ -2,9 +2,9 @@
 __pycache__/
 *.pyc
 node_modules/
-apps/web/dist/
-apps/web/public/projection/
-packages/*/dist/
+frontend/web/dist/
+frontend/web/public/projection/
+frontend/protocol/dist/
 
 # Generated binaries ship on the rolling data-latest release, not in Git history.
 *.xlsx
