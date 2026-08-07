@@ -26,6 +26,7 @@ One team. Used for both validation input and as the unit stored in the sample li
   "format": "single",                 // "single" | "double"
   "season": "M-4",                    // nullable for a hand-built team
   "rule": "M-B",                      // nullable for a hand-built team
+  "event": null,                       // rule-scoped event object below; null/absent for season rows
   "pokemon": [
     {
       "species": "Staraptor",         // dex canonical English name (Mega forms: "Mega Staraptor")
@@ -43,6 +44,9 @@ One team. Used for both validation input and as the unit stored in the sample li
 ```
 
 Field notes:
+- Collected ladder rows carry `season` and no `event`. A competition not owned by a ladder season
+  carries `season: null`, an explicit `rule`, and `event: {id,name,category,start_date,end_date}`.
+  Event and season are parallel provenance axes; event dates never imply a season assignment.
 - `species` / `item` / `ability` / `moves` use **dex canonical English** so validation and cross-checks
   against `$pokemon-champions-dex` are exact. Raw importer identifiers are normalized here before
   anything ships.
@@ -102,12 +106,16 @@ event title, or other source-locating field. It keeps `fetched_at` plus the whit
 data/teams/
   index.json
   <season>_<format>.jsonl
+  <rule>-events_<format>.jsonl
 ```
 
-- One JSONL file represents one `(season, format)` partition and contains one `team-json` per line.
+- A season JSONL represents one `(season, format)` partition. A non-empty event JSONL represents the
+  rule-scoped event pool for `(rule, format)`; its rows have `season:null` plus distinct event ids.
 - Filter and label evidence by `season`, `rule`, `format`, and `performance`.
 - Runtime consumers may merge partitions sharing the same rule; old regulations remain explicitly
   labeled and are not treated as current.
+- Exact-season reads use only `<season>_<format>.jsonl`; rule-pool reads also include the matching
+  `<rule>-events_<format>.jsonl`. Empty event scopes do not create files or index entries.
 
 ## 4. Representative Sets
 
@@ -181,6 +189,7 @@ The **live cache shape** — the matrix is keyed by `variant_id`:
   "kind": "opponent-cache",
   "built_for": {"season": "M-4", "rule": "M-B", "format": "single",
                 "data_rule": "M-B", "data_seasons": ["M-3", "M-4"],
+                "data_partitions": ["M-3", "M-4", "M-B-events"],
                 "built_at": "...", "top_k": 60, "variant_count": 201,
                 "cache_schema_version": 2,
                 "source_fingerprints": {"meta": "sha256...", "team_library": "sha256..."}},
@@ -242,7 +251,8 @@ The **live cache shape** — the matrix is keyed by `variant_id`:
   one — so it appears as a **defender only** (`real_team_backed:false`, `moves:null`).
   It therefore appears only as a defender.
 - Source fingerprints cover the season-scoped meta ranking/details and every same-rule team-library
-  partition. A mismatch refuses the cache and requires rebuild; a refreshed local data snapshot is
+  partition, including the rule event partition. A mismatch refuses the cache and requires rebuild;
+  a refreshed local data snapshot is
   never silently paired with older calculations.
 - `offense` reuses the live `matchup` damage fact (full roll band + possible/guaranteed KO buckets;
   only a damage-based one-turn KO is exact, 2+ turn KO is a static approximation flagged

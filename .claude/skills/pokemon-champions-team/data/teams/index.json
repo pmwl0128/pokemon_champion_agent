@@ -3,7 +3,7 @@
     "season": "M-1",
     "rule": "M-A",
     "format": "double",
-    "count": 766
+    "count": 860
   },
   "M-1_single": {
     "season": "M-1",
@@ -15,7 +15,7 @@
     "season": "M-2",
     "rule": "M-A",
     "format": "double",
-    "count": 313
+    "count": 408
   },
   "M-2_single": {
     "season": "M-2",
@@ -27,24 +27,60 @@
     "season": "M-3",
     "rule": "M-B",
     "format": "double",
-    "count": 4931
+    "count": 7475
   },
   "M-3_single": {
     "season": "M-3",
     "rule": "M-B",
     "format": "single",
-    "count": 578
+    "count": 588
   },
   "M-4_double": {
     "season": "M-4",
     "rule": "M-B",
     "format": "double",
-    "count": 3863
+    "count": 12319
   },
   "M-4_single": {
     "season": "M-4",
     "rule": "M-B",
     "format": "single",
-    "count": 216
+    "count": 417
+  },
+  "M-5_double": {
+    "season": "M-5",
+    "rule": "M-B",
+    "format": "double",
+    "count": 195
+  },
+  "M-5_single": {
+    "season": "M-5",
+    "rule": "M-B",
+    "format": "single",
+    "count": 12
+  },
+  "M-A-events_double": {
+    "partition": "M-A-events",
+    "partition_kind": "event",
+    "season": null,
+    "rule": "M-A",
+    "format": "double",
+    "count": 510
+  },
+  "M-A-events_single": {
+    "partition": "M-A-events",
+    "partition_kind": "event",
+    "season": null,
+    "rule": "M-A",
+    "format": "single",
+    "count": 43
+  },
+  "M-B-events_single": {
+    "partition": "M-B-events",
+    "partition_kind": "event",
+    "season": null,
+    "rule": "M-B",
+    "format": "single",
+    "count": 48
   }
 }

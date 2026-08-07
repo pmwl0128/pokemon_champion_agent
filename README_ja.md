@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>環境スナップショット</b> · M-4 / M-B · 更新日 <b>2026-08-05</b>
+  <b>環境スナップショット</b> · M-5 / M-B · 更新日 <b>2026-08-07</b>
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@
 
 4つのスキルはagent CLIからすべて利用できます。データ、構成情報、生成過程をより直感的に確認できるよう、任意のコンパニオンブラウザ画面も用意されています。図鑑や環境スナップショットを視覚的に閲覧し、対面、ダメージ、素早さ、調整、構築診断を補助します。
 
-- **オンライン版：**[champion.mpan.top:1025](https://champion.mpan.top:1025) をインストール不要で利用できます。リソース制約のため、オンライン版の一部機能はローカル版より簡略化されています。
+- **オンライン版：**[champion.mpan.top](https://champion.mpan.top) をインストール不要で利用できます。リソース制約のため、オンライン版の一部機能はローカル版より簡略化されています。
 - **ローカル版：**[`data-latest` Release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest) から [`pokemon-champions-ui.zip`](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/pokemon-champions-ui.zip) を取得します。ビルド済みパッケージにはNode.js、アカウント、モデルAPI Keyは不要です。
 
 この画面はスキルの前提条件ではなく、AI助手との完全なローカル協調フローを置き換えるものでもありません。機能差、依存関係、使用方法は[ビジュアルインターフェース](#ビジュアルインターフェース)を参照してください。
@@ -274,7 +274,7 @@ AをBへ変更した場合の防御、S操作、環境上の穴を比較して�
 
 ### オンライン版を使う
 
-[https://champion.mpan.top:1025](https://champion.mpan.top:1025) を開きます。環境・図鑑の閲覧と
+[https://champion.mpan.top](https://champion.mpan.top) を開きます。環境・図鑑の閲覧と
 ブラウザ計算にはアカウント不要です。Q&A、構築、診断、AI解説は、デプロイがそのcapabilityを公開して
 いる場合だけ表示され、残り回数はサービスの応答が基準です。標準型対面表は低信頼度の参考なので、
 自分の構築を判断するときは実際の型を入力して再計算してください。

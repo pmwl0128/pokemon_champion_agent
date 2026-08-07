@@ -748,8 +748,15 @@ def audit_answer(draft: Any, slate_input: Any, slate_output: Any, *,
             for rows in bucket_rows.values():
                 for row in rows if isinstance(rows, list) else []:
                     if isinstance(row, dict) and row.get("evidence_id"):
+                        # `opponent_variant` names the exact observed build the battery ran this cell
+                        # against. Without it the recompute re-resolves the species to its MODAL
+                        # build, which for a multi-archetype species is a different opponent and a
+                        # different number — an honest claim then reads as fabricated (audit
+                        # 2026-08-06). It is battery-supplied binding data, exactly like `member`
+                        # and `direction`; the calc itself is still re-run independently below.
                         eid_index.setdefault(row["evidence_id"], []).append(
-                            {"candidate": i, "member": row.get("member"), "direction": direction})
+                            {"candidate": i, "member": row.get("member"), "direction": direction,
+                             "opponent_variant": row.get("opponent_variant")})
 
     bindings: list[dict[str, Any]] = []
     meta: list[tuple[str, str, dict]] = []
@@ -841,10 +848,17 @@ def audit_answer(draft: Any, slate_input: Any, slate_output: Any, *,
                                        "detail": "neither side of the coordinates is on a recommended "
                                                  "team — claims bind YOUR presented teams to the field"})
                     continue
+            # The opponent side is whichever side is NOT one of our bound members, so that is where
+            # the battery's observed-build id applies.
+            opponent_variant = (known or {}).get("opponent_variant")
             bindings.append({"kind": "damage", "format": parsed["format"],
                              "attacker": parsed["attacker"], "defender": parsed["defender"],
                              "move": parsed["move"],
-                             "attacker_member": am, "defender_member": dm})
+                             "attacker_member": am, "defender_member": dm,
+                             **({"defender_variant": opponent_variant} if opponent_variant and dm is None
+                                else {}),
+                             **({"attacker_variant": opponent_variant} if opponent_variant and am is None
+                                else {})})
         else:
             mm, ambiguous = member_of(parsed["member"])
             if ambiguous:

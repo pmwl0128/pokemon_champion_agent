@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>环境快照</b> · M-4 / M-B · 截至 <b>2026-08-05</b>
+  <b>环境快照</b> · M-5 / M-B · 截至 <b>2026-08-07</b>
 </p>
 
 <p align="center">
@@ -50,7 +50,7 @@
 
 四个技能通过agent-cli即可完整使用。为了方便用户更直观的看到数据、配置信息和生成过程，项目提供一套可选的配套浏览器前端界面，用图形化方式浏览图鉴、环境快照，并辅助用户完成对位、伤害、速度、调校和队伍诊断等操作：
 
-- **在线使用：**打开 [champion.mpan.top:1025](https://champion.mpan.top:1025)，无需安装。注意在线端因资源限制，功能与本地版相比有所简化。
+- **在线使用：**打开 [champion.mpan.top](https://champion.mpan.top)，无需安装。注意在线端因资源限制，功能与本地版相比有所简化。
 - **本地使用：**从 [`data-latest` Release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest) 下载 [`pokemon-champions-ui.zip`](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/pokemon-champions-ui.zip)。预构建包不需要 Node.js，也不需要账号或模型 API Key。
 
 界面不是技能的前置依赖，也不会代替 AI 助手完成完整的本地协作流程。功能差异、安装依赖和使用方法见[可视化界面](#可视化界面)。
@@ -276,7 +276,7 @@ team 技能内部使用一套流程化约束来减少“先凭印象生成，再
 
 ### 直接使用在线版
 
-访问 [https://champion.mpan.top:1025](https://champion.mpan.top:1025) 即可。环境、图鉴、趋势、对位和浏览器计算不需要账号；事实问答、建队与 AI 解读是否显示，以及可用次数，由当前在线部署的 capability 和额度决定。
+访问 [https://champion.mpan.top](https://champion.mpan.top) 即可。环境、图鉴、趋势、对位和浏览器计算不需要账号；事实问答、建队与 AI 解读是否显示，以及可用次数，由当前在线部署的 capability 和额度决定。
 
 建议按以下顺序使用：
 

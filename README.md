@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-4 / M-B · updated <b>2026-08-05</b>
+  <b>Metagame snapshot</b> · M-5 / M-B · updated <b>2026-08-07</b>
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ Scripts own facts, arithmetic, and deterministic checks. The model interprets yo
 
 All four skills are fully usable through an agent CLI. To make the data, configurations, and generation process easier to inspect, the project also provides an optional companion browser front end. It lets you browse the dex and metagame snapshots visually and assists with matchup, damage, Speed, tuning, and team-diagnosis work:
 
-- **Online:** open [champion.mpan.top:1025](https://champion.mpan.top:1025) with no installation required. Because the online edition has limited resources, some features are simplified compared with the local edition.
+- **Online:** open [champion.mpan.top](https://champion.mpan.top) with no installation required. Because the online edition has limited resources, some features are simplified compared with the local edition.
 - **Local:** download [`pokemon-champions-ui.zip`](https://github.com/pmwl0128/pokemon_champion_agent/releases/download/data-latest/pokemon-champions-ui.zip) from the [`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest). The prebuilt bundle requires neither Node.js nor an account or model API key.
 
 The interface is not a prerequisite for the skills and does not replace the complete local collaboration workflow with an AI assistant. See [Optional Visual Interface](#optional-visual-interface) for feature differences, dependencies, and usage instructions.
@@ -281,7 +281,7 @@ conversation, candidate comparison, revision loop, or file collaboration.
 
 ### Use the online edition
 
-Open [https://champion.mpan.top:1025](https://champion.mpan.top:1025). Static environment and dex
+Open [https://champion.mpan.top](https://champion.mpan.top). Static environment and dex
 browsing plus browser calculations require no account. Q&A, builder, diagnosis, and AI explanation are
 shown only when the deployment advertises those capabilities; quota status comes from the service.
 Standard-set matchup pages are low-confidence references. Paste or enter the actual set when judging

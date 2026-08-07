@@ -98,8 +98,35 @@ def team_seasons_for_rule(fmt: str, rule: str) -> list[str]:
     return repset.seasons_in(repset.load_teams_for_rule(fmt, rule))
 
 
+def team_partitions_for_rule(fmt: str, rule: str) -> list[str]:
+    """Non-empty physical partitions contributing to a rule pool, including rule-level events."""
+    index_path = repset.data_dir() / "index.json"
+    if index_path.exists():
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            if isinstance(index, dict):
+                return sorted({
+                    str(entry.get("partition") or entry.get("season"))
+                    for entry in index.values()
+                    if isinstance(entry, dict)
+                    and entry.get("format") == fmt
+                    and entry.get("rule") == rule
+                    and int(entry.get("count") or 0) > 0
+                    and (entry.get("partition") or entry.get("season"))
+                })
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            pass
+    partitions = set()
+    for path in repset.data_dir().glob(f"*_{fmt}.jsonl"):
+        rows = repset._read_jsonl(path)
+        if any(team.get("rule") == rule for team in rows):
+            partitions.add(path.stem.rsplit("_", 1)[0])
+    return sorted(partitions)
+
+
 def source_fingerprints(fmt: str, rule: str, season: str,
-                        data_seasons: list[str] | None = None) -> dict[str, str]:
+                        data_seasons: list[str] | None = None,
+                        data_partitions: list[str] | None = None) -> dict[str, str]:
     """Hashes of every mutable data source that shapes this cache.
 
     Meta ranking and detail panels are season-scoped; real-team evidence is rule-scoped and therefore
@@ -111,8 +138,8 @@ def source_fingerprints(fmt: str, rule: str, season: str,
     meta_data = skills_root / "pokemon-champions-meta" / "data"
     meta_paths = [meta_data / f"ranking_{season}_{fmt}.json",
                   meta_data / f"details_{season}_{fmt}.json"]
-    contributing_seasons = sorted(set(data_seasons or team_seasons_for_rule(fmt, rule)))
-    team_paths = [repset.data_dir() / f"{s}_{fmt}.jsonl" for s in contributing_seasons]
+    contributing = sorted(set(data_partitions or team_partitions_for_rule(fmt, rule)))
+    team_paths = [repset.data_dir() / f"{partition}_{fmt}.jsonl" for partition in contributing]
     return {"meta": _fingerprint(meta_paths), "team_library": _fingerprint(team_paths)}
 
 
@@ -145,10 +172,13 @@ def load_cache(fmt: str, rule: str) -> dict[str, Any] | None:
     if isinstance(expected, dict) and isinstance(season, str):
         recorded_seasons = sorted(set(built_for.get("data_seasons") or []))
         actual_seasons = team_seasons_for_rule(fmt, rule)
-        if recorded_seasons != actual_seasons:
+        recorded_partitions = sorted(set(built_for.get("data_partitions") or recorded_seasons))
+        actual_partitions = team_partitions_for_rule(fmt, rule)
+        if recorded_seasons != actual_seasons or recorded_partitions != actual_partitions:
             raise StaleCacheError(
                 f"opponent cache {rule}/{fmt} is stale for the local team partitions; rebuild it")
-        actual = source_fingerprints(fmt, rule, season, actual_seasons)
+        actual = source_fingerprints(fmt, rule, season, actual_seasons,
+                                     data_partitions=actual_partitions)
         if expected != actual:
             raise StaleCacheError(
                 f"opponent cache {rule}/{fmt} is stale for the local meta/team snapshots; rebuild it")

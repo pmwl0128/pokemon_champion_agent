@@ -1,6 +1,6 @@
 {
   "current": {
-    "season": "M-4",
+    "season": "M-5",
     "rule": "M-B"
   },
   "seasons": {
@@ -24,7 +24,8 @@
       "updated_at": "2026-08-05T00:00:00+00:00"
     },
     "M-5": {
-      "rule": "M-B"
+      "rule": "M-B",
+      "updated_at": "2026-08-07T00:00:00+00:00"
     }
   }
 }

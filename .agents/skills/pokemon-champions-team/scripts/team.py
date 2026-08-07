@@ -1472,6 +1472,25 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
                 else:
                     need.add(b["opponent"])
             sets_map = sources.resolve_opponent_sets(sorted(need), fmt_b, rule=rule_scope) if need else {}
+            # A ranked species expands into one battery cell per observed (item, ability) archetype,
+            # so when the binding names the variant the battery actually ran, resolve THAT build
+            # instead of the species' modal one — otherwise the recompute answers a different
+            # question than the claim (audit 2026-08-06). Falls back to the modal set when the id no
+            # longer resolves (a library refresh can retire an archetype); it never invents one.
+            variant_sets: dict[str, dict] = {}
+            wanted = {(b[side], b[f"{kind}_variant"])
+                      for b in bindings if b["kind"] == "damage"
+                      for side, kind in (("attacker", "attacker"), ("defender", "defender"))
+                      if b.get(f"{kind}_variant")}
+            for species, vid in sorted(wanted):
+                for v in sources.resolve_opponent_variants(species, fmt_b, rule=rule_scope) or []:
+                    if v.get("variant_id") == vid:
+                        variant_sets[vid] = v
+                        break
+
+            def opponent_set(binding: dict, side: str) -> dict | None:
+                vid = binding.get(f"{side}_variant")
+                return variant_sets.get(vid) or sets_map.get(binding[side])
             bound_members = [
                 member for b in bindings
                 for member in (b.get("attacker_member"), b.get("defender_member"),
@@ -1507,10 +1526,12 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
             for bi, b in enumerate(bindings):
                 if b["kind"] == "damage":
                     atk_m, def_m = b.get("attacker_member"), b.get("defender_member")
-                    if atk_m is None and sets_map.get(b["attacker"]) is None:
+                    atk_set = None if atk_m else opponent_set(b, "attacker")
+                    def_set = None if def_m else opponent_set(b, "defender")
+                    if atk_m is None and atk_set is None:
                         out[bi] = {"computed": False,
                                    "reason": f"no resolvable modal set for attacker {b['attacker']!r}"}
-                    elif def_m is None and sets_map.get(b["defender"]) is None:
+                    elif def_m is None and def_set is None:
                         out[bi] = {"computed": False,
                                    "reason": f"no resolvable modal set for defender {b['defender']!r}"}
                     else:
@@ -1519,9 +1540,9 @@ def cmd_answer_audit(draft_path: str, fmt: str, slate_path: str | None,
                         def_effective = effective(def_m) if def_m else None
                         requests.append({
                             "attacker": member_actor(atk_effective) if atk_effective
-                            else set_actor(b["attacker"], sets_map[b["attacker"]]),
+                            else set_actor(b["attacker"], atk_set),
                             "defender": member_actor(def_effective) if def_effective
-                            else set_actor(b["defender"], sets_map[b["defender"]]),
+                            else set_actor(b["defender"], def_set),
                             "move": b["move"]})
                 else:
                     member_effective = effective(b["member_member"])

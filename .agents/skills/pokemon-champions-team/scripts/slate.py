@@ -116,14 +116,24 @@ def _matchup_digest(mres: dict[str, Any], fmt: str) -> dict[str, Any]:
             off = c.get("offense") or {}
             # A fact without a move has no re-runnable coordinates — never emit a broken "…|None"
             # evidence address (self-audit 2026-07-02).
+            #
+            # `opponent` is a SPECIES, but a ranked species expands into one cell per real build, so
+            # the evidence_id alone cannot say WHICH build produced the fact. Carry the variant here
+            # exactly as the defensive bucket below already does: an M-5 Kingambit splits into five
+            # (item, ability) archetypes and Mega Garchomp's Earthquake OHKOs only the 15%-coverage
+            # Focus Sash one, so a recompute that re-resolved "Kingambit" to its modal build read the
+            # same coordinate as a 2HKO and called an honest claim fabricated (audit 2026-08-06).
+            # `opponent_is_modal` rides along for the same reason it does defensively: a fact about a
+            # minority build must not read as an equal-weight fact about the species.
+            variant = {k: c[k] for k in ("opponent_variant", "opponent_is_modal") if k in c}
             if off.get("ko_guaranteed") == 1 and off.get("move"):
                 we_g.setdefault(opp, []).append(
                     {"member": me, "move": off["move"],
-                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"])})
+                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"]), **variant})
             elif off.get("ko_possible") == 1 and off.get("move"):
                 we_p.setdefault(opp, []).append(
                     {"member": me, "move": off["move"],
-                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"])})
+                     "evidence_id": evidence_id(fmt, calc_me, opp, off["move"]), **variant})
             worst = (c.get("defense_damage") or {}).get("worst") or {}
             if worst.get("ko_guaranteed") == 1 and worst.get("move"):
                 them_g.setdefault(opp, []).append(
