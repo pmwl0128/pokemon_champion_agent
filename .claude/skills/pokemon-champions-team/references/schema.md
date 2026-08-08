@@ -26,7 +26,6 @@ One team. Used for both validation input and as the unit stored in the sample li
   "format": "single",                 // "single" | "double"
   "season": "M-4",                    // nullable for a hand-built team
   "rule": "M-B",                      // nullable for a hand-built team
-  "event": null,                       // rule-scoped event object below; null/absent for season rows
   "pokemon": [
     {
       "species": "Staraptor",         // dex canonical English name (Mega forms: "Mega Staraptor")
@@ -44,9 +43,10 @@ One team. Used for both validation input and as the unit stored in the sample li
 ```
 
 Field notes:
-- Collected ladder rows carry `season` and no `event`. A competition not owned by a ladder season
-  carries `season: null`, an explicit `rule`, and `event: {id,name,category,start_date,end_date}`.
-  Event and season are parallel provenance axes; event dates never imply a season assignment.
+- Collected ladder rows carry `season`. A competition not owned by a ladder season ships with
+  `season: null` and an explicit `rule`; its physical `<rule>-events_<format>.jsonl` partition records
+  the event provenance axis without exposing event identity. Full event metadata exists only in the
+  private updater build-state because event identity combined with placing can identify a source row.
 - `species` / `item` / `ability` / `moves` use **dex canonical English** so validation and cross-checks
   against `$pokemon-champions-dex` are exact. Raw importer identifiers are normalized here before
   anything ships.
