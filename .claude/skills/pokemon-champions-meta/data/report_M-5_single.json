@@ -2,7 +2,7 @@
   "season": "M-5",
   "rule": "M-B",
   "format": "single",
-  "generated_at": "2026-08-08T00:00:00+00:00",
+  "generated_at": "2026-08-10T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,24 +50,77 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-08-07T00:00:00+00:00",
-    "details_updated_at": "2026-08-07T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-08-08T00:00:00+00:00",
     "details_updated_at": "2026-08-08T00:00:00+00:00"
   },
+  "current": {
+    "ranking_updated_at": "2026-08-10T00:00:00+00:00",
+    "details_updated_at": "2026-08-10T00:00:00+00:00"
+  },
   "rank_moves": [
     {
-      "slug": "umbreon",
-      "name": "月亮伊布",
-      "old": 33,
-      "new": 28,
-      "delta": 5,
+      "slug": "starmie",
+      "name": "宝石海星",
+      "old": 23,
+      "new": 30,
+      "delta": -7,
       "tier": "A"
     }
   ],
   "new_entries": [],
   "dropped": [],
-  "config_changes": []
+  "config_changes": [
+    {
+      "slug": "charizard",
+      "name": "喷火龙",
+      "rank": 10,
+      "tier": "S",
+      "panel": "moves",
+      "item": "羽栖",
+      "old_pct": 18.7,
+      "new_pct": 0.0,
+      "delta": -18.7,
+      "kind": "消失",
+      "rank_triggered": false
+    },
+    {
+      "slug": "charizard",
+      "name": "喷火龙",
+      "rank": 10,
+      "tier": "S",
+      "panel": "moves",
+      "item": "雷电拳",
+      "old_pct": 0.0,
+      "new_pct": 18.1,
+      "delta": 18.1,
+      "kind": "新增",
+      "rank_triggered": false
+    },
+    {
+      "slug": "dragapult",
+      "name": "多龙巴鲁托",
+      "rank": 38,
+      "tier": "B",
+      "panel": "moves",
+      "item": "反射壁",
+      "old_pct": 24.0,
+      "new_pct": 0.0,
+      "delta": -24.0,
+      "kind": "消失",
+      "rank_triggered": false
+    },
+    {
+      "slug": "dragapult",
+      "name": "多龙巴鲁托",
+      "rank": 38,
+      "tier": "B",
+      "panel": "moves",
+      "item": "突袭",
+      "old_pct": 0.0,
+      "new_pct": 22.2,
+      "delta": 22.2,
+      "kind": "新增",
+      "rank_triggered": false
+    }
+  ]
 }
