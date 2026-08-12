@@ -39,25 +39,25 @@
     "season": "M-4",
     "rule": "M-B",
     "format": "double",
-    "count": 12835
+    "count": 12870
   },
   "M-4_single": {
     "season": "M-4",
     "rule": "M-B",
     "format": "single",
-    "count": 459
+    "count": 466
   },
   "M-5_double": {
     "season": "M-5",
     "rule": "M-B",
     "format": "double",
-    "count": 1068
+    "count": 1429
   },
   "M-5_single": {
     "season": "M-5",
     "rule": "M-B",
     "format": "single",
-    "count": 34
+    "count": 42
   },
   "M-A-events_double": {
     "partition": "M-A-events",

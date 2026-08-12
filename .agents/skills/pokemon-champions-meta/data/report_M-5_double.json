@@ -2,7 +2,7 @@
   "season": "M-5",
   "rule": "M-B",
   "format": "double",
-  "generated_at": "2026-08-10T00:00:00+00:00",
+  "generated_at": "2026-08-12T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,44 +50,28 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-08-08T00:00:00+00:00",
-    "details_updated_at": "2026-08-08T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-08-10T00:00:00+00:00",
     "details_updated_at": "2026-08-10T00:00:00+00:00"
   },
+  "current": {
+    "ranking_updated_at": "2026-08-12T00:00:00+00:00",
+    "details_updated_at": "2026-08-12T00:00:00+00:00"
+  },
   "rank_moves": [
     {
-      "slug": "sinistcha",
-      "name": "来悲粗茶",
-      "old": 10,
-      "new": 7,
-      "delta": 3,
-      "tier": "S"
-    },
-    {
-      "slug": "sylveon",
-      "name": "仙子伊布",
-      "old": 7,
-      "new": 10,
-      "delta": -3,
-      "tier": "S"
-    },
-    {
-      "slug": "aerodactyl",
-      "name": "化石翼龙",
-      "old": 23,
-      "new": 18,
-      "delta": 5,
+      "slug": "froslass",
+      "name": "雪妖女",
+      "old": 28,
+      "new": 22,
+      "delta": 6,
       "tier": "A"
     },
     {
-      "slug": "arcanine-hisui",
-      "name": "风速狗（洗翠的样子）",
-      "old": 20,
-      "new": 25,
-      "delta": -5,
+      "slug": "dragonite",
+      "name": "快龙",
+      "old": 31,
+      "new": 26,
+      "delta": 5,
       "tier": "A"
     }
   ],
