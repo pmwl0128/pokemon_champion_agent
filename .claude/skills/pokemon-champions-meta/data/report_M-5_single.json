@@ -2,7 +2,7 @@
   "season": "M-5",
   "rule": "M-B",
   "format": "single",
-  "generated_at": "2026-08-12T00:00:00+00:00",
+  "generated_at": "2026-08-14T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,77 +50,15 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-08-10T00:00:00+00:00",
-    "details_updated_at": "2026-08-10T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-08-12T00:00:00+00:00",
     "details_updated_at": "2026-08-12T00:00:00+00:00"
   },
-  "rank_moves": [
-    {
-      "slug": "volcarona",
-      "name": "火神蛾",
-      "old": 29,
-      "new": 24,
-      "delta": 5,
-      "tier": "A"
-    }
-  ],
+  "current": {
+    "ranking_updated_at": "2026-08-14T00:00:00+00:00",
+    "details_updated_at": "2026-08-14T00:00:00+00:00"
+  },
+  "rank_moves": [],
   "new_entries": [],
   "dropped": [],
-  "config_changes": [
-    {
-      "slug": "charizard",
-      "name": "喷火龙",
-      "rank": 11,
-      "tier": "A",
-      "panel": "moves",
-      "item": "剑舞",
-      "old_pct": 18.6,
-      "new_pct": 0.0,
-      "delta": -18.6,
-      "kind": "消失",
-      "rank_triggered": false
-    },
-    {
-      "slug": "charizard",
-      "name": "喷火龙",
-      "rank": 11,
-      "tier": "A",
-      "panel": "moves",
-      "item": "羽栖",
-      "old_pct": 0.0,
-      "new_pct": 17.9,
-      "delta": 17.9,
-      "kind": "新增",
-      "rank_triggered": false
-    },
-    {
-      "slug": "dragapult",
-      "name": "多龙巴鲁托",
-      "rank": 38,
-      "tier": "B",
-      "panel": "moves",
-      "item": "光墙",
-      "old_pct": 21.9,
-      "new_pct": 0.0,
-      "delta": -21.9,
-      "kind": "消失",
-      "rank_triggered": false
-    },
-    {
-      "slug": "dragapult",
-      "name": "多龙巴鲁托",
-      "rank": 38,
-      "tier": "B",
-      "panel": "moves",
-      "item": "喷射火焰",
-      "old_pct": 0.0,
-      "new_pct": 20.6,
-      "delta": 20.6,
-      "kind": "新增",
-      "rank_triggered": false
-    }
-  ]
+  "config_changes": []
 }
