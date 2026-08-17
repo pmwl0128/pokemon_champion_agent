@@ -226,6 +226,5 @@ resolver 返回 `exact`、`base_fallback` 或 `placeholder`。形态页不得把
 - session store 继续使用整会话 revision CAS；只有 artifact 依赖形成可验证契约后才评估细粒度合并。
 - MCP 等稳定 SDK，且必须直接复用 OpenAPI/protocol、鉴权、CAS 和事件语义。
 - team 常驻 worker 只有在固定基准证明冷启动是主要瓶颈、skill 先定义正式 `serve` 契约，并完成请求状态、数据代际、池宽与内存审计后才准入；builder 不能以自身长延迟作为理由。
-- projection 迁移 CDN/对象存储须有流量或可用性证据；跨源后仍保持同一 `deploymentId`、校验、CORS 与原子回滚。
 - 队伍/诊断中的计算器 hand-off 必须携带可复算 team、move、conditions 和 evidence；前端只预填，不将摘要升级为精确结论。
 - 拆分 Web 仓库须先满足 §11 的单向依赖与跨仓契约门。
