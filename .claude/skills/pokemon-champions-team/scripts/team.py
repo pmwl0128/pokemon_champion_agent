@@ -2910,4 +2910,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Every operator makes several sibling calls internally (dex facts, meta rows, ncp batteries),
+    # and outside a session each one is a fresh interpreter+data load. Holding the siblings resident
+    # for the life of the command is worth ~5x on a real operator (measured: `matchup --top-k 8` on a
+    # 4-member doubles team, 18.1s -> 3.6s, byte-identical output). Sessions nest, so the `session`
+    # batch op keeps managing its own; and the bridges still fall back to a one-shot subprocess on any
+    # worker error, so this is a pure performance path.
+    with worker.session():
+        raise SystemExit(main())

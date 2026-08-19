@@ -30,9 +30,18 @@ def _run(args: list[str]) -> Any:
     argv = [*args, "--format", "json"]
     if worker.session_active():             # perf: reuse a resident dex worker within a session
         try:
-            return json.loads(worker.run_python("dex", DEX_CLI, argv))
-        except (worker.WorkerError, json.JSONDecodeError):
+            code, out = worker.run_python("dex", DEX_CLI, argv)
+        except worker.WorkerError:
             pass                            # fall back to a one-shot subprocess (results identical)
+        else:
+            # A non-zero exit is the CLI's own answer, not a broken worker — raise it here instead
+            # of re-running the same failing call as a subprocess just to reach the same raise.
+            if code != 0:
+                raise DexUnavailable(out.strip() or "champdex.py failed")
+            try:
+                return json.loads(out)
+            except json.JSONDecodeError:
+                pass                        # unparseable stdout: let the one-shot path decide
     proc = subprocess.run(
         [sys.executable, str(DEX_CLI), *argv],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8",

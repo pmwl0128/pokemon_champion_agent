@@ -66,7 +66,11 @@ def _run(payload: Any, command: str = "one") -> Any:
     result: Any = None
     if worker.session_active():             # perf: reuse a resident ncp worker within a session
         try:
-            result = json.loads(worker.run_python("ncp", NCP_CALC_PY, [command], stdin_text))
+            # The exit code is deliberately ignored, exactly as `_oneshot` ignores `returncode`:
+            # calc emits a structured {ok:false} object AND exits 1 for a caller input error, and
+            # that JSON is the answer. The classification below turns it into NcpInputError.
+            _code, out = worker.run_python("ncp", NCP_CALC_PY, [command], stdin_text)
+            result = json.loads(out)
         except (worker.WorkerError, json.JSONDecodeError):
             result = None                   # fall back to a one-shot subprocess (results identical)
     if result is None:

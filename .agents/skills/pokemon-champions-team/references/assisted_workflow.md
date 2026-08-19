@@ -90,8 +90,10 @@ Two standing assumptions (do not relax them):
    6-pick-4; a registered six is a preview toolbox, not the battle lineup. `slate-evaluate` attaches
    `select` facts to every survivor, including each Mega option's exclusive/shared lineup routes and
    zero-or-one active-Mega states. Read those facts before making role/coverage or Mega-route claims.
-5. **Multi-operator runs go through `session`.** One process, siblings resident (~70% wall-clock
-   saved). Cost is a skip incentive — remove it.
+5. **Multi-operator runs go through `session`.** Every operator already holds its siblings resident
+   for its own duration, so what `session` still saves is the per-invocation restart across
+   operators — one interpreter, one skill import, one set of sibling spawns for the whole list
+   (~32% wall-clock over three ops). Cost is a skip incentive — remove it.
 6. **Diagnose before advising.** For "fix/review/improve my team" requests, run `diagnose` (and
    `matchup` when the complaint is matchup-shaped) before proposing changes; look for an answer
    already on the team before reaching for a replacement, and never "fix away" the user's anchor.

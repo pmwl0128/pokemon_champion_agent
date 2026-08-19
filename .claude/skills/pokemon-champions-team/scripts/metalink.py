@@ -60,10 +60,14 @@ class MetaUnavailable(RuntimeError):
 
 def _meta_run(argv: list[str]) -> tuple[int, str]:
     """(returncode, stdout) for a meta_query call — via the resident worker in a session, else a
-    one-shot subprocess. Worker errors transparently fall back to one-shot (results identical)."""
+    one-shot subprocess. Worker errors transparently fall back to one-shot (results identical).
+
+    The worker reports the CLI's real exit code, so callers that branch on it (a graceful meta
+    `not_found` is exit 0 by conventions.md §3, a genuine failure is exit 1) see the same value on
+    both paths. This used to hard-code 0, which made every worker-served call look successful."""
     if worker.session_active():
         try:
-            return 0, worker.run_python("meta", META_CLI, argv)
+            return worker.run_python("meta", META_CLI, argv)
         except worker.WorkerError:
             pass
     proc = subprocess.run(
