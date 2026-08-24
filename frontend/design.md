@@ -140,6 +140,8 @@ normalize -> audit/intake -> frame + grounding -> LLM assembly
 
 额度和预算在服务端原子处理，具体数值只在配置和 quota 响应中维护。模型预算只影响 LLM；静态浏览、浏览器计算和已生成的确定性报告不依赖它。正文不进应用日志，短期任务和计数按生命周期清理。验证码只能是附加门，不能替代预算断路器与端点校验。
 
+🚩 维护者旁路对**所有**计数端点一致生效：`X-PCUI-Dev-Key` 与服务端 `PCUI_DEV_KEY` 相等时跳过每日计数与预算断路器，管线本身完全不变，真实 token 消耗仍照常记账。发布 smoke 依赖它——否则每验证一次部署就吃掉一个面向访客的当日额度，额度耗尽后下一次部署无法通过 observe。新增计数端点必须一并接上，不能只接 QA 和 builder。
+
 ### 7.5 确定性接口与队伍诊断
 
 capability 负责入口发现，服务端仍独立执行白名单、上限、超时和并发控制。自由文本队伍按 team-json/Showdown、已知分享格式、species-only 三层解析，再统一经 dex canonicalize；不完整结论标为 partial/unknown。

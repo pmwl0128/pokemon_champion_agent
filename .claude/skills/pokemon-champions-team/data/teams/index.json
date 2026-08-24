@@ -51,13 +51,13 @@
     "season": "M-5",
     "rule": "M-B",
     "format": "double",
-    "count": 3174
+    "count": 4483
   },
   "M-5_single": {
     "season": "M-5",
     "rule": "M-B",
     "format": "single",
-    "count": 82
+    "count": 102
   },
   "M-A-events_double": {
     "partition": "M-A-events",
@@ -81,6 +81,6 @@
     "season": null,
     "rule": "M-B",
     "format": "single",
-    "count": 48
+    "count": 49
   }
 }

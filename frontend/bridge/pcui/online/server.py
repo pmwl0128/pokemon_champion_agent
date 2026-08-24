@@ -423,9 +423,16 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"td:{device_id}", f"ti:{limits.ip_hash(client_ip)}"]
         cost = 2 if thinking else 1
+        # Same dev bypass as Q&A and the builder: release smoke and maintainer testing must not
+        # spend a visitor-facing daily allowance, while real token spend is still recorded.
+        dev = bool(dev_key) and hmac.compare_digest(
+            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
+        bypass_limits = dev or unmetered
         quota_day: str | None = None
         if unmetered:
             used, limit = 0, 0
+        elif dev:
+            used, limit = limits.usage(ids[0], limits.cfg.diagnose_daily_limit)
         else:
             try:
                 used, limit, quota_day = limits.check_and_consume(
@@ -436,11 +443,11 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             async with diagnose_slots:
                 report = await _in(det_pool, _run_diagnose, text, fmt)
         except ValueError:
-            if not unmetered:
+            if not bypass_limits:
                 limits.refund(ids, quota_day, cost=cost)
             raise HTTPException(400, _err("unparseable", "could not parse a team from the text"))
         except Exception:
-            if not unmetered:
+            if not bypass_limits:
                 limits.refund(ids, quota_day, cost=cost)
             raise HTTPException(500, _err("bad_input", "diagnose pipeline failed"))
         report["quota"] = {"used": used, "limit": limit}
@@ -452,7 +459,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
         # Optional reading uses the diagnosis allowance, never the separate Q&A allowance.
         if want_explain and selected_provider is not None:
-            if unmetered:
+            if bypass_limits:
                 try:
                     async with qa_slots:
                         explanation, tokens = await _in(
@@ -483,7 +490,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 report["explanationError"] = "llm_failed"
         elif want_explain:
             report["explanationError"] = "llm_unavailable"
-        if report.get("explanationError") and thinking and not unmetered:
+        if report.get("explanationError") and thinking and not bypass_limits:
             # The ordinary deterministic diagnosis was delivered; return only the extra
             # thinking unit when the enhanced reading itself failed.
             limits.refund(ids, quota_day, cost=1)
@@ -542,6 +549,9 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"md:{device_id}", f"mi:{limits.ip_hash(client_ip)}"]
+        dev = bool(dev_key) and hmac.compare_digest(
+            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
+        bypass_limits = dev or unmetered
         quota_day: str | None = None
         quota_cost = 0
 
@@ -556,16 +566,16 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             try:
                 return await _in(
                     det_pool, run_actual_matchup, pool, body,
-                    None if unmetered else consume_workload)
+                    None if bypass_limits else consume_workload)
             except RateLimited:
                 raise HTTPException(429, _err("rate_limited",
                                               "daily matchup workload limit reached"))
             except MatchupInputError as exc:
-                if not unmetered and quota_cost:
+                if not bypass_limits and quota_cost:
                     limits.refund(ids, quota_day, cost=quota_cost)
                 raise HTTPException(400, _err("bad_input", str(exc))) from exc
             except Exception as exc:
-                if not unmetered and quota_cost:
+                if not bypass_limits and quota_cost:
                     limits.refund(ids, quota_day, cost=quota_cost)
                 raise HTTPException(500, _err("calculation_failed",
                                               "actual matchup calculation failed")) from exc
@@ -585,6 +595,9 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"ud:{device_id}", f"ui:{limits.ip_hash(client_ip)}"]
+        dev = bool(dev_key) and hmac.compare_digest(
+            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
+        bypass_limits = dev or unmetered
         quota_day: str | None = None
         quota_cost = 0
 
@@ -598,7 +611,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             try:
                 result = await _in(
                     det_pool, run_team_tune, pool, body,
-                    None if unmetered else consume_workload)
+                    None if bypass_limits else consume_workload)
                 used, limit = ((0, 0) if unmetered else
                                limits.usage(ids[0], limits.cfg.tune_daily_limit))
                 return {**result, "quota": {"used": used, "limit": limit}}
@@ -606,11 +619,11 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 raise HTTPException(429, _err("rate_limited",
                                               "daily tune workload limit reached"))
             except TuneInputError as exc:
-                if not unmetered and quota_cost:
+                if not bypass_limits and quota_cost:
                     limits.refund(ids, quota_day, cost=quota_cost)
                 raise HTTPException(400, _err("bad_input", str(exc))) from exc
             except Exception as exc:
-                if not unmetered and quota_cost:
+                if not bypass_limits and quota_cost:
                     limits.refund(ids, quota_day, cost=quota_cost)
                 raise HTTPException(500, _err("calculation_failed",
                                               "team tune calculation failed")) from exc
