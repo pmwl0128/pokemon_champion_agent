@@ -2,7 +2,7 @@
   "season": "M-5",
   "rule": "M-B",
   "format": "single",
-  "generated_at": "2026-09-04T00:00:00+00:00",
+  "generated_at": "2026-09-07T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,42 +50,15 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-09-02T00:00:00+00:00",
-    "details_updated_at": "2026-09-02T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-09-04T00:00:00+00:00",
     "details_updated_at": "2026-09-04T00:00:00+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-09-07T00:00:00+00:00",
+    "details_updated_at": "2026-09-07T00:00:00+00:00"
   },
   "rank_moves": [],
   "new_entries": [],
   "dropped": [],
-  "config_changes": [
-    {
-      "slug": "dragonite",
-      "name": "快龙",
-      "rank": 9,
-      "tier": "S",
-      "panel": "moves",
-      "item": "冰冻光束",
-      "old_pct": 0.0,
-      "new_pct": 10.8,
-      "delta": 10.8,
-      "kind": "新增",
-      "rank_triggered": false
-    },
-    {
-      "slug": "dragonite",
-      "name": "快龙",
-      "rank": 9,
-      "tier": "S",
-      "panel": "moves",
-      "item": "逆鳞",
-      "old_pct": 10.7,
-      "new_pct": 0.0,
-      "delta": -10.7,
-      "kind": "消失",
-      "rank_triggered": false
-    }
-  ]
+  "config_changes": []
 }
