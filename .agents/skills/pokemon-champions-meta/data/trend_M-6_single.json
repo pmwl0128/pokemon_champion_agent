@@ -2,7 +2,7 @@
   "season": "M-6",
   "rule": "M-C",
   "format": "single",
-  "generated_at": "2026-09-11T05:58:40+00:00",
+  "generated_at": "2026-09-12T00:00:00+00:00",
   "top_n": 30,
   "max_periods": 10,
   "periods": [
@@ -10,740 +10,1061 @@
       "date": "2026-09-11",
       "updated_at": "2026-09-11T05:58:40+00:00",
       "ranked": 244
+    },
+    {
+      "date": "2026-09-12",
+      "updated_at": "2026-09-12T00:00:00+00:00",
+      "ranked": 259
     }
   ],
   "ranks": {
     "garchomp": [
-      1
-    ],
-    "salamence": [
+      1,
       2
     ],
+    "salamence": [
+      2,
+      1
+    ],
     "primarina": [
+      3,
       3
     ],
     "golisopod": [
+      4,
       4
     ],
     "hippowdon": [
+      5,
       5
     ],
     "lucario": [
-      6
-    ],
-    "archaludon": [
+      6,
       7
     ],
-    "baxcalibur": [
-      8
-    ],
-    "gholdengo": [
+    "archaludon": [
+      7,
       9
     ],
+    "baxcalibur": [
+      8,
+      6
+    ],
+    "gholdengo": [
+      9,
+      8
+    ],
     "aegislash": [
+      10,
       10
     ],
     "rillaboom": [
-      11
-    ],
-    "mimikyu": [
+      11,
       12
     ],
+    "mimikyu": [
+      12,
+      11
+    ],
     "meowscarada": [
+      13,
       13
     ],
     "corviknight": [
+      14,
       14
     ],
     "gyarados": [
+      15,
       15
     ],
     "glimmora": [
+      16,
       16
     ],
     "basculegion": [
+      17,
       17
     ],
     "charizard": [
+      18,
       18
     ],
     "cinderace": [
-      19
+      19,
+      21
     ],
     "greninja": [
+      20,
       20
     ],
     "volcarona": [
-      21
-    ],
-    "ninetales-alola": [
-      22
-    ],
-    "sneasler": [
+      21,
       23
     ],
-    "skeledirge": [
+    "ninetales-alola": [
+      22,
+      19
+    ],
+    "sneasler": [
+      23,
       24
     ],
-    "delphox": [
-      25
-    ],
-    "rotom-wash": [
+    "skeledirge": [
+      24,
       26
     ],
-    "dragonite": [
-      27
-    ],
-    "pawmot": [
-      28
-    ],
-    "sylveon": [
-      29
-    ],
-    "metagross": [
+    "delphox": [
+      25,
       30
     ],
-    "absol": [
+    "rotom-wash": [
+      26,
+      22
+    ],
+    "dragonite": [
+      27,
+      29
+    ],
+    "pawmot": [
+      28,
+      27
+    ],
+    "sylveon": [
+      29,
+      28
+    ],
+    "metagross": [
+      30,
       31
     ],
+    "absol": [
+      31,
+      40
+    ],
     "hydreigon": [
-      32
+      32,
+      25
     ],
     "gengar": [
+      33,
       33
     ],
     "kingambit": [
-      34
-    ],
-    "indeedee": [
+      34,
       35
     ],
+    "indeedee": [
+      35,
+      34
+    ],
     "floette-eternal": [
-      36
+      36,
+      49
     ],
     "scizor": [
-      37
+      37,
+      42
     ],
     "rotom-heat": [
-      38
+      38,
+      32
     ],
     "toxapex": [
+      39,
       39
     ],
     "swampert": [
-      40
+      40,
+      36
     ],
     "bellibolt": [
-      41
-    ],
-    "raichu": [
-      42
-    ],
-    "samurott-hisui": [
-      43
-    ],
-    "mamoswine": [
+      41,
       44
     ],
-    "blaziken": [
-      45
+    "raichu": [
+      42,
+      41
     ],
-    "umbreon": [
-      46
-    ],
-    "vanilluxe": [
-      47
-    ],
-    "ceruledge": [
-      48
-    ],
-    "pelipper": [
-      49
-    ],
-    "grimmsnarl": [
-      50
-    ],
-    "meganium": [
+    "samurott-hisui": [
+      43,
       51
     ],
-    "tyranitar": [
-      52
+    "mamoswine": [
+      44,
+      47
     ],
-    "lopunny": [
+    "blaziken": [
+      45,
+      37
+    ],
+    "umbreon": [
+      46,
+      38
+    ],
+    "vanilluxe": [
+      47,
+      50
+    ],
+    "ceruledge": [
+      48,
+      46
+    ],
+    "pelipper": [
+      49,
+      48
+    ],
+    "grimmsnarl": [
+      50,
+      43
+    ],
+    "meganium": [
+      51,
       53
     ],
-    "empoleon": [
-      54
-    ],
-    "mawile": [
-      55
-    ],
-    "staraptor": [
-      56
-    ],
-    "blastoise": [
+    "tyranitar": [
+      52,
       57
     ],
-    "venusaur": [
-      58
+    "lopunny": [
+      53,
+      56
     ],
-    "clefable": [
+    "empoleon": [
+      54,
+      45
+    ],
+    "mawile": [
+      55,
       59
     ],
-    "dragapult": [
-      60
+    "staraptor": [
+      56,
+      58
     ],
-    "armarouge": [
-      61
+    "blastoise": [
+      57,
+      55
     ],
-    "starmie": [
+    "venusaur": [
+      58,
       62
     ],
+    "clefable": [
+      59,
+      54
+    ],
+    "dragapult": [
+      60,
+      61
+    ],
+    "armarouge": [
+      61,
+      60
+    ],
+    "starmie": [
+      62,
+      65
+    ],
     "ditto": [
+      63,
       63
     ],
     "excadrill": [
-      64
-    ],
-    "snorlax": [
-      65
-    ],
-    "scovillain": [
+      64,
       66
     ],
-    "skarmory": [
-      67
-    ],
-    "sirfetchd": [
+    "snorlax": [
+      65,
       68
     ],
-    "gallade": [
+    "scovillain": [
+      66,
+      64
+    ],
+    "skarmory": [
+      67,
       69
     ],
-    "victreebel": [
-      70
-    ],
-    "milotic": [
-      71
-    ],
-    "banette": [
-      72
-    ],
-    "espathra": [
+    "sirfetchd": [
+      68,
       73
     ],
-    "azumarill": [
-      74
-    ],
-    "araquanid": [
-      75
-    ],
-    "whimsicott": [
-      76
-    ],
-    "annihilape": [
-      77
-    ],
-    "politoed": [
-      78
-    ],
-    "froslass": [
-      79
-    ],
-    "slowking-galar": [
-      80
-    ],
-    "goodra-hisui": [
+    "gallade": [
+      69,
       81
     ],
-    "gardevoir": [
-      82
+    "victreebel": [
+      70,
+      74
     ],
-    "sableye": [
+    "milotic": [
+      71,
+      67
+    ],
+    "banette": [
+      72,
+      52
+    ],
+    "espathra": [
+      73,
+      75
+    ],
+    "azumarill": [
+      74,
       83
     ],
-    "kleavor": [
-      84
+    "araquanid": [
+      75,
+      80
     ],
-    "scolipede": [
-      85
+    "whimsicott": [
+      76,
+      77
     ],
-    "orthworm": [
-      86
+    "annihilape": [
+      77,
+      76
     ],
-    "incineroar": [
-      87
+    "politoed": [
+      78,
+      71
     ],
-    "toxtricity": [
+    "froslass": [
+      79,
       88
     ],
-    "kangaskhan": [
-      89
+    "slowking-galar": [
+      80,
+      70
     ],
-    "slowking": [
+    "goodra-hisui": [
+      81,
+      78
+    ],
+    "gardevoir": [
+      82,
+      85
+    ],
+    "sableye": [
+      83,
+      79
+    ],
+    "kleavor": [
+      84,
+      82
+    ],
+    "scolipede": [
+      85,
       90
     ],
-    "inteleon": [
-      91
-    ],
-    "zoroark-hisui": [
-      92
-    ],
-    "vaporeon": [
-      93
-    ],
-    "pyroar": [
-      94
-    ],
-    "arboliva": [
+    "orthworm": [
+      86,
       95
     ],
-    "hatterene": [
-      96
+    "incineroar": [
+      87,
+      89
     ],
-    "chandelure": [
-      97
+    "toxtricity": [
+      88,
+      84
     ],
-    "diggersby": [
-      98
+    "kangaskhan": [
+      89,
+      94
     ],
-    "basculegion-f": [
-      99
-    ],
-    "toxtricity-low-key": [
-      100
-    ],
-    "arcanine-hisui": [
-      101
-    ],
-    "tauros-paldea-blaze": [
-      102
-    ],
-    "serperior": [
+    "slowking": [
+      90,
       103
     ],
-    "tinkaton": [
-      104
+    "inteleon": [
+      91,
+      87
     ],
-    "altaria": [
-      105
+    "zoroark-hisui": [
+      92,
+      72
     ],
-    "torkoal": [
-      106
+    "vaporeon": [
+      93,
+      91
     ],
-    "dragalge": [
+    "pyroar": [
+      94,
+      92
+    ],
+    "arboliva": [
+      95,
+      101
+    ],
+    "hatterene": [
+      96,
+      86
+    ],
+    "chandelure": [
+      97,
+      99
+    ],
+    "diggersby": [
+      98,
       107
     ],
-    "palafin": [
-      108
+    "basculegion-f": [
+      99,
+      104
     ],
-    "overqwil": [
+    "toxtricity-low-key": [
+      100,
+      93
+    ],
+    "arcanine-hisui": [
+      101,
+      96
+    ],
+    "tauros-paldea-blaze": [
+      102,
+      105
+    ],
+    "serperior": [
+      103,
       109
     ],
-    "polteageist": [
+    "tinkaton": [
+      104,
+      100
+    ],
+    "altaria": [
+      105,
+      123
+    ],
+    "torkoal": [
+      106,
       110
     ],
-    "sinistcha": [
-      111
+    "dragalge": [
+      107,
+      98
     ],
-    "espeon": [
+    "palafin": [
+      108,
+      131
+    ],
+    "overqwil": [
+      109,
       112
     ],
-    "slowbro": [
+    "polteageist": [
+      110,
       113
     ],
-    "toucannon": [
-      114
-    ],
-    "indeedee-f": [
-      115
-    ],
-    "slurpuff": [
+    "sinistcha": [
+      111,
       116
     ],
+    "espeon": [
+      112,
+      114
+    ],
+    "slowbro": [
+      113,
+      97
+    ],
+    "toucannon": [
+      114,
+      102
+    ],
+    "indeedee-f": [
+      115,
+      108
+    ],
+    "slurpuff": [
+      116,
+      152
+    ],
     "heracross": [
-      117
+      117,
+      129
     ],
     "vivillon": [
-      118
+      118,
+      111
     ],
     "arcanine": [
+      119,
       119
     ],
     "rhyperior": [
-      120
+      120,
+      176
     ],
     "reuniclus": [
-      121
+      121,
+      147
     ],
     "pincurchin": [
-      122
+      122,
+      106
     ],
     "abomasnow": [
-      123
+      123,
+      153
     ],
     "persian-alola": [
-      124
+      124,
+      115
     ],
     "gliscor": [
-      125
+      125,
+      124
     ],
     "wigglytuff": [
-      126
+      126,
+      138
     ],
     "swalot": [
-      127
+      127,
+      184
     ],
     "chesnaught": [
-      128
+      128,
+      143
     ],
     "houndstone": [
-      129
-    ],
-    "malamar": [
-      130
-    ],
-    "weavile": [
-      131
-    ],
-    "talonflame": [
-      132
-    ],
-    "slowbro-galar": [
-      133
-    ],
-    "chimecho": [
+      129,
       134
     ],
+    "malamar": [
+      130,
+      171
+    ],
+    "weavile": [
+      131,
+      126
+    ],
+    "talonflame": [
+      132,
+      130
+    ],
+    "slowbro-galar": [
+      133,
+      127
+    ],
+    "chimecho": [
+      134,
+      150
+    ],
     "noivern": [
-      135
+      135,
+      139
     ],
     "maushold": [
-      136
+      136,
+      128
     ],
     "lycanroc-dusk": [
+      137,
       137
     ],
     "conkeldurr": [
-      138
+      138,
+      117
     ],
     "aurorus": [
-      139
-    ],
-    "vileplume": [
-      140
-    ],
-    "infernape": [
-      141
-    ],
-    "sharpedo": [
-      142
-    ],
-    "sceptile": [
-      143
-    ],
-    "alakazam": [
-      144
-    ],
-    "scrafty": [
-      145
-    ],
-    "rotom-mow": [
-      146
-    ],
-    "clawitzer": [
-      147
-    ],
-    "ampharos": [
-      148
-    ],
-    "kommo-o": [
-      149
-    ],
-    "squawkabilly": [
-      150
-    ],
-    "krookodile": [
-      151
-    ],
-    "klefki": [
-      152
-    ],
-    "glaceon": [
-      153
-    ],
-    "barbaracle": [
-      154
-    ],
-    "hawlucha": [
-      155
-    ],
-    "aggron": [
-      156
-    ],
-    "eelektross": [
-      157
-    ],
-    "decidueye-hisui": [
-      158
-    ],
-    "audino": [
-      159
-    ],
-    "salazzle": [
-      160
-    ],
-    "feraligatr": [
-      161
-    ],
-    "cofagrigus": [
-      162
-    ],
-    "roserade": [
-      163
-    ],
-    "typhlosion-hisui": [
-      164
-    ],
-    "glalie": [
+      139,
       165
     ],
-    "quaquaval": [
-      166
+    "vileplume": [
+      140,
+      125
     ],
-    "pangoro": [
-      167
+    "infernape": [
+      141,
+      140
     ],
-    "medicham": [
-      168
+    "sharpedo": [
+      142,
+      133
     ],
-    "steelix": [
-      169
+    "sceptile": [
+      143,
+      118
     ],
-    "zoroark": [
+    "alakazam": [
+      144,
+      120
+    ],
+    "scrafty": [
+      145,
+      157
+    ],
+    "rotom-mow": [
+      146,
       170
     ],
-    "garganacl": [
-      171
-    ],
-    "runerigus": [
-      172
-    ],
-    "mabosstiff": [
-      173
-    ],
-    "ninetales": [
-      174
-    ],
-    "luxray": [
-      175
-    ],
-    "crabominable": [
-      176
-    ],
-    "forretress": [
+    "clawitzer": [
+      147,
       177
     ],
-    "houndoom": [
-      178
+    "ampharos": [
+      148,
+      175
     ],
-    "farfetchd": [
-      179
+    "kommo-o": [
+      149,
+      135
     ],
-    "aerodactyl": [
+    "squawkabilly": [
+      150,
+      192
+    ],
+    "krookodile": [
+      151,
+      159
+    ],
+    "klefki": [
+      152,
+      156
+    ],
+    "glaceon": [
+      153,
+      163
+    ],
+    "barbaracle": [
+      154,
       180
     ],
-    "bastiodon": [
+    "hawlucha": [
+      155,
+      148
+    ],
+    "aggron": [
+      156,
+      122
+    ],
+    "eelektross": [
+      157,
+      146
+    ],
+    "decidueye-hisui": [
+      158,
+      149
+    ],
+    "audino": [
+      159,
+      162
+    ],
+    "salazzle": [
+      160,
+      132
+    ],
+    "feraligatr": [
+      161,
+      154
+    ],
+    "cofagrigus": [
+      162,
+      160
+    ],
+    "roserade": [
+      163,
+      172
+    ],
+    "typhlosion-hisui": [
+      164,
+      141
+    ],
+    "glalie": [
+      165,
+      155
+    ],
+    "quaquaval": [
+      166,
+      145
+    ],
+    "pangoro": [
+      167,
+      195
+    ],
+    "medicham": [
+      168,
+      191
+    ],
+    "steelix": [
+      169,
       181
     ],
+    "zoroark": [
+      170,
+      188
+    ],
+    "garganacl": [
+      171,
+      167
+    ],
+    "runerigus": [
+      172,
+      144
+    ],
+    "mabosstiff": [
+      173,
+      158
+    ],
+    "ninetales": [
+      174,
+      161
+    ],
+    "luxray": [
+      175,
+      221
+    ],
+    "crabominable": [
+      176,
+      187
+    ],
+    "forretress": [
+      177,
+      142
+    ],
+    "houndoom": [
+      178,
+      190
+    ],
+    "farfetchd": [
+      179,
+      201
+    ],
+    "aerodactyl": [
+      180,
+      151
+    ],
+    "bastiodon": [
+      181,
+      223
+    ],
     "musharna": [
+      182,
       182
     ],
     "golurk": [
-      183
-    ],
-    "mudsdale": [
-      184
-    ],
-    "pikachu": [
-      185
-    ],
-    "persian": [
-      186
-    ],
-    "meowstic": [
-      187
-    ],
-    "thievul": [
-      188
-    ],
-    "torterra": [
-      189
-    ],
-    "leafeon": [
-      190
-    ],
-    "heliolisk": [
-      191
-    ],
-    "hydrapple": [
-      192
-    ],
-    "raichu-alola": [
-      193
-    ],
-    "manectric": [
-      194
-    ],
-    "goodra": [
-      195
-    ],
-    "passimian": [
-      196
-    ],
-    "pidgeot": [
-      197
-    ],
-    "stunfisk": [
-      198
-    ],
-    "spiritomb": [
-      199
-    ],
-    "grapploct": [
-      200
-    ],
-    "camerupt": [
-      201
-    ],
-    "emolga": [
-      202
-    ],
-    "avalugg": [
-      203
-    ],
-    "alcremie": [
-      204
-    ],
-    "mr-mime": [
-      205
-    ],
-    "rotom-fan": [
-      206
-    ],
-    "furfrou": [
-      207
-    ],
-    "trevenant": [
-      208
-    ],
-    "sandaconda": [
-      209
-    ],
-    "squawkabilly-yellow": [
-      210
-    ],
-    "typhlosion": [
-      211
-    ],
-    "simisage": [
+      183,
       212
     ],
-    "oranguru": [
-      213
+    "mudsdale": [
+      184,
+      166
     ],
-    "tauros-paldea-aqua": [
-      214
+    "pikachu": [
+      185,
+      168
     ],
-    "florges": [
-      215
+    "persian": [
+      186,
+      248
     ],
-    "meowstic-f": [
-      216
+    "meowstic": [
+      187,
+      197
     ],
-    "mr-rime": [
+    "thievul": [
+      188,
+      206
+    ],
+    "torterra": [
+      189,
+      164
+    ],
+    "leafeon": [
+      190,
       217
     ],
-    "machamp": [
-      218
+    "heliolisk": [
+      191,
+      136
     ],
-    "pinsir": [
-      219
+    "hydrapple": [
+      192,
+      198
     ],
-    "emboar": [
-      220
+    "raichu-alola": [
+      193,
+      185
     ],
-    "morpeko": [
-      221
+    "manectric": [
+      194,
+      205
     ],
-    "wyrdeer": [
-      222
+    "goodra": [
+      195,
+      209
     ],
-    "beedrill": [
-      223
+    "passimian": [
+      196,
+      250
     ],
-    "flareon": [
-      224
+    "pidgeot": [
+      197,
+      178
     ],
-    "rotom-frost": [
-      225
+    "stunfisk": [
+      198,
+      213
     ],
-    "beartic": [
-      226
+    "spiritomb": [
+      199,
+      186
     ],
-    "avalugg-hisui": [
-      227
+    "grapploct": [
+      200,
+      121
     ],
-    "jolteon": [
-      228
-    ],
-    "qwilfish": [
-      229
-    ],
-    "falinks": [
-      230
-    ],
-    "tauros": [
-      231
-    ],
-    "castform": [
+    "camerupt": [
+      201,
       232
     ],
-    "gourgeist-average": [
+    "emolga": [
+      202,
       233
     ],
-    "gourgeist-small": [
+    "avalugg": [
+      203,
+      183
+    ],
+    "alcremie": [
+      204,
+      207
+    ],
+    "mr-mime": [
+      205,
+      214
+    ],
+    "rotom-fan": [
+      206,
+      210
+    ],
+    "furfrou": [
+      207,
+      240
+    ],
+    "trevenant": [
+      208,
+      228
+    ],
+    "sandaconda": [
+      209,
+      216
+    ],
+    "squawkabilly-yellow": [
+      210,
+      174
+    ],
+    "typhlosion": [
+      211,
+      203
+    ],
+    "simisage": [
+      212,
+      253
+    ],
+    "oranguru": [
+      213,
+      256
+    ],
+    "tauros-paldea-aqua": [
+      214,
+      220
+    ],
+    "florges": [
+      215,
+      208
+    ],
+    "meowstic-f": [
+      216,
+      218
+    ],
+    "mr-rime": [
+      217,
+      219
+    ],
+    "machamp": [
+      218,
+      202
+    ],
+    "pinsir": [
+      219,
+      173
+    ],
+    "emboar": [
+      220,
+      169
+    ],
+    "morpeko": [
+      221,
+      200
+    ],
+    "wyrdeer": [
+      222,
+      257
+    ],
+    "beedrill": [
+      223,
+      189
+    ],
+    "flareon": [
+      224,
+      225
+    ],
+    "rotom-frost": [
+      225,
+      196
+    ],
+    "beartic": [
+      226,
+      224
+    ],
+    "avalugg-hisui": [
+      227,
+      199
+    ],
+    "jolteon": [
+      228,
+      193
+    ],
+    "qwilfish": [
+      229,
       234
     ],
-    "perrserker": [
+    "falinks": [
+      230,
       235
     ],
-    "ariados": [
+    "tauros": [
+      231,
+      241
+    ],
+    "castform": [
+      232,
       236
     ],
+    "gourgeist-average": [
+      233,
+      null
+    ],
+    "gourgeist-small": [
+      234,
+      null
+    ],
+    "perrserker": [
+      235,
+      211
+    ],
+    "ariados": [
+      236,
+      229
+    ],
     "toxicroak": [
-      237
+      237,
+      242
     ],
     "simipour": [
-      238
+      238,
+      237
     ],
     "garbodor": [
+      239,
       239
     ],
     "stunfisk-galar": [
-      240
+      240,
+      238
     ],
     "gogoat": [
-      241
+      241,
+      null
     ],
     "dedenne": [
-      242
+      242,
+      249
     ],
     "decidueye": [
-      243
+      243,
+      226
     ],
     "farigiraf": [
+      244,
+      231
+    ],
+    "tsareena": [
+      null,
+      179
+    ],
+    "gourgeist-super": [
+      null,
+      194
+    ],
+    "arbok": [
+      null,
+      204
+    ],
+    "tyrantrum": [
+      null,
+      215
+    ],
+    "drampa": [
+      null,
+      222
+    ],
+    "aromatisse": [
+      null,
+      227
+    ],
+    "liepard": [
+      null,
+      230
+    ],
+    "lycanroc-midnight": [
+      null,
+      243
+    ],
+    "lycanroc-midday": [
+      null,
       244
+    ],
+    "simisear": [
+      null,
+      245
+    ],
+    "samurott": [
+      null,
+      247
+    ],
+    "flapple": [
+      null,
+      251
+    ],
+    "rampardos": [
+      null,
+      252
+    ],
+    "appletun": [
+      null,
+      255
+    ],
+    "watchog": [
+      null,
+      259
+    ],
+    "rotom": [
+      null,
+      260
+    ],
+    "gourgeist-large": [
+      null,
+      261
+    ],
+    "tauros-paldea-combat": [
+      null,
+      262
     ]
   },
   "names": {
@@ -803,7 +1124,7 @@
       "en": "Rillaboom"
     },
     "mimikyu": {
-      "zh": "谜拟Ｑ",
+      "zh": "谜拟丘",
       "ja": "ミミッキュ",
       "en": "Mimikyu"
     },
@@ -829,7 +1150,7 @@
     },
     "basculegion": {
       "zh": "幽尾玄鱼",
-      "ja": "イダイトウ",
+      "ja": "イダイトウ(オス)",
       "en": "Basculegion"
     },
     "charizard": {
@@ -853,7 +1174,7 @@
       "en": "Volcarona"
     },
     "ninetales-alola": {
-      "zh": "九尾（阿罗拉）",
+      "zh": "九尾（阿罗拉的样子）",
       "ja": "アローラキュウコン",
       "en": "Ninetales-Alola"
     },
@@ -913,18 +1234,18 @@
       "en": "Gengar"
     },
     "kingambit": {
-      "zh": "仆斩将军",
+      "zh": "仆刀将军",
       "ja": "ドドゲザン",
       "en": "Kingambit"
     },
     "indeedee": {
       "zh": "爱管侍",
-      "ja": "イエッサン",
+      "ja": "イエッサン(オス)",
       "en": "Indeedee"
     },
     "floette-eternal": {
       "zh": "花叶蒂（永恒之花）",
-      "ja": "フラエッテ(えいえん)",
+      "ja": "フラエッテ(永遠)",
       "en": "Floette-Eternal"
     },
     "scizor": {
@@ -958,7 +1279,7 @@
       "en": "Raichu"
     },
     "samurott-hisui": {
-      "zh": "大剑鬼（洗翠）",
+      "zh": "大剑鬼（洗翠的样子）",
       "ja": "ヒスイダイケンキ",
       "en": "Samurott-Hisui"
     },
@@ -1143,13 +1464,13 @@
       "en": "Froslass"
     },
     "slowking-galar": {
-      "zh": "呆呆王（伽勒尔）",
+      "zh": "呆呆王（伽勒尔的样子）",
       "ja": "ガラルヤドキング",
       "en": "Slowking-Galar"
     },
     "goodra-hisui": {
-      "zh": "黏美龙（洗翠）",
-      "ja": "ヌメルゴン(ヒスイ)",
+      "zh": "黏美龙（洗翠的样子）",
+      "ja": "ヒスイヌメルゴン",
       "en": "Goodra-Hisui"
     },
     "gardevoir": {
@@ -1184,7 +1505,7 @@
     },
     "toxtricity": {
       "zh": "颤弦蝾螈",
-      "ja": "ストリンダー",
+      "ja": "ストリンダー(ハイ)",
       "en": "Toxtricity"
     },
     "kangaskhan": {
@@ -1203,8 +1524,8 @@
       "en": "Inteleon"
     },
     "zoroark-hisui": {
-      "zh": "索罗亚克（洗翠）",
-      "ja": "ゾロアーク(ヒスイ)",
+      "zh": "索罗亚克（洗翠的样子）",
+      "ja": "ヒスイゾロアーク",
       "en": "Zoroark-Hisui"
     },
     "vaporeon": {
@@ -1238,22 +1559,22 @@
       "en": "Diggersby"
     },
     "basculegion-f": {
-      "zh": "幽尾玄鱼（雌性）",
+      "zh": "幽尾玄鱼（雌性的样子）",
       "ja": "イダイトウ(メス)",
       "en": "Basculegion-F"
     },
     "toxtricity-low-key": {
-      "zh": "颤弦蝾螈（低调）",
+      "zh": "颤弦蝾螈（低调的样子）",
       "ja": "ストリンダー(ロー)",
       "en": "Toxtricity-Low Key"
     },
     "arcanine-hisui": {
-      "zh": "风速狗（洗翠）",
+      "zh": "风速狗（洗翠的样子）",
       "ja": "ヒスイウインディ",
       "en": "Arcanine-Hisui"
     },
     "tauros-paldea-blaze": {
-      "zh": "肯泰罗（火炽种）",
+      "zh": "肯泰罗（帕底亚的样子・火炽种）",
       "ja": "パルデアケンタロス(炎)",
       "en": "Tauros-Paldea-Blaze"
     },
@@ -1318,7 +1639,7 @@
       "en": "Toucannon"
     },
     "indeedee-f": {
-      "zh": "爱管侍（雌性）",
+      "zh": "爱管侍（雌性的样子）",
       "ja": "イエッサン(メス)",
       "en": "Indeedee-F"
     },
@@ -1363,7 +1684,7 @@
       "en": "Abomasnow"
     },
     "persian-alola": {
-      "zh": "猫老大（阿罗拉）",
+      "zh": "猫老大（阿罗拉的样子）",
       "ja": "アローラペルシアン",
       "en": "Persian-Alola"
     },
@@ -1408,7 +1729,7 @@
       "en": "Talonflame"
     },
     "slowbro-galar": {
-      "zh": "呆壳兽（伽勒尔）",
+      "zh": "呆壳兽（伽勒尔的样子）",
       "ja": "ガラルヤドラン",
       "en": "Slowbro-Galar"
     },
@@ -1429,7 +1750,7 @@
     },
     "lycanroc-dusk": {
       "zh": "鬃岩狼人（黄昏的样子）",
-      "ja": "ルガルガン(たそがれ)",
+      "ja": "ルガルガン(黄昏)",
       "en": "Lycanroc-Dusk"
     },
     "conkeldurr": {
@@ -1494,7 +1815,7 @@
     },
     "squawkabilly": {
       "zh": "怒鹦哥",
-      "ja": "イキリンコ",
+      "ja": "イキリンコ(緑)",
       "en": "Squawkabilly"
     },
     "krookodile": {
@@ -1533,7 +1854,7 @@
       "en": "Eelektross"
     },
     "decidueye-hisui": {
-      "zh": "狙射树枭（洗翠）",
+      "zh": "狙射树枭（洗翠的样子）",
       "ja": "ヒスイジュナイパー",
       "en": "Decidueye-Hisui"
     },
@@ -1553,7 +1874,7 @@
       "en": "Feraligatr"
     },
     "cofagrigus": {
-      "zh": "死神棺",
+      "zh": "迭失棺",
       "ja": "デスカーン",
       "en": "Cofagrigus"
     },
@@ -1563,7 +1884,7 @@
       "en": "Roserade"
     },
     "typhlosion-hisui": {
-      "zh": "火暴兽（洗翠）",
+      "zh": "火暴兽（洗翠的样子）",
       "ja": "ヒスイバクフーン",
       "en": "Typhlosion-Hisui"
     },
@@ -1578,7 +1899,7 @@
       "en": "Quaquaval"
     },
     "pangoro": {
-      "zh": "流氓熊猫",
+      "zh": "霸道熊猫",
       "ja": "ゴロンダ",
       "en": "Pangoro"
     },
@@ -1603,7 +1924,7 @@
       "en": "Garganacl"
     },
     "runerigus": {
-      "zh": "死神板",
+      "zh": "迭失板",
       "ja": "デスバーン",
       "en": "Runerigus"
     },
@@ -1679,7 +2000,7 @@
     },
     "meowstic": {
       "zh": "超能妙喵",
-      "ja": "ニャオニクス",
+      "ja": "ニャオニクス(オス)",
       "en": "Meowstic"
     },
     "thievul": {
@@ -1708,7 +2029,7 @@
       "en": "Hydrapple"
     },
     "raichu-alola": {
-      "zh": "雷丘（阿罗拉）",
+      "zh": "雷丘（阿罗拉的样子）",
       "ja": "アローラライチュウ",
       "en": "Raichu-Alola"
     },
@@ -1794,7 +2115,7 @@
     },
     "squawkabilly-yellow": {
       "zh": "怒鹦哥（黄羽毛）",
-      "ja": "イキリンコ(イエローフェザー)",
+      "ja": "イキリンコ(黄)",
       "en": "Squawkabilly-Yellow"
     },
     "typhlosion": {
@@ -1813,7 +2134,7 @@
       "en": "Oranguru"
     },
     "tauros-paldea-aqua": {
-      "zh": "肯泰罗（水澜种）",
+      "zh": "肯泰罗（帕底亚的样子・水澜种）",
       "ja": "パルデアケンタロス(水)",
       "en": "Tauros-Paldea-Aqua"
     },
@@ -1823,7 +2144,7 @@
       "en": "Florges"
     },
     "meowstic-f": {
-      "zh": "超能妙喵（雌性）",
+      "zh": "超能妙喵（雌性的样子）",
       "ja": "ニャオニクス(メス)",
       "en": "Meowstic-F"
     },
@@ -1878,7 +2199,7 @@
       "en": "Beartic"
     },
     "avalugg-hisui": {
-      "zh": "冰岩怪（洗翠）",
+      "zh": "冰岩怪（洗翠的样子）",
       "ja": "ヒスイクレベース",
       "en": "Avalugg-Hisui"
     },
@@ -1943,7 +2264,7 @@
       "en": "Garbodor"
     },
     "stunfisk-galar": {
-      "zh": "泥巴鱼（伽勒尔）",
+      "zh": "泥巴鱼（伽勒尔的样子）",
       "ja": "ガラルマッギョ",
       "en": "Stunfisk-Galar"
     },
@@ -1966,16 +2287,106 @@
       "zh": "奇麒麟",
       "ja": "リキキリン",
       "en": "Farigiraf"
+    },
+    "tsareena": {
+      "zh": "甜冷美后",
+      "ja": "アマージョ",
+      "en": "Tsareena"
+    },
+    "gourgeist-super": {
+      "zh": "南瓜怪人（巨颗种）",
+      "ja": "パンプジン(ギガだま)",
+      "en": "Gourgeist-Super"
+    },
+    "arbok": {
+      "zh": "阿柏怪",
+      "ja": "アーボック",
+      "en": "Arbok"
+    },
+    "tyrantrum": {
+      "zh": "怪颚龙",
+      "ja": "ガチゴラス",
+      "en": "Tyrantrum"
+    },
+    "drampa": {
+      "zh": "老翁龙",
+      "ja": "ジジーロン",
+      "en": "Drampa"
+    },
+    "aromatisse": {
+      "zh": "芳香精",
+      "ja": "フレフワン",
+      "en": "Aromatisse"
+    },
+    "liepard": {
+      "zh": "酷豹",
+      "ja": "レパルダス",
+      "en": "Liepard"
+    },
+    "lycanroc-midnight": {
+      "zh": "鬃岩狼人（黑夜的样子）",
+      "ja": "ルガルガン(夜)",
+      "en": "Lycanroc-Midnight"
+    },
+    "lycanroc-midday": {
+      "zh": "鬃岩狼人（白昼的样子）",
+      "ja": "ルガルガン(昼)",
+      "en": "Lycanroc-Midday"
+    },
+    "simisear": {
+      "zh": "爆香猿",
+      "ja": "バオッキー",
+      "en": "Simisear"
+    },
+    "samurott": {
+      "zh": "大剑鬼",
+      "ja": "ダイケンキ",
+      "en": "Samurott"
+    },
+    "flapple": {
+      "zh": "苹裹龙",
+      "ja": "アップリュー",
+      "en": "Flapple"
+    },
+    "rampardos": {
+      "zh": "战槌龙",
+      "ja": "ラムパルド",
+      "en": "Rampardos"
+    },
+    "appletun": {
+      "zh": "丰蜜龙",
+      "ja": "タルップル",
+      "en": "Appletun"
+    },
+    "watchog": {
+      "zh": "步哨鼠",
+      "ja": "ミルホッグ",
+      "en": "Watchog"
+    },
+    "rotom": {
+      "zh": "洛托姆",
+      "ja": "ロトム",
+      "en": "Rotom"
+    },
+    "gourgeist-large": {
+      "zh": "南瓜怪人（大颗种）",
+      "ja": "パンプジン(おおだま)",
+      "en": "Gourgeist-Large"
+    },
+    "tauros-paldea-combat": {
+      "zh": "肯泰罗（帕底亚的样子・斗战种）",
+      "ja": "パルデアケンタロス(闘)",
+      "en": "Tauros-Paldea-Combat"
     }
   },
   "series": [
     {
-      "slug": "garchomp",
+      "slug": "salamence",
       "reason": "top30",
       "latest_rank": 1
     },
     {
-      "slug": "salamence",
+      "slug": "garchomp",
       "reason": "top30",
       "latest_rank": 2
     },
@@ -1995,22 +2406,22 @@
       "latest_rank": 5
     },
     {
-      "slug": "lucario",
+      "slug": "baxcalibur",
       "reason": "top30",
       "latest_rank": 6
     },
     {
-      "slug": "archaludon",
+      "slug": "lucario",
       "reason": "top30",
       "latest_rank": 7
     },
     {
-      "slug": "baxcalibur",
+      "slug": "gholdengo",
       "reason": "top30",
       "latest_rank": 8
     },
     {
-      "slug": "gholdengo",
+      "slug": "archaludon",
       "reason": "top30",
       "latest_rank": 9
     },
@@ -2020,12 +2431,12 @@
       "latest_rank": 10
     },
     {
-      "slug": "rillaboom",
+      "slug": "mimikyu",
       "reason": "top30",
       "latest_rank": 11
     },
     {
-      "slug": "mimikyu",
+      "slug": "rillaboom",
       "reason": "top30",
       "latest_rank": 12
     },
@@ -2060,7 +2471,7 @@
       "latest_rank": 18
     },
     {
-      "slug": "cinderace",
+      "slug": "ninetales-alola",
       "reason": "top30",
       "latest_rank": 19
     },
@@ -2070,54 +2481,69 @@
       "latest_rank": 20
     },
     {
-      "slug": "volcarona",
+      "slug": "cinderace",
       "reason": "top30",
       "latest_rank": 21
     },
     {
-      "slug": "ninetales-alola",
+      "slug": "rotom-wash",
       "reason": "top30",
       "latest_rank": 22
     },
     {
-      "slug": "sneasler",
+      "slug": "volcarona",
       "reason": "top30",
       "latest_rank": 23
     },
     {
-      "slug": "skeledirge",
+      "slug": "sneasler",
       "reason": "top30",
       "latest_rank": 24
     },
     {
-      "slug": "delphox",
-      "reason": "top30",
+      "slug": "hydreigon",
+      "reason": "top30+mover",
       "latest_rank": 25
     },
     {
-      "slug": "rotom-wash",
+      "slug": "skeledirge",
       "reason": "top30",
       "latest_rank": 26
     },
     {
-      "slug": "dragonite",
+      "slug": "pawmot",
       "reason": "top30",
       "latest_rank": 27
     },
     {
-      "slug": "pawmot",
+      "slug": "sylveon",
       "reason": "top30",
       "latest_rank": 28
     },
     {
-      "slug": "sylveon",
+      "slug": "dragonite",
       "reason": "top30",
       "latest_rank": 29
     },
     {
+      "slug": "delphox",
+      "reason": "top30+mover",
+      "latest_rank": 30
+    },
+    {
       "slug": "metagross",
       "reason": "top30",
-      "latest_rank": 30
+      "latest_rank": 31
+    },
+    {
+      "slug": "floette-eternal",
+      "reason": "mover",
+      "latest_rank": 49
+    },
+    {
+      "slug": "banette",
+      "reason": "mover",
+      "latest_rank": 52
     }
   ]
 }

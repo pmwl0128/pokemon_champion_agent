@@ -69,7 +69,7 @@
     "season": "M-6",
     "rule": "M-C",
     "format": "single",
-    "count": 61
+    "count": 63
   },
   "M-A-events_double": {
     "partition": "M-A-events",

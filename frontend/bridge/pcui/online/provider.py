@@ -67,7 +67,7 @@ class OpenAIChatConfig:
     provider: str = "openai-compatible"
     base_url: str = "https://api.deepseek.com"
     api_path: str = "/chat/completions"
-    model: str = "deepseek-v4-flash"
+    model: str = "deepseek-flash"
     api_style: str = "openai-chat-completions"
     temperature: float | None = 0.3
     top_p: float | None = None
@@ -111,7 +111,7 @@ class OpenAIChatConfig:
                 "PCUI_OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1").strip()
             model = values.get(
                 "PCUI_OPENCODE_MODEL",
-                values.get("PCUI_LLM_MODEL", "deepseek-v4-flash")).strip()
+                values.get("PCUI_LLM_MODEL", "deepseek-flash")).strip()
             api_key = values.get("PCUI_OPENCODE_API_KEY", "").strip()
             api_path = values.get(
                 "PCUI_OPENCODE_API_PATH", "/chat/completions").strip()
@@ -121,7 +121,7 @@ class OpenAIChatConfig:
                 values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
             model = values.get(
                 "PCUI_DEEPSEEK_MODEL",
-                values.get("DEEPSEEK_MODEL", "deepseek-v4-flash")).strip()
+                values.get("DEEPSEEK_MODEL", "deepseek-flash")).strip()
             api_key = values.get(
                 "PCUI_DEEPSEEK_API_KEY",
                 values.get("PCUI_LLM_API_KEY",
@@ -134,7 +134,7 @@ class OpenAIChatConfig:
                 values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
             model = values.get(
                 "PCUI_LLM_MODEL",
-                values.get("DEEPSEEK_MODEL", "deepseek-v4-flash")).strip()
+                values.get("DEEPSEEK_MODEL", "deepseek-flash")).strip()
             api_key = values.get(
                 "PCUI_LLM_API_KEY",
                 values.get("DEEPSEEK_API_KEY", "")).strip()
@@ -279,7 +279,7 @@ class DeepSeekProvider(OpenAICompatibleProvider):
     """Backward-compatible constructor for callers that still use the old class name."""
 
     def __init__(self, api_key: str, base_url: str = "https://api.deepseek.com",
-                 model: str = "deepseek-v4-flash"):
+                 model: str = "deepseek-flash"):
         super().__init__(OpenAIChatConfig(api_key=api_key, base_url=base_url, model=model))
 
 

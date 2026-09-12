@@ -210,7 +210,13 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     @app.get("/api/quota")
     async def quota_status(request: Request):
-        if unmetered:
+        # The same maintainer key that exempts the action endpoints must also exempt this
+        # preflight view. The SPA disables actions when the reported visitor allowance is
+        # exhausted, so returning the anonymous IP usage here would prevent an authenticated
+        # release smoke from ever reaching the endpoint that already honours the bypass.
+        dev = bool(dev_key) and hmac.compare_digest(
+            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
+        if unmetered or dev:
             empty = {"used": 0, "limit": 0}
             return {"qa": empty, "diagnose": empty, "builder": empty, "matchup": empty,
                     "tune": empty}
