@@ -56,6 +56,10 @@ const STRINGS = {
     zh: "最多展示近 10 次数据刷新（同日只取最新一次）：包含期间进过前 30 的全部宝可梦，以及进过前 60 且排名大幅变动的宝可梦；30 名以后压缩显示。",
     en: "Shows up to the latest 10 refreshes (only the latest per day): every Pokémon that reached the top 30, plus major movers that reached the top 60. Ranks past 30 are compressed.",
     ja: "直近最大10回の更新（同日は最新の1回のみ）を対象に、期間中に30位以内へ入った全ポケモンと、60位以内へ入り順位が大きく動いたポケモンを表示します。31位以下は圧縮表示です。" },
+  "trend.singleSnapshot": {
+    zh: "当前只有一次数据快照，暂时没有可比较的趋势；下次刷新后将显示趋势线。以下为本次排名。",
+    en: "Only one data snapshot is available, so there is no trend to compare yet. Trend lines will appear after the next refresh; the current ranking is shown below.",
+    ja: "現在はデータスナップショットが1回分のみのため、比較できるトレンドはまだありません。次回更新後に推移線を表示します。以下は今回の順位です。" },
   "calc.title": { zh: "伤害计算", en: "Damage calc", ja: "ダメージ計算" },
   "calc.attacker": { zh: "攻击方", en: "Attacker", ja: "攻撃側" },
   "calc.defender": { zh: "防守方", en: "Defender", ja: "防御側" },
@@ -433,6 +437,10 @@ const STRINGS = {
   "matchup.variantHint": { zh: "带 A/B/C 角标的宝可梦有多种真实配置，点击宝可梦可切换",
                            en: "A Pokémon badged A/B/C runs several real builds — click it to switch",
                            ja: "A/B/C バッジのポケモンには複数の実型があります。クリックで切り替え" },
+  "matchup.omittedNoSet": {
+    zh: "KO 表已省略 {count} 个没有可用计算结果的防守轴，避免把空白误当成伤害结果。",
+    en: "The KO table omits {count} defender axes with no usable calculation results, so missing data is not mistaken for damage.",
+    ja: "KO表では、利用可能な計算結果がない防御軸を{count}件省略し、欠損データをダメージ結果と誤認しないようにしています。" },
   "matchup.variantModal": { zh: "主流", en: "most common", ja: "最頻" },
   "matchup.variantShare": { zh: "占该宝可梦真实队伍的 {n}", en: "{n} of this Pokémon's real teams",
                             ja: "このポケモンの実チームの {n}" },
@@ -1388,7 +1396,7 @@ const STRINGS = {
   "kind.answer-audit": { zh: "答案审计", en: "Answer audit", ja: "回答監査" },
   "kind.tune-request": { zh: "调参需求", en: "Tune request", ja: "調整依頼" },
   "kind.tune-result": { zh: "调参结果", en: "Tune result", ja: "調整結果" },
-} as const;
+} as const satisfies Record<string, Record<Lang, string>>;
 
 /** Effect/description text for the interface language; English is the permanent
  * fallback (design §2.1 — never hand-translate). */

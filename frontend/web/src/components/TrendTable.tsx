@@ -21,7 +21,8 @@ export function TrendTable({ trend }: { trend: TrendDto }) {
     - (currentRank(b.ranks) ?? Number.MAX_SAFE_INTEGER));
 
   return (
-    <section className="panel trend-mobile" aria-label={t("trend.title")}>
+    <section className={`panel trend-mobile${trend.periods.length < 2 ? " trend-snapshot" : ""}`}
+             aria-label={t("trend.title")}>
       <div className="trend-table-scroll" tabIndex={0} data-scroll-region>
         <table className="trend-table">
           <thead>

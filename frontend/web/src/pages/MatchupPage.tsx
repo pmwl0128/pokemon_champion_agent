@@ -26,6 +26,7 @@ import { useRuntime } from "../runtime/context.tsx";
 import { displayName, optionalKey, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
 import { koLabel, koTone } from "../lib/ko.ts";
+import { populatedKoAxes } from "../lib/matchupGrid.ts";
 import { CellInspector, SetBlock, type InspectorDamage } from "../components/CellInspector.tsx";
 import { ActualMatchupWorkspace } from "./ActualMatchupWorkspace.tsx";
 
@@ -183,10 +184,16 @@ function KoGrid({ format }: { format: FormatId }) {
   const view = useMemo(() => {
     if (state.status !== "ready") return null;
     const overview: OppKoGridDto = state.data;
-    const cols = [...overview.species].sort(byRank);             // every species can be a defender
+    const all = [...overview.species].sort(byRank);
+    // Meta-only sets remain valid defender columns (incoming damage needs no stitched move list),
+    // while only real joint four-move sets become attacker rows. Independently, do not render an
+    // all-empty axis when every calculation for an active build failed or was unavailable: absence
+    // is not damage data.
+    const available = populatedKoAxes(overview.grid);
+    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
     // Attacker rows are decided by the ACTIVE build: switching a species to a build that has no
     // offense row (meta-only) correctly drops it from the rows.
-    const rows = cols.filter((s) => overview.grid[activeKey(s, rowPicks)]);
+    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     // Variant key -> its species row, so the detail panel can name a selected cell whose
     // coordinates are variant keys rather than species slugs.
     const byVariant = new Map<string, SpeciesRowDto>();
@@ -194,8 +201,8 @@ function KoGrid({ format }: { format: FormatId }) {
       for (const v of sp.variants ?? []) byVariant.set(v.key, sp);
       byVariant.set(sp.slug, sp);                     // legacy grid: key IS the species slug
     }
-    return { overview, cols, rows, byVariant };
-  }, [state, rowPicks]);
+    return { overview, cols, rows, byVariant, omittedCols: all.length - cols.length };
+  }, [state, rowPicks, colPicks]);
 
   if (state.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
   if (state.status === "error") {
@@ -204,7 +211,7 @@ function KoGrid({ format }: { format: FormatId }) {
       : t("state.errorDetail")}</div>;
   }
   if (!view) return null;
-  const { overview, cols, rows, byVariant } = view;
+  const { overview, cols, rows, byVariant, omittedCols } = view;
   const detailCell = sel ? detailCache?.matrix[sel.a]?.[sel.d] : null;
   const detailOff = detailCell?.offense ?? null;
 
@@ -218,6 +225,12 @@ function KoGrid({ format }: { format: FormatId }) {
         <div className="matrix-guide variant-guide">
           <span className="matrix-guide-mark" aria-hidden>◧</span>
           {t("matchup.variantHint")}
+        </div>
+      )}
+      {omittedCols > 0 && (
+        <div className="matrix-guide variant-guide">
+          <span className="matrix-guide-mark" aria-hidden>−</span>
+          {t("matchup.omittedNoSet").replace("{count}", String(omittedCols))}
         </div>
       )}
       <div className="matchup-scroll">

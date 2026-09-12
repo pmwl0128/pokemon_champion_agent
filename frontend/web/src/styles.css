@@ -2025,6 +2025,29 @@ input:focus, select:focus, textarea:focus {
 /* charts + matrices */
 .trend-chart { padding: 10px; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .trend-mobile { display: none; }
+.trend-mobile.trend-snapshot { display: block; overflow: hidden; }
+.trend-snapshot-note { margin-bottom: 10px; }
+.trend-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.trend-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0;
+  font-variant-numeric: tabular-nums; }
+.trend-table th, .trend-table td { height: 42px; padding: 6px 11px; border-bottom: 1px solid var(--line);
+  text-align: center; white-space: nowrap; }
+.trend-table thead th { color: var(--sub); background: var(--panel-2); font-size: 11px;
+  font-weight: 700; }
+.trend-table tbody td { min-width: 76px; color: var(--sub); font: 12px var(--font-mono); }
+.trend-table tbody td.current { color: var(--ink); font-weight: 750; }
+.trend-table .trend-identity { position: sticky; left: 0; z-index: 1; width: 146px; min-width: 146px;
+  max-width: 146px; text-align: left; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
+.trend-table thead .trend-identity { z-index: 2; background: var(--panel-2); }
+.trend-table .trend-identity a { display: flex; align-items: center; justify-content: space-between;
+  gap: 7px; color: var(--ink); }
+.trend-table .trend-identity a:hover { text-decoration: none; }
+.trend-table .trend-identity span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.trend-table .trend-identity small { flex: none; font: 700 10.5px var(--font-mono); }
+.trend-table .trend-identity small.up { color: var(--success); }
+.trend-table .trend-identity small.down { color: var(--danger); }
+.trend-table .trend-identity small.flat { color: var(--sub); }
+.trend-table tbody tr:last-child th, .trend-table tbody tr:last-child td { border-bottom: 0; }
 .matchup-scroll { border-color: var(--line); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
 .matchup-grid thead th, .matchup-grid th.row-head { background: color-mix(in srgb, var(--panel) 96%, var(--panel-2)); }
 .matchup-grid td:not(.diag):hover {
@@ -2176,27 +2199,6 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 520px) and (orientation: portrait) {
   .trend-chart { display: none; }
   .trend-mobile { display: block; overflow: hidden; }
-  .trend-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
-  .trend-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0;
-    font-variant-numeric: tabular-nums; }
-  .trend-table th, .trend-table td { height: 42px; padding: 6px 11px; border-bottom: 1px solid var(--line);
-    text-align: center; white-space: nowrap; }
-  .trend-table thead th { color: var(--sub); background: var(--panel-2); font-size: 11px;
-    font-weight: 700; }
-  .trend-table tbody td { min-width: 76px; color: var(--sub); font: 12px var(--font-mono); }
-  .trend-table tbody td.current { color: var(--ink); font-weight: 750; }
-  .trend-table .trend-identity { position: sticky; left: 0; z-index: 1; width: 146px; min-width: 146px;
-    max-width: 146px; text-align: left; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
-  .trend-table thead .trend-identity { z-index: 2; background: var(--panel-2); }
-  .trend-table .trend-identity a { display: flex; align-items: center; justify-content: space-between;
-    gap: 7px; color: var(--ink); }
-  .trend-table .trend-identity a:hover { text-decoration: none; }
-  .trend-table .trend-identity span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .trend-table .trend-identity small { flex: none; font: 700 10.5px var(--font-mono); }
-  .trend-table .trend-identity small.up { color: var(--success); }
-  .trend-table .trend-identity small.down { color: var(--danger); }
-  .trend-table .trend-identity small.flat { color: var(--sub); }
-  .trend-table tbody tr:last-child th, .trend-table tbody tr:last-child td { border-bottom: 0; }
 }
 
 @media (max-width: 420px) {

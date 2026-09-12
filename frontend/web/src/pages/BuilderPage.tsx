@@ -307,7 +307,7 @@ function ThreatAssessmentPanel({ assessment, team, format, dexByName }: {
                     </EntityHover>
                     {(summary.item || summary.ability) && (
                       <span className="muted">
-                        {[summary.item, summary.ability].filter(Boolean).map(String).join(" · ")}
+                        {prose([summary.item, summary.ability].filter(Boolean).map(String).join(" · "))}
                       </span>
                     )}
                     {route.opponentIsModal === true && (

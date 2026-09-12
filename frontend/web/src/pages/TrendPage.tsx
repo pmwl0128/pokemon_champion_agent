@@ -27,10 +27,16 @@ export function TrendPage() {
         <div className="notice">{t("state.errorDetail")}</div>
       )}
       {trend.status === "ready" && (
-        <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
-          <TrendChart trend={trend.data} />
+        <>
+          {trend.data.periods.length > 1 ? (
+            <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
+              <TrendChart trend={trend.data} />
+            </Suspense>
+          ) : (
+            <p className="notice trend-snapshot-note">{t("trend.singleSnapshot")}</p>
+          )}
           <TrendTable trend={trend.data} />
-        </Suspense>
+        </>
       )}
     </>
   );

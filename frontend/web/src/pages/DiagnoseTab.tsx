@@ -5,7 +5,7 @@
  * with dex-localized species chips; session continuity mirrors the wizard's. */
 import type { DiagnoseReportDto, FormatId } from "@pokemon-champions/protocol";
 import { DIAGNOSE_TEXT_MAX_CHARS, DiagnoseReportDtoSchema } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EntityHover } from "../components/EntityHover.tsx";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { TypeBadge } from "../components/TypeBadge.tsx";
@@ -424,12 +424,13 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
   // own weather setters: Mega-aware (Mega Froslass = Snow Warning), so read the skill coverage
   const weatherBearers = report.roles.coverage.find((c) => c.key === "weather_rewrite")?.bearers ?? [];
   const slowFirst = [...report.speed.order].reverse();
-  const allRows: Record<string, { assets: Asset[]; extra?: string }> = {
+  const allRows: Record<string, { assets: Asset[]; extra?: ReactNode }> = {
     trickroom: {
       assets: merge(byMove(PRIORITY, t("diag.how.priority")), byMove(DISRUPT, t("diag.how.disrupt")),
         byMove("trick room", t("diag.how.ownTR"))),
       extra: slowFirst[0]
-        ? `${t("diag.mode.slowest")}${slowFirst.slice(0, 2).map((o) => o.species).join(", ")}`
+        ? <>{t("diag.mode.slowest")} <SpeciesChips
+            names={slowFirst.slice(0, 2).map((o) => o.species)} /></>
         : undefined,
     },
     tailwind: {

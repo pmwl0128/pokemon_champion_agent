@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GameImage } from "./GameImage.tsx";
 import { displayName, useT, type Lang } from "../i18n.ts";
+import { useDexByName } from "../hooks.ts";
 import { localName, useNameMaps } from "../lib/names.ts";
 
 export const pct = (n: number | null | undefined) => (n == null ? null : `${Math.round(n * 100)}%`);
@@ -58,6 +59,7 @@ function VariantPicker({ s, picks, onPick, onClose, lang, anchorRef, hintKey }: 
 }) {
   const t = useT();
   const maps = useNameMaps();
+  const dex = useDexByName();
   const current = activeKey(s, picks);
   const ref = useRef<HTMLDivElement>(null);
   // The panel is position:fixed (it must escape the grid's overflow clip), so it is placed from the
@@ -120,7 +122,10 @@ function VariantPicker({ s, picks, onPick, onClose, lang, anchorRef, hintKey }: 
                 <span className="variant-main">
                   <span className="variant-item">
                     {v.item ? localName(maps.item, v.item, lang) : "—"}
-                    {v.runForm && <span className="mega-badge" title={v.runForm}>MEGA</span>}
+                    {v.runForm && <span className="mega-badge"
+                      title={dex.get(v.runForm) ? displayName(dex.get(v.runForm)!, lang) : v.runForm}>
+                      MEGA
+                    </span>}
                   </span>
                   <span className="variant-ability">
                     {v.ability ? localName(maps.ability, v.ability, lang) : "—"}

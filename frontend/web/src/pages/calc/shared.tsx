@@ -129,6 +129,19 @@ export interface ModalSet {
   moves: string[];
 }
 
+/** Apply facts that belong to the literal dex form selected by the user. Meta detail falls back
+ * from a Mega form to its ranked base species, so its stitched modal set can carry the base
+ * ability. The stone is form-specific already; the ability must be form-specific too or an
+ * explicit Mega Salamence request silently reaches the engine without Aerilate. */
+export function modalForEntry(modal: ModalSet, entry: DexIndexEntry | undefined,
+                              stone: ItemRef | undefined): ModalSet {
+  return {
+    ...modal,
+    ...(stone ? { item: stone.name } : {}),
+    ...(entry?.isMega ? { ability: entry.abilities[0]?.name ?? "" } : {}),
+  };
+}
+
 /** A convenience STARTING build for the calc tools, stitched from a mon's meta panels: the top
  * ability / item / nature / SP spread + top-4 damaging moves, each the marginal mode of its own
  * panel. These fields have NO joint-distribution guarantee — this combination may never have been
@@ -196,15 +209,10 @@ export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSe
       const definitive = dex !== null && (!entry || !entry.isMega || !!base);
       hit = (async () => {
         try {
-          let dto: MetaDetailDto;
-          try {
-            dto = await adapter.detail(fmt, slug);
-          } catch (e) {
-            if (!(e instanceof HttpError && e.status === 404) || !base) throw e;
-            dto = await adapter.detail(fmt, base.slug);
-          }
-          const modal = toModalSet(dto);
-          return stone ? { ...modal, item: stone.name } : modal;
+          // A known Mega form has no independent ranking row. Go straight to its base detail:
+          // probing the guaranteed-missing Mega URL first adds latency and a noisy browser 404.
+          const dto: MetaDetailDto = await adapter.detail(fmt, base?.slug ?? slug);
+          return modalForEntry(toModalSet(dto), entry, stone);
         } catch (e) {
           // 404 = unranked this period → no standard build; leave the form empty (cache it so we
           // don't re-hit a known-absent detail every pick).
@@ -245,7 +253,7 @@ export function withMega<S extends { slug: string; item: string }>(
   s: S, dex: DexIndexEntry[], items: ItemRef[],
 ): { state: S; entry: DexIndexEntry | undefined; mega: boolean } {
   const base = dex.find((e) => e.slug === s.slug);
-  const mega = megaFor(s.slug, s.item, dex, items);
+  const mega = base?.isMega ? base : megaFor(s.slug, s.item, dex, items);
   if (!mega) return { state: s, entry: base, mega: false };
   const state = { ...s };
   const withAbility = state as S & { ability?: string };
@@ -325,15 +333,14 @@ export function ItemCombo({ value, onChange, items, disabled }: {
 
 /** Trilingual mon input with suggestions + sprite. Typing is always literal; exact zh/ja/en names
  * and explicit option picks resolve locally, while fuzzy adapter resolution requires Enter.
- * Reused by SideForm and the speed-ladder rows. `displayEntry` overrides the sprite (the Mega form
- * when the held stone activates). */
-export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
+ * Reused by SideForm and the speed-ladder rows. The sprite always identifies the literal selected
+ * entry; an activated held-stone form is disclosed by the adjacent MEGA badge. */
+export function MonPicker({ slug, onSlug, dex, placeholder }: {
   idKey: string;
   slug: string;
   onSlug: (slug: string) => void;
   dex: DexIndexEntry[];
   placeholder?: string;
-  displayEntry?: DexIndexEntry;
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -402,12 +409,11 @@ export function MonPicker({ slug, onSlug, dex, placeholder, displayEntry }: {
     });
   };
 
-  const shown = displayEntry ?? entry;
   return (
     <span className="mon-picker">
       <span className="mon-picker-slot">
-        {shown
-          ? <GameImage assetKey={shown.key} role="card" alt={shown.name}
+        {entry
+          ? <GameImage assetKey={entry.key} role="card" alt={entry.name}
               className="mini mon-picker-img" />
           : <img className="mini mon-picker-img" src={PLACEHOLDERS.pokemon}
               alt="" loading="lazy" aria-hidden />}
@@ -435,7 +441,7 @@ export function SideForm({ label, side, setSide, dex, natures, items, onRemove, 
   const { lang } = useLang();
   const t = useT();
   const entry = dex.find((e) => e.slug === side.slug);
-  const mega = megaFor(side.slug, side.item, dex, items);
+  const mega = entry?.isMega ? entry : megaFor(side.slug, side.item, dex, items);
   // A Mega form picked BY NAME requires its stone — pin the item and lock the input.
   const requiredStone = entry?.isMega
     ? items.find((i) => i.requiredBy?.includes(entry.name)) : undefined;
@@ -445,6 +451,15 @@ export function SideForm({ label, side, setSide, dex, natures, items, onRemove, 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requiredStone?.name, side.slug]);
+  // The ability selector must describe the form the engine will calculate. Switching a held
+  // stone on a base species, or selecting a Mega form by name, replaces an incompatible base
+  // ability immediately instead of relying on an invisible request-time correction.
+  useEffect(() => {
+    if (mega && !mega.abilities.some((a) => a.name === side.ability)) {
+      setSide((s) => ({ ...s, ability: mega.abilities[0]?.name ?? "" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mega?.slug, side.item]);
 
   return (
     <div className="panel form-panel side-grid mon-config">
@@ -459,7 +474,6 @@ export function SideForm({ label, side, setSide, dex, natures, items, onRemove, 
       </strong>
       <label>{t("ranking.pokemon")}
         <MonPicker idKey={label} slug={side.slug} dex={dex}
-          displayEntry={mega ?? undefined}
           onSlug={(slug) => setSide((s) => s.slug === slug ? s : { ...EMPTY_SIDE, slug })} />
       </label>
       <div className="mini-fields four">
@@ -467,7 +481,7 @@ export function SideForm({ label, side, setSide, dex, natures, items, onRemove, 
           <select value={side.ability}
             onChange={(e) => setSide((s) => ({ ...s, ability: e.target.value }))}>
             <option value="">—</option>
-            {entry?.abilities.map((a) => (
+            {(mega ?? entry)?.abilities.map((a) => (
               <option key={a.name} value={a.name}>{displayName(a, lang)}</option>
             ))}
           </select>

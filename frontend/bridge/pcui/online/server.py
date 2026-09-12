@@ -39,6 +39,7 @@ BUILDER_TACTICS = ("stall", "trickroom", "weather", "tailwind", "screens",
                    "pivot", "setup", "hazards")
 DIAGNOSE_TEXT_MAX = 8_000       # a 6-member Showdown export is ~2KB; team-json ~4KB
 DIAGNOSE_TIMEOUT = 150.0        # one team.py session (parse, then validate+diagnose)
+DIAGNOSE_STREAM_HEARTBEAT = 15.0  # keep the proxy/client path alive while deterministic work runs
 DIAGNOSE_TOP_K = 30             # independent live battery scope; team skill permits 1..60
 MATCHUP_QUEUE_WAIT = 20.0        # deterministic lane: bounded wait, never consumes model quota
 MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 12x60 costs 24 units
@@ -451,10 +452,12 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 limits.refund(ids, quota_day, cost=cost)
             raise HTTPException(500, _err("bad_input", "diagnose pipeline failed"))
         report["quota"] = {"used": used, "limit": limit}
-        if on_report is not None:
+        if on_report is not None and want_explain:
             # The deterministic report is already complete and useful. Stream this immutable
             # snapshot before the optional model call so a thinking-mode visitor can inspect
             # legality, structure and matchups instead of staring at a spinner for another minute.
+            # With no explanation there is no second phase: emitting report + done would send the
+            # same ~500 KB payload twice and increases the chance of a proxy/client interruption.
             await on_report(report)
 
         # Optional reading uses the diagnosis allowance, never the separate Q&A allowance.
@@ -528,13 +531,21 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
         async def events():
             while True:
-                kind, line = await queue.get()
+                try:
+                    kind, line = await asyncio.wait_for(
+                        queue.get(), timeout=DIAGNOSE_STREAM_HEARTBEAT)
+                except asyncio.TimeoutError:
+                    # Valid NDJSON event which old/new clients safely ignore. An empty line may be
+                    # swallowed by buffering proxies; a small object guarantees observable bytes.
+                    yield '{"type":"progress"}\n'
+                    continue
                 yield line + "\n"
                 if kind in ("done", "error"):
                     break
 
         return StreamingResponse(events(), media_type="application/x-ndjson",
-                                 headers={"Cache-Control": "no-store"})
+                                 headers={"Cache-Control": "no-store",
+                                          "X-Accel-Buffering": "no"})
 
     @app.post("/api/team/matchup")
     async def actual_team_matchup(request: Request, body: dict):

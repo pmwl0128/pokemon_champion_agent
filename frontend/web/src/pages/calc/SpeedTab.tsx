@@ -85,8 +85,8 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
 }) {
   const { lang } = useLang();
   const t = useT();
-  const mega = megaFor(side.slug, side.item, dex, items);
   const entry = dex.find((e) => e.slug === side.slug);
+  const mega = entry?.isMega ? entry : megaFor(side.slug, side.item, dex, items);
   const requiredStone = entry?.isMega
     ? items.find((i) => i.requiredBy?.includes(entry.name)) : undefined;
   useEffect(() => {
@@ -107,7 +107,6 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
         {onRemove && <button className="mini-x" onClick={onRemove} aria-label={t("a11y.remove")}>✕</button>}
       </strong>
       <MonPicker idKey={`spd-${label}`} slug={side.slug} dex={dex}
-        displayEntry={mega ?? undefined}
         onSlug={(slug) => setSide((s) => ({ ...s, slug }))} />
       <div className="speed-presets">
         <button onClick={() => preset(presets.plus, 32, 31)}>{t("speed.preset.max")}</button>
