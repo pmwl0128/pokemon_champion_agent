@@ -38,6 +38,7 @@ from typing import Any
 
 import completeness
 import evidence
+import handover
 import rules
 from mega import base_of_form_name
 
@@ -59,9 +60,9 @@ _SEASON_RULE = rules.SEASON_RULE          # single source (rules.py); do not re-
 # --------------------------------------------------------------------------- #
 # A species/archetype seen in fewer than this many real teams is too thin to trust as
 # "representative" — the resolver falls back to meta below it. Tunable; deliberately conservative for
-# early M-B samples.
+# thin early-season samples.
 MIN_SAMPLE = 3
-# A cluster also needs material support within its species pool. The current M-B library shows that
+# A cluster also needs material support within its species pool. The reviewed M-B evidence showed that
 # the old fixed top-3 ceiling retained only ~87-88% of Top-60 observations, while a 3% share floor and
 # five-row ceiling retains ~89% singles / ~92% doubles without admitting the sub-percent noise that a
 # fixed count of three permits in the much larger doubles sample. Keep admission and capacity separate:
@@ -107,7 +108,9 @@ def load_teams(fmt: str, season: str | None = None) -> list[dict[str, Any]]:
 # Keyed on the data dir too: CHAMP_TEAM_DATA can differ within one process (tests point it at fixtures),
 # so a cache that ignored it would serve one dir's result for another.
 _TEAM_CACHE: dict[tuple[str, str, str | None], list[dict[str, Any]]] = {}
-_RULE_TEAM_CACHE: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+# (data_dir, format, rule) -> (validity token, pool). See `cached_teams_for_rule` for the token.
+_RULE_TEAM_CACHE: dict[tuple[str, str, str],
+                       tuple[tuple[Any, ...], list[dict[str, Any]]]] = {}
 
 
 def cached_teams(fmt: str, season: str | None = None) -> list[dict[str, Any]]:
@@ -121,10 +124,10 @@ def cached_teams(fmt: str, season: str | None = None) -> list[dict[str, Any]]:
 def load_teams_for_rule(fmt: str, rule: str) -> list[dict[str, Any]]:
     """All stored teams for a format whose row provenance says `rule`.
 
-    Files stay season-partitioned (`M-3_double.jsonl`, `M-4_double.jsonl`, ...), but current build
-    consumption is rule-scoped: M-3 and M-4 are both M-B and should contribute to the same real-team
-    evidence pool, while M-A rows must never leak into M-B. Filtering on the row's own `rule` keeps the
-    storage label authoritative and survives future same-rule season additions without adding another
+    Files stay season-partitioned (`M-3_double.jsonl`, `M-4_double.jsonl`, ...), but default build
+    consumption is rule-scoped: sibling seasons under the same rule contribute to one real-team
+    evidence pool, while rows from other rules stay out. Filtering on the row's own `rule` keeps the
+    storage label authoritative and survives future same-rule season additions without another
     hardcoded filename list.
     """
     d = data_dir()
@@ -135,15 +138,35 @@ def load_teams_for_rule(fmt: str, rule: str) -> list[dict[str, Any]]:
         season, _ = jf.stem.rsplit("_", 1)
         file_rule = _SEASON_RULE.get(season)
         teams.extend(t for t in _read_jsonl(jf) if (t.get("rule") or file_rule) == rule)
+    # Source rows retain their old `rule`; only receipt-approved rows receive an in-memory target
+    # annotation. Invalid or stale receipts fail loudly instead of silently widening the pool.
+    teams.extend(handover.load_teams(d, fmt, rule, _read_jsonl))
     return teams
 
 
 def cached_teams_for_rule(fmt: str, rule: str) -> list[dict[str, Any]]:
-    """Process-local cache for a rule-scoped real-team pool."""
-    key = (str(data_dir()), fmt, rule)
-    if key not in _RULE_TEAM_CACHE:
-        _RULE_TEAM_CACHE[key] = load_teams_for_rule(fmt, rule)
-    return _RULE_TEAM_CACHE[key]
+    """Process-local cache for a rule-scoped real-team pool.
+
+    Keyed on a validity TOKEN, not just the pool identity: a long-lived bridge can cross the hard
+    handover expiry while running, and a dev refresh can rewrite a partition underneath it. The token
+    covers both (plus every authority the receipt is bound to), so the entry is reused only while it
+    would still be rebuilt identically — and is discarded the moment the window closes. Rebuilding
+    unconditionally instead, which is what a receipt used to force, cost a full re-parse and re-hash
+    of the whole library on EVERY per-species call (audit 2026-09-08)."""
+    team_dir = data_dir()
+    key = (str(team_dir), fmt, rule)
+    token = handover.pool_token(team_dir, fmt, rule)
+    cached = _RULE_TEAM_CACHE.get(key)
+    if cached is not None and cached[0] == token:
+        return cached[1]
+    teams = load_teams_for_rule(fmt, rule)
+    _RULE_TEAM_CACHE[key] = (token, teams)
+    return teams
+
+
+def clear_cached_teams_for_rule(fmt: str, rule: str) -> None:
+    """Force the next rule-pool read to use the current on-disk partitions."""
+    _RULE_TEAM_CACHE.pop((str(data_dir()), fmt, rule), None)
 
 
 def seasons_in(teams: list[dict[str, Any]]) -> list[str]:
@@ -339,12 +362,22 @@ def library_forms(species: str, teams: list[dict[str, Any]]) -> list[str]:
 
 
 def _members_of(species: str, teams: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
+    native: list[dict[str, Any]] = []
+    transitioned: list[dict[str, Any]] = []
     for t in teams:
         thi = _team_has_item(t)
-        out.extend(m for m in t.get("pokemon", [])
-                   if m.get("species") == species and _template_eligible_member(m, team_has_item=thi))
-    return out
+        bucket = transitioned if t.get("target_rule") else native
+        for member in t.get("pokemon", []):
+            if member.get("species") != species or not _template_eligible_member(member, team_has_item=thi):
+                continue
+            stamped = dict(member)
+            stamped["_evidence_rule"] = t.get("evidence_rule") or t.get("rule")
+            stamped["_target_rule"] = t.get("target_rule") or t.get("rule")
+            if t.get("expires_at"):
+                stamped["_handover_expires_at"] = t["expires_at"]
+            bucket.append(stamped)
+    # The receipt's clock is the only cutover. Native sample count must not shorten the week.
+    return [*native, *transitioned]
 
 
 def _build_modal_set(species: str, fmt: str, members: list[dict[str, Any]]) -> dict[str, Any]:
@@ -384,7 +417,9 @@ def _build_modal_set(species: str, fmt: str, members: list[dict[str, Any]]) -> d
     # current sources) floors 'high', so this is a no-op for the existing library.
     conf = _confidence(sample, cnt / sample)
     conf = _cap_by_completeness(conf, winners)
-    return {
+    expiries = sorted({m.get("_handover_expires_at") for m in members
+                       if m.get("_handover_expires_at")})
+    result = {
         "species": species, "source": "real-team", "format": fmt,
         "ability": ability, "item": item, "nature": nature, "moves": list(moves),
         "sps": sps,                               # real co-occurring LEGAL spread, or None
@@ -402,6 +437,15 @@ def _build_modal_set(species: str, fmt: str, members: list[dict[str, Any]]) -> d
         "note": (f"real-team modal joint set: {cnt}/{sample} teams ({species}, {fmt}); "
                  f"ability/item/nature/moves co-occur (no marginal stitch). {spread_note}"),
     }
+    if expiries:
+        evidence_rules = sorted({m.get("_evidence_rule") for m in members if m.get("_evidence_rule")})
+        target_rules = sorted({m.get("_target_rule") for m in members if m.get("_target_rule")})
+        result.update({
+            "evidence_rules": evidence_rules,
+            "target_rule": target_rules[0] if len(target_rules) == 1 else None,
+            "handover_expires_at": expiries[0] if len(expiries) == 1 else None,
+        })
+    return result
 
 
 def representative_set_from_teams(species: str, fmt: str, teams: list[dict[str, Any]], *,

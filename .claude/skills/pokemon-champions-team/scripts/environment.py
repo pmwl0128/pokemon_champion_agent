@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import team_i18n as i18n
-from rules import get_ruleset, SEASON_RULE
+from rules import SEASON_RULE
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SKILLS_ROOT = SKILL_DIR.parent
@@ -29,20 +29,26 @@ _DEX_JSON = SKILLS_ROOT / "pokemon-champions-dex" / "data" / "champions_dex.json
 _META_CURRENT = SKILLS_ROOT / "pokemon-champions-meta" / "data" / "current.json"
 
 _FALLBACK_SEASON_RULE = SEASON_RULE       # single source (rules.py); do not re-declare a local copy
-_FALLBACK_CURRENT_SEASON = "M-4"
-_FALLBACK_CURRENT_RULE = get_ruleset().rule
-
-
 def _meta_current() -> tuple[str, str]:
-    """Current season/rule from the sibling meta manifest, with a stable fallback for tests/offline."""
+    """Current season/rule from the sibling manifest; missing authority is a hard error."""
     try:
         cur = json.loads(_META_CURRENT.read_text(encoding="utf-8"))
         current = cur.get("current") or {}
-        season = current.get("season") or _FALLBACK_CURRENT_SEASON
-        rule = current.get("rule") or _FALLBACK_SEASON_RULE.get(season) or _FALLBACK_CURRENT_RULE
-        return season, rule
-    except Exception:
-        return _FALLBACK_CURRENT_SEASON, _FALLBACK_CURRENT_RULE
+        season = current.get("season")
+        rule = current.get("rule")
+        if not season or not rule:
+            raise RuntimeError("current season/rule is incomplete")
+        recorded = (cur.get("seasons") or {}).get(season, {}).get("rule")
+        pinned = _FALLBACK_SEASON_RULE.get(season)
+        if pinned is None:
+            raise RuntimeError(f"current season {season!r} is absent from the reviewed season map")
+        if recorded and recorded != rule:
+            raise RuntimeError(f"current rule {rule!r} conflicts with season record {recorded!r}")
+        if pinned != rule:
+            raise RuntimeError(f"current rule {rule!r} conflicts with pinned season map {pinned!r}")
+        return str(season), str(rule)
+    except Exception as exc:
+        raise RuntimeError(f"cannot resolve current environment from {_META_CURRENT}: {exc}") from exc
 
 
 CURRENT_SEASON, CURRENT_RULE = _meta_current()
@@ -90,9 +96,8 @@ def resolve(season: str | None = None, rule: str | None = None, *,
 
     `data_season`/`data_rule`/`data_seasons` are for results whose DATA is served from a real-team
     partition or rule pool rather than the current-only bases. A `repset --season M-2` query genuinely
-    reads M-2 teams; a default current M-B build query reads the M-B rule pool (M-3 + M-4 when both
-    exist). Record that data provenance explicitly instead of pretending it is the top-level current
-    season.
+    reads M-2 teams; a default build query reads every eligible partition for the current rule. Record
+    that data provenance explicitly instead of pretending it is the top-level current season.
     """
     warnings: list[str] = []
     if season and season != CURRENT_SEASON:

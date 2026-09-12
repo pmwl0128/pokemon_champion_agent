@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-5 / M-B · updated <b>2026-09-07</b>
+  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-09-11</b>
 </p>
 
 <p align="center">
@@ -107,7 +107,7 @@ An offline-first metagame snapshot for what players are actually using. Rankings
 Example requests:
 
 ```text
-What are the top 20 Pokémon in the current M-B Doubles snapshot?
+What are the top 20 Pokémon in the current Doubles snapshot?
 How do Mega Metagross movesets differ between Singles and Doubles?
 Which Pokémon rose or fell this update, and which item distributions changed?
 Which partners commonly appear around Tailwind setters in Doubles?
@@ -220,7 +220,7 @@ The library is not a leaderboard:
 ### Example Requests
 
 ```text
-Start the team-building flow for an M-B Doubles team and ask me what you need to know.
+Start the team-building flow for a current-rule Doubles team and ask me what you need to know.
 
 Build one final Singles team around Mega Staraptor, and explain the important trade-offs.
 

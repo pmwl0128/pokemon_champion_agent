@@ -16,15 +16,18 @@ DATA_DIR = SKILL_DIR / "data"
 CACHE_DIR = DATA_DIR
 CURRENT_PATH = DATA_DIR / "current.json"
 
-DEFAULT_SEASON = "M-4"
-DEFAULT_RULE = "M-B"
 SEASON_RULE = {
     "M-1": "M-A",
     "M-2": "M-A",
     "M-3": "M-B",
     "M-4": "M-B",
     "M-5": "M-B",
+    "M-6": "M-C",
 }
+
+
+class EnvironmentResolutionError(ValueError):
+    """The requested season/rule tuple is unknown or contradicts the registered environment."""
 
 PANEL_MAP = {
     "moves": "moves",
@@ -105,27 +108,28 @@ def norm_panel(panel: str) -> str:
     return PANEL_MAP.get(panel, PANEL_MAP.get(maybe_repair_cn(panel), panel.lower()))
 
 
-def default_current_state() -> dict[str, Any]:
-    return {
-        "current": {"season": DEFAULT_SEASON, "rule": DEFAULT_RULE},
-        "seasons": {
-            DEFAULT_SEASON: {
-                "rule": DEFAULT_RULE,
-                "label": "Pokémon Champions M-4 / Regulation M-B",
-            }
-        },
-    }
-
-
 def current_state() -> dict[str, Any]:
-    state = load_json(CURRENT_PATH, default_current_state())
-    state.setdefault("current", {"season": DEFAULT_SEASON, "rule": DEFAULT_RULE})
-    state.setdefault("seasons", {})
+    state = load_json(CURRENT_PATH, {})
+    if not isinstance(state, dict) or not isinstance(state.get("current"), dict):
+        raise RuntimeError(f"current environment authority is missing or invalid: {CURRENT_PATH}")
+    seasons = state.setdefault("seasons", {})
+    if not isinstance(seasons, dict):
+        raise RuntimeError(f"current environment season registry is invalid: {CURRENT_PATH}")
     for sid, srule in SEASON_RULE.items():
-        state["seasons"].setdefault(sid, {"rule": srule})
+        entry = seasons.setdefault(sid, {"rule": srule})
+        if not isinstance(entry, dict) or entry.get("rule") not in (None, srule):
+            raise RuntimeError(
+                f"season {sid!r} conflicts with registered rule {srule!r}: {CURRENT_PATH}")
+        entry.setdefault("rule", srule)
     cur = state["current"]
-    season = cur.get("season") or DEFAULT_SEASON
-    rule = cur.get("rule") or DEFAULT_RULE
+    season = cur.get("season")
+    rule = cur.get("rule")
+    if not season or not rule:
+        raise RuntimeError(f"current season/rule is incomplete: {CURRENT_PATH}")
+    mapped = SEASON_RULE.get(season)
+    if mapped is None or mapped != rule:
+        raise RuntimeError(
+            f"current environment {season}/{rule} is not an exact SEASON_RULE registration")
     state["current"] = {"season": season, "rule": rule}
     state["seasons"].setdefault(season, {"rule": rule})
     return state
@@ -136,14 +140,27 @@ def resolve_season_rule(season: str | None = None, rule: str | None = None) -> t
     current = state.get("current", {})
     seasons = state.get("seasons", {})
     if season:
-        resolved_rule = rule or seasons.get(season, {}).get("rule") or SEASON_RULE.get(season) or current.get("rule") or DEFAULT_RULE
+        mapped = SEASON_RULE.get(season)
+        if mapped is None:
+            raise EnvironmentResolutionError(f"season {season!r} is not registered in SEASON_RULE")
+        recorded = seasons.get(season, {}).get("rule")
+        if recorded and recorded != mapped:
+            raise EnvironmentResolutionError(
+                f"season {season!r} record conflicts with SEASON_RULE: {recorded!r} != {mapped!r}")
+        if rule and rule != mapped:
+            raise EnvironmentResolutionError(f"season {season!r} belongs to {mapped!r}, not {rule!r}")
+        resolved_rule = mapped
         return season, resolved_rule
     if rule:
-        current_season = current.get("season") or DEFAULT_SEASON
+        if rule not in set(SEASON_RULE.values()):
+            raise EnvironmentResolutionError(f"rule {rule!r} is not registered in SEASON_RULE")
+        current_season = current.get("season")
         if seasons.get(current_season, {}).get("rule") == rule or current.get("rule") == rule:
             return current_season, rule
-        matches = [sid for sid, meta in seasons.items() if meta.get("rule") == rule]
+        # Only the code-reviewed registry may choose a season. Extra manifest rows are historical
+        # metadata, not permission to route a query or updater into an unregistered partition.
+        matches = [sid for sid, mapped in SEASON_RULE.items() if mapped == rule]
         if matches:
             return matches[-1], rule
-        return current_season, rule
-    return current.get("season") or DEFAULT_SEASON, current.get("rule") or DEFAULT_RULE
+        raise EnvironmentResolutionError(f"no registered season is mapped to rule {rule!r}")
+    return str(current["season"]), str(current["rule"])

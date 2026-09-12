@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import checks
+import handover
 import repset
 import team_i18n as i18n
 
@@ -53,6 +54,10 @@ CONFIDENCE_REASON = "vs-observed-build"
 # reader must actually prepare for is the first entry.
 _GRADE_ORDER = {"C0": 0, "C1": 1, "C2": 2}
 CACHE_SCHEMA_VERSION = 2
+
+# The module that turns a check/matchup/tune question into a calc request. Hashed into the cache's
+# calculation authority, relative to the skills root so producer and verifier name it identically.
+CALLER_REL = "pokemon-champions-team/scripts/ncplink.py"
 
 
 class StaleCacheError(RuntimeError):
@@ -84,7 +89,7 @@ def team_seasons_for_rule(fmt: str, rule: str) -> list[str]:
         try:
             index = json.loads(index_path.read_text(encoding="utf-8"))
             if isinstance(index, dict):
-                return sorted({
+                seasons = {
                     str(entry.get("season"))
                     for entry in index.values()
                     if isinstance(entry, dict)
@@ -92,7 +97,10 @@ def team_seasons_for_rule(fmt: str, rule: str) -> list[str]:
                     and entry.get("rule") == rule
                     and int(entry.get("count") or 0) > 0
                     and entry.get("season")
-                })
+                }
+                seasons.update(p for p in handover.source_partitions(repset.data_dir(), fmt, rule)
+                               if not p.endswith("-events"))
+                return sorted(seasons)
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             pass
     return repset.seasons_in(repset.load_teams_for_rule(fmt, rule))
@@ -105,7 +113,7 @@ def team_partitions_for_rule(fmt: str, rule: str) -> list[str]:
         try:
             index = json.loads(index_path.read_text(encoding="utf-8"))
             if isinstance(index, dict):
-                return sorted({
+                partitions = {
                     str(entry.get("partition") or entry.get("season"))
                     for entry in index.values()
                     if isinstance(entry, dict)
@@ -113,7 +121,9 @@ def team_partitions_for_rule(fmt: str, rule: str) -> list[str]:
                     and entry.get("rule") == rule
                     and int(entry.get("count") or 0) > 0
                     and (entry.get("partition") or entry.get("season"))
-                })
+                }
+                partitions.update(handover.source_partitions(repset.data_dir(), fmt, rule))
+                return sorted(partitions)
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             pass
     partitions = set()
@@ -121,7 +131,25 @@ def team_partitions_for_rule(fmt: str, rule: str) -> list[str]:
         rows = repset._read_jsonl(path)
         if any(team.get("rule") == rule for team in rows):
             partitions.add(path.stem.rsplit("_", 1)[0])
+    partitions.update(handover.source_partitions(repset.data_dir(), fmt, rule))
     return sorted(partitions)
+
+
+def calculation_authority() -> dict:
+    """Bind derived team calculations to the current dex, installed JS engine, and call convention.
+
+    The engine hashes alone are not enough: what a cached cell MEANS also depends on how this skill
+    ASKS for it. Turning the calc's switch-in Attack drops off keeps every frame history-free and
+    moves every physical number without touching one engine byte, so the calc boundary module is
+    hashed alongside the engine. Any edit there invalidates the cache, which is the safe direction:
+    that file is small, rarely touched, and is the only place the request convention lives.
+    """
+    root = SCRIPTS.parent.parent
+    ncp = root / "ncp-damage-calculator/scripts"
+    return {"dex": handover.binary_sha256(handover.dex_path(repset.data_dir())),
+            "ncp": {p.relative_to(root).as_posix(): handover.file_sha256(p)
+                    for p in sorted(ncp.rglob("*.js"))},
+            "caller": {CALLER_REL: handover.file_sha256(root / CALLER_REL)}}
 
 
 def source_fingerprints(fmt: str, rule: str, season: str,
@@ -140,6 +168,8 @@ def source_fingerprints(fmt: str, rule: str, season: str,
                   meta_data / f"details_{season}_{fmt}.json"]
     contributing = sorted(set(data_partitions or team_partitions_for_rule(fmt, rule)))
     team_paths = [repset.data_dir() / f"{partition}_{fmt}.jsonl" for partition in contributing]
+    if handover.load_active_receipt(repset.data_dir(), rule):
+        team_paths.append(handover.receipt_path(repset.data_dir()))
     return {"meta": _fingerprint(meta_paths), "team_library": _fingerprint(team_paths)}
 
 
@@ -154,7 +184,7 @@ def cache_path(fmt: str, rule: str) -> Path:
     return cache_dir() / f"{rule}_{fmt}.json"
 
 
-def load_cache(fmt: str, rule: str) -> dict[str, Any] | None:
+def load_cache(fmt: str, rule: str, *, native: bool = False) -> dict[str, Any] | None:
     """The cached matrix for a (rule, format), or None when it has not been built/shipped.
 
     Keyed by RULE, not season: neither half of the content is per-season. The opponent universe is
@@ -162,11 +192,23 @@ def load_cache(fmt: str, rule: str) -> dict[str, Any] | None:
     rule pool (`cached_teams_for_rule`). Season-keyed files implied a per-season matrix that was
     never built — the retention policy already expires these by rule, and rebuilding a non-current
     season only re-stamped the current ranking under an older name."""
+    if native and not handover._NATIVE_ONLY.get():
+        with handover.native_only():
+            return load_cache(fmt, rule, native=True)
     p = cache_path(fmt, rule)
+    if native:
+        p = p.with_name(f"{rule}_{fmt}.native.json")
     if not p.exists():
         return None
     cache = json.loads(p.read_text(encoding="utf-8"))
     built_for = cache.get("built_for") or {}
+    if built_for.get("calculation_authority") is not None and built_for["calculation_authority"] != calculation_authority():
+        raise StaleCacheError("opponent cache uses an older dex/calculator; rebuild it")
+    if native and built_for.get("handover_receipt"):
+        raise StaleCacheError("native team cache cannot contain handover evidence")
+    if not native and built_for.get("handover_receipt") and not handover.load_active_receipt(
+            repset.data_dir(), rule):
+        return load_cache(fmt, rule, native=True)
     expected = built_for.get("source_fingerprints")
     season = built_for.get("season")
     if isinstance(expected, dict) and isinstance(season, str):
@@ -182,6 +224,8 @@ def load_cache(fmt: str, rule: str) -> dict[str, Any] | None:
         if expected != actual:
             raise StaleCacheError(
                 f"opponent cache {rule}/{fmt} is stale for the local meta/team snapshots; rebuild it")
+    if cache.get("unavailable"):
+        return None
     if built_for.get("cache_schema_version") not in (None, CACHE_SCHEMA_VERSION):
         raise StaleCacheError(
             f"opponent cache {rule}/{fmt} uses unsupported schema "

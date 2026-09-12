@@ -107,6 +107,7 @@ data/teams/
   index.json
   <season>_<format>.jsonl
   <rule>-events_<format>.jsonl
+  handover.json                         # optional, temporary cross-rule validation receipt
 ```
 
 - A season JSONL represents one `(season, format)` partition. A non-empty event JSONL represents the
@@ -116,6 +117,11 @@ data/teams/
   labeled and are not treated as current.
 - Exact-season reads use only `<season>_<format>.jsonl`; rule-pool reads also include the matching
   `<rule>-events_<format>.jsonl`. Empty event scopes do not create files or index entries.
+- `handover.json` never changes those rows or their labels. While its target is current and its
+  maximum seven-day window is open, the runtime revalidates its target, ruleset, source partitions,
+  target dex bytes, validator code, and immutable local activation timestamp. It deep-copies only
+  receipt-approved rows with in-memory `evidence_rule`, `target_rule`, `handover_reason`, and
+  `expires_at` annotations. Any mismatch fails closed.
 
 ## 4. Representative Sets
 
@@ -136,6 +142,11 @@ whole base species), `species_sample_total` (the whole-species count, == `specie
 item filter narrows the pool), `item_filter` (the item the pool was filtered to, or `null`),
 `confidence` (sample-size ∧ modal-share folded). When `item_filter` is set, read `coverage`/
 `species_sample` against the filtered pool, never as whole-species coverage.
+
+Throughout an active team handover, validated prior-rule and native members contribute together.
+Such a set carries `evidence_rules`, `target_rule`, and `handover_expires_at`. Native sample counts
+do not shorten the 168-hour window; at expiry only target-rule team evidence remains.
+Dex, meta and calculator data always belong to the current rule.
 
 > **CLI canonicalization:** `team.py repset <species>` resolves the raw species via
 > dex first (Chinese/Japanese aliases → canonical English) so the library's English keys match. Mega
@@ -192,6 +203,7 @@ The **live cache shape** — the matrix is keyed by `variant_id`:
                 "data_partitions": ["M-3", "M-4", "M-B-events"],
                 "built_at": "...", "top_k": 60, "variant_count": 201,
                 "cache_schema_version": 2,
+                "handover_receipt": false,
                 "source_fingerprints": {"meta": "sha256...", "team_library": "sha256..."}},
   "species": [{"rank": 7, "species": "Staraptor",
                "variant_id": "variant:Staraptor|item=Staraptite|ability=Intimidate",
@@ -251,7 +263,14 @@ The **live cache shape** — the matrix is keyed by `variant_id`:
   one — so it appears as a **defender only** (`real_team_backed:false`, `moves:null`).
   It therefore appears only as a defender.
 - Source fingerprints cover the season-scoped meta ranking/details and every same-rule team-library
-  partition, including the rule event partition. A mismatch refuses the cache and requires rebuild;
+  partition, including the rule event partition. An active handover adds its approved source
+  partitions and receipt to that fingerprint and sets `built_for.handover_receipt:true` and
+  `built_for.team_evidence_expires_at`. At expiry readers select the companion
+  `<rule>_<format>.native.json`; `unavailable:true` means native samples cannot supply a matrix.
+  `built_for.calculation_authority` binds current dex bytes, all installed calculator JS files,
+  and the hash of the module this skill asks the calculator through: the same engine answers a
+  different question once that request convention changes.
+  A source or calculation mismatch refuses the cache and requires rebuild;
   a refreshed local data snapshot is
   never silently paired with older calculations.
 - `offense` reuses the live `matchup` damage fact (full roll band + possible/guaranteed KO buckets;
@@ -423,6 +442,7 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
   "kind": "frame", "format": "double", "anchor": ["Maushold"], "order": "common_first",
   "pool_size": 223, "partitioned": true, "frames_total": 11, "frames_shown": 11,
   "thin": false, "meta_fallback": false,
+  "handover": null,
   "skeletons": [{
     "frame_id": "fa1a799e1ab",                 // MECHANICAL hash, never a team-name/type label
     "structural_profile": {"speed_control_modes": {...}, "structural_signals": {...},
@@ -460,6 +480,9 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 - Build-flow contexts/slates should carry `frame_required:true`. With that flag, `slate-evaluate`
   refuses a missing `--frame-output`, and `answer-audit` reports a violation if the saved slate output
   has no `frame_fingerprint` in its receipt chain.
+- During the entire active week, `handover` reports evidence rules, contributing row count and expiry
+  for validated prior-rule structural rows, regardless of the native team count. At expiry structure
+  becomes target-rule-only and `handover` is `null`.
 
 **The two fields the AI PRODUCES for the binding:**
 - `slate.frame_bindings[i]` (aligned with `teams[i]`): `{frame_id, off_meta?:[species], deviations?:

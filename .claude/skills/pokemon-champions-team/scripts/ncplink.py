@@ -86,6 +86,14 @@ def _run(payload: Any, command: str = "one") -> Any:
     return result
 
 
+# The calc resolves the switch-in Attack drops (Intimidate, Supersweet Syrup) by default, which is
+# what a one-off damage question wants. This skill does not: a check cell, a matchup cell and a tune
+# benchmark are all HISTORY-FREE single frames, and Intimidate relief is surfaced separately as a
+# labelled soft lane (checks `_intimidate_switch_in`, tune's Intimidate lane, design §17). Leaving the
+# calc default on would fold that lane into the base number and then apply it a second time on top.
+SWITCH_IN_DROPS = False
+
+
 def damage_vs(attacker: dict[str, Any], defender: dict[str, Any], move: str,
               field: dict[str, Any] | None = None) -> tuple[list[int], int]:
     """Return (sorted damage rolls, defender max HP) for `attacker` hitting `defender` with `move`.
@@ -93,7 +101,8 @@ def damage_vs(attacker: dict[str, Any], defender: dict[str, Any], move: str,
     `attacker`/`defender` are ncp pokemon dicts: name, ability, item, nature, sps, [moves].
     Survival = a roll strictly below max HP (see cliffs.survival_prob).
     """
-    payload = {"attacker": attacker, "defender": defender, "move": move, "field": field or {}}
+    payload = {"attacker": attacker, "defender": defender, "move": move, "field": field or {},
+               "switch_in_drops": SWITCH_IN_DROPS}
     out = _run(payload)
     return list(out.get("damage", [])), int(out.get("defenderHP") or 0)
 
@@ -110,7 +119,8 @@ def damage_batch(requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     if not requests:
         return []
-    payload = [{"attacker": r["attacker"], "defender": r["defender"],
-                "move": r["move"], "field": r.get("field") or {}} for r in requests]
+    payload = [{"attacker": r["attacker"], "defender": r["defender"], "move": r["move"],
+                "field": r.get("field") or {}, "switch_in_drops": SWITCH_IN_DROPS}
+               for r in requests]
     out = _run(payload, command="batch")
     return list(out) if isinstance(out, list) else []

@@ -8,6 +8,7 @@ import type {
 } from "@pokemon-champions/protocol";
 import { HttpError, type DexIndexEntry } from "./runtime/adapter.ts";
 import { useRuntime } from "./runtime/context.tsx";
+import { watchTeamExpiry } from "./runtime/teamEvidence.ts";
 
 export type Async<T> =
   | { status: "loading" }
@@ -61,6 +62,7 @@ interface QueryEntry<T> {
  * entries use a bounded LRU: detail/card browsing is keyed per Pokemon and must not retain the whole
  * dex forever on low-memory clients. */
 class QueryCache {
+  delete(key: string): void { this.entries.delete(key); }
   private entries = new Map<string, QueryEntry<unknown>>();
   private readonly maxReady = 128;
 
@@ -115,8 +117,20 @@ const queries = new QueryCache();
 function useQuery<T>(key: string, fn: () => Promise<T>, deps: unknown[]): Async<T> {
   const { capabilities } = useRuntime();
   const cacheKey = `${capabilities.deploymentId}:${key}`;
-  const request = useAsync(() => queries.get(cacheKey, fn), [cacheKey, ...deps]);
-  return queries.peek<T>(cacheKey) ?? request;
+  const [revision, setRevision] = useState(0);
+  const request = useAsync(() => queries.get(cacheKey, fn), [cacheKey, revision, ...deps]);
+  const result = queries.peek<T>(cacheKey) ?? request;
+  const expiryText = result.status === "ready"
+    ? (result.data as { teamEvidenceExpiresAt?: string } | null)?.teamEvidenceExpiresAt : undefined;
+  const expiry = expiryText ? Date.parse(expiryText) : undefined;
+  useEffect(() => {
+    if (expiry === undefined) return;
+    return watchTeamExpiry(expiry, () => {
+      queries.delete(cacheKey);
+      setRevision(n => n + 1);
+    });
+  }, [cacheKey, expiry]);
+  return expiry !== undefined && Date.now() >= expiry ? LOADING : result;
 }
 
 export function useRanking(format: FormatId): Async<RankingDto> {

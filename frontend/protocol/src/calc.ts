@@ -54,6 +54,11 @@ export const DamageRequestDtoSchema = z.object({
   defender: CombatantDtoSchema,
   move: z.string().min(1),
   field: FieldDtoSchema.optional(),
+  /** Resolve the switch-in Attack drops the two sides put on each other (Intimidate, Supersweet
+   * Syrup). The calc defaults this on, which is what a one-off damage question wants. A tuning
+   * frame carries no battle history and reports Intimidate as its own lane, so it sends false —
+   * the `tune` operator does the same server-side, and the two must not disagree. */
+  switch_in_drops: z.boolean().optional(),
 });
 export type DamageRequestDto = z.infer<typeof DamageRequestDtoSchema>;
 

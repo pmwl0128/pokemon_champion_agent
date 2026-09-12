@@ -637,6 +637,9 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       })(),
       move,
       field,
+      // A tuning frame carries no battle history: the switch-in Attack drops stay off so these
+      // numbers and the ones the precise `tune` operator returns describe the same frame.
+      switch_in_drops: false,
     }));
     const token = ++runToken.current;
     adapter.damageBatch(items_).then((res) => {
@@ -677,7 +680,7 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       for (let sp = 0; sp <= 32; sp++) {
         const dv: SideState = { ...defender, sps: { ...defender.sps, [stat]: sp } };
         items_.push({ attacker: cleanSide(a.side, aEntry.name),
-          defender: cleanSide(dv, dEntry.name), move, field });
+          defender: cleanSide(dv, dEntry.name), move, field, switch_in_drops: false });
         map.push({ key: `${i}:${move}`, stat, sp });
       }
     });

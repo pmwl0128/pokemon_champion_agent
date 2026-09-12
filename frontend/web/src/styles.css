@@ -784,6 +784,10 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 
 /* ---- dex detail: full-width stack, compact matchup strip, multi-column learnset ---- */
 .detail-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+/* base / Mega / Mega-Z of one species: the sibling forms of whichever one you opened */
+.form-switcher { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.form-switcher .lbl { font-size: 11px; color: var(--sub); text-transform: uppercase;
+  letter-spacing: 0.04em; }
 .matchup-strip .matchup-groups { display: flex; flex-wrap: wrap; gap: 14px 22px; padding: 10px 16px 14px; }
 /* two columns: left defensive profile, right STAB coverage */
 .matchup-two { display: grid; grid-template-columns: 1fr 1fr; }

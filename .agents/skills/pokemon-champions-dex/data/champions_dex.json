@@ -1,28 +1,13 @@
 {
-  "built_at": "2026-07-19T15:42:01+00:00",
+  "built_at": "2026-09-11T09:34:59+00:00",
   "counts": {
-    "abilities": 201,
-    "items": 148,
-    "learnset_rows": 19617,
-    "moves": 496,
-    "pokemon": 315
+    "abilities": 216,
+    "items": 166,
+    "learnset_rows": 21659,
+    "moves": 512,
+    "pokemon": 348
   },
   "moves": [
-    {
-      "accuracy": "",
-      "canonical": "(No Move)",
-      "category": "Status",
-      "display_name": "无招式",
-      "display_name_ja": null,
-      "power": "",
-      "pp": "",
-      "priority": 0,
-      "raw": {
-        "category": "Status",
-        "type": "Typeless"
-      },
-      "type": "Typeless"
-    },
     {
       "accuracy": 100,
       "canonical": "Accelerock",
@@ -1473,6 +1458,21 @@
     },
     {
       "accuracy": 100,
+      "canonical": "Court Change",
+      "category": "Status",
+      "display_name": "换场",
+      "display_name_ja": "コートチェンジ",
+      "power": "",
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "category": "Status",
+        "type": "Normal"
+      },
+      "type": "Normal"
+    },
+    {
+      "accuracy": 100,
       "canonical": "Covet",
       "category": "Physical",
       "display_name": "渴望",
@@ -1816,6 +1816,24 @@
       "type": "Normal"
     },
     {
+      "accuracy": 100,
+      "canonical": "Double Shock",
+      "category": "Physical",
+      "display_name": "电光双击",
+      "display_name_ja": "でんこうそうげき",
+      "power": 120,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 120,
+        "category": "Physical",
+        "isPunch": true,
+        "makesContact": true,
+        "type": "Electric"
+      },
+      "type": "Electric"
+    },
+    {
       "accuracy": "",
       "canonical": "Double Team",
       "category": "Status",
@@ -2074,6 +2092,23 @@
       "type": "Ground"
     },
     {
+      "accuracy": 100,
+      "canonical": "Drum Beating",
+      "category": "Physical",
+      "display_name": "鼓击",
+      "display_name_ja": "ドラムアタック",
+      "power": 80,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 80,
+        "category": "Physical",
+        "hasSecondaryEffect": true,
+        "type": "Grass"
+      },
+      "type": "Grass"
+    },
+    {
       "accuracy": 90,
       "canonical": "Dual Wingbeat",
       "category": "Physical",
@@ -2173,6 +2208,7 @@
         "bp": 80,
         "category": "Special",
         "hasSecondaryEffect": true,
+        "isSound": true,
         "type": "Psychic"
       },
       "type": "Psychic"
@@ -2237,7 +2273,7 @@
       "raw": {
         "bp": 130,
         "category": "Special",
-        "hasSecondaryEffect": true,
+        "hasSecondaryEffect": false,
         "type": "Electric"
       },
       "type": "Electric"
@@ -3029,7 +3065,7 @@
       "raw": {
         "bp": 70,
         "category": "Special",
-        "hasSecondaryEffect": true,
+        "hasSecondaryEffect": false,
         "type": "Ice"
       },
       "type": "Ice"
@@ -3151,6 +3187,23 @@
         "type": "Steel"
       },
       "type": "Steel"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Glaive Rush",
+      "category": "Physical",
+      "display_name": "巨剑突击",
+      "display_name_ja": "きょけんとつげき",
+      "power": 120,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 120,
+        "category": "Physical",
+        "makesContact": true,
+        "type": "Dragon"
+      },
+      "type": "Dragon"
     },
     {
       "accuracy": 100,
@@ -4082,6 +4135,24 @@
     },
     {
       "accuracy": 100,
+      "canonical": "Jaw Lock",
+      "category": "Physical",
+      "display_name": "紧咬不放",
+      "display_name_ja": "くらいつく",
+      "power": 80,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 80,
+        "category": "Physical",
+        "isBite": true,
+        "makesContact": true,
+        "type": "Dark"
+      },
+      "type": "Dark"
+    },
+    {
+      "accuracy": 100,
       "canonical": "Jet Punch",
       "category": "Physical",
       "display_name": "喷射拳",
@@ -4675,6 +4746,22 @@
       "type": "Steel"
     },
     {
+      "accuracy": 100,
+      "canonical": "Meteor Assault",
+      "category": "Physical",
+      "display_name": "流星突击",
+      "display_name_ja": "スターアサルト",
+      "power": 170,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 170,
+        "category": "Physical",
+        "type": "Fighting"
+      },
+      "type": "Fighting"
+    },
+    {
       "accuracy": 90,
       "canonical": "Meteor Beam",
       "category": "Special",
@@ -4708,6 +4795,21 @@
         "type": "Steel"
       },
       "type": "Steel"
+    },
+    {
+      "accuracy": "",
+      "canonical": "Milk Drink",
+      "category": "Status",
+      "display_name": "喝牛奶",
+      "display_name_ja": "ミルクのみ",
+      "power": "",
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "category": "Status",
+        "type": "Normal"
+      },
+      "type": "Normal"
     },
     {
       "accuracy": "",
@@ -5041,6 +5143,21 @@
     },
     {
       "accuracy": 100,
+      "canonical": "Octolock",
+      "category": "Status",
+      "display_name": "蛸固",
+      "display_name_ja": "たこがため",
+      "power": "",
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "category": "Status",
+        "type": "Fighting"
+      },
+      "type": "Fighting"
+    },
+    {
+      "accuracy": 100,
       "canonical": "Outrage",
       "category": "Physical",
       "display_name": "逆鳞",
@@ -5055,6 +5172,24 @@
         "type": "Dragon"
       },
       "type": "Dragon"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Overdrive",
+      "category": "Special",
+      "display_name": "破音",
+      "display_name_ja": "オーバードライブ",
+      "power": 80,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 80,
+        "category": "Special",
+        "isSound": true,
+        "isSpread": true,
+        "type": "Electric"
+      },
+      "type": "Electric"
     },
     {
       "accuracy": 90,
@@ -5399,6 +5534,23 @@
     },
     {
       "accuracy": 100,
+      "canonical": "Pound",
+      "category": "Physical",
+      "display_name": "拍击",
+      "display_name_ja": "はたく",
+      "power": 40,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 40,
+        "category": "Physical",
+        "makesContact": true,
+        "type": "Normal"
+      },
+      "type": "Normal"
+    },
+    {
+      "accuracy": 100,
       "canonical": "Power Gem",
       "category": "Special",
       "display_name": "力量宝石",
@@ -5643,6 +5795,24 @@
         "type": "Psychic"
       },
       "type": "Psychic"
+    },
+    {
+      "accuracy": 90,
+      "canonical": "Pyro Ball",
+      "category": "Physical",
+      "display_name": "火焰球",
+      "display_name_ja": "かえんボール",
+      "power": 120,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 120,
+        "category": "Physical",
+        "hasSecondaryEffect": true,
+        "isBullet": true,
+        "type": "Fire"
+      },
+      "type": "Fire"
     },
     {
       "accuracy": 100,
@@ -5919,6 +6089,21 @@
         "zp": 160
       },
       "type": "Fighting"
+    },
+    {
+      "accuracy": "",
+      "canonical": "Revival Blessing",
+      "category": "Status",
+      "display_name": "复生祈祷",
+      "display_name_ja": "さいきのいのり",
+      "power": "",
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "category": "Status",
+        "type": "Normal"
+      },
+      "type": "Normal"
     },
     {
       "accuracy": 100,
@@ -6464,6 +6649,21 @@
       "type": "Steel"
     },
     {
+      "accuracy": "",
+      "canonical": "Shift Gear",
+      "category": "Status",
+      "display_name": "换档",
+      "display_name_ja": "ギアチェンジ",
+      "power": "",
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "category": "Status",
+        "type": "Steel"
+      },
+      "type": "Steel"
+    },
+    {
       "accuracy": 100,
       "canonical": "Simple Beam",
       "category": "Status",
@@ -6554,6 +6754,24 @@
       "priority": 0,
       "raw": {
         "category": "Status",
+        "type": "Normal"
+      },
+      "type": "Normal"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Slash",
+      "category": "Physical",
+      "display_name": "劈开",
+      "display_name_ja": "きりさく",
+      "power": 80,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 80,
+        "category": "Physical",
+        "isSlice": true,
+        "makesContact": true,
         "type": "Normal"
       },
       "type": "Normal"
@@ -6692,6 +6910,22 @@
         "type": "Dark"
       },
       "type": "Dark"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Snipe Shot",
+      "category": "Special",
+      "display_name": "狙击",
+      "display_name_ja": "ねらいうち",
+      "power": 85,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 85,
+        "category": "Special",
+        "type": "Water"
+      },
+      "type": "Water"
     },
     {
       "accuracy": 100,
@@ -6889,6 +7123,23 @@
         "type": "Ghost"
       },
       "type": "Ghost"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Spit Up",
+      "category": "Special",
+      "display_name": "喷出",
+      "display_name_ja": "はきだす",
+      "power": 1,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 1,
+        "category": "Special",
+        "stockpileBP": true,
+        "type": "Normal"
+      },
+      "type": "Normal"
     },
     {
       "accuracy": 100,
@@ -8487,6 +8738,24 @@
         "type": "Psychic"
       },
       "type": "Psychic"
+    },
+    {
+      "accuracy": 100,
+      "canonical": "Zing Zap",
+      "category": "Physical",
+      "display_name": "麻麻刺刺",
+      "display_name_ja": "びりびりちくちく",
+      "power": 80,
+      "pp": "",
+      "priority": 0,
+      "raw": {
+        "bp": 80,
+        "category": "Physical",
+        "hasSecondaryEffect": true,
+        "makesContact": true,
+        "type": "Electric"
+      },
+      "type": "Electric"
     }
   ],
   "pokemon": [
@@ -8881,6 +9150,32 @@
     },
     {
       "abilities": [
+        "Seed Sower",
+        "Harvest"
+      ],
+      "base_species": "Arboliva",
+      "canonical": "Arboliva",
+      "display_name": "奥利瓦",
+      "display_name_ja": "オリーヴァ",
+      "is_mega": 0,
+      "national_dex_no": 930,
+      "required_item": null,
+      "stats": {
+        "at": 69,
+        "df": 90,
+        "hp": 78,
+        "sa": 125,
+        "sd": 109,
+        "sp": 39
+      },
+      "types": [
+        "Grass",
+        "Normal"
+      ],
+      "weight": 48.2
+    },
+    {
+      "abilities": [
         "Intimidate",
         "Flash Fire",
         "Justified"
@@ -8961,9 +9256,9 @@
     },
     {
       "abilities": [
+        "Swarm",
         "Insomnia",
-        "Sniper",
-        "Swarm"
+        "Sniper"
       ],
       "base_species": "Ariados",
       "canonical": "Ariados",
@@ -9014,8 +9309,8 @@
     },
     {
       "abilities": [
-        "Aroma Veil",
-        "Healer"
+        "Healer",
+        "Aroma Veil"
       ],
       "base_species": "Aromatisse",
       "canonical": "Aromatisse",
@@ -9065,8 +9360,8 @@
     },
     {
       "abilities": [
-        "Snow Warning",
-        "Refrigerate"
+        "Refrigerate",
+        "Snow Warning"
       ],
       "base_species": "Aurorus",
       "canonical": "Aurorus",
@@ -9301,6 +9596,32 @@
         "Steel"
       ],
       "weight": 149.5
+    },
+    {
+      "abilities": [
+        "Thermal Exchange",
+        "Ice Body"
+      ],
+      "base_species": "Baxcalibur",
+      "canonical": "Baxcalibur",
+      "display_name": "戟脊龙",
+      "display_name_ja": "セグレイブ",
+      "is_mega": 0,
+      "national_dex_no": 998,
+      "required_item": null,
+      "stats": {
+        "at": 145,
+        "df": 92,
+        "hp": 115,
+        "sa": 75,
+        "sd": 86,
+        "sp": 87
+      },
+      "types": [
+        "Dragon",
+        "Ice"
+      ],
+      "weight": 210
     },
     {
       "abilities": [
@@ -9610,6 +9931,31 @@
         "Psychic"
       ],
       "weight": 1
+    },
+    {
+      "abilities": [
+        "Blaze",
+        "Libero"
+      ],
+      "base_species": "Cinderace",
+      "canonical": "Cinderace",
+      "display_name": "闪焰王牌",
+      "display_name_ja": "エースバーン",
+      "is_mega": 0,
+      "national_dex_no": 815,
+      "required_item": null,
+      "stats": {
+        "at": 116,
+        "df": 75,
+        "hp": 80,
+        "sa": 65,
+        "sd": 75,
+        "sp": 119
+      },
+      "types": [
+        "Fire"
+      ],
+      "weight": 33
     },
     {
       "abilities": [
@@ -10236,6 +10582,33 @@
     },
     {
       "abilities": [
+        "Keen Eye",
+        "Inner Focus",
+        "Defiant"
+      ],
+      "base_species": "Farfetch'd",
+      "canonical": "Farfetch'd",
+      "display_name": "大葱鸭",
+      "display_name_ja": "カモネギ",
+      "is_mega": 0,
+      "national_dex_no": 83,
+      "required_item": null,
+      "stats": {
+        "at": 90,
+        "df": 55,
+        "hp": 52,
+        "sa": 58,
+        "sd": 62,
+        "sp": 60
+      },
+      "types": [
+        "Normal",
+        "Flying"
+      ],
+      "weight": 15
+    },
+    {
+      "abilities": [
         "Cud Chew",
         "Armor Tail",
         "Sap Sipper"
@@ -10752,6 +11125,56 @@
     },
     {
       "abilities": [
+        "Sap Sipper",
+        "Grass Pelt"
+      ],
+      "base_species": "Gogoat",
+      "canonical": "Gogoat",
+      "display_name": "坐骑山羊",
+      "display_name_ja": "ゴーゴート",
+      "is_mega": 0,
+      "national_dex_no": 673,
+      "required_item": null,
+      "stats": {
+        "at": 100,
+        "df": 62,
+        "hp": 123,
+        "sa": 97,
+        "sd": 81,
+        "sp": 68
+      },
+      "types": [
+        "Grass"
+      ],
+      "weight": 91
+    },
+    {
+      "abilities": [
+        "Emergency Exit"
+      ],
+      "base_species": "Golisopod",
+      "canonical": "Golisopod",
+      "display_name": "具甲武者",
+      "display_name_ja": "グソクムシャ",
+      "is_mega": 0,
+      "national_dex_no": 768,
+      "required_item": null,
+      "stats": {
+        "at": 125,
+        "df": 140,
+        "hp": 75,
+        "sa": 60,
+        "sd": 90,
+        "sp": 40
+      },
+      "types": [
+        "Bug",
+        "Water"
+      ],
+      "weight": 108
+    },
+    {
+      "abilities": [
         "Iron Fist",
         "Klutz",
         "No Guard"
@@ -10940,6 +11363,31 @@
     },
     {
       "abilities": [
+        "Limber",
+        "Technician"
+      ],
+      "base_species": "Grapploct",
+      "canonical": "Grapploct",
+      "display_name": "八爪武师",
+      "display_name_ja": "オトスパス",
+      "is_mega": 0,
+      "national_dex_no": 853,
+      "required_item": null,
+      "stats": {
+        "at": 118,
+        "df": 90,
+        "hp": 80,
+        "sa": 70,
+        "sd": 80,
+        "sp": 42
+      },
+      "types": [
+        "Fighting"
+      ],
+      "weight": 39
+    },
+    {
+      "abilities": [
         "Torrent",
         "Protean"
       ],
@@ -11100,9 +11548,9 @@
     },
     {
       "abilities": [
+        "Swarm",
         "Guts",
-        "Moxie",
-        "Swarm"
+        "Moxie"
       ],
       "base_species": "Heracross",
       "canonical": "Heracross",
@@ -11282,6 +11730,60 @@
     },
     {
       "abilities": [
+        "Inner Focus",
+        "Synchronize",
+        "Psychic Surge"
+      ],
+      "base_species": "Indeedee",
+      "canonical": "Indeedee",
+      "display_name": "爱管侍",
+      "display_name_ja": "イエッサン",
+      "is_mega": 0,
+      "national_dex_no": 876,
+      "required_item": null,
+      "stats": {
+        "at": 65,
+        "df": 55,
+        "hp": 60,
+        "sa": 105,
+        "sd": 95,
+        "sp": 95
+      },
+      "types": [
+        "Psychic",
+        "Normal"
+      ],
+      "weight": 28
+    },
+    {
+      "abilities": [
+        "Own Tempo",
+        "Synchronize",
+        "Psychic Surge"
+      ],
+      "base_species": "Indeedee",
+      "canonical": "Indeedee-F",
+      "display_name": "爱管侍（雌性的样子）",
+      "display_name_ja": "イエッサン（メスのすがた）",
+      "is_mega": 0,
+      "national_dex_no": 876,
+      "required_item": null,
+      "stats": {
+        "at": 55,
+        "df": 65,
+        "hp": 70,
+        "sa": 95,
+        "sd": 105,
+        "sp": 85
+      },
+      "types": [
+        "Psychic",
+        "Normal"
+      ],
+      "weight": 28
+    },
+    {
+      "abilities": [
         "Blaze",
         "Iron Fist"
       ],
@@ -11305,6 +11807,31 @@
         "Fighting"
       ],
       "weight": 55
+    },
+    {
+      "abilities": [
+        "Torrent",
+        "Sniper"
+      ],
+      "base_species": "Inteleon",
+      "canonical": "Inteleon",
+      "display_name": "千面避役",
+      "display_name_ja": "インテレオン",
+      "is_mega": 0,
+      "national_dex_no": 818,
+      "required_item": null,
+      "stats": {
+        "at": 85,
+        "df": 65,
+        "hp": 70,
+        "sa": 125,
+        "sd": 65,
+        "sp": 120
+      },
+      "types": [
+        "Water"
+      ],
+      "weight": 45.2
     },
     {
       "abilities": [
@@ -11386,9 +11913,9 @@
     },
     {
       "abilities": [
+        "Swarm",
         "Sheer Force",
-        "Sharpness",
-        "Swarm"
+        "Sharpness"
       ],
       "base_species": "Kleavor",
       "canonical": "Kleavor",
@@ -11699,6 +12226,32 @@
     },
     {
       "abilities": [
+        "Intimidate",
+        "Guard Dog",
+        "Stakeout"
+      ],
+      "base_species": "Mabosstiff",
+      "canonical": "Mabosstiff",
+      "display_name": "獒教父",
+      "display_name_ja": "マフィティフ",
+      "is_mega": 0,
+      "national_dex_no": 943,
+      "required_item": null,
+      "stats": {
+        "at": 120,
+        "df": 90,
+        "hp": 80,
+        "sa": 60,
+        "sd": 70,
+        "sp": 85
+      },
+      "types": [
+        "Dark"
+      ],
+      "weight": 61
+    },
+    {
+      "abilities": [
         "Guts",
         "No Guard",
         "Steadfast"
@@ -11959,6 +12512,31 @@
     },
     {
       "abilities": [
+        "Sharpness"
+      ],
+      "base_species": "Absol",
+      "canonical": "Mega Absol Z",
+      "display_name": "超级阿勃梭鲁Ｚ",
+      "display_name_ja": "メガアブソルＺ",
+      "is_mega": 1,
+      "national_dex_no": 359,
+      "required_item": "Absolite Z",
+      "stats": {
+        "at": 154,
+        "df": 60,
+        "hp": 65,
+        "sa": 75,
+        "sd": 60,
+        "sp": 151
+      },
+      "types": [
+        "Dark",
+        "Ghost"
+      ],
+      "weight": 49
+    },
+    {
+      "abilities": [
         "Tough Claws"
       ],
       "base_species": "Aerodactyl",
@@ -12156,6 +12734,31 @@
     },
     {
       "abilities": [
+        "Thermal Exchange"
+      ],
+      "base_species": "Baxcalibur",
+      "canonical": "Mega Baxcalibur",
+      "display_name": "超级戟脊龙",
+      "display_name_ja": "メガセグレイブ",
+      "is_mega": 1,
+      "national_dex_no": 998,
+      "required_item": "Baxcalibrite",
+      "stats": {
+        "at": 175,
+        "df": 117,
+        "hp": 115,
+        "sa": 105,
+        "sd": 101,
+        "sp": 87
+      },
+      "types": [
+        "Dragon",
+        "Ice"
+      ],
+      "weight": 315
+    },
+    {
+      "abilities": [
         "Adaptability"
       ],
       "base_species": "Beedrill",
@@ -12273,8 +12876,8 @@
         "sp": 90
       },
       "types": [
-        "Fire",
-        "Ghost"
+        "Ghost",
+        "Fire"
       ],
       "weight": 69.6
     },
@@ -12752,6 +13355,30 @@
     },
     {
       "abilities": [
+        "Levitate"
+      ],
+      "base_species": "Garchomp",
+      "canonical": "Mega Garchomp Z",
+      "display_name": "超级烈咬陆鲨Ｚ",
+      "display_name_ja": "メガガブリアスＺ",
+      "is_mega": 1,
+      "national_dex_no": 445,
+      "required_item": "Garchompite Z",
+      "stats": {
+        "at": 130,
+        "df": 85,
+        "hp": 108,
+        "sa": 141,
+        "sd": 85,
+        "sp": 151
+      },
+      "types": [
+        "Dragon"
+      ],
+      "weight": 99
+    },
+    {
+      "abilities": [
         "Pixilate"
       ],
       "base_species": "Gardevoir",
@@ -12848,6 +13475,31 @@
         "Poison"
       ],
       "weight": 77
+    },
+    {
+      "abilities": [
+        "Tough Claws"
+      ],
+      "base_species": "Golisopod",
+      "canonical": "Mega Golisopod",
+      "display_name": "超级具甲武者",
+      "display_name_ja": "メガグソクムシャ",
+      "is_mega": 1,
+      "national_dex_no": 768,
+      "required_item": "Golisopite",
+      "stats": {
+        "at": 150,
+        "df": 175,
+        "hp": 75,
+        "sa": 70,
+        "sd": 120,
+        "sp": 40
+      },
+      "types": [
+        "Bug",
+        "Steel"
+      ],
+      "weight": 148
     },
     {
       "abilities": [
@@ -13072,6 +13724,31 @@
         "Steel"
       ],
       "weight": 57.5
+    },
+    {
+      "abilities": [
+        "Aura Guard"
+      ],
+      "base_species": "Lucario",
+      "canonical": "Mega Lucario Z",
+      "display_name": "超级路卡利欧Ｚ",
+      "display_name_ja": "メガルカリオＺ",
+      "is_mega": 1,
+      "national_dex_no": 448,
+      "required_item": "Lucarionite Z",
+      "stats": {
+        "at": 100,
+        "df": 70,
+        "hp": 70,
+        "sa": 164,
+        "sd": 70,
+        "sp": 151
+      },
+      "types": [
+        "Fighting",
+        "Steel"
+      ],
+      "weight": 49.4
     },
     {
       "abilities": [
@@ -13393,6 +14070,31 @@
         "Ghost"
       ],
       "weight": 161
+    },
+    {
+      "abilities": [
+        "Aerilate"
+      ],
+      "base_species": "Salamence",
+      "canonical": "Mega Salamence",
+      "display_name": "超级暴飞龙",
+      "display_name_ja": "メガボーマンダ",
+      "is_mega": 1,
+      "national_dex_no": 373,
+      "required_item": "Salamencite",
+      "stats": {
+        "at": 145,
+        "df": 130,
+        "hp": 95,
+        "sa": 120,
+        "sd": 90,
+        "sp": 120
+      },
+      "types": [
+        "Dragon",
+        "Flying"
+      ],
+      "weight": 112.6
     },
     {
       "abilities": [
@@ -14001,6 +14703,33 @@
     },
     {
       "abilities": [
+        "Soundproof",
+        "Filter",
+        "Technician"
+      ],
+      "base_species": "Mr. Mime",
+      "canonical": "Mr. Mime",
+      "display_name": "魔墙人偶",
+      "display_name_ja": "バリヤード",
+      "is_mega": 0,
+      "national_dex_no": 122,
+      "required_item": null,
+      "stats": {
+        "at": 45,
+        "df": 65,
+        "hp": 40,
+        "sa": 100,
+        "sd": 120,
+        "sp": 90
+      },
+      "types": [
+        "Psychic",
+        "Fairy"
+      ],
+      "weight": 54.5
+    },
+    {
+      "abilities": [
         "Tangled Feet",
         "Screen Cleaner",
         "Ice Body"
@@ -14337,6 +15066,33 @@
     },
     {
       "abilities": [
+        "Volt Absorb",
+        "Natural Cure",
+        "Iron Fist"
+      ],
+      "base_species": "Pawmot",
+      "canonical": "Pawmot",
+      "display_name": "巴布土拨",
+      "display_name_ja": "パーモット",
+      "is_mega": 0,
+      "national_dex_no": 923,
+      "required_item": null,
+      "stats": {
+        "at": 115,
+        "df": 70,
+        "hp": 70,
+        "sa": 70,
+        "sd": 60,
+        "sp": 105
+      },
+      "types": [
+        "Electric",
+        "Fighting"
+      ],
+      "weight": 41
+    },
+    {
+      "abilities": [
         "Keen Eye",
         "Drizzle",
         "Rain Dish"
@@ -14361,6 +15117,84 @@
         "Flying"
       ],
       "weight": 28
+    },
+    {
+      "abilities": [
+        "Battle Armor",
+        "Tough Claws",
+        "Steely Spirit"
+      ],
+      "base_species": "Perrserker",
+      "canonical": "Perrserker",
+      "display_name": "喵头目",
+      "display_name_ja": "ニャイキング",
+      "is_mega": 0,
+      "national_dex_no": 863,
+      "required_item": null,
+      "stats": {
+        "at": 110,
+        "df": 100,
+        "hp": 70,
+        "sa": 50,
+        "sd": 60,
+        "sp": 50
+      },
+      "types": [
+        "Steel"
+      ],
+      "weight": 28
+    },
+    {
+      "abilities": [
+        "Limber",
+        "Technician",
+        "Unnerve"
+      ],
+      "base_species": "Persian",
+      "canonical": "Persian",
+      "display_name": "猫老大",
+      "display_name_ja": "ペルシアン",
+      "is_mega": 0,
+      "national_dex_no": 53,
+      "required_item": null,
+      "stats": {
+        "at": 70,
+        "df": 60,
+        "hp": 65,
+        "sa": 65,
+        "sd": 65,
+        "sp": 115
+      },
+      "types": [
+        "Normal"
+      ],
+      "weight": 32
+    },
+    {
+      "abilities": [
+        "Fur Coat",
+        "Technician",
+        "Rattled"
+      ],
+      "base_species": "Persian",
+      "canonical": "Persian-Alola",
+      "display_name": "猫老大（阿罗拉的样子）",
+      "display_name_ja": "ペルシアン（アローラのすがた）",
+      "is_mega": 0,
+      "national_dex_no": 53,
+      "required_item": null,
+      "stats": {
+        "at": 60,
+        "df": 60,
+        "hp": 65,
+        "sa": 75,
+        "sd": 65,
+        "sp": 115
+      },
+      "types": [
+        "Dark"
+      ],
+      "weight": 33
     },
     {
       "abilities": [
@@ -14413,6 +15247,31 @@
         "Electric"
       ],
       "weight": 6
+    },
+    {
+      "abilities": [
+        "Lightning Rod",
+        "Electric Surge"
+      ],
+      "base_species": "Pincurchin",
+      "canonical": "Pincurchin",
+      "display_name": "啪嚓海胆",
+      "display_name_ja": "バチンウニ",
+      "is_mega": 0,
+      "national_dex_no": 871,
+      "required_item": null,
+      "stats": {
+        "at": 101,
+        "df": 95,
+        "hp": 48,
+        "sa": 91,
+        "sd": 85,
+        "sp": 15
+      },
+      "types": [
+        "Electric"
+      ],
+      "weight": 1
     },
     {
       "abilities": [
@@ -14519,9 +15378,9 @@
     },
     {
       "abilities": [
-        "Moxie",
         "Rivalry",
-        "Unnerve"
+        "Unnerve",
+        "Moxie"
       ],
       "base_species": "Pyroar",
       "canonical": "Pyroar",
@@ -14724,6 +15583,31 @@
         "Rock"
       ],
       "weight": 282.8
+    },
+    {
+      "abilities": [
+        "Overgrow",
+        "Grassy Surge"
+      ],
+      "base_species": "Rillaboom",
+      "canonical": "Rillaboom",
+      "display_name": "轰擂金刚猩",
+      "display_name_ja": "ゴリランダー",
+      "is_mega": 0,
+      "national_dex_no": 812,
+      "required_item": null,
+      "stats": {
+        "at": 125,
+        "df": 90,
+        "hp": 100,
+        "sa": 60,
+        "sd": 70,
+        "sp": 85
+      },
+      "types": [
+        "Grass"
+      ],
+      "weight": 90
     },
     {
       "abilities": [
@@ -14956,6 +15840,32 @@
     },
     {
       "abilities": [
+        "Intimidate",
+        "Moxie"
+      ],
+      "base_species": "Salamence",
+      "canonical": "Salamence",
+      "display_name": "暴飞龙",
+      "display_name_ja": "ボーマンダ",
+      "is_mega": 0,
+      "national_dex_no": 373,
+      "required_item": null,
+      "stats": {
+        "at": 135,
+        "df": 80,
+        "hp": 95,
+        "sa": 110,
+        "sd": 80,
+        "sp": 100
+      },
+      "types": [
+        "Dragon",
+        "Flying"
+      ],
+      "weight": 102.6
+    },
+    {
+      "abilities": [
         "Corrosion",
         "Oblivious"
       ],
@@ -15084,9 +15994,9 @@
     },
     {
       "abilities": [
+        "Swarm",
         "Technician",
-        "Light Metal",
-        "Swarm"
+        "Light Metal"
       ],
       "base_species": "Scizor",
       "canonical": "Scizor",
@@ -15112,8 +16022,8 @@
     {
       "abilities": [
         "Poison Point",
-        "Speed Boost",
-        "Swarm"
+        "Swarm",
+        "Speed Boost"
       ],
       "base_species": "Scolipede",
       "canonical": "Scolipede",
@@ -15341,6 +16251,31 @@
         "Ghost"
       ],
       "weight": 2.2
+    },
+    {
+      "abilities": [
+        "Steadfast",
+        "Scrappy"
+      ],
+      "base_species": "Sirfetch'd",
+      "canonical": "Sirfetch'd",
+      "display_name": "葱游兵",
+      "display_name_ja": "ネギガナイト",
+      "is_mega": 0,
+      "national_dex_no": 865,
+      "required_item": null,
+      "stats": {
+        "at": 135,
+        "df": 95,
+        "hp": 62,
+        "sa": 68,
+        "sd": 82,
+        "sp": 65
+      },
+      "types": [
+        "Fighting"
+      ],
+      "weight": 117
     },
     {
       "abilities": [
@@ -15610,6 +16545,60 @@
     {
       "abilities": [
         "Intimidate",
+        "Hustle",
+        "Guts"
+      ],
+      "base_species": "Squawkabilly",
+      "canonical": "Squawkabilly",
+      "display_name": "怒鹦哥",
+      "display_name_ja": "イキリンコ",
+      "is_mega": 0,
+      "national_dex_no": 931,
+      "required_item": null,
+      "stats": {
+        "at": 96,
+        "df": 51,
+        "hp": 82,
+        "sa": 45,
+        "sd": 51,
+        "sp": 92
+      },
+      "types": [
+        "Normal",
+        "Flying"
+      ],
+      "weight": 2.4
+    },
+    {
+      "abilities": [
+        "Intimidate",
+        "Hustle",
+        "Sheer Force"
+      ],
+      "base_species": "Squawkabilly",
+      "canonical": "Squawkabilly-Yellow",
+      "display_name": "怒鹦哥（黄羽毛）",
+      "display_name_ja": "イキリンコ（イエローフェザー）",
+      "is_mega": 0,
+      "national_dex_no": 931,
+      "required_item": null,
+      "stats": {
+        "at": 96,
+        "df": 51,
+        "hp": 82,
+        "sa": 45,
+        "sd": 51,
+        "sp": 92
+      },
+      "types": [
+        "Normal",
+        "Flying"
+      ],
+      "weight": 2.4
+    },
+    {
+      "abilities": [
+        "Intimidate",
         "Reckless"
       ],
       "base_species": "Staraptor",
@@ -15741,6 +16730,32 @@
     },
     {
       "abilities": [
+        "Liquid Ooze",
+        "Sticky Hold",
+        "Gluttony"
+      ],
+      "base_species": "Swalot",
+      "canonical": "Swalot",
+      "display_name": "吞食兽",
+      "display_name_ja": "マルノーム",
+      "is_mega": 0,
+      "national_dex_no": 317,
+      "required_item": null,
+      "stats": {
+        "at": 73,
+        "df": 83,
+        "hp": 100,
+        "sa": 73,
+        "sd": 83,
+        "sp": 55
+      },
+      "types": [
+        "Poison"
+      ],
+      "weight": 80
+    },
+    {
+      "abilities": [
         "Torrent",
         "Damp"
       ],
@@ -15767,8 +16782,8 @@
     },
     {
       "abilities": [
-        "Pixilate",
-        "Cute Charm"
+        "Cute Charm",
+        "Pixilate"
       ],
       "base_species": "Sylveon",
       "canonical": "Sylveon",
@@ -15924,6 +16939,32 @@
     },
     {
       "abilities": [
+        "Run Away",
+        "Unburden",
+        "Stakeout"
+      ],
+      "base_species": "Thievul",
+      "canonical": "Thievul",
+      "display_name": "猾大狐",
+      "display_name_ja": "フォクスライ",
+      "is_mega": 0,
+      "national_dex_no": 828,
+      "required_item": null,
+      "stats": {
+        "at": 58,
+        "df": 58,
+        "hp": 70,
+        "sa": 87,
+        "sd": 92,
+        "sp": 90
+      },
+      "types": [
+        "Dark"
+      ],
+      "weight": 19.9
+    },
+    {
+      "abilities": [
         "Mold Breaker",
         "Own Tempo",
         "Pickpocket"
@@ -15951,9 +16992,9 @@
     },
     {
       "abilities": [
+        "White Smoke",
         "Drought",
-        "Shell Armor",
-        "White Smoke"
+        "Shell Armor"
       ],
       "base_species": "Torkoal",
       "canonical": "Torkoal",
@@ -16081,6 +17122,60 @@
         "Fighting"
       ],
       "weight": 44.4
+    },
+    {
+      "abilities": [
+        "Punk Rock",
+        "Plus",
+        "Technician"
+      ],
+      "base_species": "Toxtricity",
+      "canonical": "Toxtricity",
+      "display_name": "颤弦蝾螈",
+      "display_name_ja": "ストリンダー",
+      "is_mega": 0,
+      "national_dex_no": 849,
+      "required_item": null,
+      "stats": {
+        "at": 98,
+        "df": 70,
+        "hp": 75,
+        "sa": 114,
+        "sd": 70,
+        "sp": 75
+      },
+      "types": [
+        "Electric",
+        "Poison"
+      ],
+      "weight": 40
+    },
+    {
+      "abilities": [
+        "Punk Rock",
+        "Minus",
+        "Technician"
+      ],
+      "base_species": "Toxtricity",
+      "canonical": "Toxtricity-Low Key",
+      "display_name": "颤弦蝾螈（低调的样子）",
+      "display_name_ja": "ストリンダー（ローなすがた）",
+      "is_mega": 0,
+      "national_dex_no": 849,
+      "required_item": null,
+      "stats": {
+        "at": 98,
+        "df": 70,
+        "hp": 75,
+        "sa": 114,
+        "sd": 70,
+        "sp": 75
+      },
+      "types": [
+        "Electric",
+        "Poison"
+      ],
+      "weight": 40.0
     },
     {
       "abilities": [
@@ -16526,9 +17621,36 @@
     },
     {
       "abilities": [
-        "Sap Sipper",
-        "Intimidate",
+        "Cute Charm",
+        "Competitive",
         "Frisk"
+      ],
+      "base_species": "Wigglytuff",
+      "canonical": "Wigglytuff",
+      "display_name": "胖可丁",
+      "display_name_ja": "プクリン",
+      "is_mega": 0,
+      "national_dex_no": 40,
+      "required_item": null,
+      "stats": {
+        "at": 70,
+        "df": 45,
+        "hp": 140,
+        "sa": 85,
+        "sd": 50,
+        "sp": 45
+      },
+      "types": [
+        "Normal",
+        "Fairy"
+      ],
+      "weight": 12
+    },
+    {
+      "abilities": [
+        "Intimidate",
+        "Frisk",
+        "Sap Sipper"
       ],
       "base_species": "Wyrdeer",
       "canonical": "Wyrdeer",

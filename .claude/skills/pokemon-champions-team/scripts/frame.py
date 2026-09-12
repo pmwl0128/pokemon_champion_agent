@@ -278,7 +278,9 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
     anchor_labels = [_filter_label(f) for f in filter_members]
     anchor_species = {f["species"] for f in filter_members}
 
-    pool = [t for t in teams if all(_matches(t, f) for f in filter_members)] if filter_members else list(teams)
+    structural_teams = list(teams)
+    pool = ([t for t in structural_teams if all(_matches(t, f) for f in filter_members)]
+            if filter_members else structural_teams)
     pool_size = len(pool)
     profiles = [team_profile.profile(t, dex_fn=dex_fn, move_fn=move_fn, item_fn=item_fn) for t in pool]
     pool_mega_distribution = mega_slot_distribution(profiles)
@@ -341,6 +343,12 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         notes.append("META_FALLBACK: no real joint grammar for this anchor (empty pool or no core "
                      "candidate cleared repset) — this is the data-gated boundary (design §19.8), "
                      "stated honestly; assemble from meta + dex facts and disclose the low confidence.")
+    transitioned = sum(1 for t in pool if t.get("target_rule"))
+    if transitioned:
+        notes.append(
+            f"HANDOVER: {transitioned}/{pool_size} structural rows retain their evidence_rule and "
+            "were revalidated for the target rule; both evidence pools contribute until the "
+            "receipt expires, regardless of native sample count.")
     if residual:
         notes.append(f"{residual} pool team(s) fell in structural groups below MIN_SAMPLE (no frame "
                      "emitted for them) — not silently merged into a shown frame.")
@@ -357,6 +365,14 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         "skeletons": skeletons,
         "thin": thin,
         "meta_fallback": meta_fallback,
+        "handover": ({"rows": transitioned,
+                       "evidence_rules": sorted({t.get("evidence_rule") for t in pool
+                                                 if t.get("evidence_rule")}),
+                       "target_rules": sorted({t.get("target_rule") for t in pool
+                                               if t.get("target_rule")}),
+                       "expires_at": sorted({t.get("expires_at") for t in pool
+                                             if t.get("expires_at")})}
+                      if transitioned else None),
         "confidence": "low" if thin else "medium",
         "confidence_reason": "thin-observed-sample" if thin else "observed-sample",
         "notes": notes,

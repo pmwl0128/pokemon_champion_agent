@@ -179,9 +179,9 @@ def _library_scope(fmt: str, season: str | None = None, context=None) -> dict[st
     """Real-team data scope for library consumers.
 
     `--season` is exact: it reads that season's file because the user asked for a labeled partition.
-    Without an explicit season, current-rule data is consumed as a rule pool, so M-3 and M-4 M-B rows
-    contribute together while M-A rows stay out. A context that explicitly targets an old, non-current
-    rule keeps the old exact season behavior when it has a season label.
+    Without an explicit season, current-rule data is consumed as one rule pool: sibling seasons under
+    that rule contribute together while other rules stay out. A context that explicitly targets an
+    old, non-current rule keeps the old exact-season behavior when it has a season label.
     """
     if season:
         return {"kind": "season", "season": season, "rule": environment.rule_for_season(season)}
@@ -659,7 +659,8 @@ def cmd_diagnose(path: str, fmt: str, aspect: str, context_path: str | None = No
     if want_spd:
         out["speed"] = diagnose_speed(team, facts, move_facts)
     if want_roles:
-        out["roles"] = diagnose_roles(team, facts)
+        out["roles"] = diagnose_roles(
+            team, facts, rule=(context.rule if context and context.rule else None))
     stamp, env_warn = _stamp(None, team)
     out["environment"] = stamp
     if env_warn:
@@ -2292,9 +2293,8 @@ def cmd_search(query_arg, species, has_move, has_item, has_ability, fmt, season,
                out_fmt: str, where=None) -> int:
     """Search the real-team library by any combination of per-member conditions (facts only).
     `where` (a boolean AND/OR/NOT JSON query, or '-' for stdin) takes precedence over the slot/flag form."""
-    # Default to the CURRENT RULE pool, not one season: M-3 and M-4 are both M-B and can be consumed
-    # together, while `--season M-x` remains an exact partition query and `--season all` is the explicit
-    # all-regulations scan.
+    # Default to the CURRENT RULE pool across its season partitions. `--season M-x` remains an exact
+    # partition query and `--season all` is the explicit all-regulations scan.
     cross_season = (season == "all")
     resolved_season = None if cross_season else season
     resolved_rule = None if (cross_season or resolved_season) else environment.CURRENT_RULE
@@ -2434,8 +2434,8 @@ TEAM_SCHEMA = {
         "repset": "<species> --game-format single|double [--season] [--max-clusters N] -> up to N "
                   "real-team (item,ability) archetypes by prevalence, each with cluster/coverage/share/"
                   "sample/spread_origin/confidence; facts only, no strength score; [] when too thin. "
-                  "Default reads the current rule pool (M-B can include M-3+M-4); --season is an exact "
-                  "season partition query.",
+                  "Default reads the current rule pool across its eligible season partitions; "
+                  "--season is an exact season partition query.",
         "oppmatrix": "[species] --game-format single|double [--vs <defender>] [--season] [--as-checks] -> "
                      "precomputed observed-build matchup matrix over meta top-K (offense band/KO + speed "
                      "line per ordered pair); attacker rows only for real-team-backed species; EVERY cell "

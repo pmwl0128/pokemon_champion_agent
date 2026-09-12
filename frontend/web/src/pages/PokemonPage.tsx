@@ -1,13 +1,13 @@
 /** Dex-detail page: the pokemon's own facts — base/actual stats, type matchups, learnable moves.
  * The hero's rank chips LINK to the meta-detail page (usage panels live there). */
-import type { FormatId, LearnsetDto, TypeName } from "@pokemon-champions/protocol";
+import type { FormatId, LearnsetDto, PokemonCardDto, TypeName } from "@pokemon-champions/protocol";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { EntityHover } from "../components/EntityHover.tsx";
 import { MonHero } from "../components/MonHero.tsx";
 import { StatsPanel } from "../components/StatsPanel.tsx";
 import { CategoryBadge, TypeBadge } from "../components/TypeBadge.tsx";
-import { useAsync, usePokemonCard, useRanking } from "../hooks.ts";
+import { useAsync, useDexIndex, usePokemonCard, useRanking } from "../hooks.ts";
 import { displayName, useLang, useT, type MsgKey } from "../i18n.ts";
 import { defensiveProfile, offensiveProfile } from "../lib/typechart.ts";
 import { loadLearnset } from "../runtime/projection.ts";
@@ -109,6 +109,38 @@ function LearnsetPanel({ slug }: { slug: string }) {
   );
 }
 
+/** Every form of this species, base first. A species used to have at most one Mega, so landing on
+ * one form and never being offered the others was survivable; Regulation M-C added second Megas whose
+ * typing and stat shape differ outright (Mega Garchomp is physical Dragon/Ground, Mega Garchomp Z is a
+ * faster special pure Dragon), so the sibling forms have to be reachable from the form you opened. */
+function FormSwitcher({ current }: { current: PokemonCardDto }) {
+  const dex = useDexIndex();
+  const navigate = useNavigate();
+  const { lang } = useLang();
+  const t = useT();
+  const base = current.baseSpecies ?? current.name;
+  const forms = dex.status === "ready"
+    ? dex.data.filter((e) => e.name === base || e.baseSpecies === base)
+      .sort((a, b) => Number(a.isMega) - Number(b.isMega) || a.name.localeCompare(b.name))
+    : [];
+  if (forms.length < 2) return null;
+  return (
+    <div className="form-switcher">
+      <span className="lbl">{t("dex.forms")}</span>
+      <div className="seg">
+        {forms.map((f) => (
+          <button key={f.slug} type="button"
+            className={f.slug === current.slug ? "on" : undefined}
+            aria-current={f.slug === current.slug ? "page" : undefined}
+            onClick={() => navigate(`/pokemon/${f.slug}`)}>
+            {displayName(f, lang)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function PokemonPage() {
   const { slug = "" } = useParams();
   const navigate = useNavigate();
@@ -138,6 +170,7 @@ export function PokemonPage() {
             ? ranking.data.rows.find((row) => row.name === rankingName)?.slug : undefined;
           navigate(`/meta/${baseSlug ?? mon.slug}?format=${f}`);
         }} />
+      <FormSwitcher current={mon} />
       <div className="detail-stack">
         <StatsPanel stats={mon.stats} />
         <MatchupPanel types={mon.types} />

@@ -22,6 +22,7 @@ import {
   type QaRequestDto, type ResolveEntryDto, type SpeedBatchResultDto, type SpeedInputDto,
 } from "@pokemon-champions/protocol";
 import { engineDamage, engineDamageBatch, engineSpeedBatch } from "../lib/calc-engine/index.ts";
+import { loadTeamEvidence } from "./teamEvidence.ts";
 import {
   AsyncOnce, HttpError, fetchJson, versionParam,
   type BuilderApi, type DexIndexEntry, type RuntimeAdapter, type RuntimeConfig,
@@ -191,19 +192,27 @@ export class OnlineAdapter implements RuntimeAdapter {
    * no compute), exported to the projection like ranking/detail — a format with no built cache 404s to
    * the UI's "not built" notice, matching the bridge. */
   async oppCache(format: FormatId): Promise<OppCacheDto> {
-    return OppCacheDtoSchema.parse(await fetchJson(this.url(`/matchup/oppcache_${format}.json`)));
+    return OppCacheDtoSchema.parse(await this.teamSnapshot("oppcache", format));
+  }
+
+  private async teamSnapshot(view: string, format: FormatId): Promise<unknown> {
+    const value = await loadTeamEvidence(native => fetchJson(
+      this.url(`/matchup/${view}_${format}${native ? ".native" : ""}.json`)));
+    if ((value as { available?: boolean }).available === false)
+      throw new HttpError(404, "Native team evidence is not yet sufficient");
+    return value;
   }
 
   /** Lean KO overview: full damage/speed/set facts are fetched only after opening a cell. */
   async oppKo(format: FormatId): Promise<OppKoGridDto> {
     return OppKoGridDtoSchema.parse(
-      await fetchJson(this.url(`/matchup/oppko_${format}.json`)));
+      await this.teamSnapshot("oppko", format));
   }
 
   /** Derived C2/C1/C0 check grid over that same static cache. */
   async oppChecks(format: FormatId): Promise<OppCheckGridDto> {
     return OppCheckGridDtoSchema.parse(
-      await fetchJson(this.url(`/matchup/oppchecks_${format}.json`)));
+      await this.teamSnapshot("oppchecks", format));
   }
 
   async tune(team: unknown, benchmarks: unknown[]) {

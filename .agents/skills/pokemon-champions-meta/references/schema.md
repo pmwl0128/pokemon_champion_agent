@@ -61,7 +61,8 @@ per-pokemon update time; the file-level `updated_at` is the refresh stamp for ev
 
 ## Current State
 
-`current.json` stores the default context and season/rule mapping:
+`current.json` stores the default context and season/rule mapping. This is an illustrative historical
+shape; always read the bundled file for the active values:
 
 ```json
 {
@@ -70,10 +71,21 @@ per-pokemon update time; the file-level `updated_at` is the refresh stamp for ev
     "M-1": {"rule": "M-A", "label": "Pokémon Champions M-1 / Regulation M-A"},
     "M-2": {"rule": "M-A", "label": "Pokémon Champions M-2 / Regulation M-A"},
     "M-3": {"rule": "M-B", "label": "Pokémon Champions M-3 / Regulation M-B"},
-    "M-4": {"rule": "M-B", "label": "Pokémon Champions M-4 / Regulation M-B"}
+    "M-4": {"rule": "M-B", "label": "Pokémon Champions M-4 / Regulation M-B",
+            "updated_at": "2026-08-05T00:00:00+00:00",
+            "activated_at": "2026-07-09T11:20:31+00:00"}
   }
 }
 ```
+
+A season entry's timestamps answer different questions and are not interchangeable. `updated_at` is
+the UPSTREAM data stamp — when the snapshot this file describes was aggregated — and moves with every
+refresh; `created_at` (when present) records when the entry was first written. `activated_at` is when
+this checkout first made the season current: written once, never rewritten by a later refresh of the
+same season. Only `activated_at` anchors the seven-day cross-regulation team handover window, so a
+stale or future upstream stamp can neither shorten nor extend it. Any of the three may be absent —
+entries that became current before a field existed simply do not carry it, which is why the bundled
+file's older seasons have no `activated_at`.
 
 Queries with no `--season` or `--rule` resolve through `current`. Same-rule historical seasons remain
 queryable while their files are retained. On a rule rollover, the update pipeline prunes stale-rule

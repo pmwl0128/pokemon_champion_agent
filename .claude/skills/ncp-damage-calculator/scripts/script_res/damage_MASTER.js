@@ -733,11 +733,13 @@ function checkMoveTypeChange(move, field, attacker) {
                         : "Normal";
     }
     else if (move.name == "Terrain Pulse") {
-        move.type = field.terrain === "Electric" ? "Electric"
-            : field.terrain === "Grassy" ? "Grass"
-                : field.terrain === "Misty" ? "Fairy"
-                    : field.terrain === "Psychic" ? "Psychic"
-                        : "Normal";
+        //The type only follows the terrain while the USER is grounded, matching the x2 BP gate in basePowerFunc
+        move.type = !pIsGrounded(attacker, field) ? "Normal"
+            : field.terrain === "Electric" ? "Electric"
+                : field.terrain === "Grassy" ? "Grass"
+                    : field.terrain === "Misty" ? "Fairy"
+                        : field.terrain === "Psychic" ? "Psychic"
+                            : "Normal";
     }
     else if (move.name == "Techno Blast") {
         move.type = attacker.item === "Burn Drive" ? "Fire"
@@ -830,7 +832,7 @@ function checkContactOverride(move, attacker) {
 }
 
 function setIsQuarteredByProtect(attacker, defender, field, move, description) {
-    let qualifiedQuartered = field.isProtect && (move.isZ || move.isSignatureZ || attacker.isDynamax || attacker.ability === 'Piercing Drill' || (attacker.ability === 'Unseen Fist' && gen >= 10));
+    let qualifiedQuartered = field.isProtect && (move.isZ || move.isSignatureZ || attacker.isDynamax || attacker.ability === 'Piercing Drill' || (attacker.ability === 'Unseen Fist' && gen >= 10 && move.makesContact));
     if (qualifiedQuartered && attacker.ability === 'Piercing Drill') description.attackerAbility = attacker.ability;
     return qualifiedQuartered;
 }
@@ -988,7 +990,8 @@ function checkMeFirst(move, moveDescName, defender, isDynamax) {
 
 function statusMoves(move, attacker, defender, description) {
     if (move.name === "Pain Split" && attacker.item !== "Assault Vest") {
-        return { "damage": [Math.floor((defender.curHP - attacker.curHP) / 2)], "description": buildDescription(description) };
+        var painSplitHP = Math.floor((attacker.curHP + defender.curHP) / 2);
+        return { "damage": [Math.max(0, defender.curHP - painSplitHP)], "description": buildDescription(description) };
     }
     else if (move.bp === 0 || move.category === "Status") {
         return { "damage": [0], "description": buildDescription(description) };
@@ -1170,6 +1173,12 @@ function immunityChecks(move, attacker, defender, field, description, defAbility
 //Special Cases
 function setDamage(move, attacker, defender, description, isQuarteredByProtect, field) {
     var isParentBond = attacker.ability === "Parental Bond";
+    if (move.name === "Spit Up" && !move.stockpiles) {
+        return { "damage": [0], "description": buildDescription(description) };
+    }
+    if (move.name === "Steel Roller" && !(field && field.terrain)) {
+        return { "damage": [0], "description": buildDescription(description) };
+    }
     //a. Counterattacks (Counter, Mirror Coat, Metal Burst, Comeuppance, Bide)
     if (['Counter', 'Mirror Coat', 'Metal Burst', 'Comeuppance'].indexOf(move.name) !== -1) {
         var counteredMove = defender.moves[move.usedOppMoveIndex];
@@ -1305,7 +1314,7 @@ function basePowerFunc(move, description, turnOrder, attacker, defender, field, 
         //a. Speed based
         //a.i. Gyro Ball
         case "Gyro Ball":
-            basePower = Math.min(150, Math.floor(25 * defender.stats[SP] / attacker.stats[SP]));
+            basePower = Math.min(150, Math.floor(25 * defender.stats[SP] / attacker.stats[SP]) + 1);
             description.moveBP = basePower;
             break;
         //a.ii. Electro Ball
@@ -1380,6 +1389,10 @@ function basePowerFunc(move, description, turnOrder, attacker, defender, field, 
         //e.i. Fury Cutter
         //e.ii. Rollout, Ice Ball
         //e.iii. Spit Up
+        case "Spit Up":
+            basePower = 100 * move.stockpiles;
+            description.moveBP = basePower;
+            break;
 
         //f. Boost based
         //f.i. Stored Power, Power Trip
@@ -1874,7 +1887,13 @@ function calcAttack(move, attacker, defender, description, isCritical, defAbilit
     }
     else if (isMidMoveAtkBoost) {
         description.attackBoost = attacker.boosts[attackStat];
-        attack = getModifiedStat(attackSource.rawStats[attackStat], attacker.boosts[attackStat]);
+        //explore a possible better implementation
+        if (attackSource.boosts[attackStat] === 0 || (isCritical && attackSource.boosts[attackStat] < 0)) {
+            attack = attackSource.rawStats[attackStat];
+        }
+        else {
+            attack = getModifiedStat(attackSource.rawStats[attackStat], attacker.boosts[attackStat]);
+        }
         attacker.boosts[attackStat] -= (1 * isContrary);
     }
     //c. Crit
@@ -1948,7 +1967,7 @@ function calcAtMods(move, attacker, defAbility, description, field) {
         || (attacker.ability === "Flash Fire" && attacker.abilityOn && move.type === "Fire")
         || (attacker.ability === "Steelworker" && move.type === "Steel")
         || (attacker.ability === "Gorilla Tactics" && move.category === "Physical" && !attacker.isDynamax)
-        || (["Plus", "Minus"].indexOf(attacker.ability) !== -1 && attacker.abilityOn)
+        || (["Plus", "Minus"].indexOf(attacker.ability) !== -1 && attacker.abilityOn && move.category === "Special")
         || (attacker.ability === "Sharpness" && move.isSlice)
         || (attacker.ability === "Rocky Payload" && move.type === "Rock")
         || (attacker.ability === "Fire Mane" && move.type === "Fire")) {
@@ -2361,8 +2380,8 @@ function calcFinalMods(move, attacker, defender, field, description, isCritical,
         finalMods.push(0x800);
         description.defenderAbility = defAbility;
     }
-    //h. Fluffy (contact)
-    if (defAbility === "Fluffy" && move.makesContact) {
+    //h. Fluffy (contact)/Aura Guard
+    if (["Fluffy", "Aura Guard"].includes(defAbility) && move.makesContact) {
         finalMods.push(0x800);
         description.defenderAbility = defAbility;
     }

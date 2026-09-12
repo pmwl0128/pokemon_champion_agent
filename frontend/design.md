@@ -108,7 +108,10 @@ projection、bridge、skills 与 SPA 共享 `deploymentId`；内容 URL 带发�
 
 - OnlineAdapter 的 damage/damageBatch/speedBatch 在客户端完成，组件不区分宿主；
 - opponent cache 是去来源的标准配置参考，不替代用户队 live matchup；meta-only 目标不伪造攻击档位；
-- `team.tune` 是受限确定性 API，浏览器反解不能标作精确 tune；
+- 跨规则交接只影响 team 派生的参考配置和网格。DTO 携带 `teamEvidenceExpiresAt`，并在同一 deployment
+  提供 native 视图；浏览器到期后原位切换，原生样本不足则显示无参考矩阵。dex、meta 和计算引擎始终
+  使用当前规则，不能随 team 证据延长；
+- `team.tune` 是受限确定性 API，浏览器反解不能标作精确 tune；两者必须描述同一帧，浏览器侧的调校请求与 `tune` 算子一样关闭出场降能力（`switch_in_drops:false`），否则同一组输入会给出两个答案；
 - SPA 与 projection 的 `calcEngineDigest` 不一致时拒绝计算。
 
 公式权威和 vendor 边界见 [`../dev/design.md`](../dev/design.md)；Web 只做宿主适配。
@@ -220,7 +223,7 @@ NCP 可由进程内 quickjs-ng、常驻 Node 或 Node one-shot 承载。无 Node
 
 位图 pack 使用内容寻址文件和 manifest；原创图标、placeholder 与品牌 SVG 随 UI bundle。运行时只通过 manifest resolver，以 dex canonical slug 为主键。
 
-resolver 返回 `exact`、`base_fallback` 或 `placeholder`。形态页不得把 base fallback 伪装成 exact；无法确认时用占位图。第三方图片记录 provider、URL/revision、获取时间和 rights note；运行时不热链。新增来源或 roster 变化后重建并校验，不得 fuzzy 猜图。
+resolver 返回 `exact`、`base_fallback` 或 `placeholder`。形态页不得把 base fallback 伪装成 exact；无法确认时用占位图。第三方图片记录 provider、URL/revision、获取时间和 rights note；运行时不热链。新增来源或 roster 变化后重建并校验，不得 fuzzy 猜图。发布用 pack 必须与当前 dex canonical Pokémon/item 集合精确相等，每个 payload 的 size/hash 复验通过；projection 构建同时要求当前 rule 的 single/double opponent cache 都存在、非空且源指纹有效。
 
 ## §13 开放问题与准入条件
 

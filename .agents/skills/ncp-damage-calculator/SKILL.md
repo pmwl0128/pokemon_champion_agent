@@ -110,5 +110,8 @@ needed. It is explanatory documentation, not a second contract.
   `hp/atk/def/spa/spd/spe`.
 - NCP contains entries beyond the Champions-legal roster. Use `$pokemon-champions-team` or the dex for
   legality.
+- On-field state is resolved before the damage frame: Intimidate, terrain seeds, Trace, Air Lock,
+  Infiltrator, weight and paradox abilities all apply on their own. Pass `switch_in_drops: false`
+  when the caller already encodes Intimidate in `boosts`. See `references/api.md`.
 - Damage results model the fields exposed by the API, not every possible residual or multi-turn effect.
 - Speed defaults are 31 Speed IV, 32 Speed SP, and a positive Speed nature unless explicitly replaced.

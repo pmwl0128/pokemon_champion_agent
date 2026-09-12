@@ -122,6 +122,7 @@ export const SpeciesRowDtoSchema = z.object({
 export type SpeciesRowDto = z.infer<typeof SpeciesRowDtoSchema>;
 
 export const OppCacheDtoSchema = z.object({
+  teamEvidenceExpiresAt: z.string().datetime({ offset: true }).optional(),
   season: z.string().min(1),
   rule: z.string().min(1),
   format: FormatIdSchema,
@@ -162,6 +163,7 @@ export type OppKoSummaryDto = z.infer<typeof OppKoSummaryDtoSchema>;
 /** Lean KO overview keyed exactly like `OppCacheDto.matrix`. A selected cell can therefore switch
  * to the full cache without coordinate translation or recalculation. */
 export const OppKoGridDtoSchema = z.object({
+  teamEvidenceExpiresAt: z.string().datetime({ offset: true }).optional(),
   format: FormatIdSchema,
   confidence: z.string(),
   confidenceReason: z.string(),
@@ -203,6 +205,7 @@ export type OppCheckGrade = z.infer<typeof OppCheckGradeSchema>;
 /** grid[attackerBuildKey][defenderBuildKey]. Consumers may render a species-sized representative
  * view first and switch either axis to another retained observed build without recalculation. */
 export const OppCheckGridDtoSchema = z.object({
+  teamEvidenceExpiresAt: z.string().datetime({ offset: true }).optional(),
   format: FormatIdSchema,
   confidence: z.string(),
   confidenceReason: z.string(),

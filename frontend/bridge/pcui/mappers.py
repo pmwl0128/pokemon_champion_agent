@@ -409,6 +409,14 @@ def derive_oppcheck_grid(cache: dict) -> dict:
     return _oppcache_mod().derive_check_grid(cache)
 
 
+def _team_evidence_window(cache: dict) -> dict:
+    built = cache.get("built_for") or {}
+    expiry = built.get("team_evidence_expires_at")
+    if built.get("handover_receipt") and not expiry:
+        raise ValueError("team handover cache is missing its evidence expiry")
+    return {"teamEvidenceExpiresAt": expiry} if expiry else {}
+
+
 def map_oppcheck_grid(cache: dict, derived: dict) -> dict:
     """Encode the grid's keys; everything else is already minimal.
 
@@ -424,6 +432,7 @@ def map_oppcheck_grid(cache: dict, derived: dict) -> dict:
                 **({"contested": True} if c.get("contested") else {}),
             } for dj, c in row.items()}
     return {
+        **_team_evidence_window(cache),
         "format": derived.get("format") or (cache.get("built_for") or {}).get("format") or "single",
         "confidence": derived.get("confidence") or "",
         "confidenceReason": derived.get("confidence_reason") or "",
@@ -480,6 +489,7 @@ def map_oppko_grid(cache: dict) -> dict:
             ])
         grid[opponent_key(ai)] = row
     return {
+        **_team_evidence_window(cache),
         "format": bf.get("format") or "single",
         "confidence": cache.get("confidence") or "",
         "confidenceReason": cache.get("confidence_reason") or "",
@@ -600,6 +610,7 @@ def map_oppcache(cache: dict) -> dict:
         if vs:
             vs.sort(key=lambda v: (not v.get("isModal"), -(v.get("coverage") or 0)))
     return {
+        **_team_evidence_window(cache),
         "season": bf.get("season") or "", "rule": bf.get("rule") or "",
         "format": bf.get("format") or "single",
         "builtAt": bf.get("built_at") or "", "topK": bf.get("top_k") or len(grouped),
@@ -722,6 +733,18 @@ def map_diagnose_report(team: dict, validate_raw: dict, diagnose_raw: dict) -> d
                  "bearers": [{"species": b.get("species") or "", "via": b.get("via")}
                              for b in (e.get("bearers") or []) if isinstance(b, dict)]}
                 for k, e in (roles.get("coverage") or {}).items() if isinstance(e, dict)]
+    # A regulation that is too young to re-measure carry rates borrows its predecessor's study for
+    # the handover window. The reason strings already name that rule; this says it is borrowed and
+    # when it lapses, so a consumer is not left reading a stale attention level as a current one.
+    calibration_raw = roles.get("attention_calibration")
+    calibration = None
+    if isinstance(calibration_raw, dict) and calibration_raw.get("status"):
+        calibration = {"rule": str(calibration_raw.get("rule") or ""),
+                       "status": str(calibration_raw["status"])}
+        if calibration_raw.get("measured_on"):
+            calibration["measuredOn"] = str(calibration_raw["measured_on"])
+        if calibration_raw.get("expires_at"):
+            calibration["expiresAt"] = str(calibration_raw["expires_at"])
     role_members = [{"species": m.get("species") or "",
                      "signals": [str(s) for s in (m.get("signals") or [])]}
                     for m in (roles.get("compression") or [])
@@ -817,6 +840,7 @@ def map_diagnose_report(team: dict, validate_raw: dict, diagnose_raw: dict) -> d
                   # when every member's moveset is authoritative — otherwise a move signal may
                   # simply be unknown, not absent (mirrors the skill's ⚠️ role banner).
                   "coverageConfirmed": bool(roles.get("coverage_confirmed", True)),
-                  "incompleteMembers": _incomplete_members(roles.get("incomplete_members"))},
+                  "incompleteMembers": _incomplete_members(roles.get("incomplete_members")),
+                  **({"attentionCalibration": calibration} if calibration else {})},
         **({"checks": checks} if checks else {}),
     }

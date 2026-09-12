@@ -2,7 +2,7 @@
   "schema_version": "1",
   "asset_pack_version": "0.1.0",
   "deployment_id": "pack-0.1.0",
-  "generated_at": "2026-07-28T08:30:29+00:00",
+  "generated_at": "2026-09-11T10:33:29+00:00",
   "assets": [
     {
       "key": "pokemon:abomasnow",
@@ -395,7 +395,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/979.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:48+00:00",
+        "retrieved_at": "2026-09-11T08:38:41+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -496,6 +496,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:arboliva",
+      "kind": "pokemon",
+      "national_dex": 930,
+      "form_key": "arboliva",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/arboliva.card.aebe8b2d.webp",
+          "sha256": "aebe8b2d21477c15c73c3787e58bf36e82b4343b4121c2215588791277ffa7b5",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 962
+        },
+        "dense": {
+          "path": "files/pokemon/arboliva.dense.9527473a.webp",
+          "sha256": "9527473afb443ff7459e00c07d319a0087dad54dd2cd6815c9201763c48a974c",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4568
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/930.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:39+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -923,7 +956,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/689.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:45+00:00",
+        "retrieved_at": "2026-09-11T08:38:33+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -1024,6 +1057,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:baxcalibur",
+      "kind": "pokemon",
+      "national_dex": 998,
+      "form_key": "baxcalibur",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/baxcalibur.card.252ff525.webp",
+          "sha256": "252ff525435806075343180ee251ec021495b638d34804889c2aa2b1aeec4c40",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 932
+        },
+        "dense": {
+          "path": "files/pokemon/baxcalibur.dense.eb3cc7f1.webp",
+          "sha256": "eb3cc7f1e6e8dc86be41f196abcd76684cb51788b5b22371118c75bb88a677f2",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4488
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/998.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:41+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -1187,7 +1253,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/257.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:39+00:00",
+        "retrieved_at": "2026-09-11T08:38:26+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -1420,6 +1486,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:cinderace",
+      "kind": "pokemon",
+      "national_dex": 815,
+      "form_key": "cinderace",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/cinderace.card.dc26e628.webp",
+          "sha256": "dc26e6286e499a771ea880d0649c9e9a722b0b7eb6dcfb071518ce0bc6c85493",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 828
+        },
+        "dense": {
+          "path": "files/pokemon/cinderace.dense.7d0568a7.webp",
+          "sha256": "7d0568a76ba9b741da3dde062492f7bac90c14719b0bec21977d223aea19ce94",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3406
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/815.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:34+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -1847,7 +1946,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/691.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:46+00:00",
+        "retrieved_at": "2026-09-11T08:38:33+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -1979,7 +2078,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/604.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:44+00:00",
+        "retrieved_at": "2026-09-11T08:38:31+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -2210,7 +2309,40 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/870.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:46+00:00",
+        "retrieved_at": "2026-09-11T08:38:38+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:farfetchd",
+      "kind": "pokemon",
+      "national_dex": 83,
+      "form_key": "farfetchd",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/farfetchd.card.4827ee3f.webp",
+          "sha256": "4827ee3f3679bdb18ec7cef587e634b0d9b69d888afcd051db2062dcef8f137f",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 666
+        },
+        "dense": {
+          "path": "files/pokemon/farfetchd.dense.cf8a5ed7.webp",
+          "sha256": "cf8a5ed70a587f351573205f303c16584f0928a02e2f84f26ad5599cba6dd0cf",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2624
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/83.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:24+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -2738,7 +2870,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/1000.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:48+00:00",
+        "retrieved_at": "2026-09-11T08:38:42+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -2872,6 +3004,72 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:gogoat",
+      "kind": "pokemon",
+      "national_dex": 673,
+      "form_key": "gogoat",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/gogoat.card.b53b5abe.webp",
+          "sha256": "b53b5abe79fd5e9bfb726867e756fd2f96e4c95ff04248fb6a01eb4262e7789d",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 834
+        },
+        "dense": {
+          "path": "files/pokemon/gogoat.dense.6ba80e5b.webp",
+          "sha256": "6ba80e5b602aff6ff14e8e0ba6fbf7b38b1488b079a447a131dc527caf5fe5c8",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3618
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/673.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:32+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:golisopod",
+      "kind": "pokemon",
+      "national_dex": 768,
+      "form_key": "golisopod",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/golisopod.card.c653d326.webp",
+          "sha256": "c653d32696deae953db1365758a3f0a4bf6727f793bb3cfe97cadb13e96ea0c1",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 1140
+        },
+        "dense": {
+          "path": "files/pokemon/golisopod.dense.990971a8.webp",
+          "sha256": "990971a8118529b57d8ef2d73b0f24216673bc16214f6e6984eb28fecccfb655",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 6290
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/768.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:34+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -3107,6 +3305,39 @@
       }
     },
     {
+      "key": "pokemon:grapploct",
+      "kind": "pokemon",
+      "national_dex": 853,
+      "form_key": "grapploct",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/grapploct.card.da75501c.webp",
+          "sha256": "da75501c2ae79c0fe09eb1df262c9ae2a94ab25a98e2bb1816efe76f934c7e64",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 720
+        },
+        "dense": {
+          "path": "files/pokemon/grapploct.dense.423e7abc.webp",
+          "sha256": "423e7abc20984a9f3c2f83645234534ec73497e343bdc4f5d5cf5d2b810b3637",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3766
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/853.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:36+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:greninja",
       "kind": "pokemon",
       "national_dex": 658,
@@ -3167,7 +3398,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/861.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:46+00:00",
+        "retrieved_at": "2026-09-11T08:38:36+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -3431,7 +3662,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/972.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:47+00:00",
+        "retrieved_at": "2026-09-11T08:38:41+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -3536,6 +3767,72 @@
       }
     },
     {
+      "key": "pokemon:indeedee",
+      "kind": "pokemon",
+      "national_dex": 876,
+      "form_key": "indeedee",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/indeedee.card.9a93518a.webp",
+          "sha256": "9a93518abdf564b6df3327bcfc42b627b685312f993851bdd974afafb19e951d",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 526
+        },
+        "dense": {
+          "path": "files/pokemon/indeedee.dense.86c41523.webp",
+          "sha256": "86c4152365bbd8c40b2647c27d0349f7c04972e7c14127eb1c3782a6aa17102a",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2026
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/876.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:38+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:indeedee-f",
+      "kind": "pokemon",
+      "national_dex": 876,
+      "form_key": "indeedee-f",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/indeedee-f.card.5d44106c.webp",
+          "sha256": "5d44106c1c6308672cb114090912fbb96009821cc8894ee2ba90cb3c7fbb75c7",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 542
+        },
+        "dense": {
+          "path": "files/pokemon/indeedee-f.dense.b22ac2fb.webp",
+          "sha256": "b22ac2fb5f7fa00bca8f4b81777b48232c919fe686cf342cb8c4194d1aa84226",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2056
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10186.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:53+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:infernape",
       "kind": "pokemon",
       "national_dex": 392,
@@ -3565,6 +3862,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:inteleon",
+      "kind": "pokemon",
+      "national_dex": 818,
+      "form_key": "inteleon",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/inteleon.card.3c556f46.webp",
+          "sha256": "3c556f463578473ac8624c82644cfee9116fc9a95e3a91b673139278188891fc",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 822
+        },
+        "dense": {
+          "path": "files/pokemon/inteleon.dense.346b13ae.webp",
+          "sha256": "346b13aea40d53580c51dffc89be0fc5eef9a54c818d74c9f1c1c9e1ccdfde94",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3554
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/818.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:35+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -4064,6 +4394,39 @@
       }
     },
     {
+      "key": "pokemon:mabosstiff",
+      "kind": "pokemon",
+      "national_dex": 943,
+      "form_key": "mabosstiff",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mabosstiff.card.a8eeafe0.webp",
+          "sha256": "a8eeafe061169548d224f5359bf0d285023fb544efa98bc2581f37985517a50f",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 782
+        },
+        "dense": {
+          "path": "files/pokemon/mabosstiff.dense.70dd399b.webp",
+          "sha256": "70dd399ba3cec92b99724b415858277d343418fe88fa8cb88a8c9ae5fc6a7ce7",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2932
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/943.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:40+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:machamp",
       "kind": "pokemon",
       "national_dex": 68,
@@ -4124,7 +4487,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/687.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:45+00:00",
+        "retrieved_at": "2026-09-11T08:38:32+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -4289,7 +4652,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/303.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:41+00:00",
+        "retrieved_at": "2026-09-11T08:38:27+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -4389,6 +4752,39 @@
         "source_url": "https://github.com/darkstormgames/champions-calc",
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
+        "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:mega-absol-z",
+      "kind": "pokemon",
+      "national_dex": 359,
+      "form_key": "mega-absol-z",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-absol-z.card.ac1fba48.webp",
+          "sha256": "ac1fba48d3b34442aaee8a277159024838263214613b32aaabcc5c0d38790629",
+          "media_type": "image/webp",
+          "width": 120,
+          "height": 120,
+          "bytes": 11786
+        },
+        "dense": {
+          "path": "files/pokemon/mega-absol-z.dense.190051d3.webp",
+          "sha256": "190051d3433c66d8e91d68d044bb0b1cace2b2e3e8d9977ee2e48001614991a1",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5798
+        }
+      },
+      "provenance": {
+        "provider": "SebNotFound/champions-calc",
+        "source_url": "https://github.com/SebNotFound/champions-calc",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -4651,8 +5047,41 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
+        "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:mega-baxcalibur",
+      "kind": "pokemon",
+      "national_dex": 998,
+      "form_key": "mega-baxcalibur",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-baxcalibur.card.0f5862d6.webp",
+          "sha256": "0f5862d605b50ea3601e5443b2c1d34d9063007e8f270e35efc8d14e0a84e9e0",
+          "media_type": "image/webp",
+          "width": 120,
+          "height": 120,
+          "bytes": 10794
+        },
+        "dense": {
+          "path": "files/pokemon/mega-baxcalibur.dense.051900c0.webp",
+          "sha256": "051900c0bab43ad72eb2aee91f2c46516c558c82cecc821c18f6df2bb8435a92",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5026
+        }
+      },
+      "provenance": {
+        "provider": "SebNotFound/champions-calc",
+        "source_url": "https://github.com/SebNotFound/champions-calc",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -4751,7 +5180,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10050.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:40+00:00",
+        "retrieved_at": "2026-09-11T08:38:26+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5080,8 +5509,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5179,8 +5608,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5278,8 +5707,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5450,6 +5879,39 @@
       }
     },
     {
+      "key": "pokemon:mega-garchomp-z",
+      "kind": "pokemon",
+      "national_dex": 445,
+      "form_key": "mega-garchomp-z",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-garchomp-z.card.9af962e0.webp",
+          "sha256": "9af962e0e5886ee1657b163449ee84aba1e3f7cf7bc708284a2441932be941fd",
+          "media_type": "image/webp",
+          "width": 120,
+          "height": 120,
+          "bytes": 10320
+        },
+        "dense": {
+          "path": "files/pokemon/mega-garchomp-z.dense.ed05310b.webp",
+          "sha256": "ed05310ba33426e4794bc568ccf26b9b0f90d15aed75f092f585b2ca1eacc8af",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5006
+        }
+      },
+      "provenance": {
+        "provider": "SebNotFound/champions-calc",
+        "source_url": "https://github.com/SebNotFound/champions-calc",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
+        "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:mega-gardevoir",
       "kind": "pokemon",
       "national_dex": 282,
@@ -5577,6 +6039,39 @@
         "source_url": "https://github.com/darkstormgames/champions-calc",
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
+        "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:mega-golisopod",
+      "kind": "pokemon",
+      "national_dex": 768,
+      "form_key": "mega-golisopod",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-golisopod.card.7989c267.webp",
+          "sha256": "7989c2675f07c0ce53421bbddcb0a43af596cc6b158514e8d507a0d6d1367a17",
+          "media_type": "image/webp",
+          "width": 120,
+          "height": 120,
+          "bytes": 13098
+        },
+        "dense": {
+          "path": "files/pokemon/mega-golisopod.dense.98568520.webp",
+          "sha256": "98568520c3fa6ce667218ee639a7265ee9b3845f86bee935051d41e06ef4d855",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5824
+        }
+      },
+      "provenance": {
+        "provider": "SebNotFound/champions-calc",
+        "source_url": "https://github.com/SebNotFound/champions-calc",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5879,6 +6374,39 @@
       }
     },
     {
+      "key": "pokemon:mega-lucario-z",
+      "kind": "pokemon",
+      "national_dex": 448,
+      "form_key": "mega-lucario-z",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-lucario-z.card.48f5d1b3.webp",
+          "sha256": "48f5d1b3333e4b76042c8be45d6624e922642a14bd206f51b745eb1674928d45",
+          "media_type": "image/webp",
+          "width": 120,
+          "height": 120,
+          "bytes": 12324
+        },
+        "dense": {
+          "path": "files/pokemon/mega-lucario-z.dense.1b612c17.webp",
+          "sha256": "1b612c17da40496c00ca9c47f8fdee24f27f3bb08b78d2a6112c0f422e9cef69",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5642
+        }
+      },
+      "provenance": {
+        "provider": "SebNotFound/champions-calc",
+        "source_url": "https://github.com/SebNotFound/champions-calc",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
+        "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:mega-malamar",
       "kind": "pokemon",
       "national_dex": 687,
@@ -5905,8 +6433,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -5972,7 +6500,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10052.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:41+00:00",
+        "retrieved_at": "2026-09-11T08:38:28+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6104,7 +6632,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10076.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:42+00:00",
+        "retrieved_at": "2026-09-11T08:38:29+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6202,8 +6730,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6235,8 +6763,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6268,8 +6796,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6308,6 +6836,39 @@
       }
     },
     {
+      "key": "pokemon:mega-salamence",
+      "kind": "pokemon",
+      "national_dex": 373,
+      "form_key": "mega-salamence",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mega-salamence.card.01c494c0.webp",
+          "sha256": "01c494c031cbeaa24515f476827cf8310692ab04ec16df08d278ef949cadcab9",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 1046
+        },
+        "dense": {
+          "path": "files/pokemon/mega-salamence.dense.753a2695.webp",
+          "sha256": "753a269587302fa4b95a4d2dda9c88fdcc651b091841a6a8f9dd3ad16813f01c",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5592
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10089.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:53+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:mega-sceptile",
       "kind": "pokemon",
       "national_dex": 254,
@@ -6335,7 +6896,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10065.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:38+00:00",
+        "retrieved_at": "2026-09-11T08:38:25+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6400,8 +6961,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6466,8 +7027,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6598,8 +7159,8 @@
       "provenance": {
         "provider": "SebNotFound/champions-calc",
         "source_url": "https://github.com/SebNotFound/champions-calc",
-        "revision": "4259012",
-        "retrieved_at": "2026-06-18T20:49:09+02:00",
+        "revision": "103f77b",
+        "retrieved_at": "2026-09-09T18:24:37+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6698,7 +7259,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10064.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:40+00:00",
+        "retrieved_at": "2026-09-11T08:38:26+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -6962,7 +7523,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/376.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:42+00:00",
+        "retrieved_at": "2026-09-11T08:38:29+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -7100,6 +7661,39 @@
       }
     },
     {
+      "key": "pokemon:mr-mime",
+      "kind": "pokemon",
+      "national_dex": 122,
+      "form_key": "mr-mime",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/mr-mime.card.292b3fe4.webp",
+          "sha256": "292b3fe4307bdb95226d66b97c5cf895a1ef537ac581c6845e1c31c017ae9252",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 784
+        },
+        "dense": {
+          "path": "files/pokemon/mr-mime.dense.e26d1626.webp",
+          "sha256": "e26d162619524059bddb3c91eb93cb2288926a7b132b0c209210f3d3184e0eef",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2966
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/122.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:24+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:mr-rime",
       "kind": "pokemon",
       "national_dex": 866,
@@ -7193,7 +7787,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/518.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:43+00:00",
+        "retrieved_at": "2026-09-11T08:38:30+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -7391,7 +7985,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/904.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:47+00:00",
+        "retrieved_at": "2026-09-11T08:38:39+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -7529,6 +8123,39 @@
       }
     },
     {
+      "key": "pokemon:pawmot",
+      "kind": "pokemon",
+      "national_dex": 923,
+      "form_key": "pawmot",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/pawmot.card.b3929cc9.webp",
+          "sha256": "b3929cc98c9042490ae38ee898a0c85274284279f072264e72c4e7e05815a9a7",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 700
+        },
+        "dense": {
+          "path": "files/pokemon/pawmot.dense.84dcc85c.webp",
+          "sha256": "84dcc85ca8f65ccd66d20ef913632889edcd6ffd7de8ef9145746b124d1dd273",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3222
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/923.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:39+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:pelipper",
       "kind": "pokemon",
       "national_dex": 279,
@@ -7558,6 +8185,105 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:perrserker",
+      "kind": "pokemon",
+      "national_dex": 863,
+      "form_key": "perrserker",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/perrserker.card.b02f3619.webp",
+          "sha256": "b02f3619b89c6ef7f4f9e09b2a88cb3e73d21ba232731f11f6b31f477b99c860",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 794
+        },
+        "dense": {
+          "path": "files/pokemon/perrserker.dense.03407f4c.webp",
+          "sha256": "03407f4c93270cdf7df8821e98efa91f602826fde516d9b2e5206430b5e10a54",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2936
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/863.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:37+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:persian",
+      "kind": "pokemon",
+      "national_dex": 53,
+      "form_key": "persian",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/persian.card.a868ef22.webp",
+          "sha256": "a868ef22408f81cbc67668ee18a9f6ba66d45c6cc65adecf1890cfb18aa9fcb4",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 614
+        },
+        "dense": {
+          "path": "files/pokemon/persian.dense.59ec2c67.webp",
+          "sha256": "59ec2c67545140cbe07bc46fa668c7c7e3ac55f4465709227ba984310627697e",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3358
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/53.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:23+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:persian-alola",
+      "kind": "pokemon",
+      "national_dex": 53,
+      "form_key": "persian-alola",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/persian-alola.card.dfadc405.webp",
+          "sha256": "dfadc405b1c670ea03a86e9ec392153f0e056854fa3c1bcde96718ba96419f83",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 674
+        },
+        "dense": {
+          "path": "files/pokemon/persian-alola.dense.232404f2.webp",
+          "sha256": "232404f23ae6effc76603f9ef4b8899e829593e2662be4f0efec10312112cec0",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3160
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10108.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:52+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -7624,6 +8350,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:pincurchin",
+      "kind": "pokemon",
+      "national_dex": 871,
+      "form_key": "pincurchin",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/pincurchin.card.8a9c9282.webp",
+          "sha256": "8a9c92821f47eb4062c403936ec93b19e31d919ad57918d880e4df732b590eb4",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 426
+        },
+        "dense": {
+          "path": "files/pokemon/pincurchin.dense.60885081.webp",
+          "sha256": "608850817895ab8765e31070e4ec9094f96fc9de44bba9afe2665db46ac25ae9",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 1548
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/871.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:38+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -7787,7 +8546,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/668.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:44+00:00",
+        "retrieved_at": "2026-09-11T08:38:32+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -7853,7 +8612,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/211.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:38+00:00",
+        "retrieved_at": "2026-09-11T08:38:24+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -7919,7 +8678,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10100.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:37+00:00",
+        "retrieved_at": "2026-09-11T08:38:22+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -8020,6 +8779,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:rillaboom",
+      "kind": "pokemon",
+      "national_dex": 812,
+      "form_key": "rillaboom",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/rillaboom.card.98c4c15b.webp",
+          "sha256": "98c4c15ba1b3d66b1e4e76c9933c9402a29c09564dcce42f30c2f013e40205cc",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 1306
+        },
+        "dense": {
+          "path": "files/pokemon/rillaboom.dense.d961ba87.webp",
+          "sha256": "d961ba875f58b2b7f511147eee68f1a3a8159f56d58c20b66ba61d5e48978378",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 6186
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/812.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:34+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -8321,6 +9113,39 @@
       }
     },
     {
+      "key": "pokemon:salamence",
+      "kind": "pokemon",
+      "national_dex": 373,
+      "form_key": "salamence",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/salamence.card.bf1a0f62.webp",
+          "sha256": "bf1a0f62696b9452cd37bfc050b469fc82e6359f588eb4f75cbfc2473c7b9e88",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 970
+        },
+        "dense": {
+          "path": "files/pokemon/salamence.dense.df8f372c.webp",
+          "sha256": "df8f372cad857b52bb4db5a1e8e8ac0bc6e07832ce9e921951fa11e158a22da4",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 5392
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/373.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:28+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:salazzle",
       "kind": "pokemon",
       "national_dex": 758,
@@ -8480,7 +9305,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/254.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:39+00:00",
+        "retrieved_at": "2026-09-11T08:38:25+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -8546,7 +9371,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/545.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:43+00:00",
+        "retrieved_at": "2026-09-11T08:38:30+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -8612,7 +9437,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/560.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:43+00:00",
+        "retrieved_at": "2026-09-11T08:38:31+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -8812,6 +9637,39 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:sirfetchd",
+      "kind": "pokemon",
+      "national_dex": 865,
+      "form_key": "sirfetchd",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/sirfetchd.card.59daabd9.webp",
+          "sha256": "59daabd94b082db2c8ef3a62b503fe0db065d179b137678f1dac1f11dc006244",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 880
+        },
+        "dense": {
+          "path": "files/pokemon/sirfetchd.dense.b10db5e9.webp",
+          "sha256": "b10db5e9be44021a3feab5fd935101d9d503f1fc0b8dba5bfe15007a1a6b3a44",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4148
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/865.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:37+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -9146,6 +10004,72 @@
       }
     },
     {
+      "key": "pokemon:squawkabilly",
+      "kind": "pokemon",
+      "national_dex": 931,
+      "form_key": "squawkabilly",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/squawkabilly.card.301db5c0.webp",
+          "sha256": "301db5c06a66e8ef5a5b209eac4bf9aee7bf9396b298d4f453d0473b545ac5da",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 554
+        },
+        "dense": {
+          "path": "files/pokemon/squawkabilly.dense.e7322699.webp",
+          "sha256": "e732269938068ec005204e0cb82354c96d28ed6bc620d6e032b12092f2e680e0",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2092
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/931.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:40+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:squawkabilly-yellow",
+      "kind": "pokemon",
+      "national_dex": 931,
+      "form_key": "squawkabilly-yellow",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/squawkabilly-yellow.card.8b9226b5.webp",
+          "sha256": "8b9226b5b52194c8dba71e1741dc95709006386e04be8cf29b9e89f3347e1d73",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 556
+        },
+        "dense": {
+          "path": "files/pokemon/squawkabilly-yellow.dense.1c222099.webp",
+          "sha256": "1c222099e1648272f56fc696fbbc1bf6d94d1b265449eae91017136988476112",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2020
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10261.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:54+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:staraptor",
       "kind": "pokemon",
       "national_dex": 398,
@@ -9173,7 +10097,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/398.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:42+00:00",
+        "retrieved_at": "2026-09-11T08:38:30+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -9311,6 +10235,39 @@
       }
     },
     {
+      "key": "pokemon:swalot",
+      "kind": "pokemon",
+      "national_dex": 317,
+      "form_key": "swalot",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/swalot.card.1443c142.webp",
+          "sha256": "1443c14288a3bebb709f69a7326781b1a89f48e2974c5b400caf229ec6ecd09a",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 640
+        },
+        "dense": {
+          "path": "files/pokemon/swalot.dense.2942a500.webp",
+          "sha256": "2942a500bd496a5aeb49682c26c20e31cdec30c66df8b477a22f6223eb66b728",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 3136
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/317.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:28+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:swampert",
       "kind": "pokemon",
       "national_dex": 260,
@@ -9338,7 +10295,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/260.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:40+00:00",
+        "retrieved_at": "2026-09-11T08:38:27+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -9542,6 +10499,39 @@
       }
     },
     {
+      "key": "pokemon:thievul",
+      "kind": "pokemon",
+      "national_dex": 828,
+      "form_key": "thievul",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/thievul.card.2d7bbb7e.webp",
+          "sha256": "2d7bbb7ecb9baeb379c530815de3a3bf4bd9f1bfadb0e1698703530dd625e7a5",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 828
+        },
+        "dense": {
+          "path": "files/pokemon/thievul.dense.7403e673.webp",
+          "sha256": "7403e673df99a71b17177eb8ec839d20f2bd500644821d35a8701e228bfeb340",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4006
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/828.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:35+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:tinkaton",
       "kind": "pokemon",
       "national_dex": 959,
@@ -9736,6 +10726,72 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:toxtricity",
+      "kind": "pokemon",
+      "national_dex": 849,
+      "form_key": "toxtricity",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/toxtricity.card.8bf20a67.webp",
+          "sha256": "8bf20a67f307616fa9e12f254b599807ef3d4d6cb8aaa49b00eac6e5c0ff64a4",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 972
+        },
+        "dense": {
+          "path": "files/pokemon/toxtricity.dense.d9f5cd72.webp",
+          "sha256": "d9f5cd7282189436ff21a596b7b7a92c19f85baf23f22e0cdb4c2dd2b1809538",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4408
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/849.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:36+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "pokemon:toxtricity-low-key",
+      "kind": "pokemon",
+      "national_dex": 849,
+      "form_key": "toxtricity-low-key",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/toxtricity-low-key.card.44b71681.webp",
+          "sha256": "44b716811b27b2af65bf1003cb0e05d7cfdea96b4cc8ecb002867995b973b988",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 932
+        },
+        "dense": {
+          "path": "files/pokemon/toxtricity-low-key.dense.5cf2781b.webp",
+          "sha256": "5cf2781bad53b769b3eeb2982373892d8806efb9dadcdc1277148a2e86d9106d",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 4146
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/10184.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:53+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -10130,7 +11186,7 @@
         "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
         "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/45.png",
         "revision": "master",
-        "retrieved_at": "2026-07-13T09:33:38+00:00",
+        "retrieved_at": "2026-09-11T08:38:23+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -10301,6 +11357,39 @@
       }
     },
     {
+      "key": "pokemon:wigglytuff",
+      "kind": "pokemon",
+      "national_dex": 40,
+      "form_key": "wigglytuff",
+      "match": "exact",
+      "files": {
+        "card": {
+          "path": "files/pokemon/wigglytuff.card.e42bc373.webp",
+          "sha256": "e42bc3737135ef603e4f2668e292cf486e382c1f58cb4915ae451aa023cae399",
+          "media_type": "image/webp",
+          "width": 96,
+          "height": 96,
+          "bytes": 618
+        },
+        "dense": {
+          "path": "files/pokemon/wigglytuff.dense.f5a89478.webp",
+          "sha256": "f5a89478bff59a5e83c1c81ceb505be6a579ce0ea5352171a4ac46b5a10f4993",
+          "media_type": "image/webp",
+          "width": 64,
+          "height": 64,
+          "bytes": 2572
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon/40.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:38:22+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "pokemon:wyrdeer",
       "kind": "pokemon",
       "national_dex": 899,
@@ -10446,6 +11535,29 @@
       }
     },
     {
+      "key": "item:absolite-z",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/absolite-z.dense.4746ef94.webp",
+          "sha256": "4746ef94600991afc66d2df6c6fac1900b3429d0136bd225ca29b5b87b77f21a",
+          "media_type": "image/webp",
+          "width": 24,
+          "height": 24,
+          "bytes": 186
+        }
+      },
+      "provenance": {
+        "provider": "rh-hideout/pokeemerald-expansion",
+        "source_url": "https://github.com/rh-hideout/pokeemerald-expansion",
+        "revision": "d74f64dc",
+        "retrieved_at": "2026-09-11T08:13:05+02:00",
+        "license": "No repository-wide asset license declared; Pokemon artwork rights remain with the original owners.",
+        "rights_note": "Attributed community sprite source; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:aerodactylite",
       "kind": "item",
       "match": "exact",
@@ -10488,6 +11600,29 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:air-balloon",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/air-balloon.dense.e76225a4.webp",
+          "sha256": "e76225a435e96029dbd31253f7d9295f195c2c4dd0c80306e6212fcf848d25a0",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 136
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/air-balloon.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:54+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -10669,9 +11804,32 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:41:51+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:baxcalibrite",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/baxcalibrite.dense.0024d9ac.webp",
+          "sha256": "0024d9ac46449bbd10ab7bde2a11666f7e9be30bd191af121540036ccb24ee07",
+          "media_type": "image/webp",
+          "width": 24,
+          "height": 24,
+          "bytes": 188
+        }
+      },
+      "provenance": {
+        "provider": "rh-hideout/pokeemerald-expansion",
+        "source_url": "https://github.com/rh-hideout/pokeemerald-expansion",
+        "revision": "d74f64dc",
+        "retrieved_at": "2026-09-11T08:13:05+02:00",
+        "license": "No repository-wide asset license declared; Pokemon artwork rights remain with the original owners.",
+        "rights_note": "Attributed community sprite source; non-commercial fan use."
       }
     },
     {
@@ -10714,7 +11872,30 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:46:37+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:binding-band",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/binding-band.dense.3ed0ea67.webp",
+          "sha256": "3ed0ea67370b4f2121ae9810a4ba6d446f9eaea9d6c198cd65a23d6a4f0759b5",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 138
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/binding-band.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:55+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -10805,7 +11986,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:47:10+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11241,7 +12422,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:47:30+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11286,7 +12467,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:42:41+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11377,7 +12558,53 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:43:45+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:eject-button",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/eject-button.dense.50bbdd46.webp",
+          "sha256": "50bbdd467ec6c1d787b71a511b663b97f0ad7011cf9e4799fdcf61758323f262",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 186
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/eject-button.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:55+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:electric-seed",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/electric-seed.dense.fd779384.webp",
+          "sha256": "fd7793841c4d542f9eb48ab019a6713c8c2588cb6a4ee45aa3e47785a6c9db26",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 244
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/electric-seed.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:55+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11445,7 +12672,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:47:53+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11490,7 +12717,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:45:05+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11657,6 +12884,29 @@
       }
     },
     {
+      "key": "item:garchompite-z",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/garchompite-z.dense.13f4c7ff.webp",
+          "sha256": "13f4c7ffb262e24a6e5bed114b7cdc6f96a112b43d2ef3db5cee150092b1f326",
+          "media_type": "image/webp",
+          "width": 24,
+          "height": 24,
+          "bytes": 192
+        }
+      },
+      "provenance": {
+        "provider": "rh-hideout/pokeemerald-expansion",
+        "source_url": "https://github.com/rh-hideout/pokeemerald-expansion",
+        "revision": "d74f64dc",
+        "retrieved_at": "2026-09-11T08:13:05+02:00",
+        "license": "No repository-wide asset license declared; Pokemon artwork rights remain with the original owners.",
+        "rights_note": "Attributed community sprite source; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:gardevoirite",
       "kind": "item",
       "match": "exact",
@@ -11749,6 +12999,29 @@
       }
     },
     {
+      "key": "item:golisopite",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/golisopite.dense.2702566f.webp",
+          "sha256": "2702566f29d49e0ae8f454c684f48f3ff679eec741a1f73168273066ee821ce7",
+          "media_type": "image/webp",
+          "width": 24,
+          "height": 24,
+          "bytes": 190
+        }
+      },
+      "provenance": {
+        "provider": "rh-hideout/pokeemerald-expansion",
+        "source_url": "https://github.com/rh-hideout/pokeemerald-expansion",
+        "revision": "d74f64dc",
+        "retrieved_at": "2026-09-11T08:13:05+02:00",
+        "license": "No repository-wide asset license declared; Pokemon artwork rights remain with the original owners.",
+        "rights_note": "Attributed community sprite source; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:golurkite",
       "kind": "item",
       "match": "exact",
@@ -11768,6 +13041,29 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:grassy-seed",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/grassy-seed.dense.2e990551.webp",
+          "sha256": "2e990551bc48772b57494c7ead757f090da088f5f84056859dacf990203d9f6a",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 252
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/grassy-seed.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T08:47:56+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -11903,7 +13199,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:48:11+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11971,7 +13267,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:48:28+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -11993,7 +13289,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:48:45+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12091,6 +13387,29 @@
       }
     },
     {
+      "key": "item:leek",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/leek.dense.00896216.webp",
+          "sha256": "008962163c1744914f2bd7e5802ab66a30387b475f37fa9dd8a58461df932135",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 156
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/stick.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:32+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:leftovers",
       "kind": "item",
       "match": "exact",
@@ -12153,7 +13472,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:48:59+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12198,7 +13517,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:49:12+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12247,6 +13566,29 @@
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:lucarionite-z",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/lucarionite-z.dense.633284d7.webp",
+          "sha256": "633284d7b8dcfc12e4949340261201ec065b72a9b3b9aba127766712f6044bf4",
+          "media_type": "image/webp",
+          "width": 24,
+          "height": 24,
+          "bytes": 186
+        }
+      },
+      "provenance": {
+        "provider": "rh-hideout/pokeemerald-expansion",
+        "source_url": "https://github.com/rh-hideout/pokeemerald-expansion",
+        "revision": "d74f64dc",
+        "retrieved_at": "2026-09-11T08:13:05+02:00",
+        "license": "No repository-wide asset license declared; Pokemon artwork rights remain with the original owners.",
+        "rights_note": "Attributed community sprite source; non-commercial fan use."
       }
     },
     {
@@ -12312,7 +13654,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:40:26+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12357,7 +13699,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:49:26+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12471,7 +13813,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:49:39+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12516,7 +13858,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:49:54+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12545,6 +13887,29 @@
       }
     },
     {
+      "key": "item:misty-seed",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/misty-seed.dense.cd753e88.webp",
+          "sha256": "cd753e88ee56288e4605718f18774c01d0a999c9168f72e817f3dfb0a6cd4791",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 252
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/misty-seed.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:32+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:muscle-band",
       "kind": "item",
       "match": "exact",
@@ -12561,7 +13926,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:50:07+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12609,6 +13974,29 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:normal-gem",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/normal-gem.dense.bacee864.webp",
+          "sha256": "bacee86473cd4df8cc26698ae99c8dfbad79dd64fb0f068b0baca8558f6bac3c",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 146
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/normal-gem.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:33+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -12820,6 +14208,29 @@
       }
     },
     {
+      "key": "item:psychic-seed",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/psychic-seed.dense.d2cc1b5e.webp",
+          "sha256": "d2cc1b5ec46911e9b424a198842a96969d807db0ef455f852459df2f59429f99",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 246
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/psychic-seed.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:33+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:pyroarite",
       "kind": "item",
       "match": "exact",
@@ -12836,7 +14247,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:43:00+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12881,7 +14292,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:44:21+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12903,7 +14314,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:45:37+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -12932,6 +14343,29 @@
       }
     },
     {
+      "key": "item:red-card",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/red-card.dense.d73dab32.webp",
+          "sha256": "d73dab328a27553a4359d920ffceff1070ea6e411c4398680f81c2579627bbf1",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 106
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/red-card.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:34+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:rindo-berry",
       "kind": "item",
       "match": "exact",
@@ -12951,6 +14385,29 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:rocky-helmet",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/rocky-helmet.dense.d63c5f2f.webp",
+          "sha256": "d63c5f2f3fce759822db550e3aa27ae81c78b3d704c5b1e731be8b7844edacf4",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 182
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/rocky-helmet.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:34+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -13001,6 +14458,29 @@
       }
     },
     {
+      "key": "item:salamencite",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/salamencite.dense.8998cd80.webp",
+          "sha256": "8998cd8092713a8dd61df68795300bd59cb0339fe147e30d3922f11c130c13b9",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 166
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/salamencite.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:35+00:00",
+        "license": "Artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
       "key": "item:sceptilite",
       "kind": "item",
       "match": "exact",
@@ -13017,7 +14497,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:50:22+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13062,7 +14542,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:41:23+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13130,7 +14610,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:43:23+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13198,7 +14678,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:50:36+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13381,7 +14861,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:50:51+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13449,7 +14929,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:44:47+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13517,7 +14997,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:51:04+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13542,6 +15022,29 @@
         "revision": "221d505",
         "retrieved_at": "2026-04-13T16:35:35+02:00",
         "license": "Repository GPL-3.0; artwork rights with original owners.",
+        "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
+      }
+    },
+    {
+      "key": "item:terrain-extender",
+      "kind": "item",
+      "match": "exact",
+      "files": {
+        "dense": {
+          "path": "files/items/terrain-extender.dense.6f46d781.webp",
+          "sha256": "6f46d781bbd42c38f71e85b243cdc9496f2d76e41100c8f683ecbb930e32df5b",
+          "media_type": "image/webp",
+          "width": 30,
+          "height": 30,
+          "bytes": 228
+        }
+      },
+      "provenance": {
+        "provider": "PokeAPI/sprites (GitHub, via jsDelivr)",
+        "source_url": "https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/terrain-extender.png",
+        "revision": "master",
+        "retrieved_at": "2026-09-11T09:18:35+00:00",
+        "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
     },
@@ -13700,7 +15203,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:51:16+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13722,7 +15225,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:51:27+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }
@@ -13767,7 +15270,7 @@
       "provenance": {
         "provider": "project-curated (maintainer-supplied)",
         "source_url": "https://github.com/pokemon-champion/pokemon_champion_agent_dev",
-        "retrieved_at": "2026-07-13T09:51:42+00:00",
+        "retrieved_at": "2026-08-06T08:03:46+00:00",
         "license": "Artwork rights with original owners.",
         "rights_note": "Redistribution for this fan project confirmed with the upstream maintainer (recorded 2026-07-13). Pokemon artwork rights remain with The Pokemon Company; non-commercial fan use."
       }

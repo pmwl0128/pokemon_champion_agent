@@ -107,6 +107,15 @@ export const DiagnoseReportDtoSchema = z.object({
     incompleteMembers: z.array(z.object({
       species: z.string(), completeness: z.string(),
     })).default([]),
+    /** How the attention levels above were calibrated. `reviewed` = measured on this regulation.
+     * `carried_over` = the predecessor's study applies, for the length of the cross-rule handover
+     * window and no longer. `unreviewed` = no level is promoted at all. Absent on old servers. */
+    attentionCalibration: z.object({
+      rule: z.string(),
+      status: z.enum(["reviewed", "carried_over", "unreviewed"]),
+      measuredOn: z.string().optional(),
+      expiresAt: z.string().optional(),
+    }).optional(),
   }),
   /** Per-opponent check grades vs the top-K meta (diagnose --with-check): the report's
    * most actionable table. Absent when no opponent cache exists for the format. */

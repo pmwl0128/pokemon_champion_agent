@@ -75,6 +75,10 @@ function createContext() {
     document: { getElementById: () => ({ value: 'light' }) },
     localStorage: { getItem: key => (key === 'dex' ? '' : null), setItem: () => {} },
     mechanicsTests: {},
+    // ap_calc.js (the UI file the headless wrapper never loads) owns these two globals; the engine
+    // helpers CALCULATE_ALL_MOVES_SV runs read them, so the sandbox has to supply the same defaults.
+    lastHighestStat: [0, 0],
+    manualProtoQuark: false,
     isCustomMods: false,
     transformSpecies: { p1: '', p2: '' },
     autoLevel: 50,
@@ -327,7 +331,7 @@ function moveDetails(name, ctx, overrides = {}) {
     bp: overrides.power ?? overrides.bp ?? base.bp ?? 0,
     type: overrides.type ?? base.type,
     category: overrides.category ?? base.category,
-    isCrit: !!overrides.isCrit,
+    isCrit: overrides.isCrit !== undefined ? !!overrides.isCrit : !!base.alwaysCrit,
     isZ: false,
     hits: overrides.hits ?? expectedHits(base.hitRange),
     hitRange: base.hitRange ?? null,          // kept so calculate() can apply a max-hit ability
@@ -340,6 +344,11 @@ function moveDetails(name, ctx, overrides = {}) {
     isPlusMove: false,
   });
 }
+
+// Abilities the NCP UI ships toggled OFF (script_res/ap_calc.js ABILITY_TOGGLE_OFF, gen >= 9): each
+// needs a trigger that a single damage frame cannot see, so "on" is a caller decision, not a default.
+const ABILITY_TOGGLE_OFF = new Set(['Flash Fire', 'Plus', 'Minus', 'Trace', 'Stakeout', 'Sand Spit',
+                                    'Battle Bond', 'Electromorphosis', 'Wind Power', 'Seed Sower']);
 
 function buildPokemon(input, ctx) {
   const name = input.name;
@@ -382,7 +391,9 @@ function buildPokemon(input, ctx) {
     ivs: { hp: 31, at: 31, df: 31, sa: 31, sd: 31, sp: 31 },
     nature: input.nature || 'Serious',
     ability: input.ability !== undefined ? input.ability : dex.ab || '',
-    abilityOn: input.abilityOn !== false,
+    abilityOn: input.abilityOn !== undefined
+      ? !!input.abilityOn
+      : !ABILITY_TOGGLE_OFF.has(input.ability !== undefined ? input.ability : (dex.ab || '')),
     supremeOverlord: input.supremeOverlord || 0,
     rivalryGender: '',
     highestStat: input.highestStat ?? -1,
@@ -464,6 +475,10 @@ function field(input = {}) {
     isSwordOfRuin: !!input.swordOfRuin,
     isTabletsOfRuin: !!input.tabletsOfRuin,
     isVesselOfRuin: !!input.vesselOfRuin,
+    clearWeather() {
+      this.weather = '';
+      for (const s of sides) s.weather = '';
+    },
     getWeather() { return this.weather; },
     getTerrain() { return this.terrain; },
     getNeutralGas() { return false; },
@@ -471,6 +486,52 @@ function field(input = {}) {
     getSwamp(i) { return sides[i]?.isSwamp || false; },
     getSide(i) { return sides[i] || side(); },
   };
+}
+
+// Upstream runs CALCULATE_ALL_MOVES_SV before dispatching to GET_DAMAGE_HANDLER, and that wrapper --
+// not the handler -- is where a Pokemon's on-field state is resolved: copied abilities, suppressed
+// weather, terrain seeds, paradox boosts, weight modifiers and so on. It is jQuery-bound (it writes
+// speed back into the page), so we call the handler directly and have to reproduce the state part
+// ourselves. Skipping it silently dropped every effect below from the damage numbers.
+function applySwitchInState(attacker, defender, f, ctx, switchInDrops) {
+  const terrain = f.getTerrain(), weather = f.getWeather();
+  ctx.checkTrace(attacker, defender);
+  ctx.checkTrace(defender, attacker);
+  ctx.checkNeutralGas(attacker, defender, f.getNeutralGas());
+  // Air Lock / Cloud Nine clear the weather for BOTH sides, so this has to precede every weather read.
+  ctx.checkAirLock(attacker, f);
+  ctx.checkAirLock(defender, f);
+  const activeWeather = f.getWeather();
+  ctx.checkForecast(attacker, activeWeather);
+  ctx.checkForecast(defender, activeWeather);
+  ctx.checkMimicry(attacker, terrain);
+  ctx.checkMimicry(defender, terrain);
+  ctx.checkTerastal(attacker);
+  ctx.checkTerastal(defender);
+  ctx.checkKlutz(attacker);
+  ctx.checkKlutz(defender);
+  ctx.checkParadoxAbilities(attacker, terrain, activeWeather);
+  ctx.checkParadoxAbilities(defender, terrain, activeWeather);
+  ctx.checkSeeds(attacker, terrain);
+  ctx.checkSeeds(defender, terrain);
+  ctx.checkSwordShield(attacker);
+  ctx.checkSwordShield(defender);
+  ctx.checkWindRider(attacker, f.getTailwind(0));
+  ctx.checkWindRider(defender, f.getTailwind(1));
+  // Intimidate and Supersweet Syrup are the only two that move the OPPONENT's stat stages, so a caller
+  // that already encodes the drop in `boosts` (the team skill's Intimidate lane does) turns them off.
+  if (switchInDrops) {
+    ctx.checkIntimidate(attacker, defender);
+    ctx.checkIntimidate(defender, attacker);
+    ctx.checkSupersweetSyrup(attacker, defender);
+    ctx.checkSupersweetSyrup(defender, attacker);
+  }
+  ctx.checkDownload(attacker, defender);
+  ctx.checkDownload(defender, attacker);
+  ctx.checkEmbodyAspect(attacker);
+  ctx.checkEmbodyAspect(defender);
+  ctx.checkBattleBond(attacker);
+  ctx.checkBattleBond(defender);
 }
 
 function calculate(input, ctx) {
@@ -482,8 +543,10 @@ function calculate(input, ctx) {
   const defender = buildPokemon(input.defender, ctx);
   const f = field(input.field || {});
   const moveName = input.move || attacker.moves[0].name;
+  const switchInDrops = (input.switch_in_drops ?? input.switchInDrops) !== false;
+  applySwitchInState(attacker, defender, f, ctx, switchInDrops);
   const move = attacker.moves.find(m => m.name === moveName) || moveDetails(moveName, ctx);
-  resolveMultiHit(move, attacker);   // sets move.hits (central) + move.hitsBand ([lo,hi] envelope)
+  resolveMultiHit(move, attacker);   // after the preamble: Skill Link may have arrived through Trace   // sets move.hits (central) + move.hitsBand ([lo,hi] envelope)
   // GET_DAMAGE_HANDLER expects stats to already carry stat-stage boosts — the upstream UI applies
   // them in CALCULATE_ALL_MOVES_SV before dispatching, which we bypass by calling the handler
   // directly. Replicate that here so boosts (Swords Dance, Choice... -1, etc.) actually affect damage.
@@ -500,6 +563,12 @@ function calculate(input, ctx) {
   };
   applyBoosts(attacker);
   applyBoosts(defender);
+  // Upstream resolves these AFTER the stats exist: the paradox abilities pick their highest stat from
+  // the boosted spread, and the speed-ratio moves need the item/field/status-modified Speed.
+  for (const [p, i] of [[attacker, 0], [defender, 1]]) {
+    if (typeof p.highestStat === 'number') ctx.setHighestStat(p, i);
+    p.stats.sp = ctx.getFinalSpeed(p, f.getWeather(), f.getTailwind(i), f.getSwamp(i), f.getTerrain());
+  }
   // Auras are field-wide ability effects the UI gates behind checkboxes; headless, activate them from
   // the on-field abilities so e.g. an attacking Fairy Aura mon gets the 1.33x on its Fairy moves.
   if (ctx._auraState) {
@@ -520,6 +589,10 @@ function calculate(input, ctx) {
   const attackerSide = f.getSide(0);
   const handlerSide = Object.assign({}, f.getSide(1));
   for (const k of OFFENSIVE_SIDE_FLAGS) handlerSide[k] = attackerSide[k];
+  // Infiltrator ignores the DEFENDER's screens, and the weight abilities/items feed the weight-based
+  // base powers (Heavy Slam / Low Kick / Grass Knot). Both act on state the handler receives.
+  ctx.checkInfiltrator(attacker, handlerSide);
+  ctx.getWeightMods(attacker, defender);
   const result = ctx.GET_DAMAGE_HANDLER(attacker, defender, move, handlerSide);
   // Multi-hit damage: build the CENTRAL band (the headline rolls) AND a TRUE damage envelope
   // [envLo, envHi] computed from the real per-hit damage — never a linear ratio. The realistic
@@ -710,8 +783,10 @@ const SCHEMA = {
     'attacker/defender': { name: 'str', ability: 'str', item: 'str', nature: 'str',
       sps: '{hp,atk,def,spa,spd,spe:int}  (smogon; legacy at/df/sa/sd/sp still accepted)',
       boosts: '{atk,def,spa,spd,spe:-6..6}', moves: '[name | {name,power,type,category}]',
-      status: 'Healthy|Burned|Paralyzed|Poisoned|Badly Poisoned|Asleep|Frozen', curHP: 'int' },
+      status: 'Healthy|Burned|Paralyzed|Poisoned|Badly Poisoned|Asleep|Frozen', curHP: 'int',
+      abilityOn: 'bool | whether a conditionally-activated ability has triggered. Defaults TRUE except for the ones whose trigger a single frame cannot see (Flash Fire, Plus, Minus, Trace, Stakeout, Sand Spit, Battle Bond, Electromorphosis, Wind Power, Seed Sower), which default FALSE — pass true to model them as active' },
     move: 'str (move name)',
+    switch_in_drops: 'bool, default true | resolve the switch-in stat drops the two sides put on EACH OTHER (Intimidate, Supersweet Syrup). Set false when the caller already encodes the drop in `boosts`. Every other on-field effect (terrain seeds, Protosynthesis/Quark Drive, Trace, Klutz, Mimicry, Air Lock/Cloud Nine, Infiltrator, weight modifiers, Intrepid Sword/Dauntless Shield, Download) is always resolved and is not switchable',
     field: { format: 'single|double', weather: 'Rain|Sun|Sand|Snow|""',
       terrain: 'Electric|Grassy|Psychic|Misty|""', attackerSide: '{helping_hand,battery,...}',
       defenderSide: '{reflect,light_screen,aurora_veil,stealth_rock}  (snake_case; camelCase also accepted; stealth_rock chips the defender, affecting ko_chance only)' },

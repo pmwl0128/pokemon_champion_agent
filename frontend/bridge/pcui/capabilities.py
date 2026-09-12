@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 from . import __version__
@@ -21,7 +22,12 @@ from .worker import WorkerPool
 # The version is folded into the
 # local deploymentId below so a DTO/mapper release is a new deployment identity even when skill data
 # is unchanged.
-WEB_PROTOCOL_VERSION = "5"
+# Version 6 requires clients to stop consuming transitional team evidence at expiry.
+WEB_PROTOCOL_VERSION = "6"
+
+# Ids derived from the installed skill snapshot. A deployed release carries a `release-<hash>`
+# id instead, bound to the whole payload rather than to the skill data alone.
+_LOCAL_ID_PREFIX = "local-"
 
 # What THIS bridge actually serves (llm.* are online-only; team.uep gates the local UEP
 # session panel — sessions/artifacts/SSE plus its lazy chunk).
@@ -128,12 +134,27 @@ def assemble(pool: WorkerPool, deployment_id: str | None = None,
                              pool.request_json("team", ["vocab", "--format", "json"]),
                              data["team"]),
     }
+    # The "deployment" IS the installed skill snapshot: derive its id from the combined fingerprints
+    # AND the wire-protocol version, so a breaking DTO/mapper change (which bumps
+    # WEB_PROTOCOL_VERSION) is a new deployment identity even when skill data is unchanged (external
+    # audit 2026-07-14: DTO version was previously absent from this fingerprint).
+    derived = _LOCAL_ID_PREFIX + _fingerprint(fingerprints, WEB_PROTOCOL_VERSION)[:12]
     if deployment_id is None:
-        # Local bridge: the "deployment" IS the installed skill snapshot — derive its id from the
-        # combined fingerprints AND the wire-protocol version, so a breaking DTO/mapper change (which
-        # bumps WEB_PROTOCOL_VERSION) is a new deployment identity even when skill data is unchanged
-        # (external audit 2026-07-14: DTO version was previously absent from this fingerprint).
-        deployment_id = "local-" + _fingerprint(fingerprints, WEB_PROTOCOL_VERSION)[:12]
+        deployment_id = derived
+    elif deployment_id.startswith(_LOCAL_ID_PREFIX) and deployment_id != derived:
+        # A supplied id comes from the projection manifest, and the SPA's drift guard compares that
+        # same manifest against what this handshake returns — so adopting it in silence made that
+        # comparison check the manifest against itself. `pcui serve` defaults `--projection` to the
+        # dev checkout's own build, which `update.py refresh` routinely leaves behind, and that is
+        # exactly the case the guard was for.
+        #
+        # Only `local-` ids are comparable: `build_release.py` rebinds a deployed projection to its
+        # `release-<payload hash>` identity, which is a different preimage and would differ here
+        # forever. Report rather than refuse — a deployed bridge that will not answer its own
+        # handshake is worse than one serving a named mismatch.
+        print(f"WARNING: serving projection {deployment_id} against skill data that fingerprints "
+              f"as {derived}. The static pages are stale; rebuild the projection "
+              f"(frontend/web/scripts/build_projection.py).", file=sys.stderr, flush=True)
     current = json.loads((META_DATA / "current.json").read_text(encoding="utf-8"))
     season = current["current"]["season"]
     env = {"season": season, "rule": current["current"]["rule"]}

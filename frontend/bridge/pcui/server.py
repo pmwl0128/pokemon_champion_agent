@@ -323,10 +323,15 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
 
     # -- calc --------------------------------------------------------------------------
 
+    # Forwarded verbatim to the calc CLI; anything else in the body is dropped. `switch_in_drops`
+    # belongs here because a tuning frame turns it off to stay history-free, and silently dropping it
+    # made the in-page quick solve disagree with the `tune` operator on every Intimidate defender.
+    CALC_REQUEST_KEYS = ("attacker", "defender", "move", "field", "switch_in_drops")
+
     @app.post("/api/calc/damage")
     async def calc_damage(body: dict):
-        payload = json.dumps({k: body[k] for k in ("attacker", "defender", "move", "field")
-                              if k in body}, ensure_ascii=False)
+        payload = json.dumps({k: body[k] for k in CALC_REQUEST_KEYS if k in body},
+                             ensure_ascii=False)
         doc = await query("calc", ["one"], payload)
         return mappers.map_damage(_raw_or_error(doc))
 
@@ -347,7 +352,7 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
         # Keep the input→result position contract: a non-object item can't be sent to the engine, so
         # it gets a bad_input error IN ITS OWN SLOT instead of being dropped (which would shift every
         # later result onto the wrong request cell — external audit 2026-07-14).
-        valid = [(i, {k: it[k] for k in ("attacker", "defender", "move", "field") if k in it})
+        valid = [(i, {k: it[k] for k in CALC_REQUEST_KEYS if k in it})
                  for i, it in enumerate(items) if isinstance(it, dict)]
         doc = await query("calc", ["batch"], json.dumps([v[1] for v in valid], ensure_ascii=False))
         if not isinstance(doc, list) or len(doc) != len(valid):

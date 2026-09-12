@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -117,6 +118,8 @@ def main() -> int:
     if not PACK.is_dir():
         raise SystemExit(f"asset pack not found at {PACK} — run frontend/assets/build_pack.py "
                          "first (refusing to build a projection without images)")
+    subprocess.run([sys.executable, str(PROJECT_ROOT / "frontend/assets/build_pack.py"), "validate"],
+                   cwd=PROJECT_ROOT, check=True)
     # Build into a sibling staging dir and swap at the end. Wiping `out` up front left the
     # projection ABSENT for the whole build (minutes): a `pcui serve` / `online-serve` already
     # running keeps serving that path, and the SPA treats a 404 on assets/manifest.json as a
@@ -125,6 +128,14 @@ def main() -> int:
     # keeps that window down to two renames.
     final = out
     staging = final.parent / f".{final.name}.building-{os.getpid()}"
+    # Sweep the trees a killed run left behind. Each is named for its own pid, so only the current
+    # run's own name was ever cleaned and a crashed build's partial copy sat next to the real
+    # projection until someone noticed it. Builds are not run concurrently against one output tree
+    # (the swap below already assumes exclusive use of `final`), so any other pid's tree is dead.
+    for stale in final.parent.glob(f".{final.name}.building-*"):
+        shutil.rmtree(stale, ignore_errors=True)
+    for stale in final.parent.glob(f".{final.name}.previous-*"):
+        shutil.rmtree(stale, ignore_errors=True)
     if staging.exists():
         shutil.rmtree(staging)
     staging.parent.mkdir(parents=True, exist_ok=True)
@@ -278,10 +289,13 @@ def main() -> int:
             # opponent matchup cache (M5): the SAME shipped static cache the bridge maps live — a
             # standard-vs-standard KO grid + derived C2/C1/C0 checks, keyed only by (rule, format).
             # Export both views so the online adapter reads them directly (no user team, no compute);
-            # a format with no built cache is simply absent -> online 404 -> the UI's "not built" notice.
+            # A release advertises team.matchup, so both formats must carry a usable cache.
             cache = mappers.load_oppcache(fmt, rule)
             if cache is None:
-                print(f"  matchup[{fmt}]: no opponent cache — skipped")
+                raise RuntimeError(f"required opponent cache is missing: {rule}/{fmt}")
+            if (not cache.get("species") or not cache.get("sets") or not cache.get("matrix")
+                    or any(not cells for cells in cache["matrix"].values())):
+                raise RuntimeError(f"required opponent cache is empty or unusable: {rule}/{fmt}")
             else:
                 # §7.1 boundary (maintainer-revised 2026-07-16): the public site must not
                 # SHOW/SEARCH/AGGREGATE real teams directly, but PROCESSED per-species sets —
@@ -308,6 +322,22 @@ def main() -> int:
                 write(out / "matchup" / f"oppcache_{fmt}.json", oppcache)
                 write(out / "matchup" / f"oppko_{fmt}.json", oppko)
                 write(out / "matchup" / f"oppchecks_{fmt}.json", oppchecks)
+                if cache.get("built_for", {}).get("handover_receipt"):
+                    native = mappers._oppcache_mod().load_cache(fmt, rule, native=True)
+                    native_views = ({"oppcache": mappers.map_oppcache(native),
+                                     "oppko": mappers.map_oppko_grid(native),
+                                     "oppchecks": mappers.map_oppcheck_grid(
+                                         native, mappers.derive_oppcheck_grid(native))}
+                                    if native is not None else
+                                    {name: {"available": False} for name in ("oppcache", "oppko", "oppchecks")})
+                    for name, doc in native_views.items():
+                        for st in (doc.get("sets") or {}).values():
+                            for field in ("source", "confidence", "note", "realTeamBacked"):
+                                st.pop(field, None)
+                        for row in doc.get("species", []):
+                            row.pop("setSource", None)
+                            row.pop("setConfidence", None)
+                        write(out / "matchup" / f"{name}_{fmt}.native.json", doc)
                 print(f"  matchup[{fmt}]: lean KO + check grids; full detail cache + sets "
                       "(provenance stripped — public)")
     finally:

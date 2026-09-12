@@ -710,9 +710,15 @@ const STRINGS = {
     zh: "以下成员配置未知，招式提供的功能未计入；标为「未检测到」的项目可能只是尚未确认：",
     en: "These members have no known moveset, so move-based functions are not counted. An item marked \"not detected\" may simply be unconfirmed:",
     ja: "以下のメンバーは型が不明なため、技による機能を計上していません。「検出なし」の項目は未確認の可能性があります：" },
+  "diag.rolesCarriedOver": {
+    zh: "注意等级沿用前代规则的实测携带率，仅在过渡期内有效：",
+    en: "Attention levels carry over the previous regulation's measured rates, and only while the handover window is open:",
+    ja: "注目度は前レギュレーションの実測採用率を引き継いでおり、移行期間中のみ有効です：" },
+  "dex.forms": { zh: "形态", en: "Forms", ja: "フォルム" },
   "diag.roles": { zh: "功能覆盖", en: "Functional coverage", ja: "機能カバー" },
   "diag.cov.priority_attack": { zh: "先制攻击", en: "Priority attack", ja: "先制技" },
   "diag.cov.weather_rewrite": { zh: "天气改写", en: "Weather rewrite", ja: "天候書き換え" },
+  "diag.cov.terrain_control": { zh: "场地控制", en: "Terrain control", ja: "フィールド管理" },
   "diag.cov.fake_out": { zh: "击掌奇袭", en: "Fake Out", ja: "ねこだまし" },
   "diag.cov.damage_mitigation": { zh: "火力削弱", en: "Damage mitigation", ja: "火力削減" },
   "diag.cov.disruption": { zh: "干扰", en: "Disruption", ja: "妨害" },
@@ -804,6 +810,10 @@ const STRINGS = {
     zh: "能覆盖或改写对手设下的天气。",
     en: "Overwrites the weather the opponent set.",
     ja: "相手が張った天候を上書きできる。" },
+  "diag.covDesc.terrain_control": {
+    zh: "能张开自己的场地，或清掉对手的场地。",
+    en: "Sets a terrain of its own, or clears the opponent's.",
+    ja: "自分のフィールドを張る、または相手のフィールドを消せる。" },
   "diag.covDesc.fake_out": {
     zh: "用击掌奇袭让对手畏缩，为己方争取一回合。",
     en: "Uses Fake Out to flinch a foe and buy a turn.",

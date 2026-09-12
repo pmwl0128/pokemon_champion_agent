@@ -81,6 +81,28 @@ Optional:
 - `curHP`: current HP as raw integer.
 - `tera`: boolean.
 - `teraType`: type name.
+- `abilityOn`: whether a conditionally-activated ability has already triggered. Most abilities default
+  to active. The ones whose trigger a single damage frame cannot observe default to inactive, matching
+  the upstream calculator's unchecked toggles: Flash Fire, Plus, Minus, Trace, Stakeout, Sand Spit,
+  Battle Bond, Electromorphosis, Wind Power and Seed Sower. Pass `true` to model them as active.
+
+## On-Field State
+
+Before the damage frame is computed the wrapper resolves the state both Pokémon bring onto the field,
+so these do not have to be pre-baked into `boosts`, `item`, `ability` or the field:
+
+- copied and suppressed abilities (Trace, Neutralizing Gas, Klutz),
+- type changes from Mimicry, Forecast and Terastallization,
+- weather suppression from Air Lock and Cloud Nine,
+- terrain seeds, Protosynthesis and Quark Drive, Intrepid Sword and Dauntless Shield, Wind Rider,
+  Download, Embody Aspect and Battle Bond,
+- Infiltrator ignoring the defender's screens,
+- Heavy Metal, Light Metal and Float Stone feeding the weight-based base powers,
+- the item, field and status modifiers on Speed that the speed-ratio moves read.
+
+The two switch-in effects that move the **other** side's stat stages, Intimidate and Supersweet Syrup,
+are also resolved. Set the top-level `switch_in_drops` to `false` when the caller already encodes that
+drop in `boosts`, otherwise it is counted twice. Nothing else on the list is switchable.
 
 ## Field Object
 
@@ -207,7 +229,7 @@ Supported table filters:
 
 Speed modifiers are computed through the same bundled NCP functions used by the damage wrapper: stat stages, Choice Scarf, Iron Ball-style speed-halving items, Quick Feet, Slow Start, Chlorophyll, Swift Swim, Sand Rush, Slush Rush, Surge Surfer, Unburden, Tailwind, swamp, and paralysis.
 
-The speedline implementation follows the Champions speedline convention for the current M-B context.
+The speedline implementation follows the Champions speedline convention for the active rule data.
 
 ## Attribution
 

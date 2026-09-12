@@ -24,6 +24,9 @@ from cliffs import (  # noqa: E402
 )
 import completeness  # noqa: E402
 import team_i18n as i18n  # noqa: E402
+import handover  # noqa: E402
+import repset  # noqa: E402
+import rules  # noqa: E402
 
 WEAK_CONCENTRATION_MIN = 2          # >=2 members weak to a type is worth surfacing
 HIGH_SEVERITY_SHARE = 0.5           # >=50% of the team weak == high severity
@@ -790,8 +793,13 @@ _ROLE_MOVES: dict[str, set[str]] = {
         "tailwind", "trick room", "icy wind", "electroweb", "thunder wave", "glare", "nuzzle",
         "sticky web", "scary face", "bulldoze", "rock tomb", "low sweep", "cotton spore",
         "string shot", "quash", "after you", "flame charge", "trailblaze", "rapid spin",
-        "aqua step",
+        "aqua step", "drum beating",
     },
+    # Terrain is its own axis: weather answers to weather_rewrite, and until this existed a team
+    # built on a terrain answered to nothing at all. Removal belongs here for the same reason Defog
+    # belongs to hazard_control — controlling the field includes taking it away.
+    "terrain_control": {"grassy terrain", "psychic terrain", "electric terrain", "misty terrain",
+                        "steel roller"},
     "redirection": {"follow me", "rage powder", "spotlight", "ally switch"},
     "screens": {"reflect", "light screen", "aurora veil"},
     "status": {
@@ -869,6 +877,7 @@ _ROLE_LABELS = {
     "disruption": "disruption", "fake_out": "Fake Out pressure (doubles)",
     "damage_mitigation": "damage mitigation", "priority_attack": "priority attack",
     "weather_rewrite": "weather rewrite", "spread": "spread damage (doubles)",
+    "terrain_control": "terrain control",
 }
 # Item signals (objective: the item is declared). Mega stones are intentionally omitted — Mega is
 # handled by validate/selection, not a role signal.
@@ -888,6 +897,7 @@ _ABILITY_SIGNALS = {
     "Sand Stream": "sandstorm setter", "Snow Warning": "snow setter",
     "Electric Surge": "Electric Terrain setter", "Grassy Surge": "Grassy Terrain setter",
     "Misty Surge": "Misty Terrain setter", "Psychic Surge": "Psychic Terrain setter",
+    "Seed Sower": "Grassy Terrain setter (on being hit)",
     "Levitate": "Ground immunity (defensive)", "Eelevate": "Ground immunity (defensive)",
     "Magic Bounce": "reflects status/hazards",
     "Unaware": "ignores stat changes (wall)", "Multiscale": "halves damage at full HP (wall)",
@@ -908,7 +918,8 @@ _ABILITY_SIGNAL_I18N = {
     "Drought": "role_signal_sun_setter", "Sand Stream": "role_signal_sand_setter",
     "Snow Warning": "role_signal_snow_setter", "Electric Surge": "role_signal_electric_terrain",
     "Grassy Surge": "role_signal_grassy_terrain", "Misty Surge": "role_signal_misty_terrain",
-    "Psychic Surge": "role_signal_psychic_terrain", "Levitate": "role_signal_ground_immunity",
+    "Psychic Surge": "role_signal_psychic_terrain", "Seed Sower": "role_signal_seed_sower",
+    "Levitate": "role_signal_ground_immunity",
     "Eelevate": "role_signal_ground_immunity", "Magic Bounce": "role_signal_magic_bounce",
     "Unaware": "role_signal_unaware", "Multiscale": "role_signal_multiscale",
     "Imposter": "role_signal_imposter",
@@ -927,6 +938,9 @@ _ABILITY_COVERAGE.update({"Unaware": {"anti_setup"}, "Imposter": {"anti_setup"}}
 _ABILITY_COVERAGE.update({"Intimidate": {"damage_mitigation"}})
 _ABILITY_COVERAGE.update({ab: {"weather_rewrite"}
                           for ab in ("Drizzle", "Drought", "Sand Stream", "Snow Warning")})
+_ABILITY_COVERAGE.update({ab: {"terrain_control"}
+                          for ab in ("Grassy Surge", "Psychic Surge", "Electric Surge",
+                                     "Seed Sower")})
 # Additional ability->role coverage (maintainer meta call 2026-07-16). Multi-role abilities
 # carry a multi-element set; base+Mega union is handled by diagnose_roles via ability_tag_via.
 _ABILITY_COVERAGE.update({
@@ -948,8 +962,8 @@ _ABILITY_COVERAGE.update({
 # each in this order). Roles not in a format's tier map are NOT_CHECKED (omitted).
 _ROLE_ORDER = ["speed_control", "priority_attack", "anti_setup", "protect", "fake_out",
                "spread", "damage_mitigation", "redirection", "hazard_set", "hazard_control",
-               "pivot", "recovery", "screens", "disruption", "weather_rewrite", "status",
-               "setup", "partner_support", "side_protect"]
+               "pivot", "recovery", "screens", "disruption", "weather_rewrite",
+               "terrain_control", "status", "setup", "partner_support", "side_protect"]
 # Per-format THREE-LEVEL ATTENTION calibration (maintainer meta call, grounded in the M-B
 # real-team library carry rates AND functional necessity). The tiers are ATTENTION levels for
 # a MISSING role, NOT "required vs optional":
@@ -963,8 +977,8 @@ _ROLE_TIERS = {
     "single": {
         # level 1 gained hazard_set (maintainer call): 57% carry, a real tempo/chip axis.
         "required": {"speed_control", "anti_setup", "priority_attack", "hazard_set"},
-        "optional": {"pivot", "recovery", "screens", "disruption",
-                     "damage_mitigation", "weather_rewrite", "status", "setup"},
+        "optional": {"pivot", "recovery", "screens", "disruption", "damage_mitigation",
+                     "weather_rewrite", "terrain_control", "status", "setup"},
         # level 3 (omitted): hazard_control, protect (doubles mechanic), redirection,
         # fake_out, partner_support / side_protect, spread (a doubles-only AOE role).
     },
@@ -973,10 +987,35 @@ _ROLE_TIERS = {
         "required": {"speed_control", "protect", "damage_mitigation", "priority_attack",
                      "fake_out", "weather_rewrite", "spread"},
         "optional": {"redirection", "pivot", "recovery", "screens", "disruption",
-                     "status", "setup", "partner_support", "side_protect"},
+                     "terrain_control", "status", "setup", "partner_support", "side_protect"},
         # level 3 (omitted): hazard_set / hazard_control (0% in doubles), anti_setup (~5%).
     },
 }
+_ROLE_CALIBRATION_RULE = "M-B"
+
+
+def _role_calibration(effective_rule: str) -> dict[str, Any]:
+    """Whether the role-attention study applies to `effective_rule`, and on what basis.
+
+    The carry rates were measured on real M-B teams. A regulation opens with far too few real teams to
+    re-measure anything, so for as long as the cross-rule handover window is open — the same seven-day
+    clock every other predecessor-evidence view runs on — the predecessor's rates carry over and the
+    status says exactly that, instead of claiming a review that has not happened. When the window
+    closes the calibration reverts to unreviewed and every absence goes back to neutral.
+    """
+    if effective_rule == _ROLE_CALIBRATION_RULE:
+        return {"rule": effective_rule, "status": "reviewed"}
+    try:
+        receipt = handover.load_active_receipt(repset.data_dir(), effective_rule)
+    except Exception:                    # noqa: BLE001 — a broken receipt is not this view's call
+        # The opponent-cache loader is the authority on a malformed receipt and fails loudly there.
+        # Here the safe reading is simply "no carry-over": it costs a warning tier, not correctness.
+        receipt = None
+    if receipt and receipt.get("evidence_rule") == _ROLE_CALIBRATION_RULE:
+        return {"rule": effective_rule, "status": "carried_over",
+                "measured_on": _ROLE_CALIBRATION_RULE,
+                "expires_at": receipt.get("expires_at")}
+    return {"rule": effective_rule, "status": "unreviewed"}
 # Reason text for LEVEL-2 absences (the AI reads it; the panel shows a generic note).
 _OPTIONAL_REASONS = {
     "single": {
@@ -1008,7 +1047,8 @@ def _stat_orientation(stats: dict[str, Any]) -> dict[str, Any]:
     return {"offense_lean": lean, "atk": at, "spa": sa, "bulk": defensive_headroom(stats)}
 
 
-def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]], *,
+                   rule: str | None = None) -> dict[str, Any]:
     """Objective functional signals per member + a neutral team coverage checklist + compression.
 
     Move signals come from move NAMES (no dex move lookup needed); stat orientation + bulk come from
@@ -1096,13 +1136,21 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
     # Doubles also checklists the partner-support + side-protection categories (singles don't run them,
     # so they'd be phantom 'not detected' gaps there — §16.3 doubles aspect).
     fmt = (team.format or "").lower()
-    tiers = _ROLE_TIERS.get(fmt, _ROLE_TIERS["single"])
+    effective_rule = (rule or team.rule or rules.current_rule()).upper()
+    calibration = _role_calibration(effective_rule)
+    calibrated = calibration["status"] in ("reviewed", "carried_over")
+    base_tiers = _ROLE_TIERS.get(fmt, _ROLE_TIERS["single"])
+    # The objective detectors remain useful after a regulation change, but an old carry-rate study may
+    # not decide which absences deserve a warning. Until the target rule is reviewed, retain the same
+    # format-applicable coverage surface and make every absence neutral.
+    tiers = (base_tiers if calibrated else
+             {"required": set(), "optional": base_tiers["required"] | base_tiers["optional"]})
     req, opt = tiers["required"], tiers["optional"]
     # required tier first, then optional — each in canonical order. NOT_CHECKED roles (in
     # neither set for this format) are simply never listed.
     checklist = ([t for t in _ROLE_ORDER if t in req]
                  + [t for t in _ROLE_ORDER if t in opt])
-    reasons = _OPTIONAL_REASONS.get(fmt, {})
+    reasons = _OPTIONAL_REASONS.get(fmt, {}) if calibrated else {}
     coverage: dict[str, dict[str, Any]] = {}
     for tag in checklist:
         bearers: list[dict[str, str]] = []
@@ -1152,6 +1200,15 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
                      "'not detected' may be incomplete): " + names + ".")
     if skipped:
         notes.append("Skipped (no dex facts): " + ", ".join(skipped) + ".")
+    if not calibrated:
+        notes.append(
+            f"Role-attention calibration has not been reviewed for {effective_rule}; objective "
+            "coverage is shown, but no absence is promoted to a required warning.")
+    elif calibration["status"] == "carried_over":
+        notes.append(
+            f"Role-attention calibration was measured on real {calibration['measured_on']} teams and "
+            f"carries over to {effective_rule} only while the handover window is open (until "
+            f"{calibration['expires_at']}); after that every absence returns to neutral.")
 
     assumptions = [
         "role signals are heuristic (move-name / base-stat / item / ability derived), not role labels",
@@ -1166,6 +1223,7 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]]) -> dict[str, An
         "partial": len(members) < 6,
         "members": members,
         "coverage": coverage,
+        "attention_calibration": calibration,
         "not_detected": not_detected,
         "compression": compression,
         "coverage_confirmed": coverage_confirmed,

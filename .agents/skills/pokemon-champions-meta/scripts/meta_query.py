@@ -12,6 +12,7 @@ from typing import Any
 
 from meta_common import (
     CACHE_DIR,
+    EnvironmentResolutionError,
     details_path,
     load_json,
     maybe_repair_cn,
@@ -1751,7 +1752,15 @@ def main() -> int:
 
     args = parser.parse_args()
     i18n.set_lang(getattr(args, "lang", None))
-    args.func(args)
+    try:
+        args.func(args)
+    except EnvironmentResolutionError as exc:
+        query = f"{getattr(args, 'season', None) or 'current'}/{getattr(args, 'format', 'both')}"
+        if args.command == "report":
+            _emit_meta_error(query, "not_found", str(exc))
+            return 0
+        _emit_meta_error(query, "unknown_format", str(exc))
+        return 1
     return 0
 
 

@@ -23,7 +23,7 @@ export interface DexIndexEntry {
   stats: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number };
   abilities: Array<{ name: string; nameZh?: string; nameJa?: string }>;
   isMega: boolean;
-  baseSpecies?: string;   // the pre-mega species name, on mega-form entries only
+  baseSpecies?: string;   // the species this entry is a form of (Mega, regional, appearance, ...)
 }
 
 /** Local-only UEP session surface (design §4.2/§6). Artifacts are OPAQUE text here: the

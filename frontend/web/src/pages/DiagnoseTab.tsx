@@ -716,7 +716,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
       {!bare.all && <div className="panel builder-result diag-section">
         <h2>{t("diag.offense")}</h2>
         {report.offense.incompleteMembers.length > 0 && (
-          <p className="notice diag-unconfirmed">
+          <p className="notice diag-unconfirmed diag-incomplete">
             {t("diag.gapsUnconfirmed")}{" "}
             <SpeciesChips names={report.offense.incompleteMembers.map((m) => m.species)} />
           </p>
@@ -767,9 +767,17 @@ function Report({ report }: { report: DiagnoseReportDto }) {
       {!bare.all && <div className="panel builder-result diag-section">
         <h2>{t("diag.roles")}</h2>
         {report.roles.incompleteMembers.length > 0 && (
-          <p className="notice diag-unconfirmed">
+          <p className="notice diag-unconfirmed diag-incomplete">
             {t("diag.rolesUncounted")}{" "}
             <SpeciesChips names={report.roles.incompleteMembers.map((m) => m.species)} />
+          </p>
+        )}
+        {report.roles.attentionCalibration?.status === "carried_over" && (
+          <p className="notice diag-unconfirmed">
+            {t("diag.rolesCarriedOver")}{" "}
+            {report.roles.attentionCalibration.measuredOn} &rarr;{" "}
+            {report.roles.attentionCalibration.rule},{" "}
+            {report.roles.attentionCalibration.expiresAt}
           </p>
         )}
         <table className="data-table diag-table diag-coverage-table">

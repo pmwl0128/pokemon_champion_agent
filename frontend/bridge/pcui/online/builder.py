@@ -700,13 +700,16 @@ class _Assembler:
 # Life Orb whose recoil bleeds its bulk (user-reported) and an attacker never gets
 # Leftovers as an early pick. The type-specific "nice to have" fillers (a STAB
 # type-boost item, a weakness-resist berry) are intentionally dropped: they need
-# per-species type/weakness resolution — too costly for a legality filler, and five
-# generic picks per lean are enough. Rocky Helmet is NOT in the Champions item pool
-# (verified against the dex) — do not add it back.
-_OFFENSIVE_FILLERS = ["Life Orb", "Choice Scarf", "Focus Sash", "Lum Berry", "Sitrus Berry", "Leftovers"]
-_DEFENSIVE_FILLERS = ["Sitrus Berry", "Leftovers", "Lum Berry", "Focus Sash", "Choice Scarf", "Life Orb"]
+# per-species type/weakness resolution — too costly for a legality filler, and a handful of
+# generic picks per lean are enough. Membership follows the POOL: Rocky Helmet was absent before
+# Regulation M-C and is in it now, so it joins as the defensive table's first pick. Anything added
+# here must be verified against the current dex and added to BOTH tables.
+_OFFENSIVE_FILLERS = ["Life Orb", "Choice Scarf", "Focus Sash", "Lum Berry", "Sitrus Berry",
+                      "Leftovers", "Rocky Helmet"]
+_DEFENSIVE_FILLERS = ["Rocky Helmet", "Sitrus Berry", "Leftovers", "Lum Berry", "Focus Sash",
+                      "Choice Scarf", "Life Orb"]
 _OFFENSIVE_FLAVOR = {"Life Orb", "Choice Scarf"}     # in a collision, keep on the attacker
-_DEFENSIVE_FLAVOR = {"Leftovers", "Sitrus Berry"}    # in a collision, keep on the wall
+_DEFENSIVE_FLAVOR = {"Leftovers", "Sitrus Berry", "Rocky Helmet"}    # in a collision, keep on the wall
 
 
 def _is_offensive(member: dict) -> bool:
