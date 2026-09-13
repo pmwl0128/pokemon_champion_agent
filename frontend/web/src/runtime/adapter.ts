@@ -138,6 +138,70 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
   return (await resp.json()) as T;
 }
 
+/** POST one slow online request and read its NDJSON event stream.
+ *
+ * The public origin sits behind a CDN that closes an origin-pull connection which has produced no
+ * bytes for about ten seconds, so a plain JSON POST of a 15-60 s deterministic job never reaches
+ * the browser at all — it fails as a bare network error while the server happily finishes the
+ * work. Asking for `application/x-ndjson` puts the same endpoint on a stream that opens before the
+ * work starts and heartbeats while it runs. Events: `progress` (ignored), `report` (an
+ * intermediate snapshot handed to `onReport`), `done` (the final payload) and `error` (rethrown
+ * with the status the plain JSON response would have carried).
+ */
+export async function postNdjson(url: string, body: unknown,
+                                 onReport?: (report: unknown) => void): Promise<unknown> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Accept": "application/x-ndjson" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = JSON.stringify((await response.json() as { detail?: unknown }).detail ?? "");
+    } catch { /* non-JSON error body */ }
+    throw new HttpError(response.status,
+      `${response.status} ${url}${detail ? ` — ${detail}` : ""}`);
+  }
+  // A deployment that answered plain JSON (an older origin, or a proxy that stripped the
+  // stream) still carries the whole payload in the body.
+  if (!response.body) return await response.json();
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let final: { value: unknown } | null = null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = done ? "" : (lines.pop() ?? "");
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as {
+          type?: string; result?: unknown; report?: unknown; status?: number; detail?: unknown;
+        };
+        if (event.type === "error") {
+          throw new HttpError(event.status ?? 500,
+            `${event.status ?? 500} ${url} — ${JSON.stringify(event.detail ?? "")}`);
+        }
+        if (event.type === "report") onReport?.(event.report);
+        if (event.type === "done") final = { value: event.result };
+      }
+      if (done) break;
+    }
+    if (!final) throw new HttpError(502, `502 ${url} — incomplete event stream`);
+    return final.value;
+  } catch (error) {
+    try { await reader.cancel(); } catch { /* transport may already be closed */ }
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(502, `502 ${url} — malformed event stream`);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 /** Single-flight promise cache that DROPS a rejected result so a transient failure can be
  * retried instead of poisoning the cache for the whole session (a page reload was otherwise
  * the only recovery). Success is cached for the session as before. */

@@ -204,9 +204,12 @@ ONLINE_ROUTES: dict[RouteKey, dict[str, Any]] = {
         "Read runtime capabilities", "system", _ref("CapabilitiesSchema")),
     ("GET", "/api/quota"): _route(
         "Read anonymous daily quotas", "system", _ref("OnlineQuotaDtoSchema")),
+    # Every slow online surface also answers as an NDJSON event stream when the client asks for
+    # one (Accept: application/x-ndjson) — see the server's STREAM_HEARTBEAT.
     ("POST", "/api/qa"): _route(
         "Ask one deterministic-tool-grounded question", "llm", _ref("QaAnswerDtoSchema"),
-        request=_ref("QaRequestDtoSchema")),
+        request=_ref("QaRequestDtoSchema"),
+        extra_content={"application/x-ndjson": _NDJSON}),
     ("POST", "/api/team/diagnose"): _route(
         "Diagnose one team", "team", _ref("DiagnoseReportDtoSchema"),
         request=_ref("DiagnoseRequestDtoSchema"),
@@ -214,10 +217,12 @@ ONLINE_ROUTES: dict[RouteKey, dict[str, Any]] = {
     ("POST", "/api/team/matchup"): _route(
         "Calculate registered-team matchup facts", "team",
         _ref("ActualMatchupResponseDtoSchema"),
-        request=_ref("ActualMatchupRequestDtoSchema")),
+        request=_ref("ActualMatchupRequestDtoSchema"),
+        extra_content={"application/x-ndjson": _NDJSON}),
     ("POST", "/api/team/tune"): _route(
         "Calculate authoritative SP cliffs", "team", _ref("TuneResultDtoSchema"),
-        request=_ref("TuneRequestDtoSchema")),
+        request=_ref("TuneRequestDtoSchema"),
+        extra_content={"application/x-ndjson": _NDJSON}),
     ("POST", "/api/builder"): _route(
         "Start one simplified team build", "builder", _ref("BuilderStartDtoSchema"),
         request=_ref("BuilderRequestDtoSchema")),

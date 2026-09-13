@@ -428,6 +428,34 @@ def resolve_name(c: sqlite3.Connection, kind: str, text: str, *, fuzzy: bool = T
     return miss
 
 
+def mega_forms_for(c: sqlite3.Connection, canonical: str,
+                   base_species: str | None) -> list[dict[str, Any]]:
+    """The Mega forms this ROSTER FORM may evolve into (holding the listed stone).
+
+    `base_species` is the Species Clause GROUPING KEY, not a host pointer, so a Mega form's key
+    cannot be matched against a member's name blindly: Raichu and Raichu-Alola share the key
+    "Raichu", yet only Raichu itself holds Raichuite X/Y. The strict name match is therefore the
+    rule — except for the one Champions species whose grouping key is not a roster form at all
+    (Mega Floette keys under "Floette" while the roster only has Floette-Eternal). There the
+    group's single non-Mega form is unambiguously the host, and refusing to say so is what left a
+    legal Floette-Eternal + Floettite registration counted as no Mega at all.
+    """
+    def rows_for(host: str) -> list[dict[str, Any]]:
+        return [{"name": r["canonical"], "required_item": r["required_item"]}
+                for r in c.execute(
+                    "select canonical, required_item from pokemon "
+                    "where is_mega=1 and base_species=? order by canonical", (host,))]
+
+    forms = rows_for(canonical)
+    if forms or not base_species or base_species == canonical:
+        return forms
+    if c.execute("select 1 from pokemon where canonical=?", (base_species,)).fetchone():
+        return []                       # the key IS a roster form: only that form is the host
+    hosts = [r["canonical"] for r in c.execute(
+        "select canonical from pokemon where is_mega=0 and base_species=?", (base_species,))]
+    return rows_for(base_species) if hosts == [canonical] else []
+
+
 def row_to_pokemon(row: sqlite3.Row, c: sqlite3.Connection, include_moves: bool = False) -> dict[str, Any]:
     data = {
         "name": row["canonical"],
@@ -442,12 +470,9 @@ def row_to_pokemon(row: sqlite3.Row, c: sqlite3.Connection, include_moves: bool 
         "required_item": row["required_item"],
     }
     if not data["is_mega"]:
-        megas = c.execute(
-            "select canonical, required_item from pokemon where is_mega=1 and base_species=? order by canonical",
-            (row["canonical"],),
-        ).fetchall()
+        megas = mega_forms_for(c, row["canonical"], row["base_species"])
         if megas:
-            data["mega_forms"] = [{"name": m["canonical"], "required_item": m["required_item"]} for m in megas]
+            data["mega_forms"] = megas
     if include_moves:
         moves = [r["move"] for r in c.execute("select move from learnsets where pokemon=? order by move", (row["canonical"],))]
         data["moves"] = moves

@@ -438,9 +438,9 @@ const STRINGS = {
                            en: "A Pokémon badged A/B/C runs several real builds — click it to switch",
                            ja: "A/B/C バッジのポケモンには複数の実型があります。クリックで切り替え" },
   "matchup.omittedNoSet": {
-    zh: "KO 表已省略 {count} 个没有可用计算结果的防守轴，避免把空白误当成伤害结果。",
-    en: "The KO table omits {count} defender axes with no usable calculation results, so missing data is not mistaken for damage.",
-    ja: "KO表では、利用可能な計算結果がない防御軸を{count}件省略し、欠損データをダメージ結果と誤認しないようにしています。" },
+    zh: "本表已省略 {count} 个没有可用计算结果的对手轴，避免把空白误当成结论。",
+    en: "This table omits {count} opponent axes with no usable calculation results, so missing data is not mistaken for a verdict.",
+    ja: "この表では、利用可能な計算結果がない相手軸を{count}件省略し、欠損データを結論と誤認しないようにしています。" },
   "matchup.variantModal": { zh: "主流", en: "most common", ja: "最頻" },
   "matchup.variantShare": { zh: "占该宝可梦真实队伍的 {n}", en: "{n} of this Pokémon's real teams",
                             ja: "このポケモンの実チームの {n}" },

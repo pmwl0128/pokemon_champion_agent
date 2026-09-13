@@ -26,7 +26,7 @@ import { useRuntime } from "../runtime/context.tsx";
 import { displayName, optionalKey, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
 import { koLabel, koTone } from "../lib/ko.ts";
-import { populatedKoAxes } from "../lib/matchupGrid.ts";
+import { populatedAxes } from "../lib/matchupGrid.ts";
 import { CellInspector, SetBlock, type InspectorDamage } from "../components/CellInspector.tsx";
 import { ActualMatchupWorkspace } from "./ActualMatchupWorkspace.tsx";
 
@@ -189,7 +189,7 @@ function KoGrid({ format }: { format: FormatId }) {
     // while only real joint four-move sets become attacker rows. Independently, do not render an
     // all-empty axis when every calculation for an active build failed or was unavailable: absence
     // is not damage data.
-    const available = populatedKoAxes(overview.grid);
+    const available = populatedAxes(overview.grid);
     const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
     // Attacker rows are decided by the ACTIVE build: switching a species to a build that has no
     // offense row (meta-only) correctly drops it from the rows.
@@ -392,16 +392,19 @@ function CheckGrid({ format }: { format: FormatId }) {
   const view = useMemo(() => {
     if (state.status !== "ready") return null;
     const checks: OppCheckGridDto = state.data;
-    const cols = [...checks.species].sort(byRank);
-    // Rows are the species that actually have an attacker row for their active build.
-    const rows = cols.filter((s) => checks.grid[activeKey(s, rowPicks)]);
+    const all = [...checks.species].sort(byRank);
+    // Every grade is derived from an ordered ATTACKER pair, so a build with no offense row is
+    // neither a row nor a column here — leaving it in painted a blank column across the table.
+    const available = populatedAxes(checks.grid);
+    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
+    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     const byVariant = new Map<string, SpeciesRowDto>();
     for (const sp of checks.species) {
       for (const v of sp.variants ?? []) byVariant.set(v.key, sp);
       byVariant.set(sp.slug, sp);
     }
-    return { checks, cols, rows, byVariant };
-  }, [state, rowPicks]);
+    return { checks, cols, rows, byVariant, omittedCols: all.length - cols.length };
+  }, [state, rowPicks, colPicks]);
 
   // Each cell is exactly the two builds it names — the grid holds every ordered build pair, so a
   // column reads its own build rather than an aggregate over the species.
@@ -415,7 +418,7 @@ function CheckGrid({ format }: { format: FormatId }) {
       : t("state.errorDetail")}</div>;
   }
   if (!view) return null;
-  const { checks, cols, rows, byVariant } = view;
+  const { checks, cols, rows, byVariant, omittedCols } = view;
   const selCell = sel ? checks.grid[sel.m]?.[sel.o] ?? null : null;
   // Damage/speed for the selected pair come from the KO matrix — this grid intentionally does not
   // duplicate them (they are derived from it).
@@ -431,6 +434,12 @@ function CheckGrid({ format }: { format: FormatId }) {
         <div className="matrix-guide variant-guide">
           <span className="matrix-guide-mark" aria-hidden>◧</span>
           {t("matchup.variantHint")}
+        </div>
+      )}
+      {omittedCols > 0 && (
+        <div className="matrix-guide variant-guide">
+          <span className="matrix-guide-mark" aria-hidden>−</span>
+          {t("matchup.omittedNoSet").replace("{count}", String(omittedCols))}
         </div>
       )}
       <div className="matchup-scroll">

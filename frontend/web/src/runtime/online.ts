@@ -24,7 +24,7 @@ import {
 import { engineDamage, engineDamageBatch, engineSpeedBatch } from "../lib/calc-engine/index.ts";
 import { loadTeamEvidence } from "./teamEvidence.ts";
 import {
-  AsyncOnce, HttpError, fetchJson, versionParam,
+  AsyncOnce, HttpError, fetchJson, postNdjson, versionParam,
   type BuilderApi, type DexIndexEntry, type RuntimeAdapter, type RuntimeConfig,
 } from "./adapter.ts";
 
@@ -216,31 +216,20 @@ export class OnlineAdapter implements RuntimeAdapter {
   }
 
   async tune(team: unknown, benchmarks: unknown[]) {
-    return TuneResultDtoSchema.parse(await fetchJson(`${this.cfg.apiBase}/team/tune`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ team, benchmarks }),
-    }));
+    return TuneResultDtoSchema.parse(await postNdjson(
+      `${this.cfg.apiBase}/team/tune`, { team, benchmarks }));
   }
 
   /** Fact QA (llm.qa): needs the API backend — only reachable when the deployment
    * advertised llm.qa in its projection capabilities (the page is hidden otherwise); the
    * backend enforces its own limits regardless. */
   async qa(req: QaRequestDto): Promise<QaAnswerDto> {
-    return QaAnswerDtoSchema.parse(await fetchJson(`${this.cfg.apiBase}/qa`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    }));
+    return QaAnswerDtoSchema.parse(await postNdjson(`${this.cfg.apiBase}/qa`, req));
   }
 
   async actualMatchup(req: ActualMatchupRequestDto) {
-    return ActualMatchupResponseDtoSchema.parse(await fetchJson(
-      `${this.cfg.apiBase}/team/matchup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req),
-      }));
+    return ActualMatchupResponseDtoSchema.parse(await postNdjson(
+      `${this.cfg.apiBase}/team/matchup`, req));
   }
 
   async quota(): Promise<OnlineQuotaDto> {
@@ -252,53 +241,11 @@ export class OnlineAdapter implements RuntimeAdapter {
    * text in, disclosure-safe per-aspect report out. */
   async diagnose(req: DiagnoseRequestDto,
                  onReport?: (report: DiagnoseReportDto) => void): Promise<DiagnoseReportDto> {
-    const url = `${this.cfg.apiBase}/team/diagnose`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/x-ndjson" },
-      body: JSON.stringify(req),
-    });
-    if (!response.ok) throw new HttpError(response.status, `${response.status} ${url}`);
-    if (!response.body) {
-      return DiagnoseReportDtoSchema.parse(await response.json());
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let final: DiagnoseReportDto | null = null;
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        const lines = buffer.split("\n");
-        buffer = done ? "" : (lines.pop() ?? "");
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const event = JSON.parse(line) as {
-            type?: string; report?: unknown; status?: number; detail?: unknown;
-          };
-          if (event.type === "error") {
-            throw new HttpError(event.status ?? 500,
-              `${event.status ?? 500} ${url} — ${JSON.stringify(event.detail ?? "")}`);
-          }
-          if ((event.type === "report" || event.type === "done") && event.report) {
-            const report = DiagnoseReportDtoSchema.parse(event.report);
-            if (event.type === "report") onReport?.(report);
-            else final = report;
-          }
-        }
-        if (done) break;
-      }
-      if (!final) throw new HttpError(502, `502 ${url} — incomplete diagnose stream`);
-      return final;
-    } catch (error) {
-      try { await reader.cancel(); } catch { /* transport may already be closed */ }
-      if (error instanceof HttpError) throw error;
-      throw new HttpError(502, `502 ${url} — malformed diagnose stream`);
-    } finally {
-      reader.releaseLock();
-    }
+    return DiagnoseReportDtoSchema.parse(await postNdjson(
+      `${this.cfg.apiBase}/team/diagnose`, req,
+      // A thinking-mode reading streams the finished deterministic report first, so the visitor
+      // can read legality, structure and matchups while the model is still writing.
+      onReport ? (report) => onReport(DiagnoseReportDtoSchema.parse(report)) : undefined));
   }
 
   /** Builder wizard (llm.builder, design §7.3): same capability-gated backend surface as

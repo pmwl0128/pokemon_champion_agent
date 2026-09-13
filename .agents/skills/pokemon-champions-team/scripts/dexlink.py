@@ -75,7 +75,7 @@ def lookup_pokemon(names: list[str], *, fuzzy: bool = False) -> dict[str, dict[s
     """Resolve each name to dex facts. Returns query-name -> fact dict.
 
     Fact dict keys: found, name (canonical), display_name, types, stats, abilities,
-    moves (cached learnset), is_mega, base_species, required_item.
+    moves (cached learnset), is_mega, base_species, required_item, mega_forms.
 
     With `fuzzy=True` the dex applies its conservative typo fallback: a confident-unique
     hit carries a `resolution` block ({match_type,score,distance,from}); a miss may carry `suggestions`
@@ -110,6 +110,9 @@ def lookup_pokemon(names: list[str], *, fuzzy: bool = False) -> dict[str, dict[s
                 "is_mega": row.get("is_mega", False),
                 "base_species": row.get("base_species"),
                 "required_item": row.get("required_item"),
+                # The dex owns the stone -> Mega host rule; base_species is only a Species Clause
+                # grouping key and cannot answer it (mega.py).
+                "mega_forms": row.get("mega_forms") or [],
             }
             if row.get("resolution"):
                 out[name]["resolution"] = row["resolution"]

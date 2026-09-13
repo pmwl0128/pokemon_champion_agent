@@ -31,9 +31,12 @@ def mega_form_from_maps(species: str | None, item: str | None, own_fact: dict[st
                         form_facts: dict[str, dict[str, Any]]) -> str | None:
     """Return the Mega form a species/item pair resolves to, or None.
 
-    A member already authored as a Mega form resolves to itself. Otherwise each item `required_by`
-    form must match the member's base species. The form's dex `base_species` wins; `base_of_form_name`
-    is only a fallback for incomplete facts.
+    A member already authored as a Mega form resolves to itself. Otherwise the dex's own
+    `mega_forms` for that roster form decides: it owns the stone -> host rule, which is NOT a
+    `base_species` comparison (that field is the Species Clause grouping key — Raichu-Alola shares
+    "Raichu" without being able to hold Raichunite, while Floette-Eternal's group key "Floette" is
+    not a roster form at all). The `required_by` walk below stays as the fallback for callers whose
+    facts predate that field.
     """
     if not species:
         return None
@@ -42,6 +45,9 @@ def mega_form_from_maps(species: str | None, item: str | None, own_fact: dict[st
         return species
     if not item:
         return None
+    for form in own_fact.get("mega_forms") or []:
+        if form.get("required_item") == item and form.get("name"):
+            return str(form["name"])
     for form in (item_info.get(item, {}) or {}).get("required_by", []):
         base = form_base_species(form, form_facts.get(form, {}) or {})
         if base == species:

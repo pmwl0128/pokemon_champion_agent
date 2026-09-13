@@ -39,7 +39,13 @@ BUILDER_TACTICS = ("stall", "trickroom", "weather", "tailwind", "screens",
                    "pivot", "setup", "hazards")
 DIAGNOSE_TEXT_MAX = 8_000       # a 6-member Showdown export is ~2KB; team-json ~4KB
 DIAGNOSE_TIMEOUT = 150.0        # one team.py session (parse, then validate+diagnose)
-DIAGNOSE_STREAM_HEARTBEAT = 15.0  # keep the proxy/client path alive while deterministic work runs
+# The public origin sits behind a CDN that drops an origin-pull connection which has produced no
+# bytes for about ten seconds; nginx logs it as 499 and the visitor sees a bare network failure.
+# Every endpoint that can outlast that therefore answers as an NDJSON stream which starts before
+# the work does and never goes quiet for longer than this. Keep it comfortably under the cutoff.
+STREAM_HEARTBEAT = 5.0
+# One heartbeat line: a valid NDJSON event that carries no content.
+PROGRESS_EVENT = '{"type":"progress"}\n'
 DIAGNOSE_TOP_K = 30             # independent live battery scope; team skill permits 1..60
 MATCHUP_QUEUE_WAIT = 20.0        # deterministic lane: bounded wait, never consumes model quota
 MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 12x60 costs 24 units
@@ -106,7 +112,68 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
     job_subs: dict[str, set[asyncio.Queue]] = {}
     loop_ref: dict[str, asyncio.AbstractEventLoop] = {}
     builder_tasks: set[asyncio.Task] = set()
-    diagnose_stream_tasks: set[asyncio.Task] = set()
+    stream_tasks: set[asyncio.Task] = set()
+
+    def _ndjson_stream(run) -> StreamingResponse:
+        """Answer one slow request as an NDJSON event stream (see STREAM_HEARTBEAT).
+
+        `run(emit)` performs the request off the response path and returns the final payload;
+        it may call `await emit(event)` to publish an intermediate event. An HTTPException it
+        raises becomes a terminal `error` event carrying the same status and detail, so a
+        streaming client reports exactly what the plain JSON response would have.
+
+        Event types: `progress` (padding, no content), `report` (an intermediate snapshot),
+        `done` (`result` holds the payload) and `error`. The stream ends after `done`/`error`.
+        """
+        queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
+
+        def _push(kind: str, event: dict) -> None:
+            queue.put_nowait((kind, json.dumps(event, ensure_ascii=False)))
+
+        async def emit(event: dict) -> None:
+            _push(str(event.get("type") or "progress"), event)
+
+        async def worker() -> None:
+            try:
+                result = await run(emit)
+            except HTTPException as exc:
+                _push("error", {"type": "error", "status": exc.status_code,
+                                "detail": exc.detail})
+            except Exception:
+                traceback.print_exc()   # the client gets a code, the operator gets the cause
+                _push("error", {"type": "error", "status": 500,
+                                "detail": _err("bad_input", "request failed")})
+            else:
+                _push("done", {"type": "done", "result": result})
+
+        task = asyncio.create_task(worker())
+        stream_tasks.add(task)
+        task.add_done_callback(stream_tasks.discard)
+
+        async def events():
+            # Before the work starts, not after the first heartbeat interval: the response
+            # headers themselves are flushed with this chunk, so an idle-timeout proxy in the
+            # path must see the stream open immediately.
+            yield PROGRESS_EVENT
+            while True:
+                try:
+                    kind, line = await asyncio.wait_for(queue.get(),
+                                                        timeout=STREAM_HEARTBEAT)
+                except asyncio.TimeoutError:
+                    # Valid NDJSON event which old/new clients safely ignore. An empty line may
+                    # be swallowed by buffering proxies; a small object guarantees bytes.
+                    yield PROGRESS_EVENT
+                    continue
+                yield line + "\n"
+                if kind in ("done", "error"):
+                    break
+
+        return StreamingResponse(events(), media_type="application/x-ndjson",
+                                 headers={"Cache-Control": "no-store",
+                                          "X-Accel-Buffering": "no"})
+
+    def _wants_ndjson(request: Request) -> bool:
+        return "application/x-ndjson" in request.headers.get("accept", "")
 
     def _job_changed(job_id: str) -> None:
         loop = loop_ref.get("loop")
@@ -234,8 +301,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                                 limits.cfg.tune_daily_limit),
         }
 
-    @app.post("/api/qa")
-    async def qa_endpoint(request: Request, body: dict):
+    async def _execute_qa(request: Request, body: dict):
         question = str(body.get("question", "")).strip()
         lang = body.get("lang")
         if lang not in ("zh", "en", "ja"):
@@ -333,6 +399,14 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 "ms": round((time.monotonic() - started) * 1000),
             }
         return payload
+
+    @app.post("/api/qa")
+    async def qa_endpoint(request: Request, body: dict):
+        """A grounded answer costs several tool rounds plus model latency, so it takes the same
+        streaming path as the deterministic surfaces (see STREAM_HEARTBEAT)."""
+        if not _wants_ndjson(request):
+            return await _execute_qa(request, body)
+        return _ndjson_stream(lambda _emit: _execute_qa(request, body))
 
     # -- team diagnose (deterministic report + optional reading, design §7.5) ---------------
     # Deterministic CPU work gets its own semaphore; an optional reading uses the LLM lane.
@@ -508,53 +582,12 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     @app.post("/api/team/diagnose")
     async def team_diagnose(request: Request, body: dict):
-        if "application/x-ndjson" not in request.headers.get("accept", ""):
+        if not _wants_ndjson(request):
             return await _execute_team_diagnose(request, body)
+        return _ndjson_stream(lambda emit: _execute_team_diagnose(
+            request, body, lambda report: emit({"type": "report", "report": report})))
 
-        queue: asyncio.Queue[tuple[str, str]] = asyncio.Queue()
-
-        async def emit_report(report: dict) -> None:
-            event = {"type": "report", "report": report}
-            await queue.put(("report", json.dumps(event, ensure_ascii=False)))
-
-        async def run_stream() -> None:
-            try:
-                final = await _execute_team_diagnose(request, body, emit_report)
-            except HTTPException as exc:
-                event = {"type": "error", "status": exc.status_code, "detail": exc.detail}
-                await queue.put(("error", json.dumps(event, ensure_ascii=False)))
-            except Exception:
-                event = {"type": "error", "status": 500,
-                         "detail": _err("bad_input", "diagnose pipeline failed")}
-                await queue.put(("error", json.dumps(event, ensure_ascii=False)))
-            else:
-                event = {"type": "done", "report": final}
-                await queue.put(("done", json.dumps(event, ensure_ascii=False)))
-
-        task = asyncio.create_task(run_stream())
-        diagnose_stream_tasks.add(task)
-        task.add_done_callback(diagnose_stream_tasks.discard)
-
-        async def events():
-            while True:
-                try:
-                    kind, line = await asyncio.wait_for(
-                        queue.get(), timeout=DIAGNOSE_STREAM_HEARTBEAT)
-                except asyncio.TimeoutError:
-                    # Valid NDJSON event which old/new clients safely ignore. An empty line may be
-                    # swallowed by buffering proxies; a small object guarantees observable bytes.
-                    yield '{"type":"progress"}\n'
-                    continue
-                yield line + "\n"
-                if kind in ("done", "error"):
-                    break
-
-        return StreamingResponse(events(), media_type="application/x-ndjson",
-                                 headers={"Cache-Control": "no-store",
-                                          "X-Accel-Buffering": "no"})
-
-    @app.post("/api/team/matchup")
-    async def actual_team_matchup(request: Request, body: dict):
+    async def _execute_actual_matchup(request: Request, body: dict):
         """Actual registered sets vs top-K usage targets (deterministic; no LLM quota)."""
         acquire = asyncio.ensure_future(matchup_slots.acquire())
         done, _pending = await asyncio.wait({acquire}, timeout=MATCHUP_QUEUE_WAIT)
@@ -599,8 +632,13 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         finally:
             matchup_slots.release()
 
-    @app.post("/api/team/tune")
-    async def team_tune(request: Request, body: dict):
+    @app.post("/api/team/matchup")
+    async def actual_team_matchup(request: Request, body: dict):
+        if not _wants_ndjson(request):
+            return await _execute_actual_matchup(request, body)
+        return _ndjson_stream(lambda _emit: _execute_actual_matchup(request, body))
+
+    async def _execute_team_tune(request: Request, body: dict):
         """Authoritative SP cliff cards, metered per explicit benchmark and never by LLM quota."""
         acquire = asyncio.ensure_future(matchup_slots.acquire())
         done, _pending = await asyncio.wait({acquire}, timeout=TUNE_QUEUE_WAIT)
@@ -646,6 +684,12 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                                               "team tune calculation failed")) from exc
         finally:
             matchup_slots.release()
+
+    @app.post("/api/team/tune")
+    async def team_tune(request: Request, body: dict):
+        if not _wants_ndjson(request):
+            return await _execute_team_tune(request, body)
+        return _ndjson_stream(lambda _emit: _execute_team_tune(request, body))
 
     # -- builder wizard (llm.builder, design §7.3) -----------------------------------------
 
@@ -848,9 +892,9 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                     if current["status"] in ("done", "failed"):
                         return
                     try:
-                        await asyncio.wait_for(q.get(), timeout=15.0)
+                        await asyncio.wait_for(q.get(), timeout=STREAM_HEARTBEAT)
                     except asyncio.TimeoutError:
-                        yield ": ping\n\n"     # keepalive through Nginx's read timeout
+                        yield ": ping\n\n"     # keepalive through every proxy in the path
                         continue
                     nxt = jobs.snapshot(job_id)
                     if nxt is None:

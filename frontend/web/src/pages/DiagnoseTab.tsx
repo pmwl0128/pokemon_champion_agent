@@ -327,7 +327,15 @@ function MegaFacts({ team }: { team: unknown }) {
     if (!m.item) return [];
     const target = items.get(m.item)?.requiredBy?.[0];
     const mega = target ? dex.get(target) : undefined;
-    if (!mega || !mega.isMega || mega.baseSpecies !== entry.name) return [];
+    if (!mega || !mega.isMega) return [];
+    // `baseSpecies` is the Species Clause GROUPING KEY, not a host pointer. It names the holder
+    // only while the key is itself a roster form (Raichu holds Raichunite; Raichu-Alola merely
+    // shares the key and holds nothing). Champions has one species whose key is no roster form at
+    // all — Mega Floette keys under "Floette" while the roster only has Floette-Eternal — and
+    // there the group's own form is the holder. Same rule as the dex (champdex.mega_forms_for).
+    const holder = dex.get(mega.baseSpecies ?? "") ? mega.baseSpecies === entry.name
+                                                   : mega.baseSpecies === entry.baseSpecies;
+    if (!holder) return [];
     return [{ member: m.species, base: entry, mega }];
   });
   if (holders.length === 0) return null;
