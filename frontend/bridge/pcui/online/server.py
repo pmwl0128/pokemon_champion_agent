@@ -15,6 +15,7 @@ import json
 import re
 import time
 import traceback
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -55,6 +56,25 @@ _DEPLOYMENT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,80}\Z")
 
 def _err(code: str, message: str) -> dict:
     return {"error": {"code": code, "message": message}}
+
+
+async def gzip_ndjson(lines):
+    """Compress an NDJSON event stream, flushing after every event.
+
+    The response-wide GZip middleware would otherwise swallow the whole point of the heartbeat:
+    zlib buffers a 20-byte event and emits nothing at all, so the socket stayed byte-silent after
+    the gzip header and the CDN closed it at ten seconds exactly as before, while an identical
+    `Accept-Encoding: identity` request succeeded. Z_SYNC_FLUSH costs a few bytes per event and
+    keeps the payload compressed (a diagnose report is ~550 KB raw, ~60 KB gzipped).
+    """
+    compressor = zlib.compressobj(6, zlib.DEFLATED, 16 + zlib.MAX_WBITS)
+    async for line in lines:
+        chunk = compressor.compress(line.encode("utf-8")) + compressor.flush(zlib.Z_SYNC_FLUSH)
+        if chunk:
+            yield chunk
+    tail = compressor.flush()
+    if tail:
+        yield tail
 
 
 def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, *,
@@ -114,7 +134,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
     builder_tasks: set[asyncio.Task] = set()
     stream_tasks: set[asyncio.Task] = set()
 
-    def _ndjson_stream(run) -> StreamingResponse:
+    def _ndjson_stream(run, request: Request) -> StreamingResponse:
         """Answer one slow request as an NDJSON event stream (see STREAM_HEARTBEAT).
 
         `run(emit)` performs the request off the response path and returns the final payload;
@@ -168,9 +188,16 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 if kind in ("done", "error"):
                     break
 
-        return StreamingResponse(events(), media_type="application/x-ndjson",
-                                 headers={"Cache-Control": "no-store",
-                                          "X-Accel-Buffering": "no"})
+        headers = {"Cache-Control": "no-store", "X-Accel-Buffering": "no",
+                   "Vary": "Accept-Encoding"}
+        if "gzip" not in request.headers.get("accept-encoding", ""):
+            return StreamingResponse(events(), media_type="application/x-ndjson",
+                                     headers=headers)
+
+        # Content-Encoding set here makes the response-wide middleware pass these bytes
+        # through untouched (starlette's responder skips an already-encoded response).
+        return StreamingResponse(gzip_ndjson(events()), media_type="application/x-ndjson",
+                                 headers={**headers, "Content-Encoding": "gzip"})
 
     def _wants_ndjson(request: Request) -> bool:
         return "application/x-ndjson" in request.headers.get("accept", "")
@@ -406,7 +433,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         streaming path as the deterministic surfaces (see STREAM_HEARTBEAT)."""
         if not _wants_ndjson(request):
             return await _execute_qa(request, body)
-        return _ndjson_stream(lambda _emit: _execute_qa(request, body))
+        return _ndjson_stream(lambda _emit: _execute_qa(request, body), request)
 
     # -- team diagnose (deterministic report + optional reading, design §7.5) ---------------
     # Deterministic CPU work gets its own semaphore; an optional reading uses the LLM lane.
@@ -585,7 +612,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         if not _wants_ndjson(request):
             return await _execute_team_diagnose(request, body)
         return _ndjson_stream(lambda emit: _execute_team_diagnose(
-            request, body, lambda report: emit({"type": "report", "report": report})))
+            request, body, lambda report: emit({"type": "report", "report": report})), request)
 
     async def _execute_actual_matchup(request: Request, body: dict):
         """Actual registered sets vs top-K usage targets (deterministic; no LLM quota)."""
@@ -636,7 +663,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
     async def actual_team_matchup(request: Request, body: dict):
         if not _wants_ndjson(request):
             return await _execute_actual_matchup(request, body)
-        return _ndjson_stream(lambda _emit: _execute_actual_matchup(request, body))
+        return _ndjson_stream(lambda _emit: _execute_actual_matchup(request, body), request)
 
     async def _execute_team_tune(request: Request, body: dict):
         """Authoritative SP cliff cards, metered per explicit benchmark and never by LLM quota."""
@@ -689,7 +716,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
     async def team_tune(request: Request, body: dict):
         if not _wants_ndjson(request):
             return await _execute_team_tune(request, body)
-        return _ndjson_stream(lambda _emit: _execute_team_tune(request, body))
+        return _ndjson_stream(lambda _emit: _execute_team_tune(request, body), request)
 
     # -- builder wizard (llm.builder, design §7.3) -----------------------------------------
 
