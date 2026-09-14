@@ -372,10 +372,12 @@ function MegaFacts({ team }: { team: unknown }) {
 }
 
 /** Archetype-counter surface: for each mainstream meta archetype, the members that can
- * answer it and HOW (priority / rewrites weather / anti-setup / breaks walls ...). Move- and
- * item-based mechanisms are computed client-side (complete — moves don't change on Mega);
- * own weather setters come from the skill coverage (Mega-aware). Format-gated like roles:
- * singles hides Trick Room / Tailwind / Intimidate; doubles hides Wall-break. */
+ * answer it and HOW (priority / rewrites weather / clears terrain / anti-setup / breaks walls ...).
+ * Move- and item-based mechanisms are computed client-side (complete — moves don't change on
+ * Mega); own weather and terrain setters come from the skill coverage (Mega-aware). Format-gated
+ * like roles: singles hides Trick Room / Tailwind / Intimidate; doubles hides Wall-break.
+ * Terrain is listed in BOTH formats, mirroring the terrain-control coverage row: a terrain
+ * archetype is answered either by overwriting the field or by removing it. */
 function ModePressure({ report }: { report: DiagnoseReportDto }) {
   const t = useT();
   const { lang } = useLang();
@@ -395,6 +397,18 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
     });
   const byMove = (s: Set<string> | string, how: string): Asset[] =>
     members.filter((m) => hasMv(m, s)).map((m) => ({ species: m.species, how }));
+  // own weather / terrain sources: Mega-aware (Mega Froslass = Snow Warning), so read the skill
+  // coverage rather than the declared base ability. A bearer's `via` is a comma-joined source list
+  // ("move:Grassy Terrain, ability:Grassy Surge").
+  const abilityVia = (via?: string | null): string | null =>
+    via?.match(/ability:([^,]+)/)?.[1]?.trim() ?? null;
+  const movesVia = (via?: string | null): string[] =>
+    (via ?? "").split(", ").filter((part) => part.startsWith("move:"))
+      .map((part) => part.slice("move:".length).trim().toLowerCase());
+  const coverageBearers = (key: string) =>
+    report.roles.coverage.find((c) => c.key === key)?.bearers ?? [];
+  const weatherBearers = coverageBearers("weather_rewrite");
+  const terrainBearers = coverageBearers("terrain_control");
   const merge = (...lists: Asset[][]): Asset[] => {
     const map = new Map<string, Set<string>>();
     for (const list of lists) {
@@ -405,14 +419,25 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
     }
     return [...map].map(([species, hows]) => ({ species, how: [...hows].join(" / ") }));
   };
+  // Grassy Glide is priority 0 in the dex and +1 only on Grassy Terrain, so it answers a speed
+  // archetype only while this team can put that terrain up — the same gate diagnose.py applies to
+  // the priority_attack role.
+  const grassyTerrainOnTeam = terrainBearers.some((b) =>
+    /ability:\s*(Grassy Surge|Seed Sower)|move:\s*Grassy Terrain/.test(b.via ?? ""));
   const PRIORITY = new Set(["accelerock", "aqua jet", "bullet punch", "extreme speed",
     "first impression", "ice shard", "jet punch", "mach punch", "quick attack",
-    "shadow sneak", "sucker punch", "vacuum wave", "water shuriken"]);
+    "shadow sneak", "sucker punch", "vacuum wave", "water shuriken",
+    ...(grassyTerrainOnTeam ? ["grassy glide"] : [])]);
   const ANTI_SETUP = new Set(["whirlwind", "roar", "dragon tail", "circle throw", "haze",
     "clear smog", "topsy-turvy"]);
   const ANTI_SETUP_ABIL = new Set(["Unaware", "Imposter"]);
   const DISRUPT = new Set(["taunt", "encore", "disable", "quash", "imprison", "torment"]);
-  const SCREEN_BREAK = new Set(["brick break", "psychic fangs", "raging bull"]);
+  // Defog removes screens as well as terrain in this game (dex: 解除反射壁…场地等状态);
+  // Court Change does not break them, it takes them, so it carries its own label.
+  const SCREEN_BREAK = new Set(["brick break", "psychic fangs", "raging bull", "defog"]);
+  // The dex's complete "removes any terrain" set — used to tell a remover apart from a setter
+  // inside the terrain-control coverage row, not to re-derive who is in it.
+  const TERRAIN_CLEAR = new Set(["steel roller", "ice spinner", "defog"]);
   const OFF_SETUP = new Set(["swords dance", "dragon dance", "nasty plot", "calm mind",
     "bulk up", "quiver dance", "shell smash", "work up", "coil", "hone claws", "tail glow",
     "growth", "shift gear", "victory dance", "clangorous soul", "no retreat", "belly drum",
@@ -420,8 +445,8 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
   const TRICK = new Set(["trick", "switcheroo"]);
   const CHOICE = new Set(["Choice Band", "Choice Specs", "Choice Scarf"]);
   const PUNISH = new Set(["Defiant", "Competitive", "Clear Body", "White Smoke",
-    "Hyper Cutter", "Mirror Armor", "Guard Dog", "Inner Focus", "Own Tempo", "Oblivious",
-    "Scrappy"]);
+    "Hyper Cutter", "Mirror Armor", "Guard Dog", "Rattled", "Inner Focus", "Own Tempo",
+    "Oblivious", "Scrappy"]);
   const antiSetup = (): Asset[] => merge(
     byMove(ANTI_SETUP, t("diag.how.antiSetup")),
     members.filter((m) => m.ability && ANTI_SETUP_ABIL.has(m.ability))
@@ -429,8 +454,6 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
   const choiceTrick = (): Asset[] =>
     members.filter((m) => m.item && CHOICE.has(m.item) && hasMv(m, TRICK))
       .map((m) => ({ species: m.species, how: t("diag.how.choiceTrick") }));
-  // own weather setters: Mega-aware (Mega Froslass = Snow Warning), so read the skill coverage
-  const weatherBearers = report.roles.coverage.find((c) => c.key === "weather_rewrite")?.bearers ?? [];
   const slowFirst = [...report.speed.order].reverse();
   const allRows: Record<string, { assets: Asset[]; extra?: ReactNode }> = {
     trickroom: {
@@ -448,16 +471,29 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
     weather: {
       assets: weatherBearers.map((b) => ({
         species: b.species,
-        how: b.via?.startsWith("ability:") ? abName(b.via.slice(b.via.indexOf(":") + 1))
-                                           : t("diag.how.weather"),
+        how: abilityVia(b.via) ? abName(abilityVia(b.via)!) : t("diag.how.weather"),
       })),
+    },
+    terrain: {
+      // The coverage row already unions setting moves, removal moves and surge abilities, so it is
+      // the whole answer. A terrain ability brings its own on-entry terrain — naming the ability
+      // says everything the member's terrain move would repeat.
+      assets: terrainBearers.map((b) => {
+        const ability = abilityVia(b.via);
+        if (ability) return { species: b.species, how: abName(ability) };
+        const moves = movesVia(b.via);
+        const how = [...new Set(moves.map((mv) =>
+          TERRAIN_CLEAR.has(mv) ? t("diag.how.clearTerrain") : t("diag.how.terrain")))];
+        return { species: b.species, how: how.join(" / ") || t("diag.how.terrain") };
+      }),
     },
     intimidate: {
       assets: members.filter((m) => m.ability && PUNISH.has(m.ability))
         .map((m) => ({ species: m.species, how: abName(m.ability!) })),
     },
     screens: {
-      assets: merge(byMove(SCREEN_BREAK, t("diag.how.breakScreen")), byMove(DISRUPT, t("diag.how.disrupt"))),
+      assets: merge(byMove(SCREEN_BREAK, t("diag.how.breakScreen")),
+        byMove("court change", t("diag.how.courtChange")), byMove(DISRUPT, t("diag.how.disrupt"))),
     },
     setup: {
       assets: merge(antiSetup(), byMove("encore", t("diag.how.encore")), byMove("taunt", t("diag.how.taunt"))),
@@ -469,8 +505,8 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
     },
   };
   const order = dbl
-    ? ["trickroom", "tailwind", "weather", "intimidate", "screens", "setup"]
-    : ["weather", "screens", "setup", "break"];
+    ? ["trickroom", "tailwind", "weather", "terrain", "intimidate", "screens", "setup"]
+    : ["weather", "terrain", "screens", "setup", "break"];
   return (
     <div className="panel builder-result diag-section">
       <h2>{t("diag.modes")}</h2>

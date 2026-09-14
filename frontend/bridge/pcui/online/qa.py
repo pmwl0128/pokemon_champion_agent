@@ -596,16 +596,17 @@ Metagame calls (maintainer-set):
   requirement. `priority` means inspect an absence closely and raise it only when the other
   report facts show a concrete consequence. `situational` means it matters only to plans that
   call for it; a missing situational entry is normal and is filtered from this payload. If a
-  role is not in the coverage list, do not invent a gap. Never print the internal expectation
-  tokens as labels in the answer. In singles, anti_setup is a high-priority signal to inspect
+  role is not in the coverage list, do not invent a gap. In singles, anti-setup is a
+  high-priority signal to inspect
   (hard answers to stat-boosting sweepers: phazing, Haze-class moves, Unaware/Imposter);
   Toxic/Yawn under `status` are only soft, partial substitutes.
-- Coverage classes: priority_attack = endgame priority finishers (priority-attention in singles;
-  situational in doubles, where Fake Out + speed control substitute); weather_rewrite = the
-  ability to overwrite the opponent's weather — a Mega form's ability counts (a Froslassite
-  Froslass battles as Mega Froslass / Snow Warning, a real setter); disruption = Taunt/Encore
-  class; damage_mitigation = Intimidate/burn class (priority-attention in doubles); fake_out = doubles
-  opening pressure.
+- Coverage classes, named by the human label the payload prints: priority attack = endgame
+  priority finishers (priority-attention in singles; situational in doubles, where Fake Out +
+  speed control substitute); weather rewrite = the ability to overwrite the opponent's weather —
+  a Mega form's ability counts (a Froslassite Froslass battles as Mega Froslass / Snow Warning,
+  a real setter); disruption = Taunt/Encore class; damage mitigation = Intimidate/burn class
+  (priority-attention in doubles); Fake Out = doubles opening pressure; terrain control = setting,
+  overwriting or removing a terrain.
 - Mega plan reading: two registered Mega stones are normal. If the report does not state a
   default Mega, do NOT invent one or infer what either form "solves" from model memory; say
   only that the battle selection must be made explicit when that ambiguity matters.
@@ -625,6 +626,15 @@ Write a SHORT interpretation (about 120 words, plain text, no markdown):
   mine: never tell it to carry a move/item, never treat it as if it were on my team.
 Name every Pokemon, move, item, ability and nature by its ENGLISH CANONICAL name exactly as
 the report does (the site localizes names itself). Answer in the language given by [lang=..].
+
+OUTPUT VOCABULARY (hard rule). Every field name, key path and enum value above describes the INPUT
+JSON. They are internal identifiers and must NEVER appear in the answer: not observedFloor,
+representativeGrade, witnessVariantIds, floorBy, representedCoverage, calculationComplete,
+hardGaps, bearers, roles.coverage, present=true/false, nor any other snake_case, camelCase or
+dotted token. Say what the field MEANS in the answer's language, or use the human label the
+payload already carries. In a non-English answer the ONLY English permitted is a canonical entity
+name (Pokemon / move / item / ability / nature), a type name, and the C2 / C1 / C0 grade codes the
+site's own table prints — every other word must be written in the answer's language.
 """
 
 DIAGNOSE_EXPLAIN_THINKING_PROFILE = """\
@@ -633,12 +643,14 @@ Thinking-mode output profile — this OVERRIDES the earlier 120-word/2-3-problem
 all factual and roster constraints above remain mandatory. Write a substantial, specific
 interpretation as 3 short plain-text paragraphs (no headings or markdown): about 450-700
 Chinese characters, 220-320 English words, or 550-850 Japanese characters.
-- Explain the team's concrete structure using ONLY present entries in `roles.coverage` and
-  their bearers/via values. Cite actual members and supplied moves/items/abilities, but do not
+- Explain the team's concrete structure using ONLY the coverage entries marked present and the
+  members listed under them. Cite actual members and supplied moves/items/abilities, but do not
   add a mechanics explanation from memory.
-- Connect 2-4 consequential risks across report sections. For opponent rows, report only the
-  observedFloor, witnessVariantIds, floorBy, representativeGrade, representedCoverage, and
-  calculationComplete facts. The compact payload intentionally has
+- Connect 2-4 consequential risks across report sections. For an opponent row, report only what
+  that row states — the weakest answer found, the observed builds it occurs on, which of my
+  members supply the strongest answer there, the grade against the representative build, how much
+  of the real-team sample the retained builds cover, and whether every retained build was
+  calculated — described in words, never by field name. The compact payload intentionally has
   no damage cells: do not explain WHY a grade was assigned, infer turns-to-KO, or add speed,
   accuracy, typing, Focus Sash, weather, or damage claims.
 - Close with 2-3 priorities phrased as selection/preservation needs or a CURRENT slot/role whose
@@ -660,8 +672,9 @@ FINAL OUTPUT CONTRACT: exactly 3 plain-text paragraphs and follow the language-s
 range in the thinking-mode profile.
 This is evidence interpretation, not a rebuild. Use English canonical entity spellings even
 inside Chinese prose. Do not introduce or recommend ANY named entity absent from [report].
-For opponent matchups, use only observedFloor/witnessVariantIds/floorBy/representativeGrade/
-representedCoverage/calculationComplete. Never explain a grade's cause
+For opponent matchups use only the facts that row carries, stated in words. No internal
+identifier may reach the prose: no field name, no key path, no snake_case or camelCase token, no
+present=true. Never explain a grade's cause
 or invent mechanics, moves, items, damage, speed, accuracy, or type interactions. Adjustment
 priorities may name a current slot and a needed function only. No headings, markdown, ban phase,
 or generic filler.
@@ -673,7 +686,151 @@ DIAGNOSE_EXPLAIN_THINKING_MAX_TOKENS = 6000
 DIAGNOSE_EXPLAIN_THINKING_TIMEOUT = 120.0
 
 
-def _diagnose_explain_projection(report: dict) -> dict:
+# ---------------------------------------------------------------------------------------- #
+# Public vocabulary for the diagnose reading.
+#
+# design §2.1: a localized answer keeps ENTITY names in English canonical and writes everything
+# else in the interface language. A DTO field name, a role key, a JSON path or an enum value is
+# an internal identifier — it is neither an entity nor a word of the answer's language, so it
+# must never reach the prose. Two enforcement points share the tables below, because a prompt
+# rule alone is not a guarantee: the PAYLOAD hands the model the same wording the page prints
+# (an identifier it never sees, it cannot echo), and a POST-PASS rewrites whatever still leaks.
+#
+# Display authority for the role rows is frontend/web/src/i18n.ts `diag.cov.*` — the reading sits
+# on the same page as that checklist, so the two must name a role identically. A bridge test pins
+# the key set to that file so a new role cannot be added on one side only.
+# ---------------------------------------------------------------------------------------- #
+_ROLE_TERMS: dict[str, dict[str, str]] = {
+    "speed_control": {"zh": "速度控制", "ja": "素早さコントロール", "en": "speed control"},
+    "priority_attack": {"zh": "先制攻击", "ja": "先制技", "en": "priority attack"},
+    "anti_setup": {"zh": "反强化", "ja": "積み対策", "en": "anti-setup"},
+    "protect": {"zh": "守住", "ja": "まもる", "en": "Protect"},
+    "fake_out": {"zh": "击掌奇袭", "ja": "ねこだまし", "en": "Fake Out"},
+    "spread": {"zh": "范围输出", "ja": "全体攻撃", "en": "spread damage"},
+    "damage_mitigation": {"zh": "火力削弱", "ja": "火力削減", "en": "damage mitigation"},
+    "redirection": {"zh": "攻击引导", "ja": "攻撃誘導", "en": "redirection"},
+    "hazard_set": {"zh": "出钉", "ja": "設置技役", "en": "hazard setter"},
+    "hazard_control": {"zh": "除钉", "ja": "設置技対策", "en": "hazard control"},
+    "pivot": {"zh": "中转", "ja": "対面操作", "en": "pivot"},
+    "recovery": {"zh": "回复", "ja": "回復", "en": "recovery"},
+    "screens": {"zh": "墙类减伤", "ja": "壁", "en": "screens"},
+    "disruption": {"zh": "干扰", "ja": "妨害", "en": "disruption"},
+    "weather_rewrite": {"zh": "天气改写", "ja": "天候書き換え", "en": "weather rewrite"},
+    "terrain_control": {"zh": "场地控制", "ja": "フィールド管理", "en": "terrain control"},
+    "status": {"zh": "异常状态", "ja": "状態異常", "en": "status pressure"},
+    "setup": {"zh": "强化手段", "ja": "積み技", "en": "setup"},
+    "partner_support": {"zh": "同伴支援", "ja": "味方支援", "en": "partner support"},
+    "side_protect": {"zh": "全体防护", "ja": "全体技対策", "en": "side protection"},
+}
+# Report fields the reading is expected to cite. The wording matches the page's own column
+# headers so the prose and the table under it read as one document.
+_FIELD_TERMS: dict[str, dict[str, str]] = {
+    "observedFloor": {"zh": "观测下界", "ja": "観測下限", "en": "observed floor"},
+    "witnessVariantIds": {"zh": "对应的实战配置", "ja": "該当する実型", "en": "witness builds"},
+    "witness": {"zh": "对应的实战配置", "ja": "該当する実型"},
+    "witnesses": {"zh": "对应的实战配置", "ja": "該当する実型"},
+    "floorBy": {"zh": "提供应对的成员", "ja": "対応を担うメンバー",
+                "en": "the members supplying that answer"},
+    "representativeGrade": {"zh": "代表配置的应对等级", "ja": "代表型に対する評価",
+                            "en": "the representative build's grade"},
+    "representedCoverage": {"zh": "真实队伍样本覆盖率", "ja": "実チームサンプルの網羅率",
+                            "en": "sample coverage"},
+    "calculationComplete": {"zh": "计算完整性", "ja": "計算の完全性",
+                            "en": "calculation completeness"},
+    "usageRank": {"zh": "使用率排名", "ja": "使用率順位", "en": "usage rank"},
+    "hardGaps": {"zh": "属性克制盲点", "ja": "範囲の盲点", "en": "coverage blind spots"},
+    "stabTypes": {"zh": "本系打点", "ja": "タイプ一致の打点", "en": "STAB coverage"},
+    "otherTypes": {"zh": "非本系打点", "ja": "タイプ不一致の打点", "en": "off-STAB coverage"},
+    "byAttackType": {"zh": "按攻击属性的防守弱点", "ja": "攻撃タイプ別の弱点",
+                     "en": "the weakness rows"},
+    "byOpponent": {"zh": "逐对手应对等级", "ja": "相手ごとの評価", "en": "the per-opponent grades"},
+    "orderUnderTrickRoom": {"zh": "戏法空间下的速度顺序", "ja": "トリックルーム下の素早さ順",
+                            "en": "the Trick Room speed order"},
+    "assumedNeutral": {"zh": "按中性性格假定", "ja": "無補正として仮定", "en": "assumed neutral"},
+    "incompleteMembers": {"zh": "配置未知的成员", "ja": "型が不明なメンバー",
+                          "en": "the members with an unknown set"},
+    "coverageConfirmed": {"zh": "功能覆盖已确认", "ja": "機能カバーの確認状況",
+                          "en": "coverage confirmed"},
+    "gapsConfirmed": {"zh": "盲点已确认", "ja": "盲点の確認状況", "en": "gaps confirmed"},
+    "attentionCalibration": {"zh": "注意等级校准", "ja": "注目度の較正",
+                             "en": "the attention calibration"},
+    "expectationReason": {"zh": "注意等级依据", "ja": "注目度の根拠", "en": "the attention reason"},
+    "bearers": {"zh": "承担该功能的成员", "ja": "その機能を担うメンバー",
+                "en": "the members providing it"},
+    "topK": {"zh": "统计的对手数量", "ja": "対象とした相手数", "en": "the opponent count"},
+}
+# Section paths. The bare one-word sections are CJK-only entries: `defense` or `checks` alone is
+# an ordinary English word that an English answer may legitimately use, while in zh/ja prose it
+# can only be an echoed key.
+_SECTION_TERMS: dict[str, dict[str, str]] = {
+    "roles.coverage": {"zh": "功能覆盖", "ja": "機能カバー", "en": "the coverage checklist"},
+    "offense.hardGaps": {"zh": "属性克制盲点", "ja": "範囲の盲点", "en": "the coverage blind spots"},
+    "checks.byOpponent": {"zh": "逐对手应对等级", "ja": "相手ごとの評価",
+                          "en": "the per-opponent grades"},
+    "defense.byAttackType": {"zh": "防守弱点", "ja": "防御面の弱点", "en": "the weakness rows"},
+    "speed.order": {"zh": "速度顺序", "ja": "素早さ順", "en": "the speed order"},
+    "roles": {"zh": "功能覆盖", "ja": "機能カバー"},
+    "coverage": {"zh": "功能覆盖", "ja": "機能カバー"},
+    "checks": {"zh": "对位应对等级", "ja": "対面評価"},
+    "offense": {"zh": "进攻打点", "ja": "攻撃範囲"},
+    "defense": {"zh": "防守弱点", "ja": "防御面の弱点"},
+    "legality": {"zh": "合法性", "ja": "ルール適合"},
+}
+# Attention levels: non-prescriptive public wording, never the wire enum.
+_ATTENTION_TERMS: dict[str, dict[str, str]] = {
+    "required": {"zh": "重点关注", "ja": "要確認", "en": "worth a close look"},
+    "priority": {"zh": "重点关注", "ja": "要確認", "en": "worth a close look"},
+    "optional": {"zh": "按需关注", "ja": "必要に応じて", "en": "situational"},
+    "situational": {"zh": "按需关注", "ja": "必要に応じて"},
+}
+_PRESENT_TERMS: dict[bool, dict[str, str]] = {
+    True: {"zh": "已具备", "ja": "あり", "en": "present"},
+    False: {"zh": "未检测到", "ja": "検出なし", "en": "not detected"},
+}
+# `via` / member-signal prefixes: the entity name after the colon stays English canonical.
+_VIA_TERMS: dict[str, dict[str, str]] = {
+    "move": {"zh": "招式", "ja": "技", "en": "move"},
+    "item": {"zh": "道具", "ja": "持ち物", "en": "item"},
+    "ability": {"zh": "特性", "ja": "特性", "en": "ability"},
+}
+
+
+def _term(table: dict[str, dict[str, str]], token: str, lang: str) -> str | None:
+    return (table.get(token) or {}).get(lang)
+
+
+def _localize_via(raw: Any, lang: str) -> Any:
+    """`ability:Grassy Surge` -> `特性：Grassy Surge`. The prefix is an identifier, the name is
+    an entity: localize the first, never the second."""
+    if not isinstance(raw, str) or not raw:
+        return raw
+    out: list[str] = []
+    for part in raw.split(", "):
+        kind, sep, name = part.partition(":")
+        label = _term(_VIA_TERMS, kind, lang)
+        if label is None:
+            out.append(part)
+        elif sep and name:
+            out.append(f"{label}: {name}" if lang == "en" else f"{label}：{name}")
+        else:
+            out.append(label)
+    return ", ".join(out)
+
+
+def _localize_signal(raw: Any, lang: str) -> Any:
+    if not isinstance(raw, str):
+        return raw
+    if ":" in raw:
+        return _localize_via(raw, lang)
+    return _term(_ROLE_TERMS, raw, lang) or raw
+
+
+def _is_machine_token(token: str) -> bool:
+    """True for tokens no natural sentence produces: snake_case, camelCase, a dotted path."""
+    return "_" in token or "." in token or any(c.isupper() for c in token)
+
+
+def _diagnose_explain_projection(report: dict, lang: str = "en") -> dict:
     """Compact model-facing report that keeps every opponent roll-up but drops the
     6-member damage cells. The deterministic API/UI still receives the complete grid.
 
@@ -683,6 +840,27 @@ def _diagnose_explain_projection(report: dict) -> dict:
     """
     trimmed = {k: report.get(k) for k in
                ("legality", "defense", "offense", "speed", "roles", "checks")}
+    roles = trimmed.get("roles")
+    if isinstance(roles, dict) and isinstance(roles.get("coverage"), list):
+        coverage = []
+        for entry in roles["coverage"]:
+            if not isinstance(entry, dict):
+                continue
+            # SITUATIONAL absences are normal in the format and must never surface as problems.
+            # Removing them from the payload is surer than asking the prose layer to ignore them.
+            if not entry.get("present") and entry.get("expectation") == "situational":
+                continue
+            key = str(entry.get("key") or "")
+            projected = {k: v for k, v in entry.items() if k != "key"}
+            projected["label"] = _term(_ROLE_TERMS, key, lang) or entry.get("label") or key
+            projected["bearers"] = [
+                {**b, "via": _localize_via(b.get("via"), lang)} if isinstance(b, dict) else b
+                for b in (entry.get("bearers") or [])]
+            coverage.append(projected)
+        members = [{**m, "signals": [_localize_signal(sig, lang) for sig in (m.get("signals") or [])]}
+                   if isinstance(m, dict) else m
+                   for m in (roles.get("members") or [])]
+        trimmed["roles"] = {**roles, "coverage": coverage, "members": members}
     checks = trimmed.get("checks")
     if isinstance(checks, dict):
         source_rows = [row for row in (checks.get("byOpponent") or [])
@@ -705,40 +883,44 @@ def _diagnose_explain_projection(report: dict) -> dict:
     return trimmed
 
 
-def _localize_diagnose_attention_tokens(text: str, lang: str) -> str:
-    """Last-resort guard for model echoes of DTO enum values in non-English prose.
+def _scrub_internal_tokens(text: str, lang: str) -> str:
+    """Last-resort guard: rewrite every internal identifier the model echoed into the public
+    wording the page uses.
 
-    The prompt and payload use non-prescriptive public levels, but an upstream model can still
-    echo a token literally. Keep that implementation vocabulary out of the user-facing reading.
+    The payload no longer carries role keys and the prompt forbids field names outright, but an
+    upstream model can still copy an identifier out of the field guide. A reading that says
+    "observedFloor 为 C0" or "speed_control 只系于…" is reporting the JSON, not the team, so the
+    rewrite is deterministic rather than advisory. English answers keep ordinary words such as
+    `defense` or `setup` and only lose the machine-shaped tokens; in zh/ja prose an English word
+    from these tables can only be an echo, so all of them are rewritten.
     """
-    if lang == "zh":
-        replacements = {"required": "重点关注", "priority": "重点关注",
-                        "optional": "按需关注", "situational": "按需关注"}
-    elif lang == "ja":
-        replacements = {"required": "要確認", "priority": "要確認",
-                        "optional": "必要に応じて", "situational": "必要に応じて"}
-    else:
+    lang = lang if lang in ("zh", "ja", "en") else "en"
+    for flag, terms in _PRESENT_TERMS.items():
+        word = terms.get(lang)
+        if word:
+            text = re.sub(rf"`?\bpresent\s*=\s*{str(flag).lower()}\b`?", word, text,
+                          flags=re.IGNORECASE)
+    mapping: dict[str, str] = {}
+    for table in (_SECTION_TERMS, _FIELD_TERMS, _ROLE_TERMS, _ATTENTION_TERMS):
+        for token, terms in table.items():
+            word = terms.get(lang)
+            if word and (lang != "en" or _is_machine_token(token)):
+                mapping[token] = word
+    if not mapping:
         return text
-    for raw, localized in replacements.items():
-        text = re.sub(rf"`?\b{raw}\b`?", localized, text, flags=re.IGNORECASE)
-    return text
+    # Longest first so `roles.coverage` wins over `roles`; the trailing lookahead independently
+    # stops a prefix from matching inside a longer path. Case-sensitive on purpose: the move
+    # `Protect` and the role key `protect` differ only by case.
+    alternation = "|".join(re.escape(t) for t in sorted(mapping, key=len, reverse=True))
+    pattern = re.compile(rf"`?(?<![\w.])({alternation})(?![\w.])`?")
+    return pattern.sub(lambda m: mapping[m.group(1)], text)
 
 
 def explain_diagnose(provider: LlmProvider, report: dict, lang: str) -> tuple[str, int]:
     """One tool-less LLM call turning a diagnose report's facts into a short reading
     (the local agent's interpretation layer, ported as an OPT-IN online add-on). Returns
     (text, tokens burned); raises LlmUnavailable / QaFailed like the QA pipeline."""
-    trimmed = _diagnose_explain_projection(report)
-    # Drop SITUATIONAL-tier absences from the coverage fed to the model: they are normal in the
-    # format and must never surface as problems — removing them from the payload is the
-    # surest guard (belt-and-suspenders with the prompt rule). Present roles and REQUIRED
-    # absences stay (signals worth checking against the rest of the report).
-    roles = trimmed.get("roles")
-    if isinstance(roles, dict) and isinstance(roles.get("coverage"), list):
-        kept = [c for c in roles["coverage"]
-                if not (isinstance(c, dict) and not c.get("present")
-                        and c.get("expectation") == "situational")]
-        trimmed = {**trimmed, "roles": {**roles, "coverage": kept}}
+    trimmed = _diagnose_explain_projection(report, lang)
     # State the complete user team explicitly and FIRST. The richer thinking profile needs
     # the actual sets to explain a plan rather than emitting a generic coverage summary; this
     # is the visitor's own submitted data, not private metagame evidence.
@@ -770,7 +952,7 @@ def explain_diagnose(provider: LlmProvider, report: dict, lang: str) -> tuple[st
                            tool_choice="none", timeout=timeout)
     tokens = result.prompt_tokens + result.completion_tokens
     text = _strip_markdown(str(result.message.get("content") or "").strip())
-    text = _localize_diagnose_attention_tokens(text, lang)
+    text = _scrub_internal_tokens(text, lang)
     if not text:
         raise QaFailed("empty diagnose explanation", tokens)
     _reject_tool_markup(text, tokens)

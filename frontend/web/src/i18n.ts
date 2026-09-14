@@ -742,6 +742,9 @@ const STRINGS = {
   "diag.how.ownTR": { zh: "戏法空间", en: "Trick Room", ja: "トリル" },
   "diag.how.ownTailwind": { zh: "顺风", en: "Tailwind", ja: "おいかぜ" },
   "diag.how.weather": { zh: "改写天气", en: "rewrites weather", ja: "天候書き換え" },
+  "diag.how.terrain": { zh: "改写场地", en: "rewrites terrain", ja: "フィールド書き換え" },
+  "diag.how.clearTerrain": { zh: "清除场地", en: "clears terrain", ja: "フィールド解除" },
+  "diag.how.courtChange": { zh: "换场夺取", en: "Court Change", ja: "コートチェンジ" },
   "diag.how.breakScreen": { zh: "破除双墙", en: "breaks screens", ja: "壁破壊" },
   "diag.how.antiSetup": { zh: "反强化", en: "anti-setup", ja: "積み対策" },
   "diag.how.encore": { zh: "再来一次", en: "Encore", ja: "アンコール" },
@@ -752,6 +755,7 @@ const STRINGS = {
   "diag.how.psychicNoise": { zh: "精神噪音", en: "Psychic Noise", ja: "サイコノイズ" },
   "diag.mode.trickroom": { zh: "戏法空间", en: "Trick Room", ja: "トリックルーム" },
   "diag.mode.weather": { zh: "天气", en: "Weather", ja: "天候" },
+  "diag.mode.terrain": { zh: "场地", en: "Terrain", ja: "フィールド" },
   "diag.mode.intimidate": { zh: "威吓", en: "Intimidate", ja: "いかく" },
   "diag.mode.screens": { zh: "双墙", en: "Screens", ja: "壁" },
   "diag.mode.setup": { zh: "强化", en: "Setup", ja: "積み" },
@@ -774,6 +778,10 @@ const STRINGS = {
     zh: "对手的天气体系",
     en: "Opponent weather archetype",
     ja: "相手の天候構築" },
+  "diag.modeDesc.terrain": {
+    zh: "对手的场地体系（青草／精神／电气场地）",
+    en: "Opponent terrain archetype (Grassy / Psychic / Electric Terrain)",
+    ja: "相手のフィールド構築（グラス／サイコ／エレキ）" },
   "diag.modeDesc.intimidate": {
     zh: "对手的威吓／降攻压制",
     en: "Opponent Intimidate and Attack-drop pressure",

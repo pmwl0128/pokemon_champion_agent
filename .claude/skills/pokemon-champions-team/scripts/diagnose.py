@@ -493,6 +493,55 @@ _SPEED_CONTROL_MOVES = {
 #   Upper Hand (快手还击, +3): only triggers when the foe is itself about to use a priority move.
 _PRIORITY_ATTACK_EXCLUDE = {"fake out", "upper hand"}
 
+# Moves whose priority stage is CONDITIONAL on a field state the TEAM ITSELF can put up. The dex
+# stores the unconditional stage (Grassy Glide is priority 0 there) and the calculator raises it only
+# under the matching field (damage_MASTER.checkConditionalPriority), so a flat reading is wrong in
+# both directions: counted always, a level-1 role ticks for a team with no terrain at all (37 members
+# of the pool learn Grassy Glide and most cannot set the terrain); counted never, the Grassy Surge
+# teams that actually run it read as having no priority finisher. Gate it on the team's own source.
+# Abilities that grant priority (Gale Wings, Prankster) stay out on purpose: the grant depends on the
+# member carrying a move of the right type, which the role pass reads by NAME and cannot verify.
+#   move key -> (field condition the team must supply, the stage it then reaches)
+_CONDITIONAL_PRIORITY: dict[str, tuple[str, int]] = {"grassy glide": ("grassy_terrain", 1)}
+_FIELD_CONDITION_MOVES = {"grassy_terrain": {"grassy terrain"}}
+_FIELD_CONDITION_ABILITIES = {"grassy_terrain": {"Grassy Surge", "Seed Sower"}}
+
+
+def _mega_by_base(facts: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Mega forms keyed by the base species that can hold their stone (team.py augments `facts`)."""
+    return {ff["base_species"]: ff for ff in facts.values()
+            if isinstance(ff, dict) and ff.get("found") and ff.get("is_mega")
+            and ff.get("base_species")}
+
+
+def _battle_abilities(member: Any, facts: dict[str, dict[str, Any]],
+                      mega_by_base: dict[str, dict[str, Any]]) -> set[str]:
+    """Every ability a member can actually battle with: its own, plus its Mega form's when it holds
+    that form's stone (both fire in one battle — base on entry, Mega after evolving)."""
+    f = facts.get(member.species) or {}
+    base, _unknown = _certain_ability(member.ability, f.get("abilities"))
+    out = {base} if base else set()
+    mf = mega_by_base.get(member.species)
+    if mf and member.item and mf.get("required_item") == member.item:
+        out.update(a for a in (mf.get("abilities") or []) if a)
+    return out
+
+
+def team_field_conditions(team: Team, facts: dict[str, dict[str, Any]]) -> set[str]:
+    """Field states the team can put up itself — the gate for a conditional move effect."""
+    mega_by_base = _mega_by_base(facts)
+    conditions: set[str] = set()
+    for m in team.pokemon:
+        moves = {(mv or "").strip().lower() for mv in (m.moves or [])}
+        abilities = _battle_abilities(m, facts, mega_by_base)
+        for condition, names in _FIELD_CONDITION_MOVES.items():
+            if moves & names:
+                conditions.add(condition)
+        for condition, names in _FIELD_CONDITION_ABILITIES.items():
+            if abilities & names:
+                conditions.add(condition)
+    return conditions
+
 
 def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
                    move_facts: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -508,6 +557,7 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
     first is not misread. Without it, priority_moves is simply empty.
     """
     move_facts = move_facts or {}
+    field_conditions = team_field_conditions(team, facts)
     members: list[dict[str, Any]] = []
     skipped: list[str] = []
     assumed: list[str] = []
@@ -556,6 +606,10 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
             if (isinstance(pr, int) and pr > 0 and cat in ("physical", "special")
                     and key not in _PRIORITY_ATTACK_EXCLUDE):
                 priority_moves.append({"move": mv, "priority": pr})
+            elif key in _CONDITIONAL_PRIORITY and cat in ("physical", "special"):
+                condition, stage = _CONDITIONAL_PRIORITY[key]
+                if condition in field_conditions:
+                    priority_moves.append({"move": mv, "priority": stage, "condition": condition})
         priority_moves.sort(key=lambda p: (-p["priority"], p["move"]))
 
         members.append({
@@ -609,9 +663,10 @@ def diagnose_speed(team: Team, facts: dict[str, dict[str, Any]],
     if any(x["priority_moves"] for x in members):
         notes.append("Priority attacking moves (dex priority stage) let a member strike "
                      "BEFORE a faster foe — the base-Speed order above does not reflect this. Some are still "
-                     "conditional (Sucker Punch only if the foe attacks; Grassy Glide only on Grassy Terrain), "
-                     "and turn order also depends on the foe's own priority and ability-granted priority "
-                     "(Prankster/Gale Wings/Triage), none of which is modeled here. Fake Out (+3, first turn "
+                     "conditional (Sucker Punch only if the foe attacks). A move carrying `condition` reaches "
+                     "that stage only under a field state THIS team can set (Grassy Glide on Grassy Terrain); "
+                     "turn order also depends on the foe's own priority and on ability-granted priority "
+                     "(Prankster/Gale Wings/Triage), which is not modeled here. Fake Out (+3, first turn "
                      "only) and Upper Hand (+3, only vs a foe's priority move) are excluded as too situational.")
     if assumed:
         notes.append("Assumed neutral (0 Spe SP / neutral nature) where unspecified: "
@@ -797,9 +852,10 @@ _ROLE_MOVES: dict[str, set[str]] = {
     },
     # Terrain is its own axis: weather answers to weather_rewrite, and until this existed a team
     # built on a terrain answered to nothing at all. Removal belongs here for the same reason Defog
-    # belongs to hazard_control — controlling the field includes taking it away.
+    # belongs to hazard_control — controlling the field includes taking it away. The removal side is
+    # the dex's own "解除场地 / removes any terrain" set, which is exactly these three moves.
     "terrain_control": {"grassy terrain", "psychic terrain", "electric terrain", "misty terrain",
-                        "steel roller"},
+                        "steel roller", "ice spinner", "defog"},
     "redirection": {"follow me", "rage powder", "spotlight", "ally switch"},
     "screens": {"reflect", "light screen", "aurora veil"},
     "status": {
@@ -809,9 +865,12 @@ _ROLE_MOVES: dict[str, set[str]] = {
     # Plan-interruption tools, split out of `status` (survey 2026-07-16: carried by ~36%
     # of M-B singles / ~33% of doubles — an answer class of its own, and `status` mixing
     # ailments with Taunt blurred both).
+    # Octolock / Jaw Lock join as trapping: denying the switch is plan interruption in the same
+    # sense as Encore, and Octolock additionally drains Def/SpD every turn. Jaw Lock locks the USER
+    # too — still a deliberate disruption tool, so it counts, and the cost is the pilot's to weigh.
     "disruption": {"taunt", "encore", "disable", "quash", "imprison", "torment",
                    "trick", "knock off", "perish song", "destiny bond", "psychic noise",
-                   "throat chop", "switcheroo", "final gambit"},
+                   "throat chop", "switcheroo", "final gambit", "octolock", "jaw lock"},
     # Opening pressure (doubles staple: 58% of real doubles teams; singles ~8% — there it
     # is a per-mon tactic, not a team slot, so the singles checklist omits it entirely).
     "fake_out": {"fake out"},
@@ -828,10 +887,12 @@ _ROLE_MOVES: dict[str, set[str]] = {
     # priority is excluded — Fake Out (opening flinch), Feint (protect-breaking), Upper
     # Hand (fires only against the foe's own priority — a counter, not a finisher).
     # First Impression stays: a real 90BP kill line, resettable by switching.
+    # Entries in _CONDITIONAL_PRIORITY (Grassy Glide) are listed here but only tag a member whose
+    # TEAM supplies the field state — see the tagging loop in diagnose_roles.
     "priority_attack": {
         "accelerock", "aqua jet", "bullet punch", "extreme speed",
-        "first impression", "ice shard", "jet punch", "mach punch", "quick attack",
-        "shadow sneak", "sucker punch", "vacuum wave", "water shuriken",
+        "first impression", "grassy glide", "ice shard", "jet punch", "mach punch",
+        "quick attack", "shadow sneak", "sucker punch", "vacuum wave", "water shuriken",
     },
     # Weather REWRITE capability (maintainer call 2026-07-16): most setters on real teams
     # are weather-INDEPENDENT (single 35%/double 32% of all teams carry a setter with no
@@ -846,10 +907,14 @@ _ROLE_MOVES: dict[str, set[str]] = {
     # Doubles partner semantics — moves that BUFF or ENABLE an ALLY (not afflict a foe): the
     # doubles-specific support signal (§16.3). Some also live in recovery/speed_control (a move may be
     # in two groups). A signal only — never a "this mon is the support" label.
+    # Milk Drink heals the USER OR AN ALLY, so it is both recovery and ally support (a move may be
+    # in two groups). Revival Blessing brings a fainted TEAMMATE back — the strongest ally-directed
+    # effect in the pool, and support is where it belongs; it is not recovery for anyone on the field.
     "partner_support": {
         "helping hand", "coaching", "decorate", "aromatic mist", "gear up", "magnetic flux",
         "heal pulse", "pollen puff", "life dew", "jungle healing", "after you",
         "acupressure", "baton pass", "psych up", "instruct", "gravity", "feint",
+        "milk drink", "revival blessing",
     },
     # Side-wide protection (doubles): guards the WHOLE side for a turn, distinct from single self-protect.
     "side_protect": {"wide guard", "quick guard", "mat block"},
@@ -863,8 +928,9 @@ _ROLE_MOVES: dict[str, set[str]] = {
         "burning jealousy", "clanging scales", "dazzling gleam", "discharge", "earthquake",
         "electroweb", "eruption", "explosion", "heat wave", "hyper voice", "icy wind",
         "lava plume", "make it rain", "matcha gotcha", "misty explosion", "mortal spin",
-        "muddy water", "parabolic charge", "petal blizzard", "rock slide", "self-destruct",
-        "sludge wave", "snarl", "sparkling aria", "struggle bug", "surf", "water spout",
+        "muddy water", "overdrive", "parabolic charge", "petal blizzard", "rock slide",
+        "self-destruct", "sludge wave", "snarl", "sparkling aria", "struggle bug", "surf",
+        "water spout",
     },
 }
 _ROLE_LABELS = {
@@ -889,6 +955,18 @@ _ITEM_SIGNALS = {
     "Black Sludge": "passive recovery (Poison)", "Sitrus Berry": "one-time recovery",
     "Rocky Helmet": "contact chip", "Mental Herb": "anti-Taunt/Encore (one-time)",
     "Safety Goggles": "weather/powder immunity",
+    # M-C made terrain a real axis: four seeds, an extender, and two new surge abilities.
+    "Grassy Seed": "Def +1 on Grassy Terrain (one-time)",
+    "Electric Seed": "Def +1 on Electric Terrain (one-time)",
+    "Psychic Seed": "SpD +1 on Psychic Terrain (one-time)",
+    "Misty Seed": "SpD +1 on Misty Terrain (one-time)",
+    "Terrain Extender": "terrain lasts 8 turns instead of 5",
+    "Air Balloon": "Ground immunity until hit",
+    "Eject Button": "switches out when hit (one-time)",
+    "Red Card": "forces the attacker out (one-time)",
+    "Leek": "crit rate +2 (Farfetch'd line)",
+    "Normal Gem": "x1.3 Normal move (one-time)",
+    "Binding Band": "binding damage 1/6 instead of 1/8",
 }
 # Ability signals well-understood as team functions (objective: declared / dex ability).
 _ABILITY_SIGNALS = {
@@ -902,6 +980,18 @@ _ABILITY_SIGNALS = {
     "Magic Bounce": "reflects status/hazards",
     "Unaware": "ignores stat changes (wall)", "Multiscale": "halves damage at full HP (wall)",
     "Imposter": "transforms into the foe incl. boosts (setup answer)",
+    "Guard Dog": "immune to Intimidate (Attack +1 instead); cannot be forced out",
+    "Rattled": "Speed +1 when hit by Dark/Ghost/Bug or intimidated",
+    "Punk Rock": "x1.3 sound moves, halves incoming sound damage",
+    "Stakeout": "x2 power against a foe switching in",
+    "Steely Spirit": "x1.5 Steel moves for itself AND its ally",
+    "Thermal Exchange": "Attack +1 when hit by Fire; cannot be burned",
+    "Liquid Ooze": "drain moves damage the drainer instead of healing it",
+    "Grass Pelt": "Defense x1.5 on Grassy Terrain",
+    "Aura Guard": "halves damage from contact moves",
+    "Emergency Exit": "forced back to the party below half HP",
+    "Run Away": "switches out through trapping effects",
+    "Libero": "becomes the type of the move it uses (once per entry)",
 }
 _ITEM_SIGNAL_I18N = {
     "Choice Band": "role_signal_choice_band", "Choice Specs": "role_signal_choice_specs",
@@ -911,6 +1001,12 @@ _ITEM_SIGNAL_I18N = {
     "Black Sludge": "role_signal_passive_recovery_poison", "Sitrus Berry": "role_signal_one_time_recovery",
     "Rocky Helmet": "role_signal_contact_chip", "Mental Herb": "role_signal_mental_herb",
     "Safety Goggles": "role_signal_safety_goggles",
+    "Grassy Seed": "role_signal_grassy_seed", "Electric Seed": "role_signal_electric_seed",
+    "Psychic Seed": "role_signal_psychic_seed", "Misty Seed": "role_signal_misty_seed",
+    "Terrain Extender": "role_signal_terrain_extender", "Air Balloon": "role_signal_air_balloon",
+    "Eject Button": "role_signal_eject_button", "Red Card": "role_signal_red_card",
+    "Leek": "role_signal_leek", "Normal Gem": "role_signal_normal_gem",
+    "Binding Band": "role_signal_binding_band",
 }
 _ABILITY_SIGNAL_I18N = {
     "Intimidate": "role_signal_intimidate", "Regenerator": "role_signal_regenerator",
@@ -923,6 +1019,12 @@ _ABILITY_SIGNAL_I18N = {
     "Eelevate": "role_signal_ground_immunity", "Magic Bounce": "role_signal_magic_bounce",
     "Unaware": "role_signal_unaware", "Multiscale": "role_signal_multiscale",
     "Imposter": "role_signal_imposter",
+    "Guard Dog": "role_signal_guard_dog", "Rattled": "role_signal_rattled",
+    "Punk Rock": "role_signal_punk_rock", "Stakeout": "role_signal_stakeout",
+    "Steely Spirit": "role_signal_steely_spirit", "Thermal Exchange": "role_signal_thermal_exchange",
+    "Liquid Ooze": "role_signal_liquid_ooze", "Grass Pelt": "role_signal_grass_pelt",
+    "Aura Guard": "role_signal_aura_guard", "Emergency Exit": "role_signal_emergency_exit",
+    "Run Away": "role_signal_run_away", "Libero": "role_signal_libero",
 }
 # Items / abilities that ALSO fulfil a checklist category, so team coverage agrees with the
 # per-member item/ability signals instead of contradicting them ("Leftovers — passive recovery"
@@ -930,6 +1032,10 @@ _ABILITY_SIGNAL_I18N = {
 _ITEM_COVERAGE = {
     "Choice Scarf": {"speed_control"},
     "Leftovers": {"recovery"}, "Black Sludge": {"recovery"}, "Sitrus Berry": {"recovery"},
+    # Eject Button is a real switch tool (the member leaves the field on being hit), so it belongs
+    # with the pivot moves. Red Card forces the ATTACKER out, which clears its boosts off the field
+    # exactly as phazing does — the hard setup answer anti_setup is about, carried by an item.
+    "Eject Button": {"pivot"}, "Red Card": {"anti_setup"},
 }
 # Field-speed abilities (weather + terrain, from the shared cliffs maps) all count as speed
 # control; Unaware/Imposter are HARD setup answers by ability (see anti_setup above).
@@ -957,6 +1063,9 @@ _ABILITY_COVERAGE.update({
     # and self-boost, it neither guards nor draws attacks aimed at partners (audit 2026-07-16).
     "Lightning Rod": {"side_protect"},
     "Toxic Debris": {"hazard_set"},
+    # Steely Spirit boosts the ALLY's Steel moves as well as its own — an ally-directed buff, the
+    # same lane as Hospitality/Telepathy rather than a personal damage trait.
+    "Steely Spirit": {"partner_support"},
 })
 # Canonical display order for the coverage checklist (required tier first, then optional,
 # each in this order). Roles not in a format's tier map are NOT_CHECKED (omitted).
@@ -1063,9 +1172,8 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]], *,
     # (team.py augments `facts` with those forms). Keyed by base species; used only when the
     # held item IS that form's Mega stone — Froslass+Froslassite -> Mega Froslass / Snow
     # Warning, a real snow setter the declared Cursed Body hides.
-    mega_by_base = {ff["base_species"]: ff for ff in facts.values()
-                    if isinstance(ff, dict) and ff.get("found") and ff.get("is_mega")
-                    and ff.get("base_species")}
+    mega_by_base = _mega_by_base(facts)
+    field_conditions = team_field_conditions(team, facts)
     for m in team.pokemon:
         f = facts.get(m.species)
         if not f or not f.get("found"):
@@ -1078,8 +1186,14 @@ def diagnose_roles(team: Team, facts: dict[str, dict[str, Any]], *,
             for mv in (m.moves or []):
                 key = (mv or "").strip().lower()
                 for tag, names in _ROLE_MOVES.items():
-                    if key in names:
-                        tags.setdefault(tag, []).append(mv)
+                    if key not in names:
+                        continue
+                    # A conditional priority move is only a priority finisher while the team can put
+                    # up the field state it needs; without it, it is an ordinary attack.
+                    if tag == "priority_attack" and key in _CONDITIONAL_PRIORITY:
+                        if _CONDITIONAL_PRIORITY[key][0] not in field_conditions:
+                            continue
+                    tags.setdefault(tag, []).append(mv)
         else:
             incomplete_members.append({
                 "species": m.species or "(blank)",
