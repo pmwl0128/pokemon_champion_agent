@@ -9,15 +9,18 @@ import {
   ActualMatchupResponseDtoSchema, BuilderJobDtoSchema, BuilderStartDtoSchema,
   CapabilitiesSchema, DamageBatchResultDtoSchema,
   DamageResultDtoSchema, DiagnoseReportDtoSchema, MetaDetailDtoSchema, OppCacheDtoSchema,
-  OnlineQuotaDtoSchema, OppCheckGridDtoSchema, OppKoGridDtoSchema, PokemonCardDtoSchema,
+  OnlineQuotaDtoSchema, OppCheckGridDtoSchema, OppKoGridDtoSchema, OppSetCatalogDtoSchema,
+  PokemonCardDtoSchema,
   QaAnswerDtoSchema, RankingDtoSchema,
-  SpeedBatchResultDtoSchema, TrendDtoSchema, UsageTrendDtoSchema,
+  LearnersDtoSchema, MetaFacetsDtoSchema, MetaKoDtoSchema,
+  MetaKoTrendDtoSchema, SpeedBatchResultDtoSchema, TrendDtoSchema, UsageTrendDtoSchema,
   TuneResultDtoSchema,
   type ActualMatchupRequestDto, type BuilderJobDto, type BuilderRequestDto,
   type BuilderStartDto, type Capabilities,
   type DamageBatchResultDto, type DamageRequestDto, type DamageResultDto,
   type DiagnoseReportDto, type DiagnoseRequestDto, type FormatId,
   type OnlineQuotaDto, type OppCacheDto, type OppCheckGridDto, type OppKoGridDto,
+  type OppSetCatalogDto,
   type PokemonCardDto, type QaAnswerDto,
   type QaRequestDto, type ResolveEntryDto, type SpeedBatchResultDto, type SpeedInputDto,
 } from "@pokemon-champions/protocol";
@@ -133,8 +136,25 @@ export class OnlineAdapter implements RuntimeAdapter {
       await fetchJson(this.url(`/meta/usage_trend_${format}/${slug}.json`)));
   }
 
+  async ko(format: FormatId, slug: string) {
+    return MetaKoDtoSchema.parse(await fetchJson(this.url(`/meta/ko_${format}/${slug}.json`)));
+  }
+
+  async koTrend(format: FormatId, slug: string) {
+    return MetaKoTrendDtoSchema.parse(
+      await fetchJson(this.url(`/meta/ko_trend_${format}/${slug}.json`)));
+  }
+
+  async metaFacets(format: FormatId) {
+    return MetaFacetsDtoSchema.parse(await fetchJson(this.url(`/meta/facets_${format}.json`)));
+  }
+
   dexIndex(): Promise<DexIndexEntry[]> {
     return loadProjectionDexIndex(this.cfg.projectionBase);
+  }
+
+  async learners() {
+    return LearnersDtoSchema.parse(await fetchJson(this.url("/dex/learners.json")));
   }
 
   async pokemonCard(nameOrSlug: string): Promise<PokemonCardDto> {
@@ -193,6 +213,10 @@ export class OnlineAdapter implements RuntimeAdapter {
    * the UI's "not built" notice, matching the bridge. */
   async oppCache(format: FormatId): Promise<OppCacheDto> {
     return OppCacheDtoSchema.parse(await this.teamSnapshot("oppcache", format));
+  }
+
+  async oppSets(format: FormatId): Promise<OppSetCatalogDto> {
+    return OppSetCatalogDtoSchema.parse(await this.teamSnapshot("oppsets", format));
   }
 
   private async teamSnapshot(view: string, format: FormatId): Promise<unknown> {

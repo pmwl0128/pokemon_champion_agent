@@ -18,6 +18,27 @@ export const BoostsSchema = z.object({
   atk: boostValue, def: boostValue, spa: boostValue, spd: boostValue, spe: boostValue,
 }).partial();
 
+/** One of the four move slots, with the per-call overrides the calc CLI accepts for it.
+ *
+ * The overrides are the only way to express two facts that are NOT properties of the move itself
+ * but of the single turn being asked about:
+ * - `isCrit` — this hit rolled a critical.
+ * - `isSpread` — false makes a spread move compute at FULL power, which is what it does in doubles
+ *   when only one target is actually on the field. Callers must not fake this by switching
+ *   `field.format`: that also drops the doubles screen multiplier (2/3) back to the singles one (1/2).
+ *
+ * Only the slot named by the request's `move` is read by the calc; the rest pad the set. */
+export const MoveSlotDtoSchema = z.union([
+  z.string().min(1),
+  z.object({
+    name: z.string().min(1),
+    isCrit: z.boolean().optional(),
+    isSpread: z.boolean().optional(),
+    hits: z.number().int().min(1).max(10).optional(),
+  }),
+]);
+export type MoveSlotDto = z.infer<typeof MoveSlotDtoSchema>;
+
 export const CombatantDtoSchema = z.object({
   name: z.string().min(1),
   ability: z.string().optional(),
@@ -27,6 +48,12 @@ export const CombatantDtoSchema = z.object({
   boosts: BoostsSchema.optional(),
   status: StatusSchema.optional(),
   curHP: z.number().int().positive().optional(),
+  moves: z.array(MoveSlotDtoSchema).max(4).optional(),
+  /** Whether a conditionally-activated ability has already triggered. The calc defaults this on,
+   * except for the abilities whose trigger a single damage frame cannot see (Flash Fire, Trace,
+   * Stakeout, Electromorphosis, …), which default off — so this is the caller's only way to say
+   * "it went off this turn". */
+  abilityOn: z.boolean().optional(),
 });
 export type CombatantDto = z.infer<typeof CombatantDtoSchema>;
 
@@ -39,11 +66,15 @@ export type Terrain = (typeof TERRAINS)[number];
 export const WeatherSchema = z.enum([...WEATHERS, ""]);
 export const TerrainSchema = z.enum([...TERRAINS, ""]);
 
-/** Side flags are snake_case booleans/counts (reflect, light_screen, helping_hand, ...). */
+/** Side flags are snake_case booleans/counts (reflect, light_screen, helping_hand, ...).
+ * `gravity` and `foresight` are field-wide rather than per-side: the calc reads them off the field
+ * itself (grounding and the Ghost-type immunity bypass are not owned by either player's half). */
 export const FieldDtoSchema = z.object({
   format: FormatIdSchema.optional(),
   weather: WeatherSchema.optional(),
   terrain: TerrainSchema.optional(),
+  gravity: z.boolean().optional(),
+  foresight: z.boolean().optional(),
   attackerSide: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
   defenderSide: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
 });
@@ -94,6 +125,10 @@ export const DamageResultDtoSchema = z.object({
   /** Effects that make the static multi-turn KO unreliable — surface, never hide. */
   koCaveats: z.array(KoCaveatDtoSchema).nullable().optional(),
   category: MoveCategorySchema,
+  /** Whether the calc resolved this move as a spread move (conditional spread included). Only then
+   * does the doubles 0.75x reduction apply — so only then is a single-target variant a different
+   * number, and only then is it worth offering one. */
+  isSpread: z.boolean().optional(),
   move: z.string(),
   attacker: z.string(),
   defender: z.string(),

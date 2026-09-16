@@ -269,7 +269,15 @@ main.content:focus { outline: none; }
 }
 .dex-card:hover { text-decoration: none; border-color: var(--sub); }
 .dex-card img.sprite { width: 56px; height: 56px; image-rendering: auto; }
-.dex-card .nm { font-weight: 600; font-size: 13.5px; text-align: center; }
+/* The name box always occupies TWO lines. A form name that wraps otherwise makes its whole grid
+   row 20px taller (grid rows size to their tallest item), so the page height depended on WHERE the
+   long names happened to land — and switching single/double reshuffles exactly that, which made the
+   ranking jump on every tab change. Reserving the second line makes every card identical instead. */
+.dex-card .nm {
+  font-weight: 600; font-size: 13.5px; text-align: center;
+  line-height: 1.45; min-height: calc(2 * 1.45em);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .dex-card .no { font-family: var(--font-mono); font-size: 11px; color: var(--sub); }
 .dex-card .types { display: flex; gap: 4px; }
 .rank-badge {
@@ -985,23 +993,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 }
 .uep-form textarea { min-height: 126px; line-height: 1.6; }
 .uep-form textarea:focus { border-color: var(--brand); outline: 3px solid var(--brand-soft); }
-.uep-format { margin: 0; padding: 0; border: 0; }
-.uep-format legend { margin-bottom: 8px; font-size: 13px; font-weight: 650; color: var(--ink); }
-.uep-format-options { display: flex; gap: 12px; flex-wrap: wrap; }
-.uep-format-option {
-  display: inline-flex; align-items: center; justify-content: flex-start; gap: 9px;
-  min-width: 168px; min-height: 42px; padding: 9px 13px; border: 1px solid var(--line);
-  border-radius: 9px; background: var(--panel); color: var(--ink); font: inherit;
-  font-size: 13px; font-weight: 650; cursor: pointer;
-}
-.uep-format-option:hover { border-color: var(--brand); background: var(--brand-soft); }
-.uep-format-option.on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
-.uep-format-radio { width: 14px; height: 14px; border: 1.5px solid var(--sub); border-radius: 50%; }
-.uep-format-option.on .uep-format-radio { border: 4px solid var(--brand); background: var(--panel); }
-.uep-create-actions {
-  display: flex; justify-content: flex-end; padding: 14px 22px;
-  border-top: 1px solid var(--line); background: var(--panel-2);
-}
+.uep-form-actions { display: flex; justify-content: flex-end; margin-top: -2px; }
 .uep-form-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto; gap: 10px; align-items: center; }
 .uep-form-row .primary-btn { min-height: 38px; }
 .sessions-index { display: block; min-width: 0; overflow: hidden; padding: 0; }
@@ -1954,7 +1946,6 @@ input:focus, select:focus, textarea:focus {
   background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px);
   box-shadow: var(--shadow);
 }
-.dex-search-row { position: sticky; top: calc(var(--topbar-offset) + 12px); z-index: 5; }
 .dex-item-card { min-height: 76px; border-color: var(--line); }
 .dex-item-card:hover {
   border-color: color-mix(in srgb, var(--brand) 52%, var(--line));
@@ -2131,7 +2122,6 @@ input:focus, select:focus, textarea:focus {
   .topbar nav a::after { left: 10px; right: 10px; }
   .page-title { font-size: 23px; }
   .page-header { margin-bottom: 16px; }
-  .dex-search-row { top: calc(var(--topbar-offset) + 12px); }
   .dex-grid.dense { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .dex-card { min-height: 126px; padding: 16px 6px 11px; }
   .dex-card img.sprite { width: 54px; height: 54px; }
@@ -2156,7 +2146,6 @@ input:focus, select:focus, textarea:focus {
   .session-info { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
   .uep-create-head { padding: 18px 16px 0; }
   .uep-form { padding: 15px 16px 18px; }
-  .uep-create-actions { padding: 13px 16px; }
   .tune-ai-head { padding: 18px 16px 0; }
   .tune-ai .tune-writeback { padding: 16px 16px 0; }
   .tune-ai-actions { margin-left: -16px; margin-right: -16px; padding: 13px 16px; flex-wrap: wrap; }
@@ -2202,9 +2191,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 420px) {
-  .uep-format-options { display: grid; grid-template-columns: 1fr; }
-  .uep-format-option { width: 100%; min-width: 0; }
-  .uep-create-actions .primary-btn { width: 100%; }
+  .uep-form-actions .primary-btn { width: 100%; }
   .dex-grid.dense { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dex-card .nm { font-size: 12.5px; }
   .page-heading-actions { overflow-x: auto; max-width: 100%; padding-bottom: 2px; flex-wrap: nowrap; }
@@ -2224,4 +2211,1490 @@ input:focus, select:focus, textarea:focus {
   .p-row:hover .type-badge { transform: none; }
   .p-row::after, .stat-tornado-row .half .track::after { display: none; }
   .party-card:hover .party-sprite, .mon-hero:hover img.sprite { transform: none; }
+}
+
+/* ── meta edge rail ───────────────────────────────────────────────────────────────────────
+   ONE rail: search, filter and the ranking list share a column, so a filter pick and the count it
+   changes are always on the same screen. It opens OUTWARD into the page gutter — `main.content` is
+   `min(1240px, 100% - 48px)` centred in the shell, so padding the shell by the rail width spends
+   the gutter first and the article does not move until the gutter runs out. Below MetaRails'
+   OVERLAY_FLOOR it covers instead; at that width there is no gutter left to borrow. */
+.shell {
+  padding-left: var(--rail-left, 0px);
+}
+/* The rail starts BELOW the topbar, so the topbar keeps the full window width and the rail simply
+   overlaps its left end — padding it too would leave a blank corner above the open rail. */
+.shell > .topbar {
+  margin-left: calc(-1 * var(--rail-left, 0px));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .shell { transition: padding 200ms var(--ease-out); }
+  .shell > .topbar { transition: margin 200ms var(--ease-out); }
+}
+.rail-handle {
+  position: fixed; top: calc(var(--topbar-offset) + 30px); z-index: 9;
+  font: inherit; font-size: 12.5px; font-weight: 650; letter-spacing: 0.05em;
+  padding: 12px 9px; cursor: pointer; color: var(--sub);
+  background: var(--panel); border: 1px solid var(--line-strong);
+  writing-mode: vertical-rl; box-shadow: var(--shadow);
+}
+.rail-handle.left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
+.rail-handle.right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
+.rail-handle:hover, .rail-handle[aria-expanded="true"] { color: var(--brand-strong); border-color: var(--brand); }
+.rail-scrim { position: fixed; inset: var(--topbar-offset) 0 0; background: rgb(16 26 47 / 0.28); z-index: 11; }
+.rail-layer { position: fixed; inset: var(--topbar-offset) 0 0; z-index: 12; pointer-events: none; }
+.rail {
+  position: absolute; top: 0; bottom: 0; left: 0; width: var(--rail-width, 320px);
+  pointer-events: auto; background: var(--panel); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.rail-layer.overlay .rail { box-shadow: var(--shadow-raised); width: min(var(--rail-width, 320px), 86vw); }
+@media (prefers-reduced-motion: no-preference) {
+  .rail { animation: rail-in 200ms var(--ease-out); }
+  @keyframes rail-in { from { transform: translateX(-100%); } }
+  .rail.right { animation-name: rail-in-right; }
+  @keyframes rail-in-right { from { transform: translateX(100%); } }
+}
+.trend-rail-body {
+  min-height: 0; overflow-y: auto; flex: 1; padding: 16px 0;
+  display: flex; flex-direction: column; justify-content: safe center;
+}
+.trend-rail-loading { min-height: 180px; display: grid; place-items: center; }
+.rail-layer.trend-overlay { z-index: 20; }
+.trend-overlay .rail.right {
+  width: min(1288px, 100%); background: var(--bg); box-shadow: var(--shadow-raised);
+}
+.trend-overlay .rail-head {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto;
+  align-items: center; gap: 12px; padding: 12px 24px;
+  background: var(--panel);
+}
+.trend-overlay .rail-head h3 {
+  grid-column: 1; grid-row: 1; align-self: end;
+  color: var(--ink); font-size: 22px; letter-spacing: normal; text-transform: none;
+}
+.trend-overlay .rail-head-description {
+  grid-column: 2; grid-row: 1; align-self: end; min-width: 0; margin: 0;
+  color: var(--sub); font-size: 12.5px; line-height: 1.5;
+}
+.trend-overlay .rail-head .page-tabs { grid-column: 3; grid-row: 1; }
+.trend-overlay .rail-head > button { grid-column: 4; grid-row: 1; }
+.trend-overlay-chart-scroll {
+  width: calc(100% - 48px); max-width: 1240px; min-width: 0; flex: none;
+  overflow-x: auto; overscroll-behavior-x: contain; margin: 0 auto;
+}
+.trend-scroll-hint { display: none; }
+.trend-overlay .trend-chart { display: block; width: 100%; min-width: 900px; }
+@media (max-width: 950px) {
+  .trend-overlay .rail-head {
+    grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto;
+    column-gap: 12px; row-gap: 7px;
+  }
+  .trend-overlay .rail-head h3 { grid-column: 1; grid-row: 1; }
+  .trend-overlay .rail-head-description { grid-column: 1 / -1; grid-row: 2; }
+  .trend-overlay .rail-head .page-tabs { grid-column: 2; grid-row: 1; }
+  .trend-overlay .rail-head > button { grid-column: 3; grid-row: 1; }
+}
+@media (max-width: 950px) {
+  .trend-scroll-hint {
+    display: block; margin: 0 14px 8px; color: var(--sub); font-size: 11px;
+  }
+}
+@media (max-width: 520px) {
+  .trend-overlay .rail-head { padding: 12px 14px; }
+  .trend-overlay .rail-head h3 { font-size: 18px; }
+  .trend-overlay-chart-scroll { width: calc(100% - 24px); }
+}
+.rail-head { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.rail-head h3 { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); flex: 1; white-space: nowrap; }
+.rail-head .count { font-size: 11.5px; color: var(--brand-strong); white-space: nowrap; }
+.rail-head > button { font: inherit; font-size: 18px; line-height: 1; border: 0; background: transparent; color: var(--sub); cursor: pointer; padding: 2px 5px; border-radius: 6px; }
+.rail-head > button:hover { color: var(--ink); background: var(--panel-2); }
+.rail-search { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.rail-search input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+/* The filter entry: a small button beside the search box, carrying the active-pick count so the
+   state stays legible with the flyout shut. */
+.filter-btn {
+  position: relative; flex: none; display: grid; place-items: center;
+  width: 32px; height: 32px; cursor: pointer; color: var(--sub);
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2);
+}
+.filter-btn:hover { color: var(--brand-strong); border-color: var(--brand); }
+.filter-btn.on { color: var(--brand-strong); border-color: var(--brand); background: var(--brand-soft); }
+.filter-btn .badge {
+  position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; display: grid; place-items: center; font-size: 10px; line-height: 1;
+  background: var(--brand); color: #fff; border: 1px solid var(--panel);
+}
+/* The filter panel is hinged to the rail RIGHT edge and may overlap the article. That overlap is
+   the point: the checkbox and the list it changes stay on screen together, so a pick is answered
+   where it is made instead of costing a trip back. It closes only on its own close button or Esc. */
+.filter-flyout {
+  position: absolute; top: 0; bottom: 0; left: var(--rail-width, 320px); z-index: 1;
+  width: min(392px, calc(100vw - var(--rail-width, 320px) - 14px)); min-width: 240px;
+  pointer-events: auto;
+  background: var(--panel); border-right: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-raised); display: flex; flex-direction: column; min-height: 0;
+}
+.rail-layer.overlay .filter-flyout { left: min(var(--rail-width, 320px), 86vw); }
+@media (prefers-reduced-motion: no-preference) {
+  .filter-flyout { animation: rail-in 180ms var(--ease-out); }
+}
+.flyout-head { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.flyout-head h3 { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); flex: 1; white-space: nowrap; }
+.flyout-head .count { font-size: 11.5px; color: var(--brand-strong); white-space: nowrap; }
+.flyout-head > button:last-child { font: inherit; font-size: 18px; line-height: 1; border: 0; background: transparent; color: var(--sub); cursor: pointer; padding: 2px 5px; border-radius: 6px; }
+.flyout-head > button:last-child:hover { color: var(--ink); background: var(--panel-2); }
+/* Facet column + value column, both always visible: switching facets never hides a pick. */
+.flyout-body { display: grid; grid-template-columns: 116px minmax(0, 1fr); flex: 1; min-height: 0; }
+.flyout-facets { border-right: 1px solid var(--line); overflow-y: auto; background: var(--panel-2); }
+.facet-tab {
+  display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 12px;
+  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  border: 0; border-left: 2px solid transparent; background: transparent; color: var(--sub);
+}
+.facet-tab:hover { color: var(--ink); }
+.facet-tab.on { background: var(--panel); color: var(--ink); font-weight: 650; border-left-color: var(--brand); }
+.facet-tab .lbl { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facet-tab .badge {
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; display: grid;
+  place-items: center; font-size: 10px; background: var(--brand); color: #fff;
+}
+.flyout-values { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.flyout-search { padding: 10px 12px; border-bottom: 1px solid var(--line); flex: none; }
+.flyout-search input { width: 100%; font: inherit; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+.value-list { overflow-y: auto; min-height: 0; flex: 1; }
+/* Active picks stay visible in EVERY view — they are the state you need while drilling down. */
+.rail-chips { display: flex; flex-wrap: wrap; gap: 5px; padding: 9px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.rail-chips .chip {
+  display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12px;
+  padding: 3px 5px 3px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--brand); background: var(--brand-soft); color: var(--brand-strong); font-weight: 600;
+}
+.rail-chips .chip .x { color: var(--sub); font-size: 13px; line-height: 1; }
+.rail-chips .rail-clear { font: inherit; font-size: 11.5px; color: var(--sub); border: 1px solid var(--line-strong); background: transparent; padding: 3px 9px; border-radius: 999px; cursor: pointer; }
+.rail-body { overflow-y: auto; min-height: 0; flex: 1; }
+.rail-empty { margin: 0; padding: 16px 14px; font-size: 12.5px; color: var(--sub); }
+.rank-list .rank-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 5px 14px;
+  font: inherit; font-size: 13.5px; text-align: left; border: 0; background: transparent;
+  color: var(--ink); cursor: pointer;
+}
+.rank-list .rank-row:hover { background: var(--panel-2); }
+.rank-list .rank-row.on { background: var(--brand-soft); font-weight: 650; }
+.rank-list .rank-row .n { font-size: 11.5px; color: var(--sub); width: 26px; flex: none; }
+.rank-list .rank-row img.mini { width: 26px; height: 26px; flex: none; }
+.rank-list .rank-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.value-list .value-row {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 12px;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink);
+}
+.value-list .value-row:hover { background: var(--panel-2); }
+.value-list .value-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.value-list .value-row .c { font-size: 11px; color: var(--sub); }
+.value-list .value-row .box {
+  width: 16px; height: 16px; flex: none; border-radius: 4px; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); font-size: 11px; color: var(--brand-strong);
+}
+.value-list .value-row.on { background: var(--brand-soft); }
+.value-list .value-row.on .box { border-color: var(--brand); background: var(--panel); }
+
+/* ── KO block ─────────────────────────────────────────────────────────────────────────────
+   A second data axis below the usage grid. Direction is encoded with the build-label pair (blue
+   outgoing / violet incoming) plus an arrow, NOT green/red: the matchup grid already owns the whole
+   KO ramp and the check-grade colors, so a warm/green split here would read as a verdict on a list
+   that carries no verdict. */
+.ko-block { margin-top: 26px; }
+.ko-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-bottom: 9px; border-bottom: 1px solid var(--line-strong); margin-bottom: 14px; }
+.ko-head h2 { margin: 0; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sub); font-weight: 600; }
+.ko-duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.ko-notice { margin-top: 18px; }
+.ko-panel > h2.ko-dir { display: flex; align-items: baseline; gap: 9px; }
+.ko-panel .ko-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11.5px; margin-left: auto; }
+.ko-panel.out > h2 { border-top: 3px solid var(--build-a); }
+.ko-panel.in > h2 { border-top: 3px solid var(--build-b); }
+.ko-panel.out .arrow, .ko-panel.out .ko-badge { color: var(--build-a); }
+.ko-panel.in .arrow, .ko-panel.in .ko-badge { color: var(--build-b); }
+.ko-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 8px; padding: 16px 16px 18px; }
+.ko-mon { display: grid; justify-items: center; gap: 3px; text-align: center; min-width: 0; }
+.ko-thumb { position: relative; display: block; width: 54px; height: 54px; }
+.ko-thumb img { width: 54px; height: 54px; display: block; }
+.ko-badge {
+  position: absolute; top: -4px; left: -6px; z-index: 1;
+  width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 9.5px; background: var(--panel); border: 1px solid var(--line-strong);
+}
+.ko-fc {
+  position: absolute; top: -4px; right: -6px; z-index: 1;
+  font-family: var(--font-mono); font-size: 9px; line-height: 1; padding: 2px 3px;
+  border-radius: 4px; color: var(--warning); background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+}
+.ko-mon .ko-nm { font-size: 11.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.ko-mon .ko-use { font-size: 10px; color: var(--sub); }
+.ko-mon .ko-use.rare { color: var(--warning); }
+/* One line while the move tier is uncollected: label on the left, state on the right. */
+.ko-moves { border-top: 1px solid var(--line); background: var(--panel-2); padding: 9px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ko-moves .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--sub); }
+.ko-moves .rows { flex: 1 0 100%; padding: 4px 0 0; margin-inline: -16px; }
+.ko-absent { display: inline-flex; gap: 7px; align-items: center; margin-left: auto; font-size: 12px; color: var(--sub); }
+.ko-absent .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); flex: none; }
+/* The partner column's new right-hand value is a RANK, not a percentage — same slot, different
+   fact, so it gets the same mono treatment and the rare-pick highlight the KO grid uses. */
+.p-row .p-pct.usage-rank.rare { color: var(--warning); }
+.panel h2 .panel-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11.5px; margin-left: auto; color: var(--sub); }
+.panel h2 { display: flex; align-items: baseline; gap: 9px; }
+@media (max-width: 720px) {
+  .ko-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .rail-handle { top: calc(var(--topbar-offset) + 8px); padding: 9px 7px; font-size: 11.5px; }
+}
+
+
+/* ── dex rail sections ────────────────────────────────────────────────────────────────────
+   The dex rail holds filters rather than a list, so its body is a stack of labelled blocks. Each
+   tab contributes its own blocks; abilities contribute none, because search is the whole of what
+   that list supports and an empty filter block would imply otherwise. */
+.rail-section { border-bottom: 1px solid var(--line); padding: 12px 14px 14px; }
+.rail-section:last-child { border-bottom: 0; }
+.rail-section > h4 {
+  margin: 0 0 9px; display: flex; align-items: baseline; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--sub);
+}
+.rail-section > h4 .aside { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; }
+/* Three per row at 360px: the icon plus a 2-4 character type name is what sets the column. */
+.type-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.type-grid .type-pick { width: 100%; justify-content: flex-start; }
+.type-pick {
+  display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px;
+  padding: 5px 8px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+}
+.type-pick img, .type-pick svg { width: 15px; height: 15px; flex: none; }
+.type-pick .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-pick:hover { border-color: var(--sub); }
+.type-pick.on { color: #fff; font-weight: 650; box-shadow: var(--shadow); }
+.type-pick.on .nm { color: #fff; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip-row .pill {
+  font: inherit; font-size: 12px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.chip-row .pill:hover { border-color: var(--sub); }
+.chip-row .pill.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-strong); font-weight: 650; }
+/* Two number boxes rather than a slider: a blank end means "no bound", which a slider cannot say. */
+.range-rows { display: grid; gap: 6px; }
+.range-row { display: grid; grid-template-columns: 52px 1fr 10px 1fr; align-items: center; gap: 6px; }
+.range-row .lbl { font-size: 12px; color: var(--sub); }
+.range-row.on .lbl { color: var(--brand-strong); font-weight: 650; }
+.range-row input {
+  width: 100%; min-width: 0; font: inherit; font-size: 12.5px; padding: 5px 8px;
+  border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel-2);
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.range-row.on input { border-color: var(--brand); }
+.range-row .dash { color: var(--sub); text-align: center; font-size: 12px; }
+/* A searchable checkbox list: the drawer has room for the options themselves, so picking one is
+   not a matter of typing and hoping the right suggestion appears. */
+.pick-list { display: grid; gap: 7px; }
+.pick-list > input {
+  width: 100%; font: inherit; font-size: 12.5px; padding: 6px 9px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2); color: var(--ink);
+}
+.pick-options {
+  max-height: 208px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel-2);
+}
+.pick-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px;
+  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink);
+}
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover { background: var(--panel); }
+.pick-row.on { background: var(--brand-soft); }
+.pick-row .box {
+  width: 15px; height: 15px; flex: none; border-radius: 4px; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); font-size: 10px; color: var(--brand-strong); background: var(--panel);
+}
+.pick-row .box.radio { border-radius: 50%; }
+.pick-row.on .box { border-color: var(--brand); }
+.pick-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row .c { font-size: 10.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
+/* The dex card's corner badge is the national number where the ranking card puts its rank, so the
+   two grids stay the same shape and switching pages moves nothing. */
+.rank-badge.dex-no { font-size: 11px; }
+
+/* ==== calc: two-team damage workspace =============================================
+   Two columns, one per side, with the RESULTS on top: the answer is what a calculator is
+   opened for, so it never sits below the form that produced it. Everything under the fold
+   is input — roster, build, field — and the all-pairs grid closes the page.
+   Colour stays on the KO ramp and the type system; the layout itself is neutral. */
+.calc-duel { display: grid; gap: 14px; }
+
+/* -- result band ------------------------------------------------------------------ */
+.duel-top { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.duel-col { display: grid; gap: 10px; min-width: 0; }
+
+.duel-moves { display: grid; gap: 4px; min-width: 0; }
+.duel-moves-cap {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sub);
+}
+.duel-moves-cap strong { color: var(--ink); font-size: 12.5px; }
+.duel-moves-cap .muted { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
+.duel-move-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; min-width: 0; padding: 7px 11px; cursor: pointer; text-align: left;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink);
+  font: inherit; font-size: 13px;
+}
+.duel-move-row:disabled { cursor: default; opacity: 0.55; }
+.duel-move-row:not(:disabled):hover { border-color: var(--line-strong); }
+.duel-move-row.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
+.duel-move-name {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.duel-move-pct { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap;
+  font-weight: 650; }
+.duel-move-ko { font-size: 11px; font-weight: 600; color: var(--sub); }
+/* The move list needs the KO ramp as TEXT, not as a filled cell: a column of solid blocks would
+   out-shout the result card under it, and the grid at the bottom already owns the filled version. */
+.ko-text-ohkoG, .ko-text-ohko { color: #c0392e; }
+.ko-text-2hko { color: #cf6a08; }
+.ko-text-3hko { color: #a97a04; }
+.ko-text-4hko { color: #7f8a1e; }
+.ko-text-slow { color: #5f7a4d; }
+.ko-text-immune, .ko-text-none { color: var(--sub); }
+@media (prefers-color-scheme: dark) {
+  .ko-text-ohkoG, .ko-text-ohko { color: #ff8a7d; }
+  .ko-text-2hko { color: #f0a052; }
+  .ko-text-3hko { color: #e0bc4e; }
+  .ko-text-4hko { color: #c3cf62; }
+  .ko-text-slow { color: #9dbd86; }
+}
+
+.duel-result {
+  display: grid; gap: 9px; padding: 14px 16px 15px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); box-shadow: var(--shadow);
+}
+.duel-empty { text-align: center; padding: 18px 0; font-size: 13px; }
+
+/* -- HP bar ------------------------------------------------------------------------ */
+.hp-bar-card { display: grid; gap: 6px; }
+.hp-bar-mon { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hp-bar-sprite { width: 40px; height: 40px; flex: none; object-fit: contain; }
+.hp-bar-sprite.placeholder { border-radius: 8px; background: var(--panel-2); }
+.hp-bar-name { font-weight: 700; font-size: 13.5px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.hp-bar-track {
+  position: relative; height: 34px; border-radius: 9px; overflow: hidden;
+  background: var(--panel-3); border: 1px solid var(--line);
+}
+.hp-bar-fill { position: absolute; inset: 0 auto 0 0; transition: width 180ms var(--ease-out); }
+.hp-bar-fill.ok { background: color-mix(in srgb, var(--success) 62%, transparent); }
+.hp-bar-fill.warn { background: color-mix(in srgb, var(--warning) 62%, transparent); }
+.hp-bar-fill.low { background: color-mix(in srgb, var(--danger) 62%, transparent); }
+.hp-bar-fill.out { background: transparent; }
+.hp-bar-read {
+  position: absolute; inset: 0; display: flex; align-items: baseline; justify-content: flex-end;
+  gap: 2px; padding: 0 11px; font-weight: 800;
+}
+.hp-bar-read strong { font-size: 19px; line-height: 34px; }
+.hp-bar-max { font-size: 12px; color: var(--sub); line-height: 34px; }
+
+/* -- numbers, rolls, one-line result ----------------------------------------------- */
+.duel-band { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.duel-band strong { font-size: clamp(22px, 3.2vw, 30px); line-height: 1.1; }
+.duel-band .muted { font-size: 13px; }
+
+.duel-rolls { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.duel-rolls-cap { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--sub); }
+.duel-roll-group { display: inline-flex; gap: 0; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--line); }
+.duel-roll-group .roll-btn { border: 0; border-right: 1px solid var(--line); border-radius: 0; }
+.duel-roll-group .roll-btn:last-child { border-right: 0; }
+.roll-btn {
+  font: inherit; font-size: 12px; font-weight: 600; padding: 4px 11px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--sub);
+}
+.roll-btn:hover { color: var(--ink); }
+.roll-btn.on { background: var(--brand-soft); color: var(--brand-strong); border-color: var(--brand); }
+.duel-roll-group .roll-btn.on { box-shadow: 0 0 0 1px var(--brand) inset; }
+/* Crit and single-target are STATE, not a third roll choice — they sit outside the roll group
+   and read as flags, so a pressed one is never mistaken for "the medium roll". */
+.roll-btn.flag { border-style: dashed; }
+.roll-btn.flag.on { border-style: solid; }
+
+.duel-summary { font-size: 13px; color: var(--sub); }
+.duel-line {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 11px; border-radius: 8px; background: var(--panel-2);
+}
+.duel-line-text {
+  flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5;
+  color: var(--sub); white-space: pre-wrap; word-break: break-word;
+}
+
+/* -- team strips + centre actions --------------------------------------------------- */
+.duel-teams {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: start;
+}
+.team-bar { display: grid; gap: 8px; min-width: 0; }
+.team-bar-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.team-bar-head strong { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sub); }
+.team-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding-bottom: 4px; border-bottom: 1px solid var(--line); min-height: 48px; }
+.team-chip { position: relative; display: inline-flex; }
+.team-chip-btn {
+  display: grid; place-items: center; width: 44px; height: 42px; padding: 0; cursor: pointer;
+  border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 8px;
+  background: transparent;
+}
+.team-chip-btn:hover { background: var(--panel-2); }
+.team-chip.on .team-chip-btn { border-bottom-color: var(--brand); background: var(--brand-soft); }
+.team-chip-btn img.mini { width: 34px; height: 34px; object-fit: contain; }
+.team-chip-empty { display: block; width: 30px; height: 30px; border-radius: 6px;
+  background: var(--panel-3); }
+.team-chip-x {
+  position: absolute; top: -3px; right: -3px; width: 17px; height: 17px; padding: 0;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--sub);
+  font-size: 9px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 120ms ease;
+}
+.team-chip:hover .team-chip-x, .team-chip-x:focus-visible { opacity: 1; }
+.team-chip-x:hover { color: var(--danger); border-color: var(--danger); }
+.team-add {
+  width: 44px; height: 42px; border: 1px dashed var(--line-strong); border-radius: 8px;
+  background: transparent; color: var(--sub); font-size: 17px; cursor: pointer;
+}
+.team-add:hover { border-color: var(--brand); color: var(--brand); }
+.team-add:disabled, .team-add:disabled:hover, .ghost-btn:disabled, .ghost-btn:disabled:hover {
+  opacity: .42; cursor: not-allowed; border-color: var(--line); color: var(--sub);
+}
+
+.duel-actions { display: grid; gap: 6px; align-content: start; padding-top: 22px; }
+.duel-actions .ghost-btn { white-space: nowrap; font-size: 12.5px; padding: 6px 12px; }
+
+.paste-panel { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel); }
+.paste-label { display: grid; gap: 6px; font-size: 12px; color: var(--sub); }
+.paste-label textarea {
+  font: inherit; font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 8px;
+  background: var(--panel-2); color: var(--ink); resize: vertical;
+}
+.paste-actions { display: flex; gap: 8px; }
+.paste-outcome { display: grid; gap: 4px; font-size: 12.5px; }
+.paste-note { color: var(--sub); }
+.paste-note.warn { color: var(--warning); }
+
+.duel-toast {
+  justify-self: center; padding: 6px 14px; border-radius: 999px; font-size: 12.5px;
+  background: var(--brand-soft); color: var(--brand-strong);
+}
+
+/* -- per-mon editor ----------------------------------------------------------------- */
+.duel-editors { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+.mon-editor { display: grid; gap: 11px; padding: 16px; min-width: 0; }
+.mon-editor-head { display: flex; align-items: center; gap: 8px; }
+.mon-editor-head strong { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sub); }
+.mon-editor-actions { margin-left: auto; display: flex; gap: 6px; }
+.ghost-btn.tiny { padding: 3px 9px; font-size: 11.5px; border-radius: 7px; }
+
+.mon-editor-id { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; }
+.mon-editor-art { display: grid; place-items: center; height: 96px; border-radius: 10px;
+  background: var(--panel-2); }
+.mon-editor-sprite { max-width: 88px; max-height: 88px; object-fit: contain; }
+.mon-editor-sprite.placeholder { display: block; width: 60px; height: 60px; border-radius: 10px;
+  background: var(--panel-3); }
+.mon-editor-idfields { display: grid; gap: 7px; min-width: 0; }
+.mon-editor-idfields > label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
+.mon-editor-idfields select { min-height: 33px; padding: 5px 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+.mon-editor-types { display: flex; gap: 6px; flex-wrap: wrap; }
+.mon-editor-cap { font-size: 12px; color: var(--sub); }
+.inline-check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px;
+  color: var(--ink); }
+.inline-check input { width: 15px; height: 15px; margin: 0; cursor: pointer; }
+
+/* Base | SP | boost | final on one row per stat: the number the calc used sits beside the number
+   you typed, so a benchmark never has to be re-derived off-page. */
+.stat-table { display: grid; gap: 3px; }
+.stat-table-head, .stat-table-row, .stat-table-foot {
+  display: grid; grid-template-columns: 42px 44px 1fr 1fr 54px; gap: 6px; align-items: center;
+}
+.stat-table-head { font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sub); }
+.stat-table-head > .num, .stat-table-row > .num { text-align: right; }
+.stat-name { font-size: 11px; font-weight: 700; color: var(--sub); font-family: var(--font-mono); }
+.stat-table-row input[type="number"] { padding: 4px 6px; text-align: center; min-width: 0;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); }
+.stat-table-row .boost-sel { padding: 4px 2px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel-2); color: var(--ink); }
+.stat-noboost { text-align: center; color: var(--line-strong); }
+.stat-final { font-weight: 700; }
+.stat-table-foot { grid-template-columns: 1fr auto; padding-top: 4px; font-size: 12px;
+  color: var(--sub); border-top: 1px solid var(--line); }
+
+.hp-field { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: center; }
+.hp-field-cap { font-size: 12px; color: var(--sub); }
+.hp-field-nums { display: inline-flex; align-items: baseline; gap: 6px; font-size: 12.5px; }
+.hp-field-nums input { width: 68px; padding: 4px 6px; text-align: center;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); }
+.hp-range { grid-column: 1 / -1; width: 100%; accent-color: var(--brand); cursor: pointer; }
+
+.move-slots { display: grid; gap: 5px; }
+.move-slot { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; }
+.move-slot-mark { display: grid; place-items: center; }
+.move-slot-dot { display: block; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--panel-3); }
+.move-slot input { width: 100%; }
+
+/* -- field conditions ---------------------------------------------------------------- */
+.field-panel { padding: 16px; display: grid; gap: 12px; }
+.field-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; }
+.field-panel-head h2 { margin: 0; font-size: 14px; }
+.field-global { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
+.field-global > label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
+.field-global select { min-height: 33px; padding: 5px 9px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--panel-2); color: var(--ink); }
+.field-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field-side { display: grid; gap: 7px; padding: 11px 12px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel-2); }
+.field-side h4 { margin: 0; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sub); }
+.field-side-flags { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.field-side .fld-chk .box { height: 26px; }
+
+/* -- all-pairs grid -------------------------------------------------------------------- */
+.all-matchups { padding: 16px; display: grid; gap: 12px; }
+.all-matchups-head { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; }
+.all-matchups-head h2 { margin: 0 0 3px; font-size: 14px; }
+.all-matchups-head p { margin: 0; font-size: 12.5px; max-width: 62ch; }
+.all-matchups-dir { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dir-read { font-size: 12.5px; color: var(--sub); }
+.dir-read strong { color: var(--ink); }
+.all-grid.busy { opacity: 0.55; }
+.all-grid th.grid-attacker { text-align: center; border-bottom: 1px solid var(--line);
+  padding-bottom: 5px; }
+.all-grid th.grid-attacker .p-inner { display: inline-flex; align-items: center; gap: 6px; }
+.all-grid th.grid-attacker img.mini { width: 26px; height: 26px; }
+.all-grid th.grid-move { font-weight: 600; }
+.all-grid th.grid-move .col-move { display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap; }
+
+/* -- narrow viewports ------------------------------------------------------------------ */
+@media (max-width: 1040px) {
+  .duel-teams { grid-template-columns: 1fr; }
+  .duel-actions { grid-auto-flow: column; justify-content: start; padding-top: 0; }
+}
+@media (max-width: 860px) {
+  .duel-top, .duel-editors, .field-sides { grid-template-columns: 1fr; }
+  .mon-editor-id { grid-template-columns: 76px 1fr; }
+  .mon-editor-art { height: 76px; }
+  .mon-editor-sprite { max-width: 68px; max-height: 68px; }
+  .duel-actions { grid-auto-flow: row; }
+  .duel-actions .ghost-btn { width: 100%; }
+}
+@media (max-width: 520px) {
+  .stat-table-head, .stat-table-row { grid-template-columns: 36px 36px 1fr 1fr 46px; }
+  .duel-rolls { gap: 5px; }
+}
+
+/* The duel panels are not `.form-panel`s (they carry their own grids), so they opt into the same
+   control shell explicitly rather than inheriting a layout meant for a different card. */
+.mon-editor label, .field-panel label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
+.mon-editor .mini-fields select,
+.mon-editor .mini-fields input:not([type="checkbox"]):not([type="radio"]),
+.mon-editor-idfields select,
+.mon-editor-idfields input:not([type="checkbox"]):not([type="radio"]),
+.field-panel select {
+  width: 100%; min-height: 38px; padding: 7px 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
+}
+.mon-editor .inline-check { display: inline-flex; grid-template-columns: none; }
+
+/* The global field row groups its switches the way the weather/terrain selects are grouped; without
+   it the bare `span` collapses and each label stacks on its own line. */
+.field-global .fld-group { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
+.field-global .fld-chk { align-self: end; }
+.field-global .fld-chk .box { height: 38px; }
+.field-side .fld-chk { align-self: start; }
+
+/* The editor already shows the calculated form as full art, so the picker's own thumbnail would be
+   a second, DIFFERENT sprite of the same mon (base vs. activated Mega) sitting next to it. */
+.mon-editor-idfields .mon-picker-slot { display: none; }
+.mon-editor-idfields .mon-picker { display: block; }
+.mega-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.mega-note .mega-name { font-size: 12px; color: var(--sub); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+/* Five columns that have to stay readable at a card width: the two numeric ends are fixed, the two
+   inputs share the rest, and a long header is clipped rather than pushing a column off its cells. */
+.stat-table-head, .stat-table-row {
+  grid-template-columns: 38px 48px minmax(54px, 1fr) minmax(58px, 1fr) 54px;
+}
+.stat-table-head > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-table-head { font-size: 10px; }
+@media (max-width: 520px) {
+  .stat-table-head, .stat-table-row {
+    grid-template-columns: 34px 40px minmax(44px, 1fr) minmax(50px, 1fr) 46px;
+  }
+}
+
+/* An empty slot is still a row: keeping the height constant stops the list from changing shape as
+   moves are filled in, which is exactly when the percentages beside it are being compared. */
+.duel-move-row { min-height: 36px; }
+
+.field-pick { display: inline-flex; align-items: center; gap: 6px; }
+/* The offer is a suggestion, not a state: it uses the warning hue the page reserves for "look at
+   this", and disappears the moment the field it fills is set. */
+.field-suggest {
+  font: inherit; font-size: 11px; font-weight: 650; white-space: nowrap; cursor: pointer;
+  padding: 4px 9px; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--warning) 46%, var(--line));
+  background: color-mix(in srgb, var(--warning) 12%, var(--panel)); color: var(--warning);
+}
+.field-suggest:hover { background: color-mix(in srgb, var(--warning) 22%, var(--panel)); }
+.all-matchups-head p { max-width: 78ch; }
+
+/* ==== calc workspace, second pass ================================================= */
+
+/* -- move list: the row is the click target, so the name is plain text -------------- */
+.duel-moves-cap { justify-content: flex-start; }
+.duel-move-name { font-weight: 600; }
+
+/* -- damage + verdict share one line ------------------------------------------------ */
+.duel-band { justify-content: space-between; gap: 12px; }
+.duel-band-nums { display: inline-flex; align-items: baseline; gap: 8px; min-width: 0; }
+.duel-band .result-verdict { flex: none; margin-left: auto; }
+
+/* -- an emptied HP bar has to say so ------------------------------------------------ */
+.hp-bar-out {
+  position: absolute; left: 11px; top: 0; line-height: 34px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--danger);
+}
+
+/* -- caveats sit under BOTH cards, so neither column stretches ---------------------- */
+.duel-caveats { display: grid; gap: 6px; }
+.duel-caveats .result-caveat { margin: 0; }
+.caveat-side {
+  display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; color: var(--sub); background: var(--panel-2);
+}
+
+/* -- team strip: import sits beside its own label, and opens over the page ---------- */
+.team-bar-head { position: relative; justify-content: flex-start; }
+.paste-pop {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+  width: min(440px, 88vw); display: grid; gap: 8px; padding: 12px;
+  border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--panel); box-shadow: var(--shadow-raised);
+}
+/* The second strip is near the right edge; anchor its popover to that edge instead. */
+.duel-teams > .team-bar:last-child .paste-pop { left: auto; right: 0; }
+
+/* -- reset buttons line up with the avatars they act on ----------------------------- */
+.duel-actions { padding-top: 26px; }
+
+/* -- species + forme on one row ----------------------------------------------------- */
+.mon-editor-namerow { display: grid; gap: 8px; }
+.mon-editor-namerow.split { grid-template-columns: 1fr 1fr; align-items: end; }
+.mon-editor-namerow > label { min-width: 0; }
+
+/* -- build row: nature needs room for "(攻击↑ / 特攻↓)", status needs far less -------- */
+.mon-build-row { display: grid; grid-template-columns: 1fr 1.45fr 1.15fr 0.85fr; gap: 8px 10px; }
+@media (max-width: 720px) { .mon-build-row { grid-template-columns: 1fr 1fr; } }
+
+/* -- boost as a slider, with the direction carried by colour ------------------------- */
+.stat-table-head, .stat-table-row {
+  grid-template-columns: 36px 42px minmax(52px, 1fr) minmax(98px, 1.4fr) 58px;
+}
+.boost-slider { display: grid; grid-template-columns: 1fr 26px; align-items: center; gap: 5px; }
+.boost-slider input[type="range"] { width: 100%; margin: 0; cursor: pointer; accent-color: var(--sub); }
+.boost-slider.up input[type="range"] { accent-color: var(--success); }
+.boost-slider.down input[type="range"] { accent-color: var(--danger); }
+.boost-read {
+  font-size: 11px; font-weight: 700; text-align: right; color: var(--sub);
+  font-variant-numeric: tabular-nums;
+}
+.boost-slider.up .boost-read { color: var(--success); }
+.boost-slider.down .boost-read { color: var(--danger); }
+
+/* The final value carries WHY: nature direction as colour, a maxed 32 SP as weight. */
+.stat-final.up { color: var(--success); }
+.stat-final.down { color: var(--danger); }
+.stat-final.maxed {
+  border-radius: 6px; padding: 1px 5px; margin-right: -5px;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+}
+
+/* -- move slots match the rest of the card's controls -------------------------------- */
+.move-slot input {
+  width: 100%; min-height: 34px; padding: 6px 10px; font: inherit; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
+}
+.move-slot input::placeholder { color: var(--sub); opacity: 0.7; }
+
+/* -- field row: one line, format first, no heading ----------------------------------- */
+.field-panel { padding: 12px 16px; gap: 10px; }
+.field-global { gap: 12px 16px; align-items: end; }
+.field-global .seg { align-self: end; }
+.field-side { padding: 9px 11px; }
+
+/* -- all-pairs grid: narrower cells fit more of the answer on screen ------------------ */
+.all-matchups { padding: 14px 16px; }
+.all-grid { border-spacing: 3px; }
+.all-grid td { min-width: 62px; padding: 4px 6px; }
+.all-grid td .pct { font-size: 12.5px; }
+.all-grid td .ko { font-size: 10px; }
+.all-grid th.grid-move { font-size: 11px; padding: 3px 5px; max-width: 90px; }
+.all-grid th.grid-move .col-move { overflow: hidden; text-overflow: ellipsis; display: block; }
+.all-grid th.row-mon { min-width: 108px; }
+.all-matchups .matrix-detail .duel-band { margin-bottom: 2px; }
+.all-matchups .matrix-detail .duel-band strong { font-size: 17px; }
+
+/* The reset pair lines up with the avatar strips it acts on, not with the labels above them. */
+.duel-actions { padding-top: 30px; }
+
+/* ==== calc workspace, third pass ================================================== */
+
+/* -- 1. the two cards are one row, so they end at the same line ---------------------
+   Line counts differ between sides (a two-line English verdict, a wrapped summary), and a card
+   sized to its own content drags every row under it out of step. Stretch instead. */
+.duel-top { align-items: stretch; }
+.duel-col { grid-template-rows: auto 1fr; }
+.duel-result { align-content: start; }
+
+/* The 16 rolls are reference detail, so they ride in the control row rather than owning one.
+   Clipped, never wrapped — the full list is in the tooltip. */
+.duel-rolls { flex-wrap: nowrap; }
+.duel-rolls-cap { flex: none; }
+.duel-roll-group, .duel-rolls .roll-btn { flex: none; }
+.duel-rolls .roll-btn { font-size: 11px; padding: 3px 8px; }
+
+/* -- 2. field row: each label sits to the LEFT of the control it names --------------- */
+.field-global > label { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.field-global > label > select { width: auto; min-width: 84px; }
+.field-global .fld-chk {
+  display: flex; align-items: center; gap: 6px; justify-items: initial; align-self: center;
+}
+.field-global .fld-chk .box { height: auto; padding: 0; }
+.field-global .fld-group { align-items: center; }
+
+/* -- 3. the reset pair sits above the strip's divider -------------------------------- */
+.duel-actions { padding-top: 4px; gap: 5px; }
+.duel-actions .ghost-btn { padding: 5px 12px; }
+
+/* -- 4. caveats ride beside the name, clipped so the card never changes height -------- */
+.hp-bar-mon { flex-wrap: nowrap; }
+.hp-bar-name { flex: none; max-width: 46%; }
+.hp-bar-notes {
+  flex: 1; min-width: 0; display: flex; gap: 5px;
+  overflow: hidden; white-space: nowrap;
+}
+.hp-note {
+  min-width: 0; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; line-height: 1.5;
+  color: var(--warning); background: color-mix(in srgb, var(--warning) 11%, transparent);
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+/* -- 5. a bipolar slider needs a bipolar track --------------------------------------- */
+.boost-slider { grid-template-columns: 1fr 26px; }
+.boost-lane { position: relative; display: flex; align-items: center; min-width: 0; height: 18px; }
+.boost-track {
+  position: absolute; left: 7px; right: 7px; top: 50%; height: 4px; transform: translateY(-50%);
+  border-radius: 2px; background: var(--panel-3); pointer-events: none;
+}
+/* The centre tick is what makes "no change" legible at a glance. */
+.boost-track::before {
+  content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px;
+  background: var(--line-strong);
+}
+.boost-track::after {
+  content: ""; position: absolute; top: 0; bottom: 0; border-radius: 2px;
+  left: var(--fill-left, 50%); width: var(--fill-width, 0%); background: currentColor;
+}
+.boost-slider.up .boost-track { color: var(--success); }
+.boost-slider.down .boost-track { color: var(--danger); }
+.boost-slider input[type="range"] {
+  position: relative; -webkit-appearance: none; appearance: none;
+  width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer;
+}
+.boost-slider input[type="range"]::-webkit-slider-runnable-track { height: 18px; background: transparent; }
+.boost-slider input[type="range"]::-moz-range-track { height: 18px; background: transparent; }
+.boost-slider input[type="range"]::-moz-range-progress { background: transparent; }
+.boost-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; margin-top: 2px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--sub);
+}
+.boost-slider input[type="range"]::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%; background: var(--panel); border: 2px solid var(--sub);
+}
+.boost-slider.up input[type="range"]::-webkit-slider-thumb { border-color: var(--success); }
+.boost-slider.up input[type="range"]::-moz-range-thumb { border-color: var(--success); }
+.boost-slider.down input[type="range"]::-webkit-slider-thumb { border-color: var(--danger); }
+.boost-slider.down input[type="range"]::-moz-range-thumb { border-color: var(--danger); }
+
+/* -- 6. grid detail: verdict, band and sentence on one aligned line ------------------- */
+.all-matchups .matrix-detail { display: grid; gap: 7px; }
+.detail-head {
+  display: grid; grid-template-columns: 104px 124px 1fr; gap: 10px; align-items: baseline;
+}
+/* The verdict cell keeps its width even when there is no verdict (a 0% hit has none), so the
+   band under it never slides left and the rows stop lining up. */
+.detail-head > .result-verdict { justify-self: start; margin: 0; }
+.detail-head > .detail-band { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.detail-head > .result-summary { font-size: 13px; min-width: 0; }
+@media (max-width: 760px) {
+  .detail-head { grid-template-columns: 1fr; gap: 5px; }
+}
+
+/* -- 7. blank slots show the bundled placeholder, not a grey rectangle ---------------- */
+.team-chip-empty, .mon-editor-sprite, .hp-bar-sprite { object-fit: contain; }
+.team-chip-btn img.team-chip-empty { width: 30px; height: 30px; opacity: 0.55; }
+img.mon-editor-sprite[alt=""] { opacity: 0.5; }
+img.hp-bar-sprite[alt=""] { opacity: 0.5; }
+
+/* The card keeps the same rows whether or not it has a result, so the only remaining source of a
+   height change is prose that wraps differently between the two sides. Clamp both text rows: the
+   full string is in the tooltip, and the copy button always hands over the whole line. */
+.duel-summary {
+  min-height: 20px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.duel-line { min-height: 54px; align-items: center; }
+.duel-line-text {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.duel-rolls .roll-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* Fixed, because the note pill beside the name is a few pixels taller than the name alone — enough
+   that a mon with a caveat and one without gave different card heights. */
+.hp-bar-mon { height: 44px; }
+.hp-note { line-height: 1.4; }
+
+.duel-band .result-verdict:empty { visibility: hidden; }
+.duel-band .result-verdict:empty::after { content: "4"; }
+/* The prose renderer puts inline portraits in this line, and those measure a pixel taller than the
+   plain text the empty state shows — enough to move everything below when you switch mons. Pin the
+   line box and cap the chips to it. */
+.duel-summary { height: 24px; line-height: 24px; overflow: hidden; }
+.duel-summary img { max-height: 20px; vertical-align: middle; }
+
+/* A `1fr` track still refuses to shrink below its content's min-content width, and the no-wrap roll
+   row has a wide one. Cap the tracks, and let that row wrap on a phone — "one line" is a two-column
+   desktop rule, not a reason to push the page sideways. */
+.duel-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.duel-editors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 860px) {
+  .duel-top, .duel-editors { grid-template-columns: minmax(0, 1fr); }
+  .duel-rolls { flex-wrap: wrap; }
+}
+
+/* ==== calc workspace, fourth pass ================================================= */
+
+/* -- 1. every cell in the field row is the same height and sits on the same line ----- */
+.field-global { align-items: center; }
+.field-global > label,
+.field-global .fld-chk {
+  min-height: 38px; font-size: 12px; color: var(--sub);
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+}
+.field-global .fld-chk .cap { font-size: 12px; color: var(--sub); }
+.field-global .fld-chk .box { display: flex; align-items: center; height: auto; padding: 0; }
+.field-global .seg { align-self: center; }
+
+/* -- 3. HP's row carries its own current value: slider, percentage, editable number --- */
+.stat-table-head, .stat-table-row {
+  grid-template-columns: 36px 42px minmax(52px, 1fr) minmax(98px, 1.4fr) 62px;
+}
+.boost-slider { grid-template-columns: 1fr 34px; }
+/* HP is a quantity, not a stage, so its bar fills from the left and takes the health ramp. */
+.boost-slider.hp .boost-track { color: var(--success); }
+.boost-slider.hp.warn .boost-track { color: var(--warning); }
+.boost-slider.hp.low .boost-track { color: var(--danger); }
+.boost-slider.hp input[type="range"]::-webkit-slider-thumb { border-color: var(--brand); }
+.boost-slider.hp input[type="range"]::-moz-range-thumb { border-color: var(--brand); }
+.boost-slider.hp .boost-read { color: var(--sub); }
+input.stat-cur.hp-cur {
+  width: 100%; min-width: 0; padding: 3px 4px; text-align: right; font-weight: 700;
+  border: 1px solid var(--line); border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
+}
+
+/* -- 4. the grid's hint shares the title's line; the reading sits right -------------- */
+.all-matchups-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.all-matchups-head h2 { margin: 0; flex: none; }
+.all-matchups-head p { margin: 0; flex: 1; min-width: 200px; }
+.all-matchups-head .ghost-btn { flex: none; align-self: center; }
+
+.detail-head {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+}
+.detail-head > .result-summary { min-width: 0; justify-self: start; }
+.detail-head > .result-verdict {
+  justify-self: end; min-width: 168px; height: 26px; display: flex; align-items: center;
+  justify-content: center; white-space: nowrap; margin: 0;
+}
+.detail-head > .detail-band { justify-self: end; white-space: nowrap; }
+@media (max-width: 760px) {
+  .detail-head { grid-template-columns: 1fr; gap: 6px; }
+  .detail-head > .result-verdict, .detail-head > .detail-band { justify-self: start; }
+}
+
+/* -- 5. the stat table's header labels centre over their columns ---------------------- */
+.stat-table-head > span { text-align: center; }
+
+/* ==== calc workspace, fifth pass ================================================== */
+
+/* -- 2. HP's editable cell is the same box as the other stats' printed one ----------- */
+.stat-table-row > .stat-final, .stat-table-row > .stat-cur {
+  height: 26px; display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 5px; box-sizing: border-box;
+}
+input.stat-cur.hp-cur {
+  height: 26px; padding: 0 5px; text-align: right; font-weight: 700; line-height: 1;
+}
+.stat-final.maxed { margin-right: 0; }
+
+/* -- 3. the rolls close the control row from the right ------------------------------ */
+
+/* -- 5. the build row's controls are one control family, one height ------------------
+   (they used to be styled through `.mini-fields`, which this card no longer uses) */
+.mon-build-row > label { display: grid; gap: 4px; font-size: 12px; color: var(--sub); min-width: 0; }
+.mon-build-row select,
+.mon-build-row input:not([type="checkbox"]):not([type="radio"]) {
+  width: 100%; height: 38px; min-height: 38px; padding: 0 10px; font: inherit; font-size: 13px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
+}
+.mon-build-row select { padding-right: 26px; }
+.mon-build-row input:disabled, .mon-build-row select:disabled {
+  color: var(--sub); background: var(--panel-2); cursor: default;
+}
+/* The item field is a combobox wrapper, so the height has to reach the input inside it. */
+.mon-build-row .adaptive-combobox, .mon-build-row .mon-picker { display: block; width: 100%; }
+
+/* -- 4. the header band owns the rule, and the hint hugs the title -------------------- */
+.all-matchups > h2 { border-bottom: 0; }
+.all-matchups-head {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 0 0 10px; border-bottom: 1px solid var(--line);
+}
+.all-matchups-head h2 { border-bottom: 0; padding: 0; flex: none; }
+.all-matchups-head p { flex: 0 1 auto; margin: 0; max-width: none; }
+.all-matchups-head .ghost-btn { flex: none; margin-left: auto; align-self: center; }
+
+/* ==== calc workspace, sixth pass ================================================== */
+
+/* -- 1. the SP budget rides on the column header it measures ------------------------- */
+.stat-head-sp { display: inline-flex; align-items: baseline; gap: 6px; justify-content: center; }
+.stat-head-sp .sp-sum { font-size: 10px; letter-spacing: 0; }
+
+/* -- 2. the header band sits closer to its own rule ---------------------------------- */
+.all-matchups { gap: 10px; }
+.all-matchups-head { padding-bottom: 6px; }
+.all-matchups-actions { display: flex; align-items: center; gap: 9px; margin-left: auto; flex: none; }
+.all-matchups-head .ghost-btn { margin-left: 0; }
+.grid-stale { font-size: 11.5px; color: var(--warning); white-space: nowrap; }
+.all-matchups-actions .primary-btn, .all-matchups-actions .ghost-btn {
+  min-height: 32px; padding: 5px 14px; font-size: 12.5px;
+}
+/* A stale table is still the last real answer, so it stays readable — just visibly not current. */
+.all-grid.busy { opacity: 0.6; }
+
+/* -- 4. dense cells get a ring, never a resize --------------------------------------
+   The 1.13x pop was written for the old sparse matrix. On this grid a scaled edge cell grows the
+   scroll content, the pointer falls out of it, it shrinks back — and the row flickers under the
+   cursor. Same treatment the dense matchup grid already uses: brighten and ring in place. */
+.calc-matrix td:not(.miss):hover {
+  transform: none; box-shadow: inset 0 0 0 1px var(--panel);
+  outline: 3px solid var(--ink); outline-offset: -3px; filter: brightness(1.12);
+}
+@media (prefers-color-scheme: dark) {
+  .calc-matrix td:not(.miss):hover { box-shadow: inset 0 0 0 1px var(--panel); }
+}
+
+/* ==== calc workspace, seventh pass ================================================ */
+
+/* -- the four slots live in the card, as a 2x2 of BUTTONS ---------------------------
+   Type colour arrives as an edge and a wash, never as a flat fill: Dark, Ghost, Dragon and Fighting
+   are dark enough that text on the solid colour stops being readable, and a move list that is only
+   legible for half the type chart is not a type system. The page's own ink stays. */
+.duel-move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.duel-move-cell {
+  --mv: var(--line-strong);
+  display: grid; gap: 1px; min-width: 0; padding: 6px 10px 6px 11px; cursor: pointer;
+  text-align: left; font: inherit; font-size: 12.5px; color: var(--ink);
+  border: 1px solid var(--line); border-left: 4px solid var(--mv); border-radius: 9px;
+  background: color-mix(in srgb, var(--mv) 7%, var(--panel));
+}
+.duel-move-cell:disabled { cursor: default; --mv: var(--line); opacity: 0.6; }
+.duel-move-cell:not(:disabled):hover { background: color-mix(in srgb, var(--mv) 14%, var(--panel)); }
+.duel-move-cell.on {
+  border-color: var(--mv); background: color-mix(in srgb, var(--mv) 17%, var(--panel));
+  box-shadow: 0 0 0 1px var(--mv) inset;
+}
+.duel-move-cell .duel-move-name {
+  font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.duel-move-cell .duel-move-pct { display: flex; justify-content: space-between; gap: 6px; }
+.duel-move-cell .duel-move-ko { font-size: 10.5px; }
+
+/* -- summary and its copy control share a line ------------------------------------- */
+.duel-summary-row { display: flex; align-items: center; gap: 10px; }
+.duel-summary-row .duel-summary { flex: 1; min-width: 0; }
+.duel-summary-row .ghost-btn { flex: none; }
+.duel-line { min-height: 46px; }
+
+/* -- the defender strip faces the page edge ---------------------------------------- */
+.team-bar.mirrored .team-bar-head { flex-direction: row-reverse; justify-content: flex-start; }
+.team-bar.mirrored .team-strip { flex-direction: row-reverse; justify-content: flex-start; }
+.team-bar.mirrored .paste-pop { left: auto; right: 0; }
+
+/* The dex flyout holds one scrolling column of filter sections, not the metagame rail's
+   facet-column + value-column split, so it overrides that grid rather than inheriting it. */
+.dex-flyout-body {
+  display: block; overflow-y: auto; padding: 4px 0 12px;
+}
+.filter-flyout:has(.dex-flyout-body) { width: min(400px, calc(100vw - var(--rail-width, 360px) - 14px)); }
+/* The rail list reuses the ranking rows, so a dex number sits where a rank does. */
+.rail-body.rank-list .rank-row .n { min-width: 34px; }
+
+/* ==== metagame detail: one card size, and picks that assemble a question ============ */
+
+/* -- one Pokemon, one colour ----------------------------------------------------------
+   `--accent` is the primary type's canonical ink, set inline by the page. Everything the site
+   normally paints in brand blue takes it instead, so the colour the hero already wears runs on
+   through the usage bars, the picks, the stat bars and the section rules below it.
+
+   The derived tokens are MIXES, never the raw type ink: the 19 type colours run from near-yellow to
+   near-black, and only a mix toward the page's own ground keeps chrome visible and text legible
+   whichever type the Pokemon happens to be. `--pct-fill` has to be re-declared rather than inherited
+   because a custom property's var() resolves where it is DECLARED — the :root copy already baked in
+   the site's blue.
+
+   `display: contents` lets the wrapper carry the variables without adding a box, so the page's
+   layout is exactly what it was before it had a colour. */
+.mon-theme { display: contents; }
+.mon-theme {
+  --brand: color-mix(in srgb, var(--accent, #2457df) 72%, #0d1a2c);
+  --brand-strong: color-mix(in srgb, var(--accent, #2457df) 46%, #071019);
+  --brand-soft: color-mix(in srgb, var(--accent, #2457df) 13%, #ffffff);
+  /* The ink, not the chrome tone: a focus ring has to carry whichever type this is, and only the
+     ink version clears 3:1 for the palest of them. */
+  --focus: var(--brand-strong);
+  --pct-fill: color-mix(in srgb, var(--accent, #2457df) 15%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  /* Mixed toward white instead: on the dark ground the same inks have to come up, not down. */
+  .mon-theme {
+    --brand: color-mix(in srgb, var(--accent, #7fa5ff) 76%, #ffffff);
+    --brand-strong: color-mix(in srgb, var(--accent, #7fa5ff) 52%, #ffffff);
+    --brand-soft: color-mix(in srgb, var(--accent, #7fa5ff) 26%, #0d1420);
+    --pct-fill: color-mix(in srgb, var(--accent, #7fa5ff) 20%, transparent);
+  }
+}
+
+/* Every panel is the same box whether it lists ten rows or two. A card that shrinks to its content
+   makes the grid ripple from Pokemon to Pokemon, and the reader re-finds the same panel in a
+   different place each time. Derived from the parts rather than typed as one number, so a font or
+   padding change carries through. */
+.detail-grid {
+  --panel-head-h: 44px;
+  --p-row-h: 38px;
+  --rows-pad: 12px;      /* .panel .rows, 6px top and bottom */
+  --panel-frame: 2px;    /* the card's own 1px border, top and bottom — a percentage max-height
+                            resolves against the CONTENT box, so leaving it out cost the tenth row
+                            two pixels and gave every full card a scrollbar. */
+  --detail-card-h: calc(var(--panel-head-h) + var(--rows-pad) + 10 * var(--p-row-h)
+                        + var(--panel-frame));
+  align-items: start;
+}
+.detail-grid > .panel, .detail-grid > .detail-pair { height: var(--detail-card-h); }
+.detail-grid > .panel > .rows { overflow-y: auto; max-height: calc(100% - var(--panel-head-h)); }
+
+/* The stat card and the abilities card share one cell, gap included, so the pair is exactly one
+   card tall. The abilities half is fixed at its three-row maximum: sizing it to content would make
+   the stat card above it change height from one Pokemon to the next, for no reason a reader could
+   name. */
+.detail-pair {
+  display: grid; grid-template-rows: 1fr auto; gap: 14px; min-width: 0;
+}
+.detail-pair > .ability-panel {
+  height: calc(var(--panel-head-h) + var(--rows-pad) + 3 * var(--p-row-h) + var(--panel-frame));
+}
+.detail-pair > .panel { min-height: 0; }
+
+/* -- the stat value card ------------------------------------------------------------- */
+.stat-values { display: flex; flex-direction: column; min-height: 0; }
+.sv-rows { display: grid; align-content: space-evenly; padding: 4px 16px 10px; flex: 1; min-height: 0; }
+.sv-row { display: grid; grid-template-columns: 38px 34px 1fr 72px; gap: 10px; align-items: center; }
+.sv-row .k { font-size: 11px; font-weight: 700; color: var(--sub); font-family: var(--font-mono); }
+.sv-row .base { font-size: 12.5px; color: var(--sub); text-align: right; }
+.sv-row .track {
+  display: flex; height: 8px; border-radius: 5px; background: var(--panel-2); overflow: hidden;
+}
+.sv-row .track .solid { background: var(--brand); }
+.sv-row .track .ext { background: color-mix(in srgb, var(--brand) 34%, transparent); }
+.sv-row .v { text-align: right; font-size: 13px; font-weight: 650; }
+.sv-row .v.up { color: var(--success); }
+.sv-row .v.down { color: var(--danger); }
+
+/* -- pressing a row takes it into the question ---------------------------------------
+   ONE shape says everything: a ring around the row, faint under the pointer and solid once picked.
+   A picked row therefore keeps its ring while hovered — the pointer deepens what is already there
+   instead of replacing it — and a row never carries two different markers at once.
+
+   Selection can NOT be a background tint here: the row background already carries the usage bar,
+   and a second wash in the same hue reads as more usage rather than as a choice. It is also not a
+   trailing glyph: that costs width the names need, and ten of them turn a card into a checklist.
+   The rank keeps being the rank. */
+.p-row.pickable { cursor: pointer; user-select: none; }
+/* The site's left rail is the hover language for rows that GO somewhere. These rows toggle, so the
+   ring is their only marker — the rail beside it was the second small bar in a different colour. */
+.p-row.pickable::before { display: none; }
+/* The ring is a LAYER of its own, not a radius on the row. Rounding the row itself rounds the usage
+   bar with it, and ten stacked rounded bars scallop the card's left edge into notches. Inset from
+   the sides so the ring reads as a mark on the row rather than a second card border, and behind the
+   text (the row is a stacking context, so z-index:-1 is still above the row's own background). */
+.p-row.pickable::after {
+  content: ""; display: block; position: absolute; inset: 1px 6px; z-index: -1;
+  border-radius: 8px; pointer-events: none;
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow 130ms ease, background-color 130ms ease;
+}
+.p-row.pickable:hover::after {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 34%, transparent);
+}
+/* Pressed is the picked look, arriving on mousedown: the row answers the finger, not the release. */
+.p-row.pickable:active::after, .p-row.pickable.picked::after,
+.p-row.pickable.picked:hover::after {
+  box-shadow: inset 0 0 0 1.5px var(--brand);
+  background: color-mix(in srgb, var(--brand) 7%, transparent);
+}
+.p-row.pickable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.p-row.locked { cursor: default; opacity: 0.5; }
+.p-row.locked:hover::after, .p-row.locked:active::after {
+  box-shadow: inset 0 0 0 1.5px transparent; background: none;
+}
+.p-row.picked .p-name { font-weight: 700; color: var(--ink); }
+.p-row.picked .p-rank { color: var(--brand-strong); font-weight: 700; }
+
+/* A row is exactly one row tall. A long name shortens rather than wrapping: a wrapped line pushes
+   the tenth row past the card's fixed height, and the card grows a scrollbar it was sized never to
+   need — the very rippling the fixed height exists to prevent. */
+.detail-grid .p-row { height: var(--p-row-h); min-height: 0; white-space: nowrap; }
+.detail-grid .p-row .p-name { min-width: 0; overflow: hidden; }
+.detail-grid .p-row .p-name > .ehover { min-width: 0; max-width: 100%; }
+
+/* A KO tile picks from its portrait and travels from its name, so each target says which it is.
+   Same ring as the rows, drawn outside the sprite so the art stays whole. */
+.ko-thumb { position: relative; border-radius: 9px;
+  transition: box-shadow 130ms ease, background-color 130ms ease, transform 120ms var(--ease-out); }
+.ko-thumb.pickable { cursor: pointer; }
+.ko-thumb.pickable:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 34%, transparent); }
+.ko-thumb.pickable:active { transform: scale(0.955); }
+.ko-thumb.locked { cursor: default; opacity: 0.45; }
+.ko-thumb.locked:hover, .ko-thumb.locked:active { box-shadow: none; transform: none; }
+.ko-mon.picked .ko-thumb, .ko-mon.picked .ko-thumb.pickable:hover {
+  box-shadow: 0 0 0 2px var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+/* The portrait is a picture, not a row: it has no name to embolden and no rank to recolour, so the
+   badge is what states "picked" at a glance across a grid of twelve. */
+.ko-tick {
+  position: absolute; right: -4px; bottom: -4px; width: 17px; height: 17px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: var(--brand-strong); color: #fff; font-size: 11px; font-weight: 800;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+@media (prefers-color-scheme: dark) {
+  /* The accent ink comes UP toward white on the dark ground, so the glyph on it goes down. */
+  .ko-tick { color: #0d1420; }
+}
+.ko-mon.picked .ko-nm { font-weight: 700; color: var(--brand-strong); }
+.ko-nm { color: inherit; }
+a.ko-nm:hover { color: var(--brand-strong); }
+
+/* -- the usage grid's own section head ------------------------------------------------ */
+.meta-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 20px 0 0; padding-bottom: 9px; border-bottom: 1px solid var(--line-strong);
+}
+.meta-head h2 {
+  margin: 0; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--sub); font-weight: 600;
+}
+.meta-head-hint { margin-left: auto; font-size: 12px; color: var(--sub); }
+.meta-head + .detail-grid { margin-top: 14px; }
+
+/* -- the hero's action, under the rank chips -----------------------------------------
+   The auto margin that used to push the chips to the hero's right edge now belongs to the column
+   that holds them; stretching that column puts the chips at the top and the action at the bottom,
+   which lands it level with the ability chips on the other side of the header. */
+.mon-hero .hero-side {
+  margin-left: auto; align-self: stretch; gap: 10px;
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;
+}
+.mon-hero .hero-side .rank-chip { margin-left: 0; }
+.mon-hero .hero-action {
+  font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap; cursor: pointer;
+  padding: 7px 16px; border-radius: 8px;
+  border: 1px solid rgb(255 255 255 / 0.45); background: rgb(255 255 255 / 0.16); color: #fff;
+}
+.mon-hero .hero-action:hover { background: rgb(255 255 255 / 0.28); }
+
+@media (max-width: 720px) {
+  .mon-hero .hero-side { align-self: auto; }
+}
+
+/* ==== calc workspace, eighth pass ================================================== */
+
+/* -- 1. the roll is a slider, and the buttons close the row from the right ------------
+   The engine hands back all sixteen rolls with every result, so picking one costs nothing and any
+   of them is a legitimate question. The slider is therefore the control and the three buttons are
+   shortcuts onto it — which is why they sit at the far end, away from the number they set: the
+   reading (value, then position) runs left to right, and the pressing is a separate act. */
+.duel-rolls { gap: 9px; }
+.duel-roll-read {
+  flex: none; display: inline-flex; align-items: baseline; gap: 5px; min-width: 76px;
+}
+.rail.right { left: auto; right: 0; border-right: 0; border-left: 1px solid var(--line); }
+.duel-roll-read strong { font-size: 15px; font-weight: 750; }
+.duel-roll-read .muted { font-size: 11px; }
+.duel-roll-lane { flex: 0 1 33%; width: 33%; max-width: 33%; min-width: 70px; }
+.duel-roll-mod { flex: none; min-width: 22px; color: var(--sub); font-size: 11.5px; text-align: center; }
+.boost-slider.roll { grid-template-columns: 1fr; }
+/* No neutral centre on a roll: zero damage is one end of the scale, not its middle. */
+.boost-slider.roll .boost-track::before { display: none; }
+.boost-slider.roll .boost-track { color: var(--brand); }
+.boost-slider.roll input[type="range"]::-webkit-slider-thumb { border-color: var(--brand); }
+.boost-slider.roll input[type="range"]::-moz-range-thumb { border-color: var(--brand); }
+.boost-slider.roll input[type="range"]:disabled { cursor: default; }
+.boost-slider.roll input[type="range"]:disabled::-webkit-slider-thumb { border-color: var(--line-strong); }
+.boost-slider.roll input[type="range"]:disabled::-moz-range-thumb { border-color: var(--line-strong); }
+.duel-roll-btns {
+  flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+}
+
+/* -- 2. the build card's four slots are a 2x2 too ------------------------------------
+   The same shape as the result card's move grid, so the slot you type into and the button you then
+   press sit in the same place. The power number leaves with the third column: the dropdown prints
+   it beside every option, which is where it is actually read. */
+.move-slots { grid-template-columns: 1fr 1fr; gap: 6px 8px; }
+.move-slots > .mon-editor-cap, .move-slots > .muted { grid-column: 1 / -1; }
+.move-slot { grid-template-columns: 20px 1fr; gap: 5px; }
+
+/* -- 3. two value columns: what the build is, and what it is playing at --------------- */
+.stat-table-head, .stat-table-row {
+  grid-template-columns: 32px minmax(44px, .75fr) minmax(56px, 1fr)
+    minmax(78px, 2fr) 52px 56px;
+  gap: 5px;
+}
+@media (max-width: 520px) {
+  .stat-table-head, .stat-table-row {
+    grid-template-columns: 28px minmax(34px, .7fr) minmax(46px, 1fr)
+      minmax(58px, 2fr) 44px 48px;
+  }
+}
+.stat-table-row input[type="number"] { padding: 4px 3px; }
+.stat-table-row > .num, .stat-table-row > .stat-name { text-align: center; }
+.stat-table-row > .stat-final, .stat-table-row > .stat-cur { justify-content: center; }
+.stat-table-row > input[type="number"]:nth-child(3) {
+  width: calc(100% - 10px); justify-self: center; box-sizing: border-box;
+}
+input.stat-cur.hp-cur { text-align: center; }
+.stat-cur { font-weight: 700; color: var(--sub); }
+/* A boosted value is a claim about the battle, not about the build, so it carries its own chip —
+   the same green/red as the nature column, but filled, so the two are never read as one statement. */
+.stat-cur.up, .stat-cur.down {
+  border-radius: 6px; padding: 0 5px; font-weight: 750;
+}
+.stat-cur.up { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.stat-cur.down { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+
+/* -- 4. the selected move has to be unmistakable -------------------------------------
+   It decides every number under it — the health bar, the band, the roll, the sentence — so "which
+   one is live" cannot be a shade apart from its three neighbours. Ring, deeper wash, a thicker type
+   edge and a heavier name, all at once: the pale types carry it on shape, the dark ones on colour. */
+.duel-move-cell { transition: background-color 120ms ease, box-shadow 130ms ease; }
+.duel-move-cell.on {
+  border-color: color-mix(in srgb, var(--mv) 70%, var(--line));
+  border-left-width: 7px;
+  background: color-mix(in srgb, var(--mv) 26%, var(--panel));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mv) 62%, transparent),
+              0 2px 8px color-mix(in srgb, var(--mv) 26%, transparent);
+}
+.duel-move-cell.on .duel-move-name { font-weight: 800; color: var(--ink); }
+.duel-move-cell.on .duel-move-ko { color: var(--ink); }
+
+@media (max-width: 720px) {
+  .duel-rolls { flex-wrap: wrap; }
+  .duel-roll-lane { flex-basis: 66%; width: 66%; max-width: 66%; order: 3; }
+  .duel-roll-mod { order: 3; }
+  .duel-roll-btns { margin-left: auto; }
+}
+
+/* ==== compact complete-build picker ==================================================
+   Both anchors already show the species. Start directly with the choices and spend the saved
+   height on the fields that distinguish two real builds. */
+.build-picker {
+  position: fixed; z-index: 1050; max-height: min(70vh, 620px); overflow: auto;
+  padding: 5px; border: 1px solid var(--line-strong); border-radius: 12px;
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised);
+  text-align: left; cursor: default;
+}
+.build-picker-note {
+  padding: 5px 7px 7px; color: var(--sub); font-size: 10.5px; line-height: 1.35;
+  border-bottom: 1px solid var(--line);
+}
+.build-picker-state { padding: 18px 12px; color: var(--sub); text-align: center; font-size: 12px; }
+.build-picker-list { list-style: none; display: grid; gap: 4px; margin: 4px 0 0; padding: 0; }
+.build-card {
+  display: block; width: 100%; padding: 6px 7px; border: 1px solid var(--line);
+  border-radius: 9px; background: color-mix(in srgb, var(--panel-2) 58%, transparent);
+  color: inherit; text-align: left; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+.build-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 56%, var(--line));
+  background: color-mix(in srgb, var(--brand) 7%, var(--panel)); transform: translateY(-1px);
+}
+
+/* The calculator borrows the dex search/facet rail, but expands one result in-place to show
+   compact build cards. The list itself remains scrollable and the filter flyout stays beside it. */
+.calc-rail-target { display: inline-flex; flex: none; gap: 2px; padding: 2px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
+.calc-rail-target button { border: 0; border-radius: 6px; padding: 4px 7px;
+  background: transparent; color: var(--sub); font: 600 11px/1.2 var(--font-ui); cursor: pointer; }
+.calc-rail-target button.on { background: var(--panel); color: var(--brand-strong); box-shadow: var(--shadow); }
+.rail-row-chevron { margin-left: auto; color: var(--sub); transition: transform 120ms ease; }
+.rail-result.expanded .rail-row-chevron { transform: rotate(180deg); }
+.calc-rail-builds { display: grid; gap: 5px; padding: 7px 10px 10px 38px;
+  border-bottom: 1px solid var(--line); background: var(--panel-2); }
+.calc-rail-builds .build-card { background: var(--panel); }
+.calc-rail-custom { font-size: 12px; font-weight: 700; min-height: 30px; }
+.calc-rail-feedback { padding: 8px 14px; border-bottom: 1px solid var(--line);
+  font-size: 11.5px; line-height: 1.35; }
+.calc-rail-feedback.ok { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--panel)); }
+.calc-rail-feedback.error { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
+
+/* Speed query cards mirror custom opponents; both columns grow downward independently. */
+.speed-side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.speed-side-column { min-width: 0; }
+.speed-side-head { margin: 0 0 8px; }
+.speed-side-cards { display: grid; gap: 10px; }
+.speed-tier .spd.mixed .speed-value, .tier-legend .lg.mixed {
+  background: repeating-linear-gradient(135deg,
+    color-mix(in srgb, var(--danger) 13%, var(--panel)) 0 6px,
+    color-mix(in srgb, var(--success) 13%, var(--panel)) 6px 12px);
+  color: var(--ink);
+}
+
+/* One frame, not a form panel around another framed command row. The labels sit beside their
+   controls, so format, fields and the calculate buttons share one compact horizontal baseline. */
+.calc-command-bar { margin: 14px 0 0; align-items: center; padding: 9px 12px; }
+.calc-command-bar .field-controls { align-items: center; gap: 10px; }
+.calc-command-bar label, .calc-command-bar .fld-chk {
+  display: inline-flex; align-items: center; gap: 6px; align-self: center;
+  white-space: nowrap; color: var(--sub); font-size: 12px;
+}
+.calc-command-bar .fld-chk .box { height: auto; padding: 0; }
+.calc-command-bar select { width: auto; min-width: 58px; padding: 6px 8px; }
+.calc-command-bar .fld-group { align-self: center; align-items: center; gap: 10px; }
+.calc-command-bar .primary-btn, .calc-command-bar .tune-solve-btns {
+  align-self: center; margin-left: auto;
+}
+.tune-command > .tune-note, .tune-command > .tune-proposal { margin-top: 10px; }
+@media (max-width: 800px) {
+  .speed-side-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.build-card.on {
+  border-color: var(--brand); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 24%, transparent);
+  background: color-mix(in srgb, var(--brand) 9%, var(--panel));
+}
+.build-card-body { display: grid; gap: 4px; min-width: 0; width: 100%; }
+.build-card-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.build-card-tag {
+  min-width: 22px; height: 20px; padding: 0 5px; display: grid; place-items: center;
+  border-radius: 6px; background: color-mix(in srgb, var(--brand) 14%, var(--panel-2));
+  color: var(--brand); font: 750 10px/1 var(--font-mono);
+}
+.build-card-tag.meta { color: #9a6827; background: color-mix(in srgb, #c98a34 17%, var(--panel-2)); }
+.build-card-tag.custom { color: var(--success); background: color-mix(in srgb, var(--success) 14%, var(--panel-2)); }
+.build-card-primary { display: flex; align-items: baseline; min-width: 0; gap: 5px; overflow: hidden; }
+.build-card-primary b {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; font-size: 12px;
+}
+.build-mega-badge {
+  flex: none; align-self: center; padding: 2px 4px; border-radius: 4px; color: #8d3ec7;
+  background: color-mix(in srgb, #a855f7 14%, var(--panel-2));
+  font: 750 8px/1 var(--font-mono); letter-spacing: .04em;
+}
+.build-card-identity {
+  display: flex; flex: 1 1 auto; min-width: 0; overflow: hidden;
+  color: var(--sub); font-size: 10.5px; line-height: 1.25; white-space: nowrap;
+}
+.build-card-identity > span:not(.build-card-sep) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.build-card-identity > span:last-child { flex: none; }
+.build-card-share { display: grid; justify-items: end; gap: 1px; color: var(--sub); font-size: 10.5px; white-space: nowrap; }
+.build-card-share em { color: var(--brand); font-size: 9px; font-style: normal; font-weight: 700; }
+.build-card-title { font-size: 11px; font-weight: 700; }
+.build-card-sep { flex: none; margin: 0 3px; color: currentColor; opacity: .78; }
+.build-card-sp-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center;
+  gap: 5px; min-width: 0;
+}
+.build-card-sp-label { color: var(--sub); font-size: 8.5px; font-weight: 750; }
+.build-card-sp-bars { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; min-width: 0; }
+.build-card-sp-stat {
+  min-width: 0; padding: 1px 3px; border-radius: 4px; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+  font-size: 8.5px; line-height: 14px; text-align: center; white-space: nowrap;
+}
+.build-card-sp-stat > span { margin-right: 2px; color: var(--brand); font-size: 8px; font-weight: 750; }
+.build-card-detail-grid {
+  display: grid; grid-template-columns: minmax(0, 1.18fr) minmax(112px, .82fr);
+  gap: 6px; align-items: stretch; min-width: 0;
+}
+.build-card-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+.build-card-move {
+  display: grid; grid-template-columns: 13px minmax(0, 1fr); align-items: center; gap: 3px;
+  min-width: 0; min-height: 20px; padding: 1px 4px; border-radius: 5px;
+  background: var(--panel); border: 1px solid var(--line); font-size: 9.5px;
+}
+.build-card-move > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.build-card-move.empty { color: var(--sub); opacity: .7; }
+.build-card-move .type-badge.icon-only img { width: 12px; height: 12px; }
+.build-card-move-dot { width: 5px; height: 5px; margin-left: 3px; border-radius: 50%; background: var(--line-strong); }
+.build-card-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+.build-card-stat {
+  min-width: 0; padding: 2px 3px; border-radius: 4px; font-size: 9px;
+  color: var(--ink); line-height: 16px; white-space: nowrap; text-align: center;
+}
+.build-card-stat .muted { color: var(--success); font-size: 8px; font-weight: 700; }
+.ehover-pop.has-addon { padding: 7px 8px; }
+.ehover-pop.has-addon .build-card-body { gap: 4px; }
+.ehover-pop.has-addon .build-card-tag { min-width: 24px; }
+.team-chip-btn .ehover { border-bottom: 0; }
+
+@media (max-width: 480px) {
+  .build-picker { max-height: calc(100vh - 16px); }
+  .build-card { padding: 6px; }
+  .build-card-detail-grid { grid-template-columns: minmax(0, 1.08fr) minmax(108px, .92fr); gap: 4px; }
 }

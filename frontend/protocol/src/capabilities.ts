@@ -18,7 +18,9 @@ import { z } from "zod";
 // Bumped 3 → 4: the default KO page now requires the lean `oppko_<format>.json` projection/API view
 // and lazy-loads the old full cache for detail. A v4 SPA paired with a v3 projection would 404.
 // Bumped 4 → 5: meta detail popovers now require the lazy per-Pokemon usage-trend endpoint/projection.
-export const WEB_PROTOCOL_VERSION = "6";
+// Bumped 6 → 7: calculator defaults and matchup build previews require the lightweight
+// `oppsets_<format>.json` / `view=sets` resource instead of loading the full matchup matrix.
+export const WEB_PROTOCOL_VERSION = "7";
 
 export const SKILL_IDS = ["dex", "meta", "calc", "team"] as const;
 export type SkillId = (typeof SKILL_IDS)[number];

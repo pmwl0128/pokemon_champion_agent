@@ -2,9 +2,11 @@
  * to page code (design §2 layering). */
 import { useEffect, useMemo, useState } from "react";
 import type {
-  FormatId, MetaDetailDto, NatureDto, OppCacheDto, OppCheckGridDto, OppKoGridDto,
+  FormatId, LearnersDto, MetaDetailDto, MetaFacetsDto, MetaKoDto, NatureDto, OppCacheDto,
+  OppCheckGridDto,
+  OppKoGridDto, OppSetCatalogDto,
   PokemonCardDto, RankingDto,
-  TrendDto, UsageTrendDto,
+  MetaKoTrendDto, TrendDto, UsageTrendDto,
 } from "@pokemon-champions/protocol";
 import { HttpError, type DexIndexEntry } from "./runtime/adapter.ts";
 import { useRuntime } from "./runtime/context.tsx";
@@ -149,12 +151,46 @@ export function useTrend(format: FormatId): Async<TrendDto> {
   return useQuery(`trend:${format}`, () => adapter.trend(format), [format, adapter]);
 }
 
+/** The KO axis for one Pokemon. Lazy and independent of `useDetail`: it is a different upstream
+ * on a different snapshot clock, and the panel it feeds sits below the fold. A 404 is the factual
+ * "this snapshot was not collected", which the page must show as a named gap, not as an empty list. */
+export function useKo(format: FormatId, slug: string): Async<MetaKoDto> {
+  const { adapter } = useRuntime();
+  return useQuery(`ko:${format}:${slug}`, () => adapter.ko(format, slug), [format, slug, adapter]);
+}
+
+/** Facet index for the filter rail — fetched only once the rail is actually opened. */
+export function useMetaFacets(format: FormatId, enabled: boolean): Async<MetaFacetsDto | null> {
+  const { adapter } = useRuntime();
+  const key = enabled ? `meta-facets:${format}` : `meta-facets:disabled:${format}`;
+  return useQuery(key, () => enabled ? adapter.metaFacets(format) : Promise.resolve(null),
+    [enabled, format, adapter]);
+}
+
 export function useUsageTrend(format: FormatId, slug: string,
                               enabled: boolean): Async<UsageTrendDto | null> {
   const { adapter } = useRuntime();
   const key = enabled ? `usage-trend:${format}:${slug}` : `usage-trend:disabled:${format}:${slug}`;
   return useQuery(key, () => enabled ? adapter.usageTrend(format, slug) : Promise.resolve(null),
     [enabled, format, slug, adapter]);
+}
+
+/** KO panel history, fetched only when a reader actually opens one of those previews. Its own
+ * document: the KO axis has its own capture clock, so its periods are not the usage trend's. */
+export function useKoTrend(format: FormatId, slug: string,
+                           enabled: boolean): Async<MetaKoTrendDto | null> {
+  const { adapter } = useRuntime();
+  const key = enabled ? `ko-trend:${format}:${slug}` : `ko-trend:disabled:${format}:${slug}`;
+  return useQuery(key, () => enabled ? adapter.koTrend(format, slug) : Promise.resolve(null),
+    [enabled, format, slug, adapter]);
+}
+
+/** Move -> learners, fetched only once a move filter is actually in play. */
+export function useLearners(enabled: boolean): Async<LearnersDto | null> {
+  const { adapter } = useRuntime();
+  const key = enabled ? "dex:learners" : "dex:learners:disabled";
+  return useQuery(key, () => enabled ? adapter.learners() : Promise.resolve(null),
+    [enabled, adapter]);
 }
 
 export function useDexIndex(enabled = true): Async<DexIndexEntry[]> {
@@ -175,7 +211,10 @@ export function useDexByName(enabled = true): Map<string, DexIndexEntry> {
 
 export function usePokemonCard(slug: string): Async<PokemonCardDto> {
   const { adapter } = useRuntime();
-  return useQuery(`pokemon:${slug}`, () => adapter.pokemonCard(slug), [slug, adapter]);
+  const result = useQuery(slug ? `pokemon:${slug}` : "pokemon:disabled",
+    () => slug ? adapter.pokemonCard(slug) : Promise.resolve(null as unknown as PokemonCardDto),
+    [slug, adapter]);
+  return slug ? result : LOADING;
 }
 
 export function useOppCache(format: FormatId): Async<OppCacheDto>;
@@ -184,6 +223,11 @@ export function useOppCache(format: FormatId, enabled = true): Async<OppCacheDto
   const { adapter } = useRuntime();
   return useQuery(enabled ? `matchup:ko:${format}` : `matchup:ko:${format}:disabled`,
     () => enabled ? adapter.oppCache(format) : Promise.resolve(null), [format, enabled, adapter]);
+}
+
+export function useOppSets(format: FormatId): Async<OppSetCatalogDto> {
+  const { adapter } = useRuntime();
+  return useQuery(`matchup:sets:${format}`, () => adapter.oppSets(format), [format, adapter]);
 }
 
 export function useOppKo(format: FormatId): Async<OppKoGridDto> {

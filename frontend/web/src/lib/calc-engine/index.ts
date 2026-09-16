@@ -65,6 +65,8 @@ function mapDamage(raw: any): Record<string, unknown> {
     koChance: null, category: raw.category,
     move: raw.move, attacker: raw.attacker, defender: raw.defender,
   };
+  // Optional-not-nullable in the DTO, and absent from results produced by an older engine snapshot.
+  if (raw.is_spread != null) out.isSpread = raw.is_spread;
   for (const [src, dst] of [["min_env", "minEnv"], ["max_env", "maxEnv"],
     ["min_env_percent", "minEnvPercent"], ["max_env_percent", "maxEnvPercent"]] as const) {
     if (raw[src] != null) out[dst] = raw[src];

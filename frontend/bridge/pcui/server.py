@@ -109,7 +109,16 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
     trend_cache: dict[str, tuple[float, Any]] = {}   # format -> (mtime, mapped TrendDto)
     # format -> (mtime, compact raw store, mapped per-Pokemon DTOs)
     usage_trend_cache: dict[str, tuple[float, dict, dict[str, Any]]] = {}
+    ko_trend_cache: dict[str, tuple[float, dict, dict[str, Any]]] = {}
     oppcache_cache: dict[str, tuple[float, Any]] = {}   # "format:view" -> (mtime, mapped DTO)
+    learners_cache: dict[str, Any] = {"doc": None}      # read-only dex data: build once per process
+    # format -> (mtime, raw KO doc, row-by-slug, mapped per-Pokemon DTOs)
+    ko_cache: dict[str, tuple[float, dict, dict, dict[str, Any]]] = {}
+    # format -> ((details mtime, ko mtime), facets DTO)
+    facets_cache: dict[str, tuple[tuple[float, float], Any]] = {}
+    # (season, format) -> {English canonical: usage rank}; the KO panels pair each opponent with
+    # how often it is actually played, which is what lets a reader discount pure exposure.
+    usage_rank_cache: dict[tuple[str, str], tuple[float, dict[str, int]]] = {}
     subscribers: set[asyncio.Queue] = set()
     loop_ref: dict[str, asyncio.AbstractEventLoop] = {}
     # When the operator deliberately binds beyond localhost (cli.py prints a warning and
@@ -218,6 +227,17 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
         doc = await query("dex", [kind, name, "--format", "json"])
         return DEX_MAPPERS[kind](_raw_or_error(doc))
 
+    @app.get("/api/dex/learners")
+    async def dex_learners():
+        """Move -> learners index for the browse filter. Cached for the process: the dex database
+        is read-only shipped data, so this cannot go stale under a running bridge."""
+        def _build() -> Any:
+            if learners_cache.get("doc") is None:
+                learners_cache["doc"] = mappers.learners_index()
+            return learners_cache["doc"]
+
+        return await asyncio.to_thread(_build)
+
     @app.post("/api/dex/resolve/batch")
     async def dex_resolve(body: dict):
         names = [str(n)[:200] for n in (body.get("names") or [])][:100]
@@ -233,6 +253,19 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
         return [mappers.map_resolve_entry(e) for e in doc]
 
     # -- meta --------------------------------------------------------------------------
+
+    def _usage_ranks(season: str, format: str) -> dict[str, int]:
+        """English canonical -> this format's usage rank, cached on the ranking file's mtime."""
+        path = META_DATA / f"ranking_{season}_{format}.json"
+        if not path.exists():
+            return {}
+        mtime = path.stat().st_mtime
+        cached = usage_rank_cache.get((season, format))
+        if cached is None or cached[0] != mtime:
+            rows = json.loads(path.read_text(encoding="utf-8")).get("rows") or []
+            cached = (mtime, {r["pokemon_en"]: r["rank"] for r in rows if r.get("pokemon_en")})
+            usage_rank_cache[(season, format)] = cached
+        return cached[1]
 
     @app.get("/api/meta/ranking")
     async def meta_ranking(format: str = "single", limit: int = 50):
@@ -321,6 +354,112 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
             raise HTTPException(404, f"no usage trend for {pokemon} in {format}")
         return dto
 
+    @app.get("/api/meta/ko-trend")
+    async def meta_ko_trend(format: str, pokemon: str):
+        """History for the KO panels. Its own store because the KO axis is captured on its own
+        clock — a single period list cannot describe both axes truthfully."""
+        if format not in ("single", "double"):
+            raise HTTPException(400, "format must be single|double")
+        slug = str(pokemon)[:200]
+
+        def _load() -> Any:
+            current = json.loads((META_DATA / "current.json").read_text(encoding="utf-8"))
+            season = current["current"]["season"]
+            path = META_DATA / f"ko_trend_{season}_{format}.json"
+            if not path.exists():
+                return None
+            mtime = path.stat().st_mtime
+            cached = ko_trend_cache.get(format)
+            if cached is None or cached[0] != mtime:
+                cached = (mtime, json.loads(path.read_text(encoding="utf-8")), {})
+                ko_trend_cache[format] = cached
+            if slug not in cached[1].get("pokemon", {}):
+                return None
+            if slug not in cached[2]:
+                cached[2][slug] = mappers.map_ko_trend(cached[1], slug)
+            return cached[2][slug]
+
+        try:
+            dto = await asyncio.to_thread(_load)
+        except mappers.MappingError as exc:
+            raise HTTPException(502, {"error": {"code": "not_found",
+                                                "message": str(exc)}}) from exc
+        if dto is None:
+            raise HTTPException(404, f"no KO trend for {pokemon} in {format}")
+        return dto
+
+    @app.get("/api/meta/ko")
+    async def meta_ko(format: str, pokemon: str):
+        """The KO axis for one Pokemon. A SEPARATE file family from ranking/details with its own
+        snapshot clock, so it is its own endpoint rather than another panel on /meta/detail."""
+        if format not in ("single", "double"):
+            raise HTTPException(400, "format must be single|double")
+        slug = str(pokemon)[:200]
+
+        def _load() -> Any:
+            current = json.loads((META_DATA / "current.json").read_text(encoding="utf-8"))
+            season = current["current"]["season"]
+            path = META_DATA / f"ko_{season}_{format}.json"
+            if not path.exists():
+                return None
+            mtime = path.stat().st_mtime
+            cached = ko_cache.get(format)
+            if cached is None or cached[0] != mtime:
+                doc = json.loads(path.read_text(encoding="utf-8"))
+                by_slug = {r.get("slug") or mappers.slugify(r["pokemon_en"]): r
+                           for r in doc.get("rows") or []}
+                cached = (mtime, doc, by_slug, {})
+                ko_cache[format] = cached
+            row = cached[2].get(slug)
+            if row is None:
+                return None
+            if slug not in cached[3]:
+                cached[3][slug] = mappers.map_ko(cached[1], row, _usage_ranks(season, format))
+            return cached[3][slug]
+
+        try:
+            dto = await asyncio.to_thread(_load)
+        except mappers.MappingError as exc:
+            raise HTTPException(502, {"error": {"code": "not_found",
+                                                "message": str(exc)}}) from exc
+        if dto is None:
+            raise HTTPException(404, f"no KO data for {pokemon} in {format}")
+        return dto
+
+    @app.get("/api/meta/facets")
+    async def meta_facets(format: str):
+        """Inverted index for the filter rail. Built once per format and cached on the shipped
+        files' mtimes: the per-pokemon detail files are lazy, so answering "which mons run Choice
+        Scarf" from the client would otherwise cost one fetch per roster entry."""
+        if format not in ("single", "double"):
+            raise HTTPException(400, "format must be single|double")
+
+        def _load() -> Any:
+            current = json.loads((META_DATA / "current.json").read_text(encoding="utf-8"))
+            season = current["current"]["season"]
+            rule = current["current"]["rule"]
+            details_path = META_DATA / f"details_{season}_{format}.json"
+            ko_path = META_DATA / f"ko_{season}_{format}.json"
+            if not details_path.exists():
+                return None
+            stamp = (details_path.stat().st_mtime,
+                     ko_path.stat().st_mtime if ko_path.exists() else 0.0)
+            cached = facets_cache.get(format)
+            if cached is None or cached[0] != stamp:
+                details = json.loads(details_path.read_text(encoding="utf-8")).get("rows") or []
+                ko_rows = (json.loads(ko_path.read_text(encoding="utf-8")).get("rows") or []
+                           if ko_path.exists() else [])
+                dto = {"season": season, "rule": rule, "format": format,
+                       "facets": mappers.build_facets(details, ko_rows)}
+                cached = (stamp, dto)
+                facets_cache[format] = cached
+            return cached[1]
+
+        dto = await asyncio.to_thread(_load)
+        if dto is None:
+            raise HTTPException(404, f"no metagame data for {format}")
+        return dto
+
     # -- calc --------------------------------------------------------------------------
 
     # Forwarded verbatim to the calc CLI; anything else in the body is dropped. `switch_in_drops`
@@ -395,8 +534,8 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
     async def team_oppcache(format: str = "single", view: str = "matrix"):
         if format not in ("single", "double"):
             raise HTTPException(400, "format must be single|double")
-        if view not in ("matrix", "ko", "checks"):
-            raise HTTPException(400, "view must be matrix|ko|checks")
+        if view not in ("matrix", "ko", "checks", "sets"):
+            raise HTTPException(400, "view must be matrix|ko|checks|sets")
 
         def _load() -> Any:
             # Read + map off the event loop; reuse the mapped DTO until the cache file's mtime
@@ -416,6 +555,8 @@ def create_app(store: Store, pool: WorkerPool, security: Security,
                     dto = mappers.map_oppcheck_grid(cache, mappers.derive_oppcheck_grid(cache))
                 elif view == "ko":
                     dto = mappers.map_oppko_grid(cache)
+                elif view == "sets":
+                    dto = mappers.map_oppsets(cache)
                 else:
                     dto = mappers.map_oppcache(cache)
                 cached = (mtime, dto)

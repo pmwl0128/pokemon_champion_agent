@@ -130,6 +130,28 @@ MESSAGES: dict[str, dict[str, str]] = {
     "panel_natures":   {"zh": "性格",   "ja": "性格",       "en": "natures"},
     "panel_partners":  {"zh": "队友",   "ja": "パートナー", "en": "partners"},
     "panel_spreads":   {"zh": "SP 分配", "ja": "SP配分",     "en": "SP spreads"},
+    # --- KO panels (a separate data axis; subject-relative names) ---
+    "panel_ko_targets":    {"zh": "常击倒对象",   "ja": "よく倒す相手",   "en": "most KOs"},
+    "panel_koed_by":       {"zh": "常被击倒于",   "ja": "よく倒される相手", "en": "most KO'd by"},
+    "panel_ko_moves":      {"zh": "击倒所用招式", "ja": "倒すときのわざ", "en": "KO moves"},
+    "panel_koed_by_moves": {"zh": "被击倒的招式", "ja": "倒されたわざ",   "en": "KO'd by moves"},
+    # --- KO coverage prose ---
+    "ko_snapshot":      {"zh": "KO 快照", "ja": "KOスナップショット", "en": "KO snapshot"},
+    "ko_no_pct":        {"zh": "对象列表只有顺序，来源不提供占比",
+                         "ja": "相手一覧は順位のみ。出典に比率はありません",
+                         "en": "opponent lists are an ordering only; the source publishes no share"},
+    "ko_species_level": {"zh": "对象为种族级（全国图鉴编号），不区分形态",
+                         "ja": "相手は species 単位（全国図鑑番号）で、フォルムは区別しません",
+                         "en": "opponents are species-level (national dex no), not per-form"},
+    "ko_moves_absent":  {"zh": "招式占比尚未采集",
+                         "ja": "わざの比率は未取得です",
+                         "en": "move shares are not collected yet"},
+    "ko_form_collapsed": {"zh": "同编号多形态，来源未区分",
+                          "ja": "同番号の複数フォルム、出典は未区別",
+                          "en": "same dex no, form not distinguished upstream"},
+    "ko_missing":       {"zh": "本快照没有 KO 数据：{context}",
+                         "ja": "このスナップショットにKOデータはありません：{context}",
+                         "en": "no KO data for {context}"},
 }
 
 

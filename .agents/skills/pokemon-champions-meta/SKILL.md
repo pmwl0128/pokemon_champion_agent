@@ -14,8 +14,9 @@ how is it used?"; canonical battle facts remain the responsibility of `$pokemon-
 1. Use the current season/rule unless the user explicitly requests a historical context.
 2. Use `ranking` for the environment overview and `detail` for one Pokémon's panels.
 3. Use `search` for reverse lookup across panel entries and `compare` for single-vs-double facts.
-4. Use `report` for snapshot changes. Use `export-excel` only when the user requests workbooks.
-5. Keep usage marginals factual: common moves/items/partners are not a guaranteed joint set.
+4. Use `ko` for the knock-out axis — whom a Pokémon knocks out and who knocks it out.
+5. Use `report` for snapshot changes. Use `export-excel` only when the user requests workbooks.
+6. Keep usage marginals factual: common moves/items/partners are not a guaranteed joint set.
 
 ## Commands
 
@@ -44,6 +45,21 @@ python scripts/meta_query.py search --format single --panel moves --where '{"and
 python scripts/meta_query.py compare --pokemon 雷丘
 python scripts/meta_query.py report --format both
 ```
+
+Query the KO axis (a separate data family with its own upstream snapshot):
+
+```bash
+python scripts/meta_query.py ko --format double --pokemon 大狃拉
+python scripts/meta_query.py ko --format single --pokemon Salamence --panel koed_by
+python scripts/meta_query.py ko --format single            # coverage only: what this snapshot has
+```
+
+`ko_targets` (alias `beats`) is whom the Pokémon knocks out; `koed_by` (alias `counters`) is who
+knocks it out. Both are an **ordering only** — the source publishes no percentage, so none is shown.
+Both are **species-level**: opponents are keyed by national dex number with no form, and a species
+that appears twice in one list is flagged rather than de-duplicated. `ko_moves` / `koed_by_moves` are
+a reserved tier: while `coverage.move_share` is `absent` they are `null`, meaning NOT COLLECTED — not
+"no KO moves". Never present a KO list as a matchup win rate; it counts knock-outs, not games.
 
 Names resolve through the sibling dex in Chinese, English, or Japanese. Fuzzy corrections are always
 disclosed: structured detail/compare results carry resolution metadata, while `search` reports a
@@ -86,3 +102,5 @@ query commands use the Python standard library.
 - Do not infer legality or learnsets from usage data.
 - Do not combine move, item, ability, nature, partner, or spread marginals into an asserted joint set.
 - A change report records factual differences between snapshots, not an interpretation of the metagame.
+- KO facts come from a different upstream snapshot than the usage data; quote each one's own
+  `updated_at` and never treat a KO ordering as a win rate, a counter verdict, or a damage result.

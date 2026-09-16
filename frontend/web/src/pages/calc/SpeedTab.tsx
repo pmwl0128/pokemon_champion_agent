@@ -7,7 +7,8 @@ import type {
   FormatId, NatureDto, SpeedInputDto, Status,
 } from "@pokemon-champions/protocol";
 import { isErrorShape } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
 import { EntityHover } from "../../components/EntityHover.tsx";
 import { FormatTabs } from "../../components/FormatTabs.tsx";
 import { GameImage } from "../../components/GameImage.tsx";
@@ -18,10 +19,12 @@ import { useRuntime } from "../../runtime/context.tsx";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import {
   BOOST_STAGES, FieldCheck, MonPicker, STATUSES, boostLabel, natureLabel, useModalFill, ItemCombo, megaFor, withMega,
+  type BuildOption,
 } from "./shared.tsx";
 
 interface SpeedState {
   slug: string;
+  ability: string;
   nature: string;
   item: string;
   speedSp: number;   // 0..32
@@ -29,15 +32,19 @@ interface SpeedState {
   boost: number;     // -6..6
   status: string;
   tailwind: boolean;
+  /** A drawer card is authoritative even when it is the deliberately blank Custom card. */
+  pinned?: boolean;
 }
 const EMPTY_SPEED: SpeedState = {
-  slug: "", nature: "", item: "", speedSp: 32, speedIv: 31, boost: 0, status: "", tailwind: false,
+  slug: "", ability: "", nature: "", item: "", speedSp: 32, speedIv: 31, boost: 0, status: "", tailwind: false,
+  pinned: false,
 };
 
 function cleanSpeed(s: SpeedState, name: string): SpeedInputDto {
   return {
     name,
     ...(s.nature ? { nature: s.nature } : {}),
+    ...(s.ability ? { ability: s.ability } : {}),
     sps: { spe: s.speedSp },
     ...(s.speedIv !== 31 ? { ivs: { spe: s.speedIv } } : {}),
     ...(s.boost ? { boosts: { spe: s.boost } } : {}),
@@ -107,7 +114,7 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
         {onRemove && <button className="mini-x" onClick={onRemove} aria-label={t("a11y.remove")}>✕</button>}
       </strong>
       <MonPicker idKey={`spd-${label}`} slug={side.slug} dex={dex}
-        onSlug={(slug) => setSide((s) => ({ ...s, slug }))} />
+        onSlug={(slug) => setSide((s) => s.slug === slug ? s : { ...EMPTY_SPEED, slug })} />
       <div className="speed-presets">
         <button onClick={() => preset(presets.plus, 32, 31)}>{t("speed.preset.max")}</button>
         <button onClick={() => preset(presets.neutral, 32, 31)}>{t("speed.preset.fast")}</button>
@@ -115,6 +122,15 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
         <button onClick={() => preset(presets.minus, 0, 0)}>{t("speed.preset.min")}</button>
       </div>
       <div className="speed-fields">
+        <label>{t("calc.ability")}
+          <select value={side.ability}
+            onChange={(e) => setSide((s) => ({ ...s, ability: e.target.value }))}>
+            <option value="">—</option>
+            {entry?.abilities.map((ability) => (
+              <option key={ability.name} value={ability.name}>{displayName(ability, lang)}</option>
+            ))}
+          </select>
+        </label>
         <label>{t("calc.nature")}
           <select value={side.nature}
             onChange={(e) => setSide((s) => ({ ...s, nature: e.target.value }))}>
@@ -159,6 +175,8 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
 }
 
 interface TierRow {
+  rowKey?: string;
+  state?: SpeedState;
   slug: string;
   name: string;
   rank: number | null;
@@ -168,10 +186,11 @@ interface TierRow {
   actual?: number;   // custom opponents' real configured speed (Scarf/Tailwind folded)
 }
 
-export function SpeedTab({ dex, natures, items }: {
+export function SpeedTab({ dex, natures, items, onRailApi }: {
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
+  onRailApi?: (api: CalcRailApi) => void;
 }) {
   const { adapter } = useRuntime();
   const t = useT();
@@ -182,10 +201,12 @@ export function SpeedTab({ dex, natures, items }: {
   const [format, setFormat] = useState<FormatId>("single");
   const [trickRoom, setTrickRoom] = useState(false);
   const [topN, setTopN] = useState(60);
-  const [mySide, setMySide] = useState<SpeedState>({ ...EMPTY_SPEED, slug: "garchomp" });
+  const [mySides, setMySides] = useState<SpeedState[]>([
+    { ...EMPTY_SPEED, slug: "garchomp" },
+  ]);
   const [opponents, setOpponents] = useState<SpeedState[]>([]);
   const [rows, setRows] = useState<TierRow[]>([]);
-  const [mySpeed, setMySpeed] = useState<number | null>(null);
+  const [mySpeeds, setMySpeeds] = useState<Array<number | null>>([]);
   const [calculatedSig, setCalculatedSig] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -195,37 +216,47 @@ export function SpeedTab({ dex, natures, items }: {
   const entryOf = (slug: string) => dex.find((e) => e.slug === slug);
   const rankOf = (slug: string) => rankingRows.find((r) => r.slug === slug)?.rank ?? null;
 
-  // Seed MY mon at 最速 once the +spe nature is known (my spread is mine — never meta-overwritten).
+  // Seed new hand-added MY rows at 最速 once the +spe nature is known. Drawer Custom cards are
+  // pinned, so deliberately blank cards do not acquire an environment/default nature behind the user.
   useEffect(() => {
-    if (presets.plus && !mySide.nature) {
-      setMySide((s) => ({ ...s, nature: presets.plus, speedSp: 32, speedIv: 31 }));
-    }
+    if (presets.plus) setMySides((previous) => {
+      let changed = false;
+      const next = previous.map((side) => {
+        if (side.nature || side.pinned) return side;
+        changed = true;
+        return { ...side, nature: presets.plus, speedSp: 32, speedIv: 31 };
+      });
+      return changed ? next : previous;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presets.plus]);
+  }, [presets.plus, mySides.length]);
 
-  // Custom opponents auto-fill their meta-standard speed investment on a fresh pick. Re-fill on a
+  // Custom opponents auto-fill their highest-share observed build on a fresh pick (Meta fallback
+  // only when no aggregate exists). Re-fill on a
   // FORMAT switch ONLY when the row is still bare or still holds its last (unedited) auto-fill — a
   // user-edited opponent (custom nature/item/speedSp) keeps its build instead of being clobbered back
-  // to the meta standard (parity with DamageTab/TuneTab's autofillSig guard — audit 2026-07-14).
-  const speedFillSig = (nature: string, item: string, speedSp: number) =>
-    JSON.stringify([nature, item, speedSp]);
+  // to the environment default (parity with DamageTab/TuneTab's autofillSig guard — audit 2026-07-14).
+  const speedFillSig = (ability: string, nature: string, item: string, speedSp: number) =>
+    JSON.stringify([ability, nature, item, speedSp]);
   const oppFill = useRef<Array<{ key: string; sig: string }>>([]);
   useEffect(() => {
     opponents.forEach((o, i) => {
-      if (!o.slug) return;
+      if (!o.slug || o.pinned) return;
       const key = `${format}:${o.slug}`;
       const prev = oppFill.current[i];
       if (prev && prev.key === key) return;
-      const bare = o.nature === "" && o.item === "" && o.speedSp === EMPTY_SPEED.speedSp;
-      const refill = bare || (prev !== undefined && speedFillSig(o.nature, o.item, o.speedSp) === prev.sig);
+      const bare = o.ability === "" && o.nature === "" && o.item === "" && o.speedSp === EMPTY_SPEED.speedSp;
+      const refill = bare || (prev !== undefined
+        && speedFillSig(o.ability, o.nature, o.item, o.speedSp) === prev.sig);
       oppFill.current[i] = { key, sig: prev?.sig ?? "" };
       if (!refill) return;
       void loadModal(o.slug, format).then((m) => {
-        if (!m) return;
+        if (!m || oppFill.current[i]?.key !== key) return;
         const sp = m.sps.spe ?? 0;
         setOpponents((prevOpp) => prevOpp.map((x, j) =>
-          j === i ? { ...x, nature: m.nature, item: m.item, speedSp: sp } : x));
-        oppFill.current[i] = { key, sig: speedFillSig(m.nature, m.item, sp) };
+          j === i && x.slug === o.slug && !x.pinned
+            ? { ...x, ability: m.ability, nature: m.nature, item: m.item, speedSp: sp } : x));
+        oppFill.current[i] = { key, sig: speedFillSig(m.ability, m.nature, m.item, sp) };
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,15 +265,19 @@ export function SpeedTab({ dex, natures, items }: {
   // The environment table is reference data, so keep it populated as its scope changes. The
   // explicit Calculate action below adds only the user's speed, position, and comparison colours.
   const tableToken = useRef(0);
-  const tableSig = JSON.stringify([format, topN, opponents, rankingRows.length, presets, dex.length]);
+  // Blank editor rows do not participate in the reference table. Adding several of them should
+  // not dispatch the same large speed batch repeatedly before the user picks a species.
+  const tableSig = JSON.stringify([format, topN, opponents.filter((side) => side.slug),
+    rankingRows.length, presets, dex.length]);
   useEffect(() => {
     // Invalidate an older batch even when the new scope has no rows and exits before requesting.
     const token = ++tableToken.current;
     const custom = opponents.filter((o) => o.slug && entryOf(o.slug));
     const customSlugs = new Set(custom.map((o) => o.slug));
-    const base: Array<{ slug: string; name: string; rank: number | null; kind: TierRow["kind"];
+    const base: Array<{ rowKey?: string; slug: string; name: string; rank: number | null; kind: TierRow["kind"];
       state?: SpeedState }> = [];
-    custom.forEach((o) => base.push({ slug: o.slug, name: entryOf(o.slug)!.name,
+    custom.forEach((o, index) => base.push({ rowKey: `custom-${index}`,
+      slug: o.slug, name: entryOf(o.slug)!.name,
       rank: rankOf(o.slug), kind: "custom", state: o }));
     rankingRows.slice(0, topN).forEach((r) => {
       const e = entryOf(r.slug);
@@ -278,7 +313,8 @@ export function SpeedTab({ dex, natures, items }: {
     Promise.all(chunks.map((c) => adapter.speedBatch(c))).then((arrs) => {
       if (token !== tableToken.current) return;
       const res = arrs.flat();
-      const out: TierRow[] = base.map((b) => ({ slug: b.slug, name: b.name, rank: b.rank,
+      const out: TierRow[] = base.map((b) => ({ rowKey: b.rowKey, state: b.state,
+        slug: b.slug, name: b.name, rank: b.rank,
         kind: b.kind, tiers: {} }));
       res.forEach((r, i) => {
         if (isErrorShape(r)) return;
@@ -297,28 +333,35 @@ export function SpeedTab({ dex, natures, items }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableSig]);
 
-  const querySig = JSON.stringify([format, trickRoom, topN, mySide, opponents]);
+  const querySig = JSON.stringify([format, trickRoom, topN, mySides, opponents]);
   const runToken = useRef(0);
   const run = async () => {
-    const mine = entryOf(mySide.slug);
-    if (!mine || ranking.status !== "ready") return;
+    const valid = mySides.flatMap((side, index) => {
+      const entry = entryOf(side.slug);
+      return entry ? [{ side, index, entry }] : [];
+    });
+    if (!valid.length || ranking.status !== "ready") return;
     const token = ++runToken.current;
     const submittedSig = querySig;
     setBusy(true);
     setError(null);
-    const myEff = withMega(mySide, dex, items);
     try {
-      const result = await adapter.speedBatch([
-        cleanSpeed(myEff.state, myEff.entry?.name ?? mine.name),
-      ]);
+      const result = await adapter.speedBatch(valid.map(({ side, entry }) => {
+        const effective = withMega(side, dex, items);
+        return cleanSpeed(effective.state, effective.entry?.name ?? entry.name);
+      }));
       if (token !== runToken.current) return;
-      const mineRow = result[0];
-      setMySpeed(mineRow && !isErrorShape(mineRow) ? mineRow.finalSpeed : null);
+      const speeds: Array<number | null> = Array.from({ length: mySides.length }, () => null);
+      valid.forEach(({ index }, resultIndex) => {
+        const row = result[resultIndex];
+        speeds[index] = row && !isErrorShape(row) ? row.finalSpeed : null;
+      });
+      setMySpeeds(speeds);
       setCalculatedSig(submittedSig);
     } catch (e) {
-      console.error("My speed calculation failed:", e);
+      console.error("My speed calculations failed:", e);
       if (token === runToken.current) {
-        setMySpeed(null);
+        setMySpeeds([]);
         setCalculatedSig(null);
         setError(t("calc.error"));
       }
@@ -327,81 +370,155 @@ export function SpeedTab({ dex, natures, items }: {
     }
   };
 
-  // Cell tone vs my mon (Trick Room flips it: the slower mon moves first).
-  const hasResult = mySpeed != null && calculatedSig === querySig;
+  // Cell tone vs every configured MY mon. A definitive colour means all of mine agree; a split
+  // verdict is striped instead of pretending one arbitrarily chosen query represents the group.
+  const hasResult = calculatedSig === querySig && mySpeeds.some((speed) => speed != null);
+  const calculatedMine = useMemo(() => !hasResult ? [] : mySides.flatMap((side, index) => {
+    const entry = entryOf(side.slug);
+    const speed = mySpeeds[index];
+    return entry && speed != null ? [{ side, index, entry, speed }] : [];
+  }), [hasResult, mySides, mySpeeds, dex]);
   const cellCls = (v: number | undefined): string => {
-    if (v == null || !hasResult || mySpeed == null) return "";
-    const diff = trickRoom ? mySpeed - v : v - mySpeed;
-    return diff > 0 ? "faster" : diff < 0 ? "slower" : "tie";
+    if (v == null || !calculatedMine.length) return "";
+    const diffs = calculatedMine.map(({ speed }) => trickRoom ? speed - v : v - speed);
+    if (diffs.every((diff) => diff > 0)) return "faster";
+    if (diffs.every((diff) => diff < 0)) return "slower";
+    if (diffs.every((diff) => diff === 0)) return "tie";
+    return "mixed";
   };
-  const myEntry = entryOf(mySide.slug);
+  const mySlugs = useMemo(() => new Set(mySides.map((side) => side.slug).filter(Boolean)), [mySides]);
   const opponentRows = useMemo(
-    () => myEntry ? rows.filter((r) => r.slug !== myEntry.slug) : rows,
-    [rows, myEntry?.slug],
+    () => mySlugs.size ? rows.filter((row) => row.kind === "custom" || !mySlugs.has(row.slug)) : rows,
+    [rows, mySlugs],
   );
-  const outspeedMax = !hasResult ? 0
-    : opponentRows.filter((r) => r.tiers.max != null && cellCls(r.tiers.max) === "slower").length;
   const displayRows = useMemo(() => {
-    if (!hasResult || mySpeed == null || !myEntry) return rows;
-    const mine: TierRow = {
-      slug: myEntry.slug, name: myEntry.name, rank: rankOf(myEntry.slug), kind: "mine",
-      base: myEntry.stats.spe, tiers: {}, actual: mySpeed,
-    };
-    return [...opponentRows, mine].sort((a, b) => {
+    if (!calculatedMine.length) return rows;
+    const mine: TierRow[] = calculatedMine.map(({ entry, speed, index }) => ({
+      rowKey: `mine-${index}`,
+      slug: entry.slug, name: entry.name, rank: rankOf(entry.slug), kind: "mine",
+      base: entry.stats.spe, tiers: {}, actual: speed,
+    }));
+    return [...opponentRows, ...mine].sort((a, b) => {
       const av = a.kind === "mine" ? a.actual : a.tiers.max;
       const bv = b.kind === "mine" ? b.actual : b.tiers.max;
       return (bv ?? -1) - (av ?? -1);
     });
     // rankOf is a cheap lookup over the already-loaded ranking rows.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, opponentRows, hasResult, mySpeed, myEntry?.slug]);
+  }, [rows, opponentRows, calculatedMine, rankingRows]);
 
-  const loadTier = (slug: string, tier: Tier) => setMySide(tierState(slug, tier, presets));
+  const loadTier = (slug: string, tier: Tier) => setMySides((previous) => previous.length
+    ? previous.map((side, index) => index === 0 ? tierState(slug, tier, presets) : side)
+    : [tierState(slug, tier, presets)]);
   const loadActual = (r: TierRow) => {
-    const o = opponents.find((x) => x.slug === r.slug);
-    if (o) setMySide({ ...o });
+    if (r.state) setMySides((previous) => previous.length
+      ? previous.map((side, index) => index === 0 ? { ...r.state! } : side)
+      : [{ ...r.state! }]);
   };
+
+  const pickFromRail = useCallback((target: CalcRailTarget, entry: DexIndexEntry,
+                                    option: BuildOption | null) => {
+    const picked: SpeedState = {
+      ...EMPTY_SPEED,
+      slug: entry.slug,
+      ability: option?.modal.ability ?? "",
+      nature: option?.modal.nature ?? "",
+      item: option?.modal.item ?? "",
+      speedSp: option ? option.modal.sps.spe ?? 0 : EMPTY_SPEED.speedSp,
+      pinned: true,
+    };
+    const list = target === "primary" ? mySides : opponents;
+    const emptyIndex = list.findIndex((candidate) => !candidate.slug);
+    if (emptyIndex < 0 && list.length >= 6) {
+      return { ok: false as const, reason: "full" as const };
+    }
+    const next = emptyIndex >= 0
+      ? list.map((candidate, index) => index === emptyIndex ? picked : candidate)
+      : [...list, picked];
+    if (target === "primary") setMySides(next); else setOpponents(next);
+    return { ok: true as const };
+  }, [mySides, opponents]);
+
+  const railApi = useMemo<CalcRailApi>(() => ({
+    format,
+    targets: [
+      { id: "primary", label: t("speed.ours") },
+      { id: "secondary", label: t("speed.theirs") },
+    ],
+    pick: pickFromRail,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [format, pickFromRail, lang]);
+  useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
   return (
     <>
-      <SpeedRow label={t("speed.myMon")} side={mySide} setSide={setMySide} dex={dex}
-        natures={natures} items={items} presets={presets} />
-
-      <div className="panel form-panel" style={{ marginTop: 14 }}>
-        <div className="field-row">
-          <div className="field-controls">
-            <FormatTabs format={format} onChange={setFormat} />
-            <label>{t("speed.topN")}
-              <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}>
-                {[30, 60, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <FieldCheck label={t("speed.trickRoom")} checked={trickRoom} onChange={setTrickRoom} />
+      <div className="speed-side-grid">
+        <section className="speed-side-column">
+          <div className="defenders-head speed-side-head">
+            <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.ours")}</h2>
+            <button className="ghost-btn" disabled={mySides.length >= 6}
+              title={mySides.length >= 6 ? t("calc.maxSix") : undefined}
+              onClick={() => setMySides((sides) => sides.length >= 6
+                ? sides : [...sides, { ...EMPTY_SPEED }])}>
+              + {t("speed.addMine")}
+            </button>
           </div>
-          <button className="primary-btn" onClick={() => void run()}
-            disabled={busy || !mySide.slug || ranking.status !== "ready"}>
-            {busy ? t("state.loading") : t("calc.run")}
-          </button>
-        </div>
+          <div className="speed-side-cards">
+            {mySides.map((side, index) => (
+              <SpeedRow key={index} label={`${t("speed.ours")} ${index + 1}`}
+                side={side}
+                setSide={(update) => setMySides((previous) => previous.map((candidate, at) =>
+                  at === index
+                    ? (typeof update === "function"
+                      ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
+                    : candidate))}
+                dex={dex} natures={natures} items={items} presets={presets}
+                onRemove={mySides.length > 1
+                  ? () => setMySides((previous) => previous.filter((_, at) => at !== index))
+                  : undefined} />
+            ))}
+          </div>
+        </section>
+        <section className="speed-side-column">
+          <div className="defenders-head speed-side-head">
+            <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.theirs")}</h2>
+            <button className="ghost-btn" disabled={opponents.length >= 6}
+              title={opponents.length >= 6 ? t("calc.maxSix") : undefined}
+              onClick={() => setOpponents((sides) => sides.length >= 6
+                ? sides : [...sides, { ...EMPTY_SPEED }])}>
+              + {t("speed.addOpponent")}
+            </button>
+          </div>
+          <div className="speed-side-cards">
+            {opponents.map((side, index) => (
+              <SpeedRow key={index} label={`${t("speed.theirs")} ${index + 1}`} side={side}
+                setSide={(update) => setOpponents((previous) => previous.map((candidate, at) =>
+                  at === index
+                    ? (typeof update === "function"
+                      ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
+                    : candidate))}
+                dex={dex} natures={natures} items={items} presets={presets}
+                onRemove={() => setOpponents((previous) => previous.filter((_, at) => at !== index))} />
+            ))}
+          </div>
+        </section>
       </div>
 
-      <div className="defenders-head">
-        <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.custom")}</h2>
-        <button className="ghost-btn" onClick={() => setOpponents((o) => [...o, { ...EMPTY_SPEED }])}>
-          + {t("speed.addOpponent")}
+      <div className="field-row calc-command-bar">
+        <div className="field-controls">
+          <FormatTabs format={format} onChange={setFormat} />
+          <label><span>{t("speed.topN")}</span>
+            <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}>
+              {[30, 60, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <FieldCheck label={t("speed.trickRoom")} checked={trickRoom} onChange={setTrickRoom} />
+        </div>
+        <button className="primary-btn" onClick={() => void run()}
+          disabled={busy || !mySides.some((side) => side.slug) || ranking.status !== "ready"}>
+          {busy ? t("state.loading") : t("calc.run")}
         </button>
       </div>
-      {opponents.length > 0 && (
-        <div className="defenders-grid">
-          {opponents.map((o, i) => (
-            <SpeedRow key={i} label={`${t("matchup.opponent")} ${i + 1}`} side={o}
-              setSide={(u) => setOpponents((prev) => prev.map((x, j) =>
-                j === i ? (typeof u === "function" ? (u as (s: SpeedState) => SpeedState)(x) : u) : x))}
-              dex={dex} natures={natures} items={items} presets={presets}
-              onRemove={() => setOpponents((prev) => prev.filter((_, j) => j !== i))} />
-          ))}
-        </div>
-      )}
 
       {error && <div className="notice mono" style={{ marginTop: 14 }}>{error}</div>}
 
@@ -410,14 +527,13 @@ export function SpeedTab({ dex, natures, items }: {
         <span className="tier-legend">
           {hasResult && <span className="lg faster">{t("speed.legendFaster")}</span>}
           {hasResult && <span className="lg slower">{t("speed.legendSlower")}</span>}
+          {hasResult && calculatedMine.length > 1 && <span className="lg mixed">{t("speed.legendMixed")}</span>}
           <span className="muted">· {t("speed.load")}</span>
         </span>
-        {hasResult && mySpeed != null && (
+        {hasResult && calculatedMine.length > 0 && (
           <span className="speed-summary">
-            {t("speed.mySpeed")} {mySpeed}
-            <span className="muted">
-              {t("speed.summary").replace("{n}", String(outspeedMax)).replace("{m}", String(opponentRows.length))}
-            </span>
+            {t("speed.mySpeed")} {calculatedMine.map(({ entry, speed }) =>
+              `${displayName(entry, lang)} ${speed}`).join(" · ")}
           </span>
         )}
       </div>
@@ -437,7 +553,7 @@ export function SpeedTab({ dex, natures, items }: {
                 {displayRows.map((r) => {
                   const e = entryOf(r.slug);
                   return (
-                    <tr key={`${r.slug}-${r.kind}`} className={r.kind}>
+                    <tr key={r.rowKey ?? `${r.slug}-${r.kind}`} className={r.kind}>
                       <th className="tier-mon" onClick={() => r.kind !== "mine" && loadTier(r.slug, "max")}
                         role={r.kind === "mine" ? undefined : "button"}
                         tabIndex={r.kind === "mine" ? undefined : 0}

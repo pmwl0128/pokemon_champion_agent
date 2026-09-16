@@ -3,6 +3,7 @@
  * dex page they LINK to the meta page (no active state); on the meta page they SWITCH the panels'
  * format (the active one highlighted). `cross` is the link to the sibling detail view. */
 import type { FormatId, PokemonCardDto } from "@pokemon-champions/protocol";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { typeColor } from "../assets/icons.ts";
 import { GameImage } from "./GameImage.tsx";
@@ -17,7 +18,7 @@ export interface HeroForm {
   onSelect: () => void;
 }
 
-export function MonHero({ mon, ranks, activeFormat, onRank, cross, forms }: {
+export function MonHero({ mon, ranks, activeFormat, onRank, cross, forms, action }: {
   mon: PokemonCardDto;
   ranks: Array<[FormatId, number | null]>;
   activeFormat?: FormatId;                 // highlight the active chip (meta page); omit on dex page
@@ -26,6 +27,9 @@ export function MonHero({ mon, ranks, activeFormat, onRank, cross, forms }: {
   /** Base/Mega display toggle (meta page): the NAME LINE lists every form, the active one
    * highlighted; clicking switches which form's identity the hero + stats show. */
   forms?: HeroForm[];
+  /** A page-level action for this Pokemon, parked under the rank chips at the hero's bottom-right
+   * so it lines up with the ability chips on the other side of the header. */
+  action?: ReactNode;
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -62,13 +66,16 @@ export function MonHero({ mon, ranks, activeFormat, onRank, cross, forms }: {
         </div>
         {cross && <Link className="cross-link" to={cross.to}>{cross.label} →</Link>}
       </div>
-      <div className="rank-chip">
-        {ranks.map(([f, rank]) => (
-          <button key={f} className={activeFormat === f ? "on" : ""} onClick={() => onRank(f)}>
-            <b className="num">{rank != null ? `#${rank}` : "—"}</b>
-            {t(`format.${f}`)}
-          </button>
-        ))}
+      <div className="hero-side">
+        <div className="rank-chip">
+          {ranks.map(([f, rank]) => (
+            <button key={f} className={activeFormat === f ? "on" : ""} onClick={() => onRank(f)}>
+              <b className="num">{rank != null ? `#${rank}` : "—"}</b>
+              {t(`format.${f}`)}
+            </button>
+          ))}
+        </div>
+        {action}
       </div>
     </header>
   );

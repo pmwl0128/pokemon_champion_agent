@@ -71,6 +71,12 @@ def details_path(season: str, fmt: str) -> Path:
     return CACHE_DIR / f"details_{season}_{fmt}.json"
 
 
+def ko_path(season: str, fmt: str) -> Path:
+    """KO-facts file. A separate family from ranking/details: different upstream, different snapshot
+    clock, and rows whose KO objects are species-level rather than form-level."""
+    return CACHE_DIR / f"ko_{season}_{fmt}.json"
+
+
 def count_cjk(text: str) -> int:
     return len(re.findall(r"[一-鿿]", text or ""))
 

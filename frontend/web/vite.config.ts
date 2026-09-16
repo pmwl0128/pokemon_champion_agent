@@ -43,13 +43,25 @@ function calcEngineDigest(): string {
 /** Dev-only: authenticate proxied /api calls against a running `pcui serve` by injecting the
  * CLI secret from daemon.json — the browser never sees it, and production traffic (bridge
  * serves the built dist same-origin) uses the bootstrap cookie instead. */
-function daemonSecret(): string | null {
+function daemonFile(): { secret?: string; port?: number } {
   try {
-    const raw = readFileSync(join(homedir(), ".pokemon-champions-ui", "daemon.json"), "utf-8");
-    return (JSON.parse(raw) as { secret?: string }).secret ?? null;
+    return JSON.parse(
+      readFileSync(join(homedir(), ".pokemon-champions-ui", "daemon.json"), "utf-8"));
   } catch {
-    return null;
+    return {};
   }
+}
+
+function daemonSecret(): string | null {
+  return daemonFile().secret ?? null;
+}
+
+/** The bridge's port is configuration (`PCUI_LOCAL_PORT`), not a constant: the running daemon
+ * records the port it actually bound, so read that instead of hardcoding one here. A dev server
+ * started before the bridge falls back to the historical default. */
+function bridgeOrigin(): string {
+  const port = daemonFile().port;
+  return `http://127.0.0.1:${typeof port === "number" && port > 0 ? port : 8763}`;
 }
 
 /** `runtime-config.json` belongs to the DEPLOYMENT, never to the SPA dist (design §2).
@@ -74,9 +86,9 @@ function localRuntimeConfig(): Plugin {
   };
 }
 
-const projectionProxy = { target: "http://127.0.0.1:8763" };
+const projectionProxy = { target: bridgeOrigin() };
 const apiProxy = {
-  target: "http://127.0.0.1:8763",
+  target: bridgeOrigin(),
   configure: (proxy: { on: (event: "proxyReq", handler: (proxyReq: {
     setHeader: (name: string, value: string) => void;
   }) => void) => void }) => {

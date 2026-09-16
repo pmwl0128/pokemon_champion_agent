@@ -21,7 +21,7 @@ import { activeKey, ColHead, RowHead } from "../components/MatchupHeads.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { SegmentedControl, segmentedPanelId, segmentedTabId }
   from "../components/SegmentedControl.tsx";
-import { useOppCache, useOppChecks, useOppKo } from "../hooks.ts";
+import { useOppCache, useOppChecks, useOppKo, useOppSets } from "../hooks.ts";
 import { useRuntime } from "../runtime/context.tsx";
 import { displayName, optionalKey, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
@@ -156,6 +156,8 @@ function variantTitle(s: SpeciesRowDto | undefined, set: OppSetDto | undefined,
 
 function KoGrid({ format }: { format: FormatId }) {
   const state = useOppKo(format);
+  const buildState = useOppSets(format);
+  const headerSets = buildState.status === "ready" ? buildState.data.sets : undefined;
   const { lang } = useLang();
   const t = useT();
   const damageText = useDamageText();
@@ -221,12 +223,6 @@ function KoGrid({ format }: { format: FormatId }) {
         <span className="matrix-guide-mark" aria-hidden>{sel ? "✓" : "↘"}</span>
         {t(sel ? "matchup.cellSelected" : "matchup.cellHint")}
       </div>
-      {cols.some((c) => (c.variants?.length ?? 0) > 1) && (
-        <div className="matrix-guide variant-guide">
-          <span className="matrix-guide-mark" aria-hidden>◧</span>
-          {t("matchup.variantHint")}
-        </div>
-      )}
       {omittedCols > 0 && (
         <div className="matrix-guide variant-guide">
           <span className="matrix-guide-mark" aria-hidden>−</span>
@@ -240,6 +236,7 @@ function KoGrid({ format }: { format: FormatId }) {
               <th className="corner">{t("matchup.attacker")} \ {t("matchup.defender")}</th>
               {cols.map((c) => (
                 <ColHead key={c.slug} s={c} lang={lang} picks={colPicks}
+                         sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
                          open={openPicker === `col:${c.slug}`}
                          onToggle={() => setOpenPicker((k) => k === `col:${c.slug}` ? null : `col:${c.slug}`)}
                          onPick={(key) => setColPicks((p) => ({ ...p, [c.slug]: key }))}
@@ -253,6 +250,7 @@ function KoGrid({ format }: { format: FormatId }) {
               return (
               <tr key={r.slug}>
                 <RowHead s={r} lang={lang} picks={rowPicks}
+                         sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
                          open={openPicker === `row:${r.slug}`}
                          onToggle={() => setOpenPicker((k) => k === `row:${r.slug}` ? null : `row:${r.slug}`)}
                          onPick={(key) => setRowPicks((p) => ({ ...p, [r.slug]: key }))}
@@ -365,6 +363,8 @@ function KoLegend() {
 
 function CheckGrid({ format }: { format: FormatId }) {
   const state = useOppChecks(format);
+  const buildState = useOppSets(format);
+  const headerSets = buildState.status === "ready" ? buildState.data.sets : undefined;
   const [sel, setSel] = useState<{ m: string; o: string } | null>(null);
   // The compact grade grid is enough to render the page. The much larger KO matrix is fetched only
   // after a cell is opened for its damage/speed detail, then remains session-cached.
@@ -430,12 +430,6 @@ function CheckGrid({ format }: { format: FormatId }) {
         <span className="matrix-guide-mark" aria-hidden>{sel ? "✓" : "↘"}</span>
         {t(sel ? "matchup.cellSelected" : "matchup.cellHint")}
       </div>
-      {cols.some((c) => (c.variants?.length ?? 0) > 1) && (
-        <div className="matrix-guide variant-guide">
-          <span className="matrix-guide-mark" aria-hidden>◧</span>
-          {t("matchup.variantHint")}
-        </div>
-      )}
       {omittedCols > 0 && (
         <div className="matrix-guide variant-guide">
           <span className="matrix-guide-mark" aria-hidden>−</span>
@@ -449,6 +443,7 @@ function CheckGrid({ format }: { format: FormatId }) {
               <th className="corner">{t("matchup.member")} \ {t("matchup.opponent")}</th>
               {cols.map((c) => (
                 <ColHead key={c.slug} s={c} lang={lang}
+                         sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
                          picks={colPicks}
                          open={openPicker === `col:${c.slug}`}
                          onToggle={() => setOpenPicker((k) => k === `col:${c.slug}` ? null : `col:${c.slug}`)}
@@ -463,6 +458,7 @@ function CheckGrid({ format }: { format: FormatId }) {
               return (
                 <tr key={r.slug}>
                   <RowHead s={r} lang={lang} picks={rowPicks}
+                           sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
                            open={openPicker === `row:${r.slug}`}
                            onToggle={() => setOpenPicker((k) => k === `row:${r.slug}` ? null : `row:${r.slug}`)}
                            onPick={(key) => setRowPicks((p) => ({ ...p, [r.slug]: key }))}

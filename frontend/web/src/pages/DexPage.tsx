@@ -1,7 +1,11 @@
 /** Dex browse: four tabs over the projection's static vocabularies — Pokemon cards,
  * the full move table (battle numbers + trilingual effect texts), the item list
  * (sprite + trilingual effect) and the ability list. Effects localize to the interface
- * language with the English text as the permanent fallback (design §2.1). */
+ * language with the English text as the permanent fallback (design §2.1).
+ *
+ * Search and filters live in the page-edge rail, and the rail's contents follow the active tab — a
+ * power range means nothing on the ability list, so it is not on screen there. Each tab keeps its
+ * own query and its own filters, so switching away and back does not discard what you set up. */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { GameImage } from "../components/GameImage.tsx";
@@ -9,7 +13,12 @@ import { PageHeader } from "../components/PageHeader.tsx";
 import { SegmentedControl, segmentedPanelId, segmentedTabId }
   from "../components/SegmentedControl.tsx";
 import { CategoryBadge, TypeBadge } from "../components/TypeBadge.tsx";
-import { useAbilities, useDexIndex, useItems, useMoves } from "../hooks.ts";
+import { RailHandle, useSideRail } from "../components/SideRail.tsx";
+import {
+  DexRail, EMPTY_FILTERS, itemMatches, moveMatches, pokemonMatches,
+  type DexFilters,
+} from "../components/DexRail.tsx";
+import { useAbilities, useDexIndex, useItems, useLearners, useMoves } from "../hooks.ts";
 import { displayName, effectText, optionalKey, useLang, useT } from "../i18n.ts";
 import type { ItemRef, MoveRef } from "../runtime/projection.ts";
 import { ITEM_CATEGORY_ORDER, itemOrder } from "./calc/shared.tsx";
@@ -25,16 +34,12 @@ function matches(query: string, ...names: Array<string | undefined>): boolean {
   return names.some((n) => n !== undefined && n.toLowerCase().includes(q));
 }
 
-function MovesTab({ query }: { query: string }) {
+function MovesTab({ rows, state }: { rows: MoveRef[]; state: string }) {
   const t = useT();
   const { lang } = useLang();
-  const moves = useMoves();
-  const filtered = useMemo(() => {
-    if (moves.status !== "ready") return [];
-    return moves.data.filter((m) => matches(query, m.name, m.nameZh, m.nameJa));
-  }, [moves, query]);
-  if (moves.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
-  if (moves.status !== "ready") return <div className="notice">{t("state.errorDetail")}</div>;
+  const filtered = rows;
+  if (state === "loading") return <div className="spinner">{t("state.loading")}</div>;
+  if (state !== "ready") return <div className="notice">{t("state.errorDetail")}</div>;
   return (
     <div className="table-scroll">
       <table className="data-table dex-moves-table">
@@ -74,17 +79,12 @@ function MovesTab({ query }: { query: string }) {
   );
 }
 
-function ItemsTab({ query }: { query: string }) {
+function ItemsTab({ rows, state }: { rows: ItemRef[]; state: string }) {
   const t = useT();
   const { lang } = useLang();
-  const items = useItems();
-  const filtered = useMemo(() => {
-    if (items.status !== "ready") return [];
-    return (items.data as ItemRef[]).filter((i) =>
-      matches(query, i.name, i.nameZh, i.nameJa));
-  }, [items, query]);
-  if (items.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
-  if (items.status !== "ready") return <div className="notice">{t("state.errorDetail")}</div>;
+  const filtered = rows;
+  if (state === "loading") return <div className="spinner">{t("state.loading")}</div>;
+  if (state !== "ready") return <div className="notice">{t("state.errorDetail")}</div>;
   // 52poke's taxonomy groups the browse (battle staples first, Mega stones last).
   const groups = new Map<string, ItemRef[]>();
   for (const i of [...filtered].sort(itemOrder)) {
@@ -163,6 +163,15 @@ export function DexPage() {
   }));
   const query = queries[tab];
   const setQuery = (q: string) => setQueries((prev) => ({ ...prev, [tab]: q }));
+  const [filters, setFilters] = useState<DexFilters>(EMPTY_FILTERS);
+  const moves = useMoves();
+  const items = useItems();
+  // Wider than the metagame rail (it holds a type grid and stat rows), and it pushes further down
+  // before covering: a card grid keeps reflowing where a panel layout would stop being readable.
+  const rail = useSideRail(360, 620);
+  // The learnset index is one lazy document: fetched when a move filter is in play, and eagerly
+  // once the rail is open so its per-move learner counts are there to read.
+  const learners = useLearners(filters.pokemon.moves.length > 0 || rail.open);
   const { lang } = useLang();
   const t = useT();
 
@@ -175,20 +184,54 @@ export function DexPage() {
     if (q !== null) setQueries((prev) => ({ ...prev, [nextTab]: q }));
   }, [params]);
 
+  const learnerTable = learners.status === "ready" && learners.data ? learners.data.moves : null;
   const filtered = useMemo(() => {
     if (index.status !== "ready") return [];
     const q = query.trim().toLowerCase();
-    if (!q) return index.data;
-    return index.data.filter((e) =>
-      e.name.toLowerCase().includes(q) ||
-      (e.nameZh?.includes(query.trim()) ?? false) ||
-      (e.nameJa?.includes(query.trim()) ?? false) ||
-      e.slug.includes(q) ||
-      String(e.nationalDex) === q);
-  }, [index, query, lang]);
+    // A move filter cannot be answered until its index has arrived. Returning the UNFILTERED list
+    // in the meantime would flash a wrong answer, so hold an empty one instead.
+    const sets = filters.pokemon.moves.length > 0
+      ? (learnerTable ? filters.pokemon.moves.map((m) => new Set(learnerTable[m] ?? [])) : null)
+      : [];
+    if (sets === null) return [];
+    return index.data.filter((e) => pokemonMatches(e, filters.pokemon, sets) && (
+      !q || e.name.toLowerCase().includes(q)
+        || (e.nameZh?.includes(query.trim()) ?? false)
+        || (e.nameJa?.includes(query.trim()) ?? false)
+        || e.slug.includes(q)
+        || String(e.nationalDex) === q));
+  }, [index, query, lang, filters.pokemon, learnerTable]);
+
+  const filteredMoves = useMemo(() => {
+    if (moves.status !== "ready") return [];
+    return moves.data.filter((m) =>
+      moveMatches(m, filters.moves) && matches(query, m.name, m.nameZh, m.nameJa));
+  }, [moves, query, filters.moves]);
+
+  const filteredItems = useMemo(() => {
+    if (items.status !== "ready") return [];
+    return (items.data as ItemRef[]).filter((i) =>
+      itemMatches(i, filters.items) && matches(query, i.name, i.nameZh, i.nameJa));
+  }, [items, query, filters.items]);
+
+  // The priority values the vocabulary actually uses — a fixed -7..+5 row would offer buckets that
+  // match nothing.
+  const priorities = useMemo(() => {
+    if (moves.status !== "ready") return [];
+    return [...new Set(moves.data.map((m) => m.priority ?? 0))].sort((a, b) => b - a);
+  }, [moves]);
+
+  const railCount = tab === "pokemon" ? filtered.length
+    : tab === "moves" ? filteredMoves.length
+      : tab === "items" ? filteredItems.length : 0;
 
   return (
     <>
+      <RailHandle state={rail} label={t("rail.dex")} />
+      <DexRail state={rail} tab={tab} query={query} setQuery={setQuery} filters={filters}
+        setFilters={setFilters} learners={learnerTable} priorities={priorities}
+        label={`${t("rail.dex")} · ${t(`dex.tab.${tab}`)}`} count={railCount}
+        rows={tab === "pokemon" ? filtered : null} />
       <PageHeader title={t("dex.title")}>
         <SegmentedControl kind="tabs" idBase="dex-section" value={tab} onChange={setTab}
           ariaLabel={t("a11y.dexSection")} className="seg dex-tabs page-tabs"
@@ -196,15 +239,8 @@ export function DexPage() {
       </PageHeader>
       <div role="tabpanel" id={segmentedPanelId("dex-section", tab)}
         aria-labelledby={segmentedTabId("dex-section", tab)}>
-        <div className="search-row dex-search-row">
-          <input type="search" value={query} placeholder={t("dex.search")}
-            onChange={(e) => setQuery(e.target.value)} aria-label={t("dex.search")} />
-          {tab === "pokemon" && index.status === "ready" && (
-            <span className="muted num">{filtered.length} / {index.data.length}</span>
-          )}
-        </div>
-        {tab === "moves" && <MovesTab query={query} />}
-        {tab === "items" && <ItemsTab query={query} />}
+        {tab === "moves" && <MovesTab rows={filteredMoves} state={moves.status} />}
+        {tab === "items" && <ItemsTab rows={filteredItems} state={items.status} />}
         {tab === "abilities" && <AbilitiesTab query={query} />}
         {tab === "pokemon" && (
           <>
@@ -213,16 +249,23 @@ export function DexPage() {
               <div className="notice">{t("state.errorDetail")}</div>
             )}
             {index.status === "ready" && (
-              filtered.length === 0
+              index.data.length === 0
                 ? <div className="notice">{t("dex.empty")}</div>
                 : (
-                  <div className="dex-grid">
-                    {filtered.map((e) => (
-                      <Link key={e.key} to={`/pokemon/${e.slug}`} className="panel dex-card">
+                  // The SAME grid and card the ranking page uses, with the dex number in the
+                  // corner where the ranking puts its rank: switching between the two leaves every
+                  // card the same size in the same place instead of reflowing under the pointer.
+                  //
+                  // The rail's search and filters scope the RAIL's list, not this grid: the grid is
+                  // the dex itself, and quietly removing rows from it would read as a different dex
+                  // rather than as a filtered view (the same rule the ranking page follows).
+                  <div className="dex-grid dense">
+                    {index.data.map((e) => (
+                      <Link key={e.key} to={`/pokemon/${e.slug}`} className="panel dex-card ranked">
+                        <span className="rank-badge num dex-no">#{e.nationalDex}</span>
                         <GameImage assetKey={e.key} role="card" alt={displayName(e, lang)}
                           className="sprite" />
                         <span className="nm">{displayName(e, lang)}</span>
-                        <span className="no num">#{e.nationalDex}</span>
                         <span className="types">
                           {e.types.map((tp) => <TypeBadge key={tp} type={tp} iconOnly />)}
                         </span>

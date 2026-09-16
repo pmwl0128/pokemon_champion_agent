@@ -157,7 +157,10 @@ function buildOption(trend: TrendDto, lang: Lang, dex: Map<string, DexIndexEntry
   };
 }
 
-export default function TrendChart({ trend }: { trend: TrendDto }) {
+export default function TrendChart({ trend, preserveDrawer = false }: {
+  trend: TrendDto;
+  preserveDrawer?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
   const { lang } = useLang();
@@ -172,7 +175,8 @@ export default function TrendChart({ trend }: { trend: TrendDto }) {
   navRef.current = (seriesName: string) => {
     const hit = trend.series.find((s) => displayName(s, lang) === seriesName
       || s.name === seriesName);
-    if (hit) navigate(`/meta/${hit.slug}?format=${trend.format}`);
+    if (hit) navigate(`/meta/${hit.slug}?format=${trend.format}`
+      + (preserveDrawer ? "&trend=1" : ""));
   };
 
   // Create/destroy the ECharts instance ONCE; data/language changes below only push a new option.

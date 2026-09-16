@@ -8,7 +8,8 @@ import type {
   NatureDto, StatKey, Terrain, TuneCardDto, Weather,
 } from "@pokemon-champions/protocol";
 import { STAT_KEYS, TERRAINS, TuneCardDtoSchema, WEATHERS, isErrorShape } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
 import { FormatTabs } from "../../components/FormatTabs.tsx";
 import { useAsync, useDexByName, usePokemonCard } from "../../hooks.ts";
 import { displayName, optionalKey, useLang, useT, type MsgKey } from "../../i18n.ts";
@@ -19,7 +20,7 @@ import { clearTuneFill, readTeamMembers, takeTuneFill, type TeamMemberish, type 
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
-import { BOOST_KEYS, EMPTY_SIDE, FieldCheck, MonPicker, SideForm, autofillSig, cleanSide, modalSig, sideIsBare, useModalFill, withMega, type SideState } from "./shared.tsx";
+import { BOOST_KEYS, EMPTY_SIDE, FieldCheck, MonPicker, SideForm, autofillSig, cleanSide, modalSig, sideFromBuild, sideIsBare, useModalFill, withMega, type BuildOption, type SideState } from "./shared.tsx";
 
 type DamageItem = DamageBatchResultDto[number];
 
@@ -88,7 +89,7 @@ function AttackerRow({ side, setSide, moves, setMoves, dex, natures, items, form
   // singles set); a user-edited / swapped-in attacker keeps its build (audit 2026-07-14).
   const fill = useRef<{ key: string; sig: string }>({ key: "", sig: "" });
   useEffect(() => {
-    if (!side.slug) return;
+    if (!side.slug || side.pinned) return;
     const key = `${format}:${side.slug}`;
     if (fill.current.key === key) return;
     const refill = sideIsBare(side) || autofillSig(side, moves) === fill.current.sig;
@@ -102,7 +103,7 @@ function AttackerRow({ side, setSide, moves, setMoves, dex, natures, items, form
       // Guard on the COMMITTED slug (like the defender fill) — inside setSide's functional updater
       // AND via setMoves' expectSlug — so THIS mon's set/moves can never stomp the switched-in one.
       if (fill.current.key !== key) return;
-      setSide((s) => (s.slug === filledSlug
+      setSide((s) => (s.slug === filledSlug && !s.pinned
         ? { ...s, ability: m.ability, item: m.item, nature: m.nature, sps: m.sps } : s));
       const first = m.moves[0];
       if (first) setMoves([first], filledSlug);
@@ -115,6 +116,7 @@ function AttackerRow({ side, setSide, moves, setMoves, dex, natures, items, form
   // learnset; an emptied selection falls to the first damaging move.
   useEffect(() => {
     if (!damaging.length) return;
+    if (side.pinned && moves.length === 0) return;
     const valid = moves.filter((mv) => damaging.some((m) => m.name === mv));
     if (valid.length !== moves.length || valid.length === 0) {
       setMoves(valid.length ? valid : [damaging[0]!.name]);
@@ -401,12 +403,13 @@ function TuneCardBody({ card }: { card: TuneCardDto }) {
   );
 }
 
-export function TuneTab({ dex, natures, items, initialTeamMode }: {
+export function TuneTab({ dex, natures, items, initialTeamMode, onRailApi }: {
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
   /** true when the URL asked for team mode (a hand-off from the UEP result panel). */
   initialTeamMode?: boolean;
+  onRailApi?: (api: CalcRailApi) => void;
 }) {
   const { adapter, can } = useRuntime();
   const t = useT();
@@ -455,6 +458,36 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
 
   const entryOf = (slug: string) => dex.find((e) => e.slug === slug);
   const { lang } = useLang();
+
+  const pickFromRail = useCallback((target: CalcRailTarget, entry: DexIndexEntry,
+                                    option: BuildOption | null) => {
+    const side = sideFromBuild(entry.slug, option);
+    if (target === "primary") {
+      setDefender(side);
+      setCards(null);
+      return { ok: true as const };
+    }
+    const emptyIndex = attacks.findIndex((attack) => !attack.side.slug);
+    if (emptyIndex < 0 && attacks.length >= 6) {
+      return { ok: false as const, reason: "full" as const };
+    }
+    const attack: Attack = { side, moves: [...(option?.modal.moves ?? [])].slice(0, 4) };
+    setAttacks(emptyIndex >= 0
+      ? attacks.map((candidate, index) => index === emptyIndex ? attack : candidate)
+      : [...attacks, attack]);
+    return { ok: true as const };
+  }, [attacks]);
+
+  const railApi = useMemo<CalcRailApi>(() => ({
+    format,
+    targets: [
+      { id: "primary", label: t("tune.rail.adjust") },
+      { id: "secondary", label: t("tune.rail.against") },
+    ],
+    pick: pickFromRail,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [format, pickFromRail, lang]);
+  useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
   // Load a team member's FULL SET as the tune target: it arrives exactly as the build
   // recommended it, then every knob on this page applies to it like to any hand-picked mon.
@@ -581,11 +614,12 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
   const defSig = useMemo(() => JSON.stringify(defender), [defender]);
   useEffect(() => { setProposal(null); setSolveNote(null); }, [defSig]);
 
-  // Defender auto-fills its meta-standard set on a fresh pick — a sensible bulk baseline to tune from.
+  // Defender auto-fills its highest-share observed set on a fresh pick, falling back to Meta only
+  // without aggregate data — a sensible bulk baseline to tune from.
   // Bare or unedited-auto-fill re-fills on a format switch; a configured/swapped-in defender is kept.
   const defFill = useRef<{ key: string; sig: string }>({ key: "", sig: "" });
   useEffect(() => {
-    if (!defender.slug) return;
+    if (!defender.slug || defender.pinned) return;
     const key = `${format}:${defender.slug}`;
     if (defFill.current.key === key) return;
     const refill = sideIsBare(defender) || autofillSig(defender) === defFill.current.sig;
@@ -598,7 +632,7 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       // fill, so a cache-hit modal can resolve before any effect re-runs. Guard INSIDE the
       // functional updater — it always sees the latest committed state regardless of microtask
       // timing — so THIS slug's modal item/ability/nature/SP can never stomp the switched member.
-      setDefender((s) => (s.slug === filledSlug
+      setDefender((s) => (s.slug === filledSlug && !s.pinned
         ? { ...s, ability: m.ability, item: m.item, nature: m.nature, sps: m.sps } : s));
       if (defFill.current.key === key) defFill.current = { key, sig: modalSig(m, []) };
     });
@@ -621,6 +655,7 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
   const runToken = useRef(0);
   const sig = JSON.stringify([defender, attacks, format, weather, terrain, reflect, lightScreen]);
   useEffect(() => {
+    const token = ++runToken.current;
     const dEntry = entryOf(defender.slug);
     const valid = attacks.flatMap((a, i) =>
       entryOf(a.side.slug) ? a.moves.filter(Boolean).map((move) => ({ a, i, move })) : []);
@@ -641,7 +676,6 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       // numbers and the ones the precise `tune` operator returns describe the same frame.
       switch_in_drops: false,
     }));
-    const token = ++runToken.current;
     adapter.damageBatch(items_).then((res) => {
       if (token !== runToken.current) return;
       const map: Record<string, DamageItem> = {};
@@ -858,8 +892,8 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       <SideForm label={t("tune.defender")} side={defender} setSide={setDefender}
         dex={dex} natures={natures} items={items} />
 
-      <div className="panel form-panel" style={{ marginTop: 14 }}>
-        <div className="field-row">
+      <div className="tune-command">
+        <div className="field-row calc-command-bar">
           <div className="field-controls">
           <FormatTabs format={format} onChange={setFormat} />
           <span className="fld-group">
@@ -929,7 +963,10 @@ export function TuneTab({ dex, natures, items, initialTeamMode }: {
       <div className="defenders-head">
         <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("tune.attackers")}</h2>
         <button className="ghost-btn"
-          onClick={() => setAttacks((a) => [...a, { side: { ...EMPTY_SIDE }, moves: [] }])}>
+          disabled={attacks.length >= 6}
+          title={attacks.length >= 6 ? t("calc.maxSix") : undefined}
+          onClick={() => setAttacks((a) => a.length >= 6
+            ? a : [...a, { side: { ...EMPTY_SIDE }, moves: [] }])}>
           + {t("tune.addAttacker")}
         </button>
       </div>

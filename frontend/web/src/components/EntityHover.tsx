@@ -19,16 +19,20 @@ export type EntityKind = "pokemon" | "move" | "item" | "ability" | "nature" | "s
 
 const STAT_ORDER = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
 const STAT_SHORT: Record<(typeof STAT_ORDER)[number], string> = {
-  hp: "HP", atk: "A", def: "B", spa: "C", spd: "D", spe: "S",
+  hp: "H", atk: "A", def: "B", spa: "C", spd: "D", spe: "S",
 };
 
 export function EntityHover({
-  kind, name, children, link = true, previewAddon, onPreviewOpen,
+  kind, name, children, link = true, href, previewAddon, onPreviewOpen, passive = false,
 }: {
   kind: EntityKind;
   /** English canonical (the site-wide join key). */
   name: string;
   children: ReactNode;
+  /** Where a click goes, when the dex is not the right destination. The metagame detail page sends
+   * its pokemon rows to the SAME format's metagame page instead: a reader comparing usage wants the
+   * next Pokemon's usage, not its dex card. */
+  href?: string;
   /** false = hover card only, no dex navigation — for chips whose click already means
    * something else (calc move toggles, speed-table row loads). */
   link?: boolean;
@@ -37,6 +41,12 @@ export function EntityHover({
   previewAddon?: ReactNode;
   /** Starts lazy data work only when a user actually asks to see the preview. */
   onPreviewOpen?: () => void;
+  /** The click belongs to something else — a pick row wrapping this card, or a KO portrait nested
+   * inside it. The card then stops being a control of its own: no focus stop, no pin, and no
+   * opening on a focus that a mouse click caused (focus events BUBBLE, so a click on the nested
+   * portrait would otherwise pin the card open over the thing that was just clicked). Keyboard
+   * focus still opens it — that is the only way a keyboard reader can see these facts. */
+  passive?: boolean;
 }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const popRef = useRef<HTMLSpanElement>(null);
@@ -110,12 +120,18 @@ export function EntityHover({
       window.removeEventListener("scroll", schedulePlace, true);
       observer?.disconnect();
     };
-  }, [open, hasPreview, mon, move, item, ability, previewAddon]);
+    // The portal contents are deliberately not dependencies here. Callers commonly construct a
+    // fresh previewAddon element on every render; depending on that identity tears down and
+    // recreates the ResizeObserver after each position update and can recurse until React aborts.
+    // The observer already re-places the card when changed content alters its measured size.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, hasPreview]);
 
-  if (!hasPreview) return <>{children}</>;   // unknown: plain render
+  if (!hasPreview && !href) return <>{children}</>;   // unknown and going nowhere: plain render
 
   const go = () => {
-    if (mon) navigate(`/pokemon/${mon.slug}`);
+    if (href) navigate(href);
+    else if (mon) navigate(`/pokemon/${mon.slug}`);
     else if (kind === "move" || kind === "item" || kind === "ability") {
       const tab = kind === "move" ? "moves" : kind === "item" ? "items" : "abilities";
       navigate(`/dex?tab=${tab}&q=${encodeURIComponent(name)}`);
@@ -217,22 +233,28 @@ export function EntityHover({
 
   return (
     <span ref={anchorRef} className={link ? "ehover" : "ehover no-link"}
-          role={link ? "link" : previewAddon ? "button" : undefined}
-          aria-expanded={!link && previewAddon ? open : undefined}
-          tabIndex={link || previewAddon ? 0 : undefined}
+          role={passive ? undefined : link ? "link" : previewAddon ? "button" : undefined}
+          aria-expanded={!passive && !link && previewAddon ? open : undefined}
+          tabIndex={passive ? undefined : link || previewAddon ? 0 : undefined}
           onClick={onClick} onKeyDown={onKeyDown}
           onMouseEnter={() => { setHovered(true); reveal(); }}
           onMouseLeave={() => setHovered(false)}
-          onFocus={() => { setFocused(true); reveal(); }} onBlur={() => setFocused(false)}
+          onFocus={(event) => {
+            // Click-borne focus does not open a passive card; keyboard focus does.
+            if (passive && !(event.target as HTMLElement).matches?.(":focus-visible")) return;
+            setFocused(true);
+            reveal();
+          }}
+          onBlur={() => setFocused(false)}
           onTouchStart={() => {
             reveal();
-            if (!pinned) {
+            if (!passive && !pinned) {
               suppressTouchClick.current = true;
               setPinned(true);
             }
           }}>
       {children}
-      {open && createPortal(preview, document.body)}
+      {open && hasPreview && createPortal(preview, document.body)}
     </span>
   );
 }

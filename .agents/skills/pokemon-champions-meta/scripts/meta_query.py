@@ -14,6 +14,7 @@ from meta_common import (
     CACHE_DIR,
     EnvironmentResolutionError,
     details_path,
+    ko_path,
     load_json,
     maybe_repair_cn,
     norm_panel,
@@ -77,6 +78,13 @@ def load_ranking(season: str, fmt: str) -> list[dict[str, Any]]:
 @lru_cache(maxsize=None)
 def load_details(season: str, fmt: str) -> list[dict[str, Any]]:
     return load_json(details_path(season, fmt), {"rows": []}).get("rows", [])
+
+
+@lru_cache(maxsize=None)
+def load_ko(season: str, fmt: str) -> dict[str, Any]:
+    """The whole KO file, not just its rows: `coverage` is part of the answer. It states which tiers
+    were collected, so a caller never has to read an absent panel as "no KO moves exist"."""
+    return load_json(ko_path(season, fmt), {})
 
 
 def dex_resolve(name: str) -> tuple[set[str], dict[str, Any] | None]:
@@ -460,6 +468,166 @@ def command_detail(args: argparse.Namespace) -> None:
     else:
         blocks = [detail_md(d, args.panel) if d else f"# {n}\n- {i18n.t('nf')}" for n, d in zip(names, resolved)]
         print("\n\n---\n\n".join(blocks))
+
+
+# --- KO axis --------------------------------------------------------------------------------
+# A second data family (ko_<season>_<format>.json) with its own upstream and snapshot clock. Its
+# object panels are SPECIES-level (keyed by national dex no) and carry no percentage — the source
+# publishes an ordering only — while the move panels are a reserved tier that stays `null` until
+# collected. Both facts are restated in every answer's `coverage`, never left to be inferred.
+KO_OBJECT_PANELS = ("ko_targets", "koed_by")
+KO_MOVE_PANELS = ("ko_moves", "koed_by_moves")
+VALID_KO_PANELS = {*KO_OBJECT_PANELS, *KO_MOVE_PANELS}
+# Accepted --panel spellings, including the source-facing words a caller is likely to reach for.
+_KO_PANEL_ALIASES = {
+    "beats": "ko_targets", "ko": "ko_targets", "kos": "ko_targets", "targets": "ko_targets",
+    "ko_targets": "ko_targets",
+    "counters": "koed_by", "koed": "koed_by", "koed_by": "koed_by",
+    "ko_moves": "ko_moves", "komoves": "ko_moves",
+    "koed_by_moves": "koed_by_moves", "koedbymoves": "koed_by_moves",
+}
+
+
+def norm_ko_panel(panel: str) -> str:
+    return _KO_PANEL_ALIASES.get(str(panel).strip().lower().replace("-", "_"), str(panel))
+
+
+def _ko_entry_name(entry: dict[str, Any], panel: str) -> str:
+    """Display for one KO entry in the active language.
+
+    Object entries carry all three names inline — they are keyed by a dex NUMBER, which the dex
+    resolver cannot localize on its own — so the fallback chain ends at `name_en` rather than
+    borrowing a form name. Move entries localize through the dex like any other move panel."""
+    if panel in KO_MOVE_PANELS:
+        return _md_panel_name(entry, "moves")
+    order = {"zh": ("name", "name_en", "name_ja"),
+             "ja": ("name_ja", "name_en", "name"),
+             "en": ("name_en", "name", "name_ja")}[i18n.lang()]
+    for key in order:
+        if entry.get(key):
+            return str(entry[key])
+    return str(entry.get("key") or "")
+
+
+def _ko_row_for(name: str, season: str, fmt: str) -> dict[str, Any] | None:
+    """Resolve a query to one KO row, reusing the dex alias set the other commands use."""
+    aliases, _resolution = dex_resolve(name)
+    needles = {normalize(x) for x in aliases}
+    needles.discard("")
+    for row in load_ko(season, fmt).get("rows") or []:
+        values = [row.get("slug", ""), row.get("pokemon", ""), row.get("pokemon_en", ""),
+                  row.get("pokemon_ja", "")]
+        if any(normalize(v) in needles for v in values):
+            return row
+    return None
+
+
+def ko_md(row: dict[str, Any], meta: dict[str, Any], panel: str | None) -> str:
+    coverage = meta.get("coverage") or {}
+    heading = (f"{i18n.value('format', meta.get('format', ''))} · "
+               f"{meta.get('season')}/{meta.get('rule', '')}")
+    lines = [f"# {_md_pokemon(row)}{i18n.parens(heading)}", "",
+             f"- {i18n.t('rank')}: {row.get('rank', '')}",
+             f"- {i18n.t('ko_snapshot')}: {meta.get('updated_at', '')}",
+             f"- {i18n.t('ko_no_pct')}",
+             f"- {i18n.t('ko_species_level')}"]
+    if coverage.get("move_share") == "absent":
+        lines.append(f"- {i18n.t('ko_moves_absent')}")
+    lines.append("")
+    panels = row.get("panels") or {}
+    for key in ([panel] if panel else [*KO_OBJECT_PANELS, *KO_MOVE_PANELS]):
+        entries = panels.get(key)
+        lines.append(f"## {i18n.panel_label(key)}")
+        if entries is None:                      # tier not collected — never rendered as "none"
+            lines.extend([i18n.t("ko_moves_absent"), ""])
+            continue
+        if not entries:
+            lines.extend([i18n.t("nf"), ""])
+            continue
+        for entry in entries:
+            usage = percent_text(entry.get("percentage"))
+            suffix = f" ({usage})" if usage else ""
+            # A repeated species in one list is an acknowledged upstream ambiguity, not a duplicated
+            # row — say so inline, or the reader reads it as a bug (see `form_collapsed`).
+            if entry.get("form_collapsed"):
+                suffix += i18n.parens(i18n.t("ko_form_collapsed"))
+            lines.append(f"{ranked_prefix(entry)}{_ko_entry_name(entry, key)}{suffix}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def command_ko(args: argparse.Namespace) -> None:
+    args.season, args.rule = resolve_season_rule(args.season, args.rule)
+    _require_data(args.season, args.format)
+    panel = norm_ko_panel(args.panel) if args.panel else None
+    if panel and panel not in VALID_KO_PANELS:
+        _emit_meta_error(args.panel, "bad_input",
+                         f"unknown KO panel '{args.panel}'; expected one of {sorted(VALID_KO_PANELS)}")
+        raise SystemExit(1)
+    meta = load_ko(args.season, args.format)
+    context = f"{args.season} {args.format}"
+    if not meta.get("rows"):
+        # The season/format is valid but this axis was not collected for it — a DATA GAP, not a bad
+        # request. So it is a graceful miss (exit 0) that NAMES the gap, instead of an empty list a
+        # caller could read as "this Pokemon knocks nothing out".
+        if args.output == "json":
+            emit({"ok": False, "query": context, "error": {
+                "code": "not_found",
+                "message": f"no KO data for {context} (this snapshot was not collected)"}}, "json")
+        else:
+            print(i18n.t("ko_missing", context=context))
+        return
+    names = list(dict.fromkeys(list(args.pokemon or [])
+                               + list(getattr(args, "pokemon_pos", None) or [])))
+    header = {"season": args.season, "rule": args.rule, "format": args.format,
+              "updated_at": meta.get("updated_at"), "coverage": meta.get("coverage")}
+    if not names:
+        # No name asked: answer with coverage. This is what a caller reads BEFORE spending a lookup
+        # on a panel that may not be collected in this snapshot.
+        if args.output == "json":
+            emit({**header, "rows": len(meta.get("rows") or [])}, "json")
+            return
+        absent = (meta.get("coverage") or {}).get("move_share") == "absent"
+        print("\n".join([
+            f"# {i18n.t('ko_snapshot')}: {meta.get('updated_at', '')}",
+            f"- {i18n.t('format')}: {i18n.value('format', args.format)}",
+            f"- {i18n.t('pokemon')}: {len(meta.get('rows') or [])}",
+            f"- {i18n.t('ko_no_pct')}",
+            f"- {i18n.t('ko_species_level')}",
+            *([f"- {i18n.t('ko_moves_absent')}"] if absent else []),
+        ]))
+        return
+    resolved = [(n, _ko_row_for(n, args.season, args.format)) for n in names]
+
+    def _shape(row: dict[str, Any]) -> dict[str, Any]:
+        if not panel:
+            return row
+        return {**row, "panels": {panel: (row.get("panels") or {}).get(panel)}}
+
+    def _miss(name: str, index: int | None = None) -> dict[str, Any]:
+        out: dict[str, Any] = {"ok": False, "query": name, "error": {
+            "code": "not_found", "message": f"not found: {name} in {context}"}}
+        if index is not None:
+            out = {"ok": False, "index": index, **{k: v for k, v in out.items() if k != "ok"}}
+        return out
+
+    if len(names) == 1:
+        name, row = resolved[0]
+        if not row:
+            if args.output == "json":
+                emit(_miss(name), "json")
+            else:
+                print(i18n.t("not_found", query=name, context=context))
+            return
+        emit({**header, **_shape(row)} if args.output == "json" else ko_md(row, meta, panel),
+             args.output)
+        return
+    if args.output == "json":
+        emit([{**header, **_shape(row)} if row else _miss(name, i)
+              for i, (name, row) in enumerate(resolved)], "json")
+        return
+    print("\n\n---\n\n".join(ko_md(row, meta, panel) if row else f"# {name}\n- {i18n.t('nf')}"
+                            for name, row in resolved))
 
 
 def iter_panel_rows(season: str, fmt: str, panel: str | None) -> list[dict[str, Any]]:
@@ -1644,6 +1812,12 @@ META_SCHEMA = {
                   "panel only; unknown --panel -> bad_input. OR `--where '<json>'` for a boolean "
                   "AND/OR/NOT query (see where_query).",
         "compare": "--pokemon <name> -> {single:{found,...},double:{found,...}}  (found:false = not ranked there)",
+        "ko": "--format single|double [--pokemon <name ...>] [--panel ko_targets|koed_by|ko_moves|"
+              "koed_by_moves] -> {season,rule,format,updated_at,coverage,...row}. The KO axis: who "
+              "knocks whom out. Separate file family and separate upstream snapshot from "
+              "ranking/details, so `updated_at` here is its own. With no --pokemon it returns "
+              "coverage only. A season with no KO snapshot collected is a graceful not_found "
+              "(exit 0), NOT an empty result.",
         "report": "--format single|double|both [--season --rule] -> the factual update report "
                   "(rank_moves/new_entries/dropped/config_changes vs the previous snapshot) as "
                   "{season,rule,format,reports:{<fmt>:<report json>}}. The canonical way to read "
@@ -1667,6 +1841,16 @@ META_SCHEMA = {
         "detail": "{rank, name, name_zh, name_ja, slug, panels:{moves,items,abilities,natures,partners,spreads}}",
         "move_entry": "{rank, name, name_ja, key, percentage:float, type:Title, category:Title, power:int|null}",
         "spread_entry": "{rank, hp,atk,def,spa,spd,spe:int, percentage:float}",
+        "ko_row": "{rank, name, name_zh, name_ja, slug, pokedex_no, panels:{ko_targets, koed_by, "
+                  "ko_moves, koed_by_moves}}",
+        "ko_object_entry": "{rank, key:'<national dex no>', name:zh, name_ja, name_en}. SPECIES-level "
+                           "(the source keys KO opponents by dex number, with no form), and carries "
+                           "NO percentage — the source publishes an ordering only. name/name_ja are "
+                           "empty for a species the dex ships only as split forms.",
+        "ko_coverage": "{opponents, opponent_identity:'national_dex', opponent_depth, move_share:"
+                       "'absent'|'ranked_pct', move_depth, rows, rows_with_move_share}. A `null` "
+                       "ko_moves/koed_by_moves panel means NOT COLLECTED (move_share:'absent'); an "
+                       "empty list would mean the source reported none.",
         "name_resolution": "on a TYPO'd query only, detail/compare add {query, resolved_name, name_resolution:{match_type:'fuzzy', score, distance, from}}; an exact query omits all three",
     },
 }
@@ -1728,6 +1912,20 @@ def main() -> int:
     search.add_argument("--limit", type=int, default=50)
     search.add_argument("--output", choices=["md", "json"], default="md")
     search.set_defaults(func=command_search)
+
+    ko = sub.add_parser("ko", parents=[common])
+    ko.add_argument("pokemon_pos", nargs="*", help="Pokemon names; convenience alias for --pokemon")
+    ko.add_argument("--format", "--game-format", choices=["single", "double"], required=True)
+    ko.add_argument("--season")
+    ko.add_argument("--rule")
+    ko.add_argument("--pokemon", nargs="+",
+                    help="one or more names; with >1 name the json output is a list. With NO name "
+                         "the command answers with this snapshot's coverage only.")
+    ko.add_argument("--panel",
+                    help="ko_targets (alias beats) | koed_by (alias counters) | ko_moves | "
+                         "koed_by_moves")
+    ko.add_argument("--output", choices=["md", "json"], default="md")
+    ko.set_defaults(func=command_ko)
 
     compare = sub.add_parser("compare", parents=[common])
     compare.add_argument("--season")

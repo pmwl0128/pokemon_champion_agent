@@ -5,9 +5,12 @@ import {
   ActualMatchupResponseDtoSchema, ArtifactAppendEventDtoSchema, CapabilitiesSchema,
   DamageBatchResultDtoSchema,
   DamageResultDtoSchema, MetaDetailDtoSchema,
-  OppCacheDtoSchema, OppCheckGridDtoSchema, OppKoGridDtoSchema, PokemonCardDtoSchema,
+  OppCacheDtoSchema, OppCheckGridDtoSchema, OppKoGridDtoSchema, OppSetCatalogDtoSchema,
+  PokemonCardDtoSchema,
   RankingDtoSchema, ResolveEntryDtoSchema, SessionDtoSchema, SessionWithLedgerDtoSchema,
-  SpeedBatchResultDtoSchema, TrendDtoSchema, TuneResultDtoSchema, UsageTrendDtoSchema,
+  LearnersDtoSchema, MetaFacetsDtoSchema, MetaKoDtoSchema,
+  MetaKoTrendDtoSchema, SpeedBatchResultDtoSchema, TrendDtoSchema, TuneResultDtoSchema,
+  UsageTrendDtoSchema,
   type ActualMatchupRequestDto, type Capabilities, type DamageRequestDto, type FormatId,
   type SpeedInputDto,
 } from "@pokemon-champions/protocol";
@@ -75,9 +78,27 @@ export class LocalAdapter implements RuntimeAdapter {
       await this.get(`/meta/usage-trend?format=${format}&pokemon=${encodeURIComponent(slug)}`));
   }
 
+  async ko(format: FormatId, slug: string) {
+    return MetaKoDtoSchema.parse(
+      await this.get(`/meta/ko?format=${format}&pokemon=${encodeURIComponent(slug)}`));
+  }
+
+  async koTrend(format: FormatId, slug: string) {
+    return MetaKoTrendDtoSchema.parse(
+      await this.get(`/meta/ko-trend?format=${format}&pokemon=${encodeURIComponent(slug)}`));
+  }
+
+  async metaFacets(format: FormatId) {
+    return MetaFacetsDtoSchema.parse(await this.get(`/meta/facets?format=${format}`));
+  }
+
   /** The browse index is projection data on BOTH runtimes (same static layer). */
   dexIndex(): Promise<DexIndexEntry[]> {
     return loadProjectionDexIndex(this.cfg.projectionBase);
+  }
+
+  async learners() {
+    return LearnersDtoSchema.parse(await this.get("/dex/learners"));
   }
 
   async pokemonCard(nameOrSlug: string) {
@@ -104,6 +125,10 @@ export class LocalAdapter implements RuntimeAdapter {
 
   async oppCache(format: FormatId) {
     return OppCacheDtoSchema.parse(await this.get(`/team/oppcache?format=${format}&view=matrix`));
+  }
+
+  async oppSets(format: FormatId) {
+    return OppSetCatalogDtoSchema.parse(await this.get(`/team/oppcache?format=${format}&view=sets`));
   }
 
   async oppKo(format: FormatId) {

@@ -1,8 +1,8 @@
 /** Shared building blocks for the calc page's three tools (damage matrix / speed line / bulk
  * tune): the per-combatant form (SideForm), the mon picker it and the speed/tune rows reuse,
- * the SP/status/aura vocabularies, and the meta "standard build" auto-fill (toModalSet). */
+ * the SP/status/aura vocabularies, and their observed-build-first auto-fill. */
 import type {
-  CombatantDto, FormatId, MetaDetailDto, NatureDto, SpSpread, Status,
+  CombatantDto, FormatId, MetaDetailDto, NatureDto, OppSetCatalogDto, OppSetDto, SpSpread, Status,
 } from "@pokemon-champions/protocol";
 import { STAT_KEYS } from "@pokemon-champions/protocol";
 import {
@@ -42,9 +42,12 @@ export interface SideState {
   sps: Partial<Record<(typeof STAT_KEYS)[number], number>>;
   status: string;
   boosts: Partial<Record<(typeof BOOST_KEYS)[number], number>>;
+  /** Explicit custom/environment picks are complete even when fields are blank. Auto-fill must not
+   * replace those deliberate blanks. */
+  pinned?: boolean;
 }
 export const EMPTY_SIDE: SideState = {
-  slug: "", ability: "", item: "", nature: "", sps: {}, status: "", boosts: {},
+  slug: "", ability: "", item: "", nature: "", sps: {}, status: "", boosts: {}, pinned: false,
 };
 
 export function natureLabel(n: NatureDto, lang: "zh" | "en" | "ja"): string {
@@ -74,11 +77,11 @@ export function spSumClass(n: number): string {
   return n > 66 ? "over" : n === 66 ? "full" : "under";
 }
 
-/** True when a side carries no user/meta config yet (just a species, or nothing). The auto-fill
+/** True when a side carries no user/environment config yet (just a species, or nothing). The auto-fill
  * effects only overwrite a BARE side, so a configured side swapped/pasted in keeps its build while a
- * fresh pick (or a species switch, which resets to EMPTY_SIDE) still gets its meta-standard fill. */
+ * fresh pick (or a species switch, which resets to EMPTY_SIDE) still gets its environment fill. */
 export function sideIsBare(s: SideState): boolean {
-  return !s.ability && !s.item && !s.nature && !s.status
+  return !s.pinned && !s.ability && !s.item && !s.nature && !s.status
     && !Object.keys(s.sps).length && !Object.keys(s.boosts).length;
 }
 
@@ -127,6 +130,34 @@ export interface ModalSet {
   nature: string;
   sps: Partial<Record<(typeof STAT_KEYS)[number], number>>;
   moves: string[];
+}
+
+/** One concrete choice shown by the environment-build picker. Observed configurations keep their
+ * joint item/ability/nature/moves/SP fields intact; the old marginal-mode Meta stitch is appended
+ * only as an explicit fallback. */
+export interface BuildOption {
+  key: string;
+  source: "aggregate" | "meta";
+  coverage: number | null;
+  isModal: boolean;
+  modal: ModalSet;
+  set: OppSetDto;
+}
+
+/** Convert one drawer/environment card into a calculator side. A null option is the deliberately
+ * blank Custom card, so both paths are pinned against background environment auto-fill. */
+export function sideFromBuild(slug: string, option: BuildOption | null): SideState {
+  if (!option) return { ...EMPTY_SIDE, slug, sps: {}, boosts: {}, pinned: true };
+  return {
+    ...EMPTY_SIDE,
+    slug,
+    ability: option.modal.ability,
+    item: option.modal.item,
+    nature: option.modal.nature,
+    sps: { ...option.modal.sps },
+    boosts: {},
+    pinned: true,
+  };
 }
 
 /** Apply facts that belong to the literal dex form selected by the user. Meta detail falls back
@@ -178,8 +209,30 @@ export function modalSig(m: ModalSet, moves: string[]): string {
     moves);
 }
 
-/** Cached meta "standard build" loader — the fill auto-applied on a fresh pick. A 404 (unranked
- * this period) resolves to null so the caller just leaves the form empty.
+/** Identity of the configuration printed on a build card. Battle-only state (status, current HP,
+ * boosts) is deliberately absent: changing the current turn must not relabel an otherwise exact
+ * environment build as custom. Four fixed move slots make a two-move build different from the
+ * same prefix with a third hand-edited move. */
+export function buildConfigSig(build: {
+  ability: string;
+  item: string;
+  nature: string;
+  sps: Partial<Record<(typeof STAT_KEYS)[number], number>>;
+  moves: string[];
+}): string {
+  const moves = [...build.moves.slice(0, 4)];
+  while (moves.length < 4) moves.push("");
+  return JSON.stringify([
+    build.ability,
+    build.item,
+    build.nature,
+    STAT_KEYS.map((key) => build.sps[key] ?? 0),
+    moves,
+  ]);
+}
+
+/** Cached Meta fallback loader. A 404 (unranked this period) resolves to null; observed builds can
+ * still be offered independently by `useBuildOptions`.
  *
  * Mega forms are never ranked on their own: the meta folds their usage into the BASE species, so
  * the base's panels already ARE the Mega build (measured: `charizard`'s top item is Charizardite Y).
@@ -188,7 +241,7 @@ export function modalSig(m: ModalSet, moves: string[]): string {
  * only one of them (Charizard X would inherit Charizardite Y) — it is pinned to THIS form's own
  * required stone. SideForm pins the same stone, but only on a slug change, so an auto-fill landing
  * afterwards must not reintroduce the wrong item. */
-export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSet | null> {
+function useMetaFill(): (slug: string, fmt: FormatId) => Promise<ModalSet | null> {
   const { adapter } = useRuntime();
   const dexIndex = useDexIndex();
   const itemVocab = useItems();
@@ -232,6 +285,116 @@ export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSe
     }
     return hit;
   };
+}
+
+function modalFromObserved(set: OppSetDto): ModalSet {
+  return {
+    ability: set.ability ?? "",
+    item: set.item ?? "",
+    nature: set.nature ?? "",
+    sps: { ...(set.sps ?? {}) },
+    moves: [...(set.moves ?? [])].slice(0, 4),
+  };
+}
+
+/** Convert the lightweight opponent-set catalog into the calculator's ordered choices. The source
+ * rows are already modal-first, but sorting here makes the user-facing contract independent of
+ * serialization order: highest observed share wins every automatic fill. */
+export function observedBuildOptions(
+  catalog: OppSetCatalogDto | null,
+  slug: string,
+  dex: DexIndexEntry[],
+  items: ItemRef[],
+): BuildOption[] {
+  if (!catalog) return [];
+  const entry = dex.find((e) => e.slug === slug);
+  const base = entry?.isMega && entry.baseSpecies
+    ? dex.find((e) => e.name === entry.baseSpecies) : entry;
+  const row = catalog.species.find((s) => s.slug === (base?.slug ?? slug));
+  if (!row) return [];
+  const stone = entry?.isMega
+    ? items.find((i) => i.requiredBy?.includes(entry.name)) : undefined;
+  return [...(row.variants ?? [])]
+    .map((variant) => ({ variant, set: catalog.sets[variant.key] }))
+    .filter((pair): pair is { variant: NonNullable<typeof pair.variant>; set: OppSetDto } =>
+      !!pair.set && (!entry?.isMega || pair.set.runForm === entry.name))
+    .sort((a, b) => (b.variant.coverage ?? -1) - (a.variant.coverage ?? -1)
+      || Number(b.variant.isModal) - Number(a.variant.isModal))
+    .map(({ variant, set }) => {
+      const modal = modalForEntry(modalFromObserved(set), entry, stone);
+      return {
+        key: variant.key,
+        source: "aggregate" as const,
+        coverage: variant.coverage ?? set.coverage ?? null,
+        isModal: variant.isModal,
+        modal,
+        set: {
+          ...set,
+          ability: modal.ability || null,
+          item: modal.item || null,
+          nature: modal.nature || null,
+          moves: modal.moves,
+          sps: modal.sps,
+        },
+      };
+    });
+}
+
+/** Cached build-choice loader shared by manual pickers and automatic fills. It reads the small set
+ * catalog, never the multi-megabyte matchup matrix. Meta remains the final card even when observed
+ * builds exist, and becomes the sole card for a species absent from the catalog. */
+export function useBuildOptions(): (
+  slug: string, fmt: FormatId,
+) => Promise<BuildOption[]> {
+  const { adapter } = useRuntime();
+  const dexIndex = useDexIndex();
+  const itemVocab = useItems();
+  const loadMeta = useMetaFill();
+  const catalogCache = useRef(new Map<FormatId, Promise<OppSetCatalogDto | null>>());
+
+  return async (slug: string, fmt: FormatId) => {
+    let catalogHit = catalogCache.current.get(fmt);
+    if (!catalogHit) {
+      catalogHit = adapter.oppSets(fmt).catch((error) => {
+        console.error(`observed build catalog failed for ${fmt}:`, error);
+        catalogCache.current.delete(fmt);
+        return null;
+      });
+      catalogCache.current.set(fmt, catalogHit);
+    }
+    const [catalog, meta] = await Promise.all([catalogHit, loadMeta(slug, fmt)]);
+    const dex = dexIndex.status === "ready" ? dexIndex.data : [];
+    const items = itemVocab.status === "ready" ? itemVocab.data : [];
+    const observed = observedBuildOptions(catalog, slug, dex, items);
+    if (!meta) return observed;
+    const entry = dex.find((e) => e.slug === slug);
+    const fallback: OppSetDto = {
+      species: entry?.baseSpecies ?? entry?.name ?? slug,
+      runForm: entry?.isMega ? entry.name : null,
+      ability: meta.ability || null,
+      item: meta.item || null,
+      nature: meta.nature || null,
+      moves: meta.moves,
+      sps: meta.sps,
+      isModal: false,
+      coverage: null,
+    };
+    return [...observed, {
+      key: `meta:${fmt}:${slug}`,
+      source: "meta" as const,
+      coverage: null,
+      isModal: observed.length === 0,
+      modal: meta,
+      set: fallback,
+    }];
+  };
+}
+
+/** Automatic fills use exactly the first card the manual picker would show: the modal/highest-share
+ * observed build, or the Meta fallback when no observed configuration exists. */
+export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSet | null> {
+  const loadOptions = useBuildOptions();
+  return async (slug: string, fmt: FormatId) => (await loadOptions(slug, fmt))[0]?.modal ?? null;
 }
 
 /** The Mega form this side's held stone unlocks for its species, or null. The engine does
@@ -348,9 +511,14 @@ export function MonPicker({ slug, onSlug, dex, placeholder }: {
   const entry = dex.find((e) => e.slug === slug);
   const [text, setText] = useState("");
   const resolveToken = useRef(0);
+  // Typing clears the slug on every keystroke that does not name an exact entry, so "slug is empty"
+  // alone cannot mean "blank the box" — that would erase the word being typed. Only an OUTSIDE
+  // clear (a blank roster slot, a reset) blanks it.
+  const typing = useRef(false);
 
   useEffect(() => {
-    if (entry) setText(displayName(entry, lang));
+    if (entry) { typing.current = false; setText(displayName(entry, lang)); return; }
+    if (!typing.current) setText("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, slug]);
 
@@ -371,6 +539,7 @@ export function MonPicker({ slug, onSlug, dex, placeholder }: {
 
   const edit = (value: string) => {
     ++resolveToken.current;
+    typing.current = true;
     setText(value);
     const q = value.trim();
     if (!q) { onSlug(""); return; }
@@ -383,6 +552,7 @@ export function MonPicker({ slug, onSlug, dex, placeholder }: {
   };
 
   const commit = (value: string, reason: ComboboxCommitReason) => {
+    typing.current = false;
     const q = value.trim();
     if (!q) { onSlug(""); return; }
     const local = localEntry(value);

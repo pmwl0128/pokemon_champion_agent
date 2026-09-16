@@ -2,11 +2,13 @@
  * 伤害矩阵 (damage matrix), 速度线 (speed line), 耐久调整 (bulk tune). The shell owns the
  * capability gate and the shared vocab load (dex / natures / items); each tool is a tab that keeps
  * its own state once visited (hidden, not unmounted, when you switch away). */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDexIndex, useItems, useNatures } from "../hooks.ts";
 import { useT } from "../i18n.ts";
 import { PageHeader } from "../components/PageHeader.tsx";
+import { CalcRail, type CalcRailApi } from "../components/CalcRail.tsx";
+import { RailHandle, useSideRail } from "../components/SideRail.tsx";
 import { SegmentedControl, segmentedPanelId, segmentedTabId }
   from "../components/SegmentedControl.tsx";
 import { useRuntime } from "../runtime/context.tsx";
@@ -22,6 +24,14 @@ export function CalcPage() {
   const dex = useDexIndex();
   const natures = useNatures();
   const items = useItems();
+  const rail = useSideRail(380, 760);
+  const [railApis, setRailApis] = useState<Partial<Record<Tab, CalcRailApi>>>({});
+  const registerRail = useCallback((id: Tab, api: CalcRailApi) => {
+    setRailApis((previous) => previous[id] === api ? previous : { ...previous, [id]: api });
+  }, []);
+  const registerDamage = useCallback((api: CalcRailApi) => registerRail("damage", api), [registerRail]);
+  const registerSpeed = useCallback((api: CalcRailApi) => registerRail("speed", api), [registerRail]);
+  const registerTune = useCallback((api: CalcRailApi) => registerRail("tune", api), [registerRail]);
 
   const hasDamage = can("calc.damage");
   const hasSpeed = can("calc.speedline");
@@ -58,6 +68,8 @@ export function CalcPage() {
 
   return (
     <>
+      <RailHandle state={rail} label={t("calc.rail.title")} />
+      <CalcRail state={rail} dex={dex.data} tab={tab} api={railApis[tab]} />
       <PageHeader title={t("calc.title")} description={t("calc.fillDisclaimer")}>
         <SegmentedControl kind="tabs" idBase="calc-tool" value={tab} onChange={show}
           ariaLabel={t("a11y.calcTool")} className="subtabs page-tabs" buttonClassName="subtab"
@@ -67,20 +79,22 @@ export function CalcPage() {
       {visited.has("damage") && hasDamage && (
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "damage")}
           aria-labelledby={segmentedTabId("calc-tool", "damage")} hidden={tab !== "damage"}>
-          <DamageTab dex={dex.data} natures={natures.data} items={items.data} />
+          <DamageTab dex={dex.data} natures={natures.data} items={items.data}
+            onRailApi={registerDamage} />
         </div>
       )}
       {visited.has("speed") && hasSpeed && (
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "speed")}
           aria-labelledby={segmentedTabId("calc-tool", "speed")} hidden={tab !== "speed"}>
-          <SpeedTab dex={dex.data} natures={natures.data} items={items.data} />
+          <SpeedTab dex={dex.data} natures={natures.data} items={items.data}
+            onRailApi={registerSpeed} />
         </div>
       )}
       {visited.has("tune") && hasDamage && (
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "tune")}
           aria-labelledby={segmentedTabId("calc-tool", "tune")} hidden={tab !== "tune"}>
           <TuneTab dex={dex.data} natures={natures.data} items={items.data}
-                   initialTeamMode={teamMode} />
+                   initialTeamMode={teamMode} onRailApi={registerTune} />
         </div>
       )}
     </>

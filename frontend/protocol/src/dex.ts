@@ -33,6 +33,16 @@ export type PokemonCardDto = z.infer<typeof PokemonCardDtoSchema>;
 
 /** A pokemon's learnable-move table (static dex data; served from the projection on both
  * runtimes, one lazy file per pokemon). */
+/** Inverted learnset index: English move canonical -> the slugs that can learn it.
+ *
+ * One lazy document for the whole roster, because the per-Pokemon learnsets are lazy too: asking
+ * "who learns Fake Out" from the client would otherwise cost one fetch per roster entry. Values are
+ * slugs (the browse index's join key), keys are English canonicals — the UI localizes at render. */
+export const LearnersDtoSchema = z.object({
+  moves: z.record(z.string(), z.array(z.string())),
+});
+export type LearnersDto = z.infer<typeof LearnersDtoSchema>;
+
 export const LearnsetDtoSchema = z.object({
   slug: z.string().min(1),
   moves: z.array(z.object({

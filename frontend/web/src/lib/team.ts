@@ -102,26 +102,37 @@ export interface DamageFill {
   moves?: string[];
 }
 
-const DAMAGE_FILL_KEY = "pc-damage-fill";
-
+/** One attacker against one defender — what a matrix cell or a threat row hands over. It writes
+ * into the SAME channel as a full-team hand-off (`stashCalcTeams`), so the calculator has one
+ * reader and one set of rules about what arrives filled and what arrives blank.
+ *
+ * Deliberately NOT pinned: these callers name an opponent and expect its standard build to come
+ * with it, so whatever they leave out is still filled from usage. */
 export function stashDamageFill(fill: DamageFill): void {
-  try {
-    sessionStorage.setItem(DAMAGE_FILL_KEY, JSON.stringify(fill));
-  } catch { /* storage blocked — the calc page just opens blank */ }
+  const moves = fill.moves?.length ? fill.moves : fill.move ? [fill.move] : [];
+  stashCalcTeams({
+    format: fill.format,
+    attackers: [{
+      slug: fill.attackerSlug,
+      ...(fill.attacker ?? {}),
+      ...(moves.length ? { moves } : {}),
+    }],
+    defenders: fill.defender ? [fill.defender] : [],
+  });
 }
 
-/** Read AND CLEAR: a damage fill is a one-shot hand-off (unlike the tune fill, the damage
- * tab has its own defaults to fall back to on reload). */
-export function takeDamageFill(): DamageFill | null {
-  try {
-    const raw = sessionStorage.getItem(DAMAGE_FILL_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(DAMAGE_FILL_KEY);
-    const parsed = JSON.parse(raw) as DamageFill;
-    return parsed && typeof parsed === "object" && "attackerSlug" in parsed ? parsed : null;
-  } catch {
-    return null;
-  }
+/** A team-json document as calculator members. These are real builds, so they are pinned: a saved
+ * team's empty slot is a fact about that team, not an invitation to invent the usual set. */
+export function teamToCalcMembers(team: unknown): CalcMember[] {
+  return readTeamMembers(team).slice(0, 6).map((mon) => ({
+    species: mon.species,
+    ...(mon.ability ? { ability: mon.ability } : {}),
+    ...(mon.item ? { item: mon.item } : {}),
+    ...(mon.nature ? { nature: mon.nature } : {}),
+    ...(mon.spread ? { sps: mon.spread } : {}),
+    ...(mon.moves?.length ? { moves: mon.moves } : {}),
+    pinned: true,
+  }));
 }
 
 /** Cross-feature team hand-off. The recent-source shelf is intentionally browser-session local:
@@ -197,6 +208,62 @@ export function takeMatchupFill(): Omit<MatchupTeamSource, "id" | "savedAt"> | n
     sessionStorage.removeItem(MATCHUP_FILL_KEY);
     const parsed = JSON.parse(raw) as Omit<MatchupTeamSource, "id" | "savedAt">;
     return parsed && readTeamMembers(parsed.team).length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One member handed to the calculator. Only the fields the caller actually has: what it omits is
+ * filled from usage, unless the member is `pinned` — that is the difference between "this opponent,
+ * standard build" and "exactly what the reader picked, blanks included". */
+export interface CalcMember {
+  /** Dex slug, when the caller already resolved one… */
+  slug?: string;
+  /** …or the English canonical species; the calculator resolves it against the dex it already holds. */
+  species?: string;
+  ability?: string;
+  item?: string;
+  nature?: string;
+  sps?: Record<string, number>;
+  moves?: string[];
+  /** The picks are complete — leave the empty fields empty instead of filling them from usage. */
+  pinned?: boolean;
+}
+
+/** Both calculator rosters in one hand-off: the page's own Pokemon (plus the partners picked
+ * alongside it) attack, and the KO picks defend. */
+export interface CalcTeamsFill {
+  format: "single" | "double";
+  attackers: CalcMember[];
+  defenders: CalcMember[];
+}
+
+const CALC_TEAMS_KEY = "pc-calc-teams-v1";
+
+export function stashCalcTeams(fill: CalcTeamsFill): void {
+  try {
+    sessionStorage.setItem(CALC_TEAMS_KEY, JSON.stringify(fill));
+  } catch { /* storage blocked — the calculator just opens on its own state */ }
+}
+
+/** Read AND CLEAR: a hand-off is one trip. Leaving it would re-apply on every later visit and
+ * overwrite whatever the reader had built in the meantime. */
+export function takeCalcTeams(): CalcTeamsFill | null {
+  try {
+    const raw = sessionStorage.getItem(CALC_TEAMS_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(CALC_TEAMS_KEY);
+    const parsed = JSON.parse(raw) as CalcTeamsFill;
+    if (!parsed || typeof parsed !== "object") return null;
+    const members = (list: unknown): CalcMember[] => (Array.isArray(list) ? list : [])
+      .filter((m): m is CalcMember =>
+        !!m && typeof m === "object" && typeof (m as CalcMember).slug === "string")
+      .slice(0, 6);
+    return {
+      format: parsed.format === "double" ? "double" : "single",
+      attackers: members(parsed.attackers),
+      defenders: members(parsed.defenders),
+    };
   } catch {
     return null;
   }

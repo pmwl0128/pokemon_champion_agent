@@ -332,6 +332,14 @@ function moveDetails(name, ctx, overrides = {}) {
     type: overrides.type ?? base.type,
     category: overrides.category ?? base.category,
     isCrit: overrides.isCrit !== undefined ? !!overrides.isCrit : !!base.alwaysCrit,
+    // Spread moves take the 0.75x doubles reduction ONLY while they actually hit two targets. A
+    // spread move aimed at a lone opponent (partner fainted / not yet sent out, or redirected) keeps
+    // full power, and the engine gates that reduction on move.isSpread alone — so the caller needs a
+    // per-call override. Switching `field.format` instead is NOT equivalent: it would also drop the
+    // doubles screen multiplier from 2/3 back to 1/2. Conditional spread (Expanding Force in Psychic
+    // Terrain, Tera Starstorm) is re-asserted inside the handler and correctly ignores this: those
+    // genuinely cannot be aimed at a single target.
+    isSpread: overrides.isSpread !== undefined ? !!overrides.isSpread : !!base.isSpread,
     isZ: false,
     hits: overrides.hits ?? expectedHits(base.hitRange),
     hitRange: base.hitRange ?? null,          // kept so calculate() can apply a max-hit ability
@@ -670,6 +678,10 @@ function calculate(input, ctx) {
     //                            unreliable (DETECTED, not modelled); null when none apply
     category: move.category,    // 'Physical' | 'Special' | 'Status' — lets a consumer tell whether a
     //                            defensive-stat effect (Stamina/Iron Defense = +Def) is even relevant
+    // Whether THIS calc resolved the move as a spread move (read after the handler, so conditional
+    // spread is already applied). It is what makes the 0.75x doubles reduction apply, so a consumer
+    // can tell whether offering a "single target" variant of this hit means anything at all.
+    is_spread: !!move.isSpread,
     move: moveName,
     attacker: attacker.name,
     defender: defender.name,
@@ -782,7 +794,8 @@ const SCHEMA = {
   input: {
     'attacker/defender': { name: 'str', ability: 'str', item: 'str', nature: 'str',
       sps: '{hp,atk,def,spa,spd,spe:int}  (smogon; legacy at/df/sa/sd/sp still accepted)',
-      boosts: '{atk,def,spa,spd,spe:-6..6}', moves: '[name | {name,power,type,category}]',
+      boosts: '{atk,def,spa,spd,spe:-6..6}',
+      moves: '[name | {name,power,type,category,hits,isCrit,isSpread}] | per-move overrides for the slot the `move` field names. isCrit forces a critical hit; isSpread:false drops the doubles 0.75x reduction for a spread move that actually hits ONE target (do not fake it by switching format — that also changes the screen multiplier)',
       status: 'Healthy|Burned|Paralyzed|Poisoned|Badly Poisoned|Asleep|Frozen', curHP: 'int',
       abilityOn: 'bool | whether a conditionally-activated ability has triggered. Defaults TRUE except for the ones whose trigger a single frame cannot see (Flash Fire, Plus, Minus, Trace, Stakeout, Sand Spit, Battle Bond, Electromorphosis, Wind Power, Seed Sower), which default FALSE — pass true to model them as active' },
     move: 'str (move name)',
@@ -800,6 +813,7 @@ const SCHEMA = {
     ko_chance: '{text,n,guaranteed,chance_pct} | engine KO verdict modelling Sitrus/Leftovers/hazards (recovery-aware; null for status/no-damage)',
     ko_caveats: '[{code,direction,cause}] | DETECTED effects making the static multi-turn KO unreliable (self/target stat-change, Stamina/Weak Armor, Multiscale, Sash/Sturdy/Disguise, Metronome, Knock Off, speed-BP, Contrary/Simple/White Herb...). direction = static overstates|understates|unclear the KO. NOT modelled — chain explicit-state snapshots to resolve. null when none apply',
     category: "'Physical'|'Special'|'Status' | the move's damage category — lets a consumer tell whether a +Def effect (Stamina/Iron Defense) is even relevant to THIS hit (irrelevant vs a special move)",
+    is_spread: 'bool | the move resolved as a spread move for THIS calc (conditional spread included). Only then does the doubles 0.75x reduction apply, so only then does a single-target variant differ',
     move: 'str', attacker: 'str', defender: 'str' },
   error_shape: { ok: false, query: '<input echo: move or attacker name>', index: 'int (batch only)',
     error: { code: 'unknown_move|unknown_pokemon|unknown_item|unknown_ability|bad_input', message: 'str' } },

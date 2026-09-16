@@ -10,7 +10,7 @@ import { AdaptiveCombobox } from "../components/AdaptiveCombobox.tsx";
 import { GameImage } from "../components/GameImage.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import {
-  useAbilities, useDexByName, useDexIndex, useItems, useMoves, useNatures, useOppCache,
+  useAbilities, useDexByName, useDexIndex, useItems, useMoves, useNatures, useOppSets,
 } from "../hooks.ts";
 import { displayName, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
@@ -340,7 +340,7 @@ function ActualResult({ response, format, sourceTeam }: {
   const navigate = useNavigate();
   const dex = useDexByName();
   const damageText = useDamageText();
-  const opp = useOppCache(format);
+  const opp = useOppSets(format);
   const sets = opp.status === "ready" ? opp.data.sets : undefined;
   const [view, setView] = useState<ResultView>("ko");
   // Which side is ATTACKING. Both directions are already computed per cell (`offense` = ours,
@@ -447,6 +447,7 @@ function ActualResult({ response, format, sourceTeam }: {
         </button>
       </th>
         {columns.map((col) => <ColHead key={col.slug} s={col.row} lang={lang} picks={colPicks}
+          sets={sets} setsBusy={opp.status === "loading"}
           open={openCol === col.slug}
           onToggle={() => setOpenCol((k) => (k === col.slug ? null : col.slug))}
           onClose={() => setOpenCol(null)}
@@ -677,12 +678,6 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     <div className="matrix-guide" aria-live="polite">
       <span className="matrix-guide-mark" aria-hidden>↘</span>{t("actual.cellHint")}
     </div>
-    {hasBuilds && (
-      <div className="matrix-guide variant-guide">
-        <span className="matrix-guide-mark" aria-hidden>◧</span>
-        {t("matchup.variantHint")}
-      </div>
-    )}
     <section className="panel actual-input-panel">
       <div className="actual-input-head">
         <div><h3>{t("actual.inputTitle")}</h3></div>

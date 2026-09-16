@@ -23,7 +23,8 @@ from .worker import WorkerPool
 # local deploymentId below so a DTO/mapper release is a new deployment identity even when skill data
 # is unchanged.
 # Version 6 requires clients to stop consuming transitional team evidence at expiry.
-WEB_PROTOCOL_VERSION = "6"
+# Version 7 adds the lightweight opponent-set catalog used by calculator defaults and build previews.
+WEB_PROTOCOL_VERSION = "7"
 
 # Ids derived from the installed skill snapshot. A deployed release carries a `release-<hash>`
 # id instead, bound to the whole payload rather than to the skill data alone.

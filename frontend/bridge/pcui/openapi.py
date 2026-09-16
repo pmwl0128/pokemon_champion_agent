@@ -139,6 +139,8 @@ LOCAL_ROUTES: dict[RouteKey, dict[str, Any]] = {
     ("POST", "/api/dex/resolve/batch"): _route(
         "Resolve canonical entity names", "dex", _array(_ref("ResolveEntryDtoSchema")),
         request=_RESOLVE_BATCH),
+    ("GET", "/api/dex/learners"): _route(
+        "Read the move -> learners index", "dex", _ref("LearnersDtoSchema")),
     ("GET", "/api/meta/ranking"): _route(
         "Read metagame ranking", "meta", _ref("RankingDtoSchema")),
     ("GET", "/api/meta/detail"): _route(
@@ -147,6 +149,12 @@ LOCAL_ROUTES: dict[RouteKey, dict[str, Any]] = {
         "Read rank history", "meta", _ref("TrendDtoSchema")),
     ("GET", "/api/meta/usage-trend"): _route(
         "Read one Pokemon's panel usage history", "meta", _ref("UsageTrendDtoSchema")),
+    ("GET", "/api/meta/ko"): _route(
+        "Read one Pokemon's KO axis", "meta", _ref("MetaKoDtoSchema")),
+    ("GET", "/api/meta/ko-trend"): _route(
+        "Read one Pokemon's KO panel history", "meta", _ref("MetaKoTrendDtoSchema")),
+    ("GET", "/api/meta/facets"): _route(
+        "Read the filter facet index", "meta", _ref("MetaFacetsDtoSchema")),
     ("POST", "/api/calc/damage"): _route(
         "Calculate one damage matchup", "calc", _ref("DamageResultDtoSchema"),
         request=_ref("DamageRequestDtoSchema")),
@@ -162,7 +170,7 @@ LOCAL_ROUTES: dict[RouteKey, dict[str, Any]] = {
     ("GET", "/api/team/oppcache"): _route(
         "Read opponent matchup projection", "team", {
             "oneOf": [_ref("OppCacheDtoSchema"), _ref("OppKoGridDtoSchema"),
-                      _ref("OppCheckGridDtoSchema")],
+                      _ref("OppCheckGridDtoSchema"), _ref("OppSetCatalogDtoSchema")],
         }),
     ("POST", "/api/team/session"): _route(
         "Run a deterministic team operator batch", "team", _TEAM_SESSION_RESULT,

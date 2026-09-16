@@ -121,6 +121,16 @@ export const SpeciesRowDtoSchema = z.object({
 });
 export type SpeciesRowDto = z.infer<typeof SpeciesRowDtoSchema>;
 
+/** Lightweight real-build catalog shared by the calculator and matchup header pickers. It is the
+ * species + processed-set slice of OppCacheDto, without the multi-megabyte damage matrix. */
+export const OppSetCatalogDtoSchema = z.object({
+  teamEvidenceExpiresAt: z.string().datetime({ offset: true }).optional(),
+  format: FormatIdSchema,
+  species: z.array(SpeciesRowDtoSchema),
+  sets: z.record(z.string(), OppSetDtoSchema),
+});
+export type OppSetCatalogDto = z.infer<typeof OppSetCatalogDtoSchema>;
+
 export const OppCacheDtoSchema = z.object({
   teamEvidenceExpiresAt: z.string().datetime({ offset: true }).optional(),
   season: z.string().min(1),

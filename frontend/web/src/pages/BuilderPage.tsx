@@ -24,7 +24,8 @@ import { useDexByName, useDexIndex, useOppCache } from "../hooks.ts";
 import { displayName, optionalKey, useLang, useT } from "../i18n.ts";
 import { useProseRenderer } from "../lib/prose.tsx";
 import {
-  readTeamMembers, rememberMatchupSource, stashDamageFill, stashMatchupFill,
+  readTeamMembers, rememberMatchupSource, stashCalcTeams, stashDamageFill,
+  stashMatchupFill, teamToCalcMembers,
 } from "../lib/team.ts";
 import { HttpError, type DexIndexEntry } from "../runtime/adapter.ts";
 import { useRuntime } from "../runtime/context.tsx";
@@ -330,7 +331,11 @@ function ThreatAssessmentPanel({ assessment, team, format, dexByName }: {
   );
 }
 
-export function BuilderPage() {
+export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
+  embedded?: boolean;
+  activeTab?: "wizard" | "diagnose";
+  onTabChange?: (tab: "wizard" | "diagnose") => void;
+} = {}) {
   const { adapter, can } = useRuntime();
   const t = useT();
   const { lang } = useLang();
@@ -342,7 +347,10 @@ export function BuilderPage() {
   // Diagnose lives here as a sibling tab (same "teams" domain, shares TeamCard) and takes
   // a hand-off from the wizard result; it is capability-gated on its own (team.validate).
   const showDiagnose = can("team.validate") && !!adapter.diagnose;
-  const [tab, setTab] = useState<"wizard" | "diagnose">("wizard");
+  const [localTab, setLocalTab] = useState<"wizard" | "diagnose">("wizard");
+  const tab = activeTab ?? localTab;
+  const setTab = onTabChange ?? setLocalTab;
+  const tabIdBase = embedded ? "assistant-mode" : "builder-mode";
   const [diagFill, setDiagFill] = useState<unknown | null>(null);
 
   // Rehydrate from sessionStorage once: the form fields always, and — when a job id was
@@ -465,20 +473,22 @@ export function BuilderPage() {
 
   return (
     <div>
-      <PageHeader title={t("builder.title")} description={t("online.aiNote")}>
-        {showDiagnose && (
-          <SegmentedControl kind="tabs" idBase="builder-mode" value={tab} onChange={setTab}
-            ariaLabel={t("a11y.builderMode")} className="seg builder-tabs page-tabs"
-            items={(["wizard", "diagnose"] as const).map((id) => ({
-              id,
-              label: t(`builder.tab.${id}`),
-            }))} />
-        )}
-      </PageHeader>
-      <div role={showDiagnose ? "tabpanel" : undefined}
-        id={showDiagnose ? segmentedPanelId("builder-mode", "wizard") : undefined}
-        aria-labelledby={showDiagnose ? segmentedTabId("builder-mode", "wizard") : undefined}
-        hidden={showDiagnose && tab !== "wizard"}>
+      {!embedded && (
+        <PageHeader title={t("builder.title")} description={t("online.aiNote")}>
+          {showDiagnose && (
+            <SegmentedControl kind="tabs" idBase={tabIdBase} value={tab} onChange={setTab}
+              ariaLabel={t("a11y.builderMode")} className="seg builder-tabs page-tabs"
+              items={(["wizard", "diagnose"] as const).map((id) => ({
+                id,
+                label: t(`builder.tab.${id}`),
+              }))} />
+          )}
+        </PageHeader>
+      )}
+      <div role={embedded || showDiagnose ? "tabpanel" : undefined}
+        id={embedded || showDiagnose ? segmentedPanelId(tabIdBase, "wizard") : undefined}
+        aria-labelledby={embedded || showDiagnose ? segmentedTabId(tabIdBase, "wizard") : undefined}
+        hidden={(embedded || showDiagnose) && tab !== "wizard"}>
       <>
       <p className="notice page-disclosure">{t("builder.disclosure")}</p>
 
@@ -558,6 +568,14 @@ export function BuilderPage() {
                       }}>
                 {t("builder.sendDiagnose")}
               </button>
+            )}
+            {completedResult && (
+              <button type="button" className="second-btn" title={t("team.sendCalcHint")}
+                onClick={() => {
+                  stashCalcTeams({ format, attackers: teamToCalcMembers(completedResult.team),
+                    defenders: [] });
+                  navigate("/calc?tab=damage");
+                }}>{t("team.sendCalc")}</button>
             )}
             {completedResult && (
               <button type="button" className="second-btn" onClick={() => {
@@ -749,8 +767,8 @@ export function BuilderPage() {
       </>
       </div>
       {showDiagnose && (
-        <div role="tabpanel" id={segmentedPanelId("builder-mode", "diagnose")}
-          aria-labelledby={segmentedTabId("builder-mode", "diagnose")}
+        <div role="tabpanel" id={segmentedPanelId(tabIdBase, "diagnose")}
+          aria-labelledby={segmentedTabId(tabIdBase, "diagnose")}
           hidden={tab !== "diagnose"}>
           {/* Keep the tab mounted: an in-flight reading must survive sibling-tab switches. */}
           <DiagnoseTab active={tab === "diagnose"} fill={diagFill}

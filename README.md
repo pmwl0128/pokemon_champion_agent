@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-09-14</b>
+  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-09-16</b>
 </p>
 
 <p align="center">
@@ -267,9 +267,10 @@ follows the instructions in `AGENTS.md` / `CLAUDE.md` under "Local Visual Interf
 
 | Capability | Online | Local bundle |
 |---|---|---|
-| Singles/Doubles rankings, details, and rank trends | Yes | Yes |
+| Singles/Doubles rankings, details, KO panels, and separate usage/KO histories | Yes | Yes |
 | Pokémon, move, item, and ability dex with zh/en/ja search | Yes | Yes |
 | Batch damage, rolls, KO ranges, and Speed lines | In-browser | Local bridge |
+| Calculator search/filter drawer with observed builds, Meta fallback, and a blank Custom option | Yes | Yes |
 | Standard-set matrix and actual-team KO/CHECK grid | Yes | Yes |
 | Quick survival calculation | Yes | Yes |
 | Exact `team.tune` cliff analysis | Deployment capability and workload quota | Yes |
@@ -278,6 +279,12 @@ follows the instructions in `AGENTS.md` / `CLAUDE.md` under "Local Visual Interf
 
 The online builder is a fixed-form, single-result workflow. It does not replace the full local UEP
 conversation, candidate comparison, revision loop, or file collaboration.
+
+The calculator drawer expands one Pokémon's build cards at a time. Its destination switch fills the
+selected side; Speed lines support up to six configured Pokémon on each side, and quick bulk tuning
+supports up to six incoming attackers. A full side rejects an additional card with an explicit notice.
+Environment KO target and threat lists are **rankings, not usage percentages**. Their capture time and
+coverage can differ from usage history; an uncollected axis is shown as a data gap.
 
 ### Use the online edition
 
@@ -550,6 +557,7 @@ The release contains transformed, validated query data and scrubbed facts-only p
 |---|---|
 | [GameWith](https://gamewith.jp/) Pokémon Champions | Rankings and move, item, ability, nature, SP, and partner details |
 | [PokeChamp DB](https://pokechamdb.com/) | Independent metagame feed and cross-check |
+| [MetaRoll](https://metaroll.app/ladder) | Doubles ranked-ladder KO move shares. Usage data from MetaRoll (metaroll.app) |
 
 ### Battle Dex, Names, and Calculation
 
@@ -567,6 +575,7 @@ The release contains transformed, validated query data and scrubbed facts-only p
 | [Yakkun / ポケモン徹底攻略](https://yakkun.com/) | Singles | Complete joint sets and SP |
 | [OP.GG](https://op.gg/) Pokémon Champions | Singles | Replica teams and SP |
 | [GameWith](https://gamewith.jp/) / [Game8](https://game8.jp/) | Singles | Top-build facts from completed seasons |
+| [POCH](https://poch.ms/en) | Singles | Public team index and reviewed in-game export images |
 | [Limitless TCG](https://play.limitlesstcg.com/) | Doubles | Online event teams, records, and placings |
 | [VGCPastes / Pokepaste](https://pokepast.es/) | Doubles | Community-curated complete teams and SP |
 

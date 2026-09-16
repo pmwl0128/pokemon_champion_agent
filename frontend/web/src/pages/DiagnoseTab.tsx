@@ -16,7 +16,8 @@ import { useNavigate } from "react-router-dom";
 import { useDamageText } from "../lib/damageText.tsx";
 import { useAbilitiesByName, useItemsByName, useOppCache } from "../hooks.ts";
 import {
-  readTeamMembers, rememberMatchupSource, stashDamageFill, stashMatchupFill,
+  readTeamMembers, rememberMatchupSource, stashCalcTeams, stashDamageFill,
+  stashMatchupFill, teamToCalcMembers,
 } from "../lib/team.ts";
 import { slugify } from "./uep/MonChip.tsx";
 import { useProseRenderer } from "../lib/prose.tsx";
@@ -1063,6 +1064,16 @@ export function DiagnoseTab({ active, fill, onConsumeFill }: {
             {t("diag.quota")} {quota.limit === 0
               ? t("quota.unlimited") : `${quota.used}/${quota.limit}`}
           </span>}
+          {report && (
+            <button type="button" className="second-btn" title={t("team.sendCalcHint")}
+              onClick={() => {
+                const teamFormat = (report.team as { format?: string })?.format === "double"
+                  ? "double" : "single";
+                stashCalcTeams({ format: teamFormat,
+                  attackers: teamToCalcMembers(report.team), defenders: [] });
+                navigate("/calc?tab=damage");
+              }}>{t("team.sendCalc")}</button>
+          )}
           {report && (
             <button type="button" className="second-btn" onClick={() => {
               const teamFormat = (report.team as { format?: string })?.format === "double"

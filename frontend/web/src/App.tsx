@@ -1,6 +1,8 @@
-import { Suspense, lazy, useEffect, useState } from "react";
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import type { FormatId } from "@pokemon-champions/protocol";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { BRAND_LOGO } from "./assets/icons.ts";
+import { RailHandle, RailLayer, type RailState } from "./components/SideRail.tsx";
 import { LangContext, detectLang, saveLang, useLang, useT, type Lang } from "./i18n.ts";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RuntimeProvider, useRuntime } from "./runtime/context.tsx";
@@ -11,21 +13,20 @@ import { RuntimeProvider, useRuntime } from "./runtime/context.tsx";
 const loadDexPage = () => import("./pages/DexPage.tsx");
 const loadPokemonPage = () => import("./pages/PokemonPage.tsx");
 const loadMetaPage = () => import("./pages/MetaPage.tsx");
-const loadTrendPage = () => import("./pages/TrendPage.tsx");
 const loadMatchupPage = () => import("./pages/MatchupPage.tsx");
 const loadCalcPage = () => import("./pages/CalcPage.tsx");
-const loadQaPage = () => import("./pages/QaPage.tsx");
-const loadBuilderPage = () => import("./pages/BuilderPage.tsx");
+const loadAssistantPage = () => import("./pages/AssistantPage.tsx");
 const loadUepPages = () => import("./pages/uep/index.ts");
 
 const DexPage = lazy(() => loadDexPage().then((m) => ({ default: m.DexPage })));
 const PokemonPage = lazy(() => loadPokemonPage().then((m) => ({ default: m.PokemonPage })));
 const MetaPage = lazy(() => loadMetaPage().then((m) => ({ default: m.MetaPage })));
-const TrendPage = lazy(() => loadTrendPage().then((m) => ({ default: m.TrendPage })));
 const MatchupPage = lazy(() => loadMatchupPage().then((m) => ({ default: m.MatchupPage })));
 const CalcPage = lazy(() => loadCalcPage().then((m) => ({ default: m.CalcPage })));
-const QaPage = lazy(() => loadQaPage().then((m) => ({ default: m.QaPage })));
-const BuilderPage = lazy(() => loadBuilderPage().then((m) => ({ default: m.BuilderPage })));
+const AssistantPage = lazy(() => loadAssistantPage().then((m) => ({ default: m.AssistantPage })));
+// The trend rail is intentionally absent from the entry graph until its handle is pressed.
+const TrendDrawer = lazy(() => import("./components/TrendDrawer.tsx")
+  .then((m) => ({ default: m.TrendDrawer })));
 // Both local UEP pages intentionally share one chunk; online runtimes never request it.
 const SessionsPage = lazy(() => loadUepPages().then((m) => ({ default: m.SessionsPage })));
 const SessionPage = lazy(() => loadUepPages().then((m) => ({ default: m.SessionPage })));
@@ -68,6 +69,47 @@ function MissingRoute() {
   );
 }
 
+function EnvironmentTrendRail() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const t = useT();
+  const environmentRoute = location.pathname === "/" || location.pathname.startsWith("/meta/");
+  const searchParams = new URLSearchParams(location.search);
+  const format = searchParams.get("format") === "double"
+    ? "double" as const : "single" as const;
+  const open = environmentRoute && searchParams.get("trend") === "1";
+  const setOpen = useCallback((open: boolean) => {
+    const updated = new URLSearchParams(location.search);
+    if (open) updated.set("trend", "1");
+    else updated.delete("trend");
+    navigate({ pathname: location.pathname, search: updated.toString() }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+  const setFormat = useCallback((next: FormatId) => {
+    const updated = new URLSearchParams(location.search);
+    updated.set("format", next);
+    navigate({ pathname: location.pathname, search: updated.toString() }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+  // The URL marker is authoritative across detail navigation and reloads. This rail is a
+  // viewport overlay, not a gutter rail: it never writes shell padding or resizes the page.
+  const state: RailState = { open, setOpen, overlay: false, width: 320, side: "right" };
+
+  if (!environmentRoute) return null;
+  return (
+    <>
+      <RailHandle state={state} label={t("nav.trend")} />
+      {state.open && (
+        <Suspense fallback={
+          <RailLayer state={state} label={t("trend.title")} className="trend-overlay">
+            <div className="spinner trend-rail-loading">{t("state.loading")}</div>
+          </RailLayer>
+        }>
+          <TrendDrawer state={state} format={format} onFormatChange={setFormat} />
+        </Suspense>
+      )}
+    </>
+  );
+}
+
 function Shell() {
   const { capabilities, can } = useRuntime();
   const t = useT();
@@ -76,6 +118,7 @@ function Shell() {
     <div className="shell">
       <RouteScrollReset />
       <a className="skip-link" href="#main-content">{t("a11y.skipContent")}</a>
+      <EnvironmentTrendRail />
       <header className="topbar">
         <span className="logo">
           <img src={BRAND_LOGO} alt="" aria-hidden />
@@ -84,18 +127,14 @@ function Shell() {
         <nav aria-label={t("a11y.primaryNav")}>
           <NavItem to="/" end label={t("nav.ranking")} />
           <NavItem to="/dex" label={t("nav.dex")} preload={loadDexPage} />
-          <NavItem to="/trend" label={t("nav.trend")} preload={loadTrendPage} />
-          {can("team.matchup") && (
-            <NavItem to="/matchup" label={t("nav.matchup")} preload={loadMatchupPage} />
-          )}
           {can("calc.damage") && (
             <NavItem to="/calc" label={t("nav.calc")} preload={loadCalcPage} />
           )}
-          {can("llm.qa") && (
-            <NavItem to="/qa" label={t("nav.qa")} preload={loadQaPage} />
+          {can("team.matchup") && (
+            <NavItem to="/matchup" label={t("nav.matchup")} preload={loadMatchupPage} />
           )}
-          {can("llm.builder") && (
-            <NavItem to="/builder" label={t("nav.builder")} preload={loadBuilderPage} />
+          {(can("llm.qa") || can("llm.builder")) && (
+            <NavItem to="/assist" label={t("nav.assistant")} preload={loadAssistantPage} />
           )}
           {can("team.uep") && (
             <NavItem to="/sessions" label={t("nav.sessions")} preload={loadUepPages} />
@@ -120,11 +159,16 @@ function Shell() {
           <Route path="/dex" element={<DexPage />} />
           <Route path="/pokemon/:slug" element={<PokemonPage />} />
           <Route path="/meta/:slug" element={<MetaPage />} />
-          <Route path="/trend" element={<TrendPage />} />
+          <Route path="/trend" element={<Navigate to="/?trend=1" replace />} />
           <Route path="/matchup" element={<MatchupPage />} />
           <Route path="/calc" element={<CalcPage />} />
-          {can("llm.qa") && <Route path="/qa" element={<QaPage />} />}
-          {can("llm.builder") && <Route path="/builder" element={<BuilderPage />} />}
+          {(can("llm.qa") || can("llm.builder")) && (
+            <Route path="/assist" element={<AssistantPage />} />
+          )}
+          {can("llm.qa") && <Route path="/qa" element={<Navigate to="/assist" replace />} />}
+          {can("llm.builder") && (
+            <Route path="/builder" element={<Navigate to="/assist?tab=wizard" replace />} />
+          )}
           {can("team.uep") && (
             <>
               <Route path="/sessions" element={<SessionsPage />} />

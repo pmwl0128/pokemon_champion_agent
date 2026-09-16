@@ -11,8 +11,11 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
 
 - `ranking_<season>_<format>.json`
 - `details_<season>_<format>.json`
+- `ko_<season>_<format>.json` (KO axis; its own upstream and snapshot clock)
 - `report_<season>_<format>.json`
 - `trend_<season>_<format>.json` (current season only; rolling refresh history for chart export)
+- `usage_trend_<season>_<format>.json` (rolling per-panel history: percentages, plus teammate RANKS)
+- `ko_trend_<season>_<format>.json` (the KO axis's own rolling history, on the KO snapshot clock)
 - `current.json`
 
 `format` is `single` or `double`.
@@ -58,6 +61,67 @@ Panel keys are normalized to English: `moves`, `items`, `abilities`, `natures`, 
 
 A row carries an optional `detail_updated` ISO stamp only when the source provides a real
 per-pokemon update time; the file-level `updated_at` is the refresh stamp for every row.
+
+## KO File
+
+A SECOND data axis, not a panel of `details`. It answers "who knocks out whom", comes from a
+different upstream than the usage data, and advances on its own snapshot clock — so its `updated_at`
+is its own and must be quoted separately.
+
+```json
+{
+  "version": 1,
+  "season": "M-6", "rule": "M-C", "format": "double",
+  "updated_at": "2026-09-15T01:46:15+00:00",
+  "snapshot": {"id": 3107, "taken_at": "2026-09-15T01:46:15+00:00", "verified": true},
+  "coverage": {
+    "opponents": "ranked",
+    "opponent_identity": "national_dex",
+    "opponent_depth": 30,
+    "opponent_form_collapsed": 688,
+    "move_share": "absent",
+    "move_depth": null,
+    "rows": 262,
+    "rows_with_move_share": 0
+  },
+  "rows": [
+    {
+      "rank": 2, "pokemon": "大狃拉", "slug": "sneasler",
+      "pokemon_en": "Sneasler", "pokemon_ja": "オオニューラ", "pokedex_no": 903,
+      "panels": {
+        "ko_targets": [{"rank": 1, "key": "727", "name": "炽焰咆哮虎", "name_ja": "ガオガエン", "name_en": "Incineroar"}],
+        "koed_by":    [{"rank": 1, "key": "373", "name": "暴飞龙", "name_ja": "ボーマンダ", "name_en": "Salamence"}],
+        "ko_moves": null,
+        "koed_by_moves": null
+      }
+    }
+  ]
+}
+```
+
+`ko_targets` is whom this Pokémon knocks out (source: "Most KOs"); `koed_by` is who knocks it out
+("Most KO'd By"). Four rules govern reading this file:
+
+- **Ordering, not share.** Object entries deliberately have NO `percentage` field — the source
+  publishes a ranked list and no count. Do not derive one, and do not read the list as a win rate.
+- **`null` means not collected.** `ko_moves` / `koed_by_moves` are a reserved tier. While
+  `coverage.move_share` is `absent` they are `null`; an empty list would mean the source reported
+  none. When the tier ships, `move_share` becomes `ranked_pct` and the panels hold move entries in
+  the same shape as `details`' `moves` panel (with `percentage`).
+- **Objects are species-level.** `key` is the national dex number and there is no form: the source
+  drops it. The names come from the dex at whatever precision that number allows: the base-form row
+  when there is one, the single form when the dex ships the species as exactly one (#670 can only
+  mean Floette-Eternal), and otherwise the BARE species name in every language (南瓜怪人 /
+  Gourgeist). Only that last case is ambiguous, and only it carries `form_rep` — the form the dex
+  points that bare name at — for consumers that need one form to draw or link to. `name_en` is the
+  species-level join key, so it equals `form_rep`'s species, not `form_rep`.
+- **A repeat is flagged, not removed.** The same `key` can appear twice in one list because the
+  underlying rows are per-form; both entries are kept (each is a separate observation) and both carry
+  `"form_collapsed": true`. `coverage.opponent_form_collapsed` counts them file-wide.
+
+Row subjects ARE form-level and identified by the dex canonical (`pokemon_en`), which is how this
+file joins `ranking`/`details`. `slug` is copied from the usage file for convenience and is empty
+when the usage snapshot does not carry that Pokémon.
 
 ## Current State
 

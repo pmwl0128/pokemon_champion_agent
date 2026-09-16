@@ -232,7 +232,11 @@ def map_detail(raw: dict) -> dict:
         moves.append(row)
     partners = []
     for e in p["partners"]:
-        en = resolve_en("pokemon", e.get("name_ja") or e["name"])
+        # A teammate row is species-level (its identity is the national dex number). `form_rep` is
+        # the dex's representative form for a species it ships only as split forms — the handle the
+        # sprite and the link need. The printed name stays whatever the panel carries, so the row
+        # says "Lycanroc" while pointing at the form the dex means by that word.
+        en = e.get("form_rep") or resolve_en("pokemon", e.get("name_ja") or e["name"])
         row = {"rank": e["rank"], **named(en, e.get("name"), e.get("name_ja")),
                "slug": slugify(en)}
         if str(e.get("key", "")).isdigit():
@@ -259,6 +263,144 @@ def map_detail(raw: dict) -> dict:
     }
 
 
+# The shipped skill data keeps 30 per direction; the page shows 10. The projection is a cropped
+# public DTO, not a mirror of the skill store (frontend/design.md §7.1), so the cut happens HERE —
+# shipping 30 to render 10 would triple this file family for nothing. Raising the page depth means
+# raising this constant, in one place, on both the bridge and the projection path.
+KO_PANEL_LIMIT = 10
+
+
+def _ko_entry(e: dict, usage_rank: dict[str, int]) -> dict:
+    """One KO opponent row. The source gives a national dex number and no form, so the identity IS
+    that number and `name` is species-level. NO percentage field is emitted — the source publishes
+    an ordering, and a null pct reads as a measured zero.
+
+    `slug`/`key` name ONE form, because a sprite and a link have to: the species itself when the dex
+    names it exactly, otherwise `form_rep`, the form the dex points that bare species name at. The
+    usage rank follows the same handle rather than being looked up separately, so the row's sprite,
+    its rank and where it leads are three statements about the same pokemon."""
+    en = e.get("name_en") or ""
+    form = e.get("form_rep") or en
+    row: dict = {
+        "rank": e["rank"],
+        **named(en, e.get("name"), e.get("name_ja")),
+        "nationalDex": int(e["key"]),
+        "usageRank": usage_rank.get(en, usage_rank.get(form)),
+    }
+    if form:
+        row["slug"] = slugify(form)
+        row["key"] = f"pokemon:{slugify(form)}"
+    if e.get("form_collapsed"):
+        row["formCollapsed"] = True
+    return row
+
+
+def _ko_move_panel(entries: list | None) -> list | None:
+    """`None` stays `None`: the reserved tier was NOT collected, which is a different fact from
+    the source reporting no KO moves. Only a real list is mapped."""
+    if entries is None:
+        return None
+    out = []
+    for e in entries[:KO_PANEL_LIMIT]:
+        row = _panel_entry("move", e)
+        row.update({"type": type_name(e.get("type")), "category": type_name(e.get("category")),
+                    "power": e.get("power")})
+        out.append(row)
+    return out
+
+
+def map_ko(doc: dict, row: dict, usage_rank: dict[str, int]) -> dict:
+    """One shipped KO row -> MetaKoDto. `doc` is the file (season/rule/format/coverage/updated_at),
+    `row` the pokemon's entry, `usage_rank` an English-canonical -> rank map for the SAME format."""
+    cov = doc.get("coverage") or {}
+    p = row.get("panels") or {}
+    en = row["pokemon_en"]
+    out = {
+        "rank": row.get("rank"),
+        "slug": row.get("slug") or slugify(en),
+        "key": f"pokemon:{slugify(en)}",
+        **named(en, row.get("pokemon"), row.get("pokemon_ja")),
+        "format": doc["format"], "season": doc["season"], "rule": doc["rule"],
+        "updatedAt": doc["updated_at"],
+        "coverage": {
+            "opponents": cov.get("opponents", "ranked"),
+            "opponentIdentity": cov.get("opponent_identity", "national_dex"),
+            "opponentDepth": cov.get("opponent_depth", 0),
+            "moveShare": cov.get("move_share", "absent"),
+            "moveDepth": cov.get("move_depth"),
+            "rows": cov.get("rows", 0),
+            "rowsWithMoveShare": cov.get("rows_with_move_share", 0),
+        },
+        "panels": {
+            "koTargets": [_ko_entry(e, usage_rank)
+                          for e in (p.get("ko_targets") or [])[:KO_PANEL_LIMIT]],
+            "koedBy": [_ko_entry(e, usage_rank)
+                       for e in (p.get("koed_by") or [])[:KO_PANEL_LIMIT]],
+            "koMoves": _ko_move_panel(p.get("ko_moves")),
+            "koedByMoves": _ko_move_panel(p.get("koed_by_moves")),
+        },
+    }
+    if cov.get("opponent_form_collapsed") is not None:
+        out["coverage"]["opponentFormCollapsed"] = cov["opponent_form_collapsed"]
+    # A merged move tier carries its own capture time and cross-capture agreement; both are absent
+    # while the tier is uncollected, so they are mapped only when the store actually has them.
+    if cov.get("move_share_captured_at"):
+        out["coverage"]["moveShareCapturedAt"] = cov["move_share_captured_at"]
+    if cov.get("move_share_agreement"):
+        out["coverage"]["moveShareAgreement"] = cov["move_share_agreement"]
+    snapshot = (doc.get("snapshot") or {}).get("id")
+    if snapshot is not None:
+        out["snapshotId"] = int(snapshot)
+    return out
+
+
+# Facet -> where its values live. `partners` and the two KO panels are pokemon facets (their values
+# are English species canonicals); the rest are entity facets read off the usage detail panels.
+FACET_PANELS = (("items", "item"), ("moves", "move"), ("abilities", "ability"),
+                ("natures", "nature"))
+
+
+def build_facets(details: list[dict], ko_rows: list[dict]) -> dict:
+    """Inverted index: facet -> English canonical value -> the slugs carrying it.
+
+    Built ONCE per format because the per-pokemon detail files are lazy: without this a filter rail
+    would have to fetch all 262 of them to answer "which mons run Choice Scarf". Values are English
+    canonicals, the cross-skill join key; the UI localizes them through the dex at render time."""
+    out: dict[str, dict[str, list[str]]] = {k: {} for k, _ in FACET_PANELS}
+    out["partners"] = {}
+    out["koTargets"] = {}
+    out["koedBy"] = {}
+
+    def add(facet: str, value: str, slug: str) -> None:
+        if not value or not slug:
+            return
+        bucket = out[facet].setdefault(value, [])
+        if slug not in bucket:
+            bucket.append(slug)
+
+    for row in details:
+        slug = row.get("slug") or ""
+        panels = row.get("panels") or {}
+        for facet, kind in FACET_PANELS:
+            for e in panels.get(facet) or []:
+                try:
+                    add(facet, resolve_en(kind, e.get("name_ja") or e["name"]), slug)
+                except MappingError:
+                    continue                    # a value the dex snapshot cannot resolve is skipped
+        for e in panels.get("partners") or []:
+            try:
+                add("partners", resolve_en("pokemon", e.get("name_ja") or e["name"]), slug)
+            except MappingError:
+                continue
+    ko_by_slug = {r.get("slug") or slugify(r["pokemon_en"]): r for r in ko_rows}
+    for slug, row in ko_by_slug.items():
+        panels = row.get("panels") or {}
+        for facet, key in (("koTargets", "ko_targets"), ("koedBy", "koed_by")):
+            for e in panels.get(key) or []:
+                add(facet, e.get("name_en") or "", slug)
+    return out
+
+
 def map_trend(raw: dict) -> dict:
     periods = [p["date"] for p in raw["periods"]]
     series = []
@@ -272,6 +414,49 @@ def map_trend(raw: dict) -> dict:
         })
     return {"season": raw["season"], "rule": raw["rule"], "format": raw["format"],
             "periods": periods, "series": series}
+
+
+def _species_rank_series(store_panel: dict) -> list[dict]:
+    """Species-level history (teammates, KO opponents) keyed by national dex number.
+
+    A key that is not a bare number comes from a retired source convention (a form-indexed teammate
+    id, say). It is dropped rather than guessed at: it cannot be placed in the dex, and it cannot
+    join the current panel either, whose rows are keyed by the number alone."""
+    out = []
+    for key, values in store_panel.items():
+        if not str(key).isdigit():
+            continue
+        out.append({"nationalDex": int(key),
+                    "ranks": [None if v is None else int(v) for v in values]})
+    return out
+
+
+def map_ko_trend(raw: dict, slug: str) -> dict:
+    """Map one Pokemon out of the KO trend store (its own clock, hence its own document).
+
+    Opponent panels stay RANKS keyed by national dex number — the identity those rows actually have.
+    Move panels are percentages keyed by the source's Japanese move name, resolved to the English
+    canonical here exactly as the usage trend does."""
+    pokemon = raw.get("pokemon", {}).get(slug)
+    if pokemon is None:
+        raise MappingError(f"ko trend not found: {slug}")
+    panels = {
+        "koTargets": _species_rank_series(pokemon.get("ko_targets", {})),
+        "koedBy": _species_rank_series(pokemon.get("koed_by", {})),
+    }
+    for dto_key, store_key in (("koMoves", "ko_moves"), ("koedByMoves", "koed_by_moves")):
+        panels[dto_key] = [
+            {"name": resolve_en("move", source_name), "values": values}
+            for source_name, values in pokemon.get(store_key, {}).items()
+        ]
+    try:
+        return {
+            "season": raw["season"], "rule": raw["rule"], "format": raw["format"],
+            "slug": slug, "periods": [p["date"] for p in raw["periods"]],
+            "panels": panels,
+        }
+    except (KeyError, TypeError) as exc:
+        raise MappingError(f"malformed ko trend store metadata: {exc}") from exc
 
 
 def map_usage_trend(raw: dict, slug: str) -> dict:
@@ -291,6 +476,8 @@ def map_usage_trend(raw: dict, slug: str) -> dict:
             {"name": resolve_en(kind, source_name), "values": values}
             for source_name, values in pokemon.get(panel, {}).items()
         ]
+
+    panels["partners"] = _species_rank_series(pokemon.get("partners", {}))
 
     stat_keys = ("hp", "atk", "def", "spa", "spd", "spe")
     spreads = []
@@ -330,6 +517,10 @@ def map_damage(raw: dict) -> dict:
         "koChance": None, "category": raw["category"],
         "move": raw["move"], "attacker": raw["attacker"], "defender": raw["defender"],
     }
+    # Optional-not-nullable in the DTO, and absent from results produced by an older engine
+    # snapshot — mirror the browser twin (calc-engine/index.ts mapDamage) exactly.
+    if raw.get("is_spread") is not None:
+        out["isSpread"] = raw["is_spread"]
     for src, dst in (("min_env", "minEnv"), ("max_env", "maxEnv"),
                      ("min_env_percent", "minEnvPercent"), ("max_env_percent", "maxEnvPercent")):
         if raw.get(src) is not None:
@@ -357,6 +548,19 @@ def map_speedline(raw: dict) -> dict:
 
 
 # --- learnset (straight from the dex DB — static data, no CLI hop needed) -----------------
+
+def learners_index() -> dict:
+    """English move canonical -> the slugs that learn it, for the dex browse filter.
+
+    Built in ONE query rather than per Pokemon: the shipped learnsets are lazy per slug, so a
+    "who learns this" filter assembled client-side would cost one request per roster entry. Slugs
+    come from the same `slugify` authority `map_pokemon` uses, so the index joins straight onto the
+    browse cards without a second spelling."""
+    out: dict[str, list[str]] = {}
+    for row in _conn().execute("select move, pokemon from learnsets order by move, pokemon"):
+        out.setdefault(str(row["move"]), []).append(slugify(str(row["pokemon"])))
+    return {"moves": out}
+
 
 def learnset_dto(canonical: str) -> dict:
     """LearnsetDto for one pokemon: learnable moves joined with the move catalog, trilingual,
@@ -675,6 +879,24 @@ def _species_columns(species_rows: list[dict], sets: dict | None = None) -> list
             vs.sort(key=lambda v: (not v["isModal"], -(v.get("coverage") or 0)))
             row["variants"] = vs
     return list(out.values())
+
+
+def map_oppsets(cache: dict) -> dict:
+    """Map only the retained real-build catalog, without the damage/check matrices.
+
+    The calculator needs concrete joint configurations as defaults, and matchup headers need them
+    for hover detail. Mapping the full matrix for those two reads costs megabytes and substantial
+    CPU for data neither surface consumes.
+    """
+    bf = cache.get("built_for") or {}
+    sets_in = cache.get("sets") or {}
+    return {
+        **_team_evidence_window(cache),
+        "format": bf.get("format") or "single",
+        "species": _species_columns(cache.get("species") or [], sets_in),
+        "sets": {opponent_key(str(key)): _map_opp_set(value)
+                 for key, value in sets_in.items()},
+    }
 
 
 # --- team diagnose report (online deterministic surface, design §7.5) ---------------------

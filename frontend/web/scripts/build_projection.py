@@ -10,10 +10,14 @@ Output (default frontend/web/public/projection/, gitignored):
     capabilities.json                 online handshake (static caps + explicitly enabled API caps)
     dex/cards.json                    all PokemonCardDto (browse index + card lookup)
     dex/{moves,abilities,natures,items}.json  complete trilingual vocabularies
+    dex/learners.json                 LearnersDto (move -> slugs; browse filter index)
     meta/ranking_{single,double}.json RankingDto
     meta/detail_{single,double}/<slug>.json   MetaDetailDto (lazy per-pokemon)
     meta/trend_{single,double}.json   TrendDto
     meta/usage_trend_{single,double}/<slug>.json   UsageTrendDto (lazy per-pokemon)
+    meta/ko_{single,double}/<slug>.json       MetaKoDto (lazy per-pokemon; own snapshot clock)
+    meta/ko_trend_{single,double}/<slug>.json MetaKoTrendDto (lazy; the KO axis's own history)
+    meta/facets_{single,double}.json          MetaFacetsDto (filter-rail inverted index)
     assets/                           the image pack (manifest + content-hashed files)
 
     python frontend/web/scripts/build_projection.py [--out DIR] [--ui-build-id ID]
@@ -41,7 +45,7 @@ PACK = PROJECT_ROOT / "frontend" / "assets" / "pack"
 # Beyond browsing, the static projection also carries:
 #  - calc.damage / calc.speedline: computed CLIENT-SIDE in the SPA's calc-engine Web Worker (the
 #    vendored NCP engine ported to the browser — frontend/design.md §7.1).
-#  - team.matchup: the M5 opponent cache is shipped STATIC DATA (standard-vs-standard KO grid + derived
+#  - team.matchup: the current-rule opponent cache is shipped STATIC DATA (standard-vs-standard KO grid + derived
 #    C2/C1/C0 checks — no user team, no compute), so it exports like ranking/detail and the online
 #    adapter reads it directly, same as the bridge maps it live.
 # Precise tune (team.tune) is deployment-optional: a static-only site degrades to the client-side
@@ -60,6 +64,19 @@ def write(path: Path, doc) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")) + "\n",
                     encoding="utf-8", newline="\n")
+
+
+def strip_matchup_provenance(doc: dict) -> dict:
+    """Keep processed sets while removing real-team attribution from every public view."""
+    for st in (doc.get("sets") or {}).values():
+        if isinstance(st, dict):
+            for field in ("source", "confidence", "note", "realTeamBacked"):
+                st.pop(field, None)
+    for row in doc.get("species", []):
+        if isinstance(row, dict):
+            row.pop("setSource", None)
+            row.pop("setConfidence", None)
+    return doc
 
 
 def load_usage_trend_store(path: Path, detail_slugs: set[str], fmt: str) -> dict:
@@ -191,6 +208,9 @@ def main() -> int:
             for mv in ls["moves"]:
                 all_moves.setdefault(mv["name"], mv)
         write(out / "dex" / "cards.json", {"cards": cards})
+        # Move -> learners, for the browse filter. One lazy document, because the per-Pokemon
+        # learnsets above are lazy: "who learns Fake Out" would otherwise cost a fetch per entry.
+        write(out / "dex" / "learners.json", mappers.learners_index())
         # The global move vocabulary is built from the moves TABLE (not the learnset
         # aggregate): the dex browse tab needs every move's numbers + trilingual effect
         # texts once, while learnset rows stay lean (they repeat per pokemon page).
@@ -283,8 +303,39 @@ def main() -> int:
                 write(out / "meta" / f"usage_trend_{fmt}" / f"{slug}.json",
                       mappers.map_usage_trend(usage, slug))
                 usage_count += 1
+            # KO axis — its own file family, lazy per slug like the details above: the panel sits
+            # below the fold, and folding it into detail_*.json would make every page load carry it.
+            ko_path = META_DATA / f"ko_{season}_{fmt}.json"
+            ko_rows: list = []
+            ko_count = 0
+            if ko_path.exists():
+                ko_doc = json.loads(ko_path.read_text(encoding="utf-8"))
+                ko_rows = ko_doc.get("rows") or []
+                # `raw` is the CLI ranking, whose rows carry the canonical English join key `name`.
+                usage_rank = {r["name"]: r["rank"] for r in raw.get("rows") or [] if r.get("name")}
+                for row in ko_rows:
+                    dto = mappers.map_ko(ko_doc, row, usage_rank)
+                    write(out / "meta" / f"ko_{fmt}" / f"{dto['slug']}.json", dto)
+                    ko_count += 1
+            # KO history rides with the KO axis, not with the usage trend: same data, same clock.
+            # Absent store = absent panel history, which the page renders as "not collected yet"
+            # rather than as a flat line.
+            ko_trend_path = META_DATA / f"ko_trend_{season}_{fmt}.json"
+            ko_trend_count = 0
+            if ko_trend_path.exists():
+                ko_trend = json.loads(ko_trend_path.read_text(encoding="utf-8"))
+                for slug in ko_trend.get("pokemon") or {}:
+                    write(out / "meta" / f"ko_trend_{fmt}" / f"{slug}.json",
+                          mappers.map_ko_trend(ko_trend, slug))
+                    ko_trend_count += 1
+            # Filter-rail index. One file per format because the detail files are lazy: a facet
+            # filter over the roster would otherwise cost one fetch per entry to answer one question.
+            write(out / "meta" / f"facets_{fmt}.json",
+                  {"season": season, "rule": rule, "format": fmt,
+                   "facets": mappers.build_facets(details["rows"], ko_rows)})
             print(f"  meta[{fmt}]: ranking + {len(details['rows'])} details + trend"
-                  f" + {usage_count} usage trends")
+                  f" + {usage_count} usage trends + {ko_count} ko"
+                  f" + {ko_trend_count} ko trends + facets")
 
             # opponent matchup cache (M5): the SAME shipped static cache the bridge maps live — a
             # standard-vs-standard KO grid + derived C2/C1/C0 checks, keyed only by (rule, format).
@@ -303,9 +354,6 @@ def main() -> int:
                 # public. Ship them WITHOUT provenance labels (source/confidence/note name the
                 # real-team library; the set itself carries no attribution on the site).
                 oppcache = mappers.map_oppcache(cache)
-                for st in (oppcache.get("sets") or {}).values():
-                    for k in ("source", "confidence", "note", "realTeamBacked"):
-                        st.pop(k, None)
                 # The LEAN variant x variant grade grid: the page renders build pairs, and the rich
                 # per-species view repeated the KO matrix's damage/speed in every cell (~5x larger
                 # for facts the client already holds).
@@ -313,32 +361,31 @@ def main() -> int:
                 # KO is the default view, but its cells need only a small verdict summary. Keep the
                 # full matrix for the detail panel and load it after a cell is opened.
                 oppko = mappers.map_oppko_grid(cache)
-                # Same de-attribution at the species-row level: setSource/setConfidence label
-                # the real-team origin — strip them from BOTH public views.
-                for doc in (oppcache, oppko, oppchecks):
-                    for row in doc.get("species", []):
-                        row.pop("setSource", None)
-                        row.pop("setConfidence", None)
+                # Calculator defaults and matchup build previews need only the processed real-build
+                # catalog. Shipping that slice separately avoids parsing the 15–17 MB matrix just
+                # to fill one Pokemon or show one hover card.
+                oppsets = mappers.map_oppsets(cache)
+                # Every public view can carry the processed set catalog. Apply one privacy
+                # boundary to all of them, including the lightweight calculator catalog.
+                for doc in (oppcache, oppko, oppchecks, oppsets):
+                    strip_matchup_provenance(doc)
                 write(out / "matchup" / f"oppcache_{fmt}.json", oppcache)
                 write(out / "matchup" / f"oppko_{fmt}.json", oppko)
                 write(out / "matchup" / f"oppchecks_{fmt}.json", oppchecks)
+                write(out / "matchup" / f"oppsets_{fmt}.json", oppsets)
                 if cache.get("built_for", {}).get("handover_receipt"):
                     native = mappers._oppcache_mod().load_cache(fmt, rule, native=True)
                     native_views = ({"oppcache": mappers.map_oppcache(native),
                                      "oppko": mappers.map_oppko_grid(native),
+                                     "oppsets": mappers.map_oppsets(native),
                                      "oppchecks": mappers.map_oppcheck_grid(
                                          native, mappers.derive_oppcheck_grid(native))}
                                     if native is not None else
-                                    {name: {"available": False} for name in ("oppcache", "oppko", "oppchecks")})
+                                    {name: {"available": False} for name in ("oppcache", "oppko", "oppchecks", "oppsets")})
                     for name, doc in native_views.items():
-                        for st in (doc.get("sets") or {}).values():
-                            for field in ("source", "confidence", "note", "realTeamBacked"):
-                                st.pop(field, None)
-                        for row in doc.get("species", []):
-                            row.pop("setSource", None)
-                            row.pop("setConfidence", None)
+                        strip_matchup_provenance(doc)
                         write(out / "matchup" / f"{name}_{fmt}.native.json", doc)
-                print(f"  matchup[{fmt}]: lean KO + check grids; full detail cache + sets "
+                print(f"  matchup[{fmt}]: lean KO + check grids + set catalog; full detail cache "
                       "(provenance stripped — public)")
     finally:
         pool.shutdown()

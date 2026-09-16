@@ -31,7 +31,9 @@ export function StatsPanel({ stats }: { stats: Stats }) {
 
   return (
     <section className="panel stats-panel">
-      <h2>{t("detail.stats")}</h2>
+      <h2>{t("detail.stats")}
+        <span className="panel-note">{t("detail.statsNote")}</span>
+      </h2>
       <div className="stat-tornado">
         <div className="stat-tornado-caption">
           <span className="cap-l">{t("stats.base")}</span>
@@ -65,7 +67,6 @@ export function StatsPanel({ stats }: { stats: Stats }) {
           );
         })}
       </div>
-      <div className="stat-note">{t("detail.statsNote")}</div>
     </section>
   );
 }

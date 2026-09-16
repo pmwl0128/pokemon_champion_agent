@@ -1,427 +1,658 @@
-/** Damage matrix: ONE attacker's several moves × several hypothetical defenders, computed in a
- * single fault-isolated batch (design ref: the gamewith calc's "add hypothetical enemy" flow).
- * Rows = defenders, columns = the attacker's picked moves, each cell a damage band + KO bucket;
- * clicking a cell opens its full roll/KO detail. */
+/** Damage workspace: two teams, side by side, both directions live.
+ *
+ * Layout mirrors the two-column calculators battlers already use — each side owns a column (its
+ * roster, its build, its four moves, its own result card), the shared field sits under both, and the
+ * results ride at the TOP where they are read, not at the bottom where they were computed. Below
+ * everything sits the all-pairs grid: the same two teams, every attacker × move against every
+ * defender, on a flippable axis.
+ *
+ * Every number on the page comes from ONE fault-isolated batch per section, so a bad cell (an
+ * unknown move on a swapped-in mon) never blanks the rest. */
 import type {
-  DamageBatchResultDto, DamageRequestDto, FieldDto, FormatId, LearnsetDto, MoveCategory,
-  NatureDto, Terrain, TypeName, Weather,
+  DamageRequestDto, DamageResultDto, LearnsetDto, NatureDto,
 } from "@pokemon-champions/protocol";
-import { TERRAINS, WEATHERS, isErrorShape } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { EntityHover } from "../../components/EntityHover.tsx";
-import { FormatTabs } from "../../components/FormatTabs.tsx";
-import { GameImage } from "../../components/GameImage.tsx";
-import { CategoryBadge, TypeBadge } from "../../components/TypeBadge.tsx";
-import { useAsync } from "../../hooks.ts";
-import { displayName, useLang, useT } from "../../i18n.ts";
+import { isErrorShape } from "@pokemon-champions/protocol";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
+import { useAsync, useMovesByName } from "../../hooks.ts";
 import { useDamageText } from "../../lib/damageText.tsx";
-import { koLabel, koTone } from "../../lib/ko.ts";
-import { takeDamageFill } from "../../lib/team.ts";
-import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
-import { useRuntime } from "../../runtime/context.tsx";
+import { localName, useNameMaps } from "../../lib/names.ts";
+import { displayName, useLang, useT } from "../../i18n.ts";
+import { parsePokepaste, formatPokepasteMon } from "../../lib/pokepaste.ts";
+import { takeCalcTeams, type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
+import { useRuntime } from "../../runtime/context.tsx";
+import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
 import {
-  ATTACKER_AURAS, DEFENDER_AURAS, EMPTY_SIDE, FieldCheck, SideForm, autofillSig, cleanSide, modalSig,
-  sideIsBare, useModalFill, withMega, type SideState,
+  autofillSig, buildConfigSig, modalSig, sideIsBare, useBuildOptions, type BuildOption,
 } from "./shared.tsx";
+import { AllMatchups, type GridCol, type GridRow } from "./duel/AllMatchups.tsx";
+import { loadDuel, saveDuel } from "./duel/persist.ts";
+import { FieldPanel } from "./duel/FieldPanel.tsx";
+import { MonEditor, buildCardOptionForMon } from "./duel/MonEditor.tsx";
+import { ResultCard, type SlotResult } from "./duel/ResultCard.tsx";
+import { TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
+import {
+  EMPTY_FIELD, MOVE_SLOTS, TERRAIN_ABILITIES, WEATHER_ABILITIES, caveatSubject, curHPOf,
+  ROLL_TOP, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide, rollValue,
+  type FieldState, type MonState, type SideId,
+} from "./duel/state.ts";
 
-interface Matrix {
-  rows: DexIndexEntry[];
-  cols: Array<{ move: string; type: TypeName; category: MoveCategory }>;
-  results: DamageBatchResultDto;
+const SIDES: SideId[] = ["a", "b"];
+/** The calc batch bound (DamageBatchRequestDtoSchema). The duel takes at most 8 of it. */
+const BATCH_MAX = 240;
+
+type PerSide<T> = Record<SideId, T>;
+const perSide = <T,>(a: T, b: T): PerSide<T> => ({ a, b });
+
+function withMoves(mon: MonState, moves: string[]): MonState {
+  const slots = [...moves.slice(0, MOVE_SLOTS)];
+  while (slots.length < MOVE_SLOTS) slots.push("");
+  return { ...mon, moves: slots };
 }
 
-export function DamageTab({ dex, natures, items }: {
+/** Apply one environment card. Only an automatic seed carries `autoSig`: a card the user explicitly
+ * chose must survive a later format switch and must never be replaced by the first card. */
+export function applyBuildOption(
+  mon: MonState, option: BuildOption, labelIndex = 0, automatic = false,
+): MonState {
+  const m = option.modal;
+  const next = withMoves(
+    { ...mon, ability: m.ability, item: m.item, nature: m.nature, sps: { ...m.sps } },
+    m.moves.length ? m.moves : mon.moves);
+  return {
+    ...next,
+    autoSig: automatic ? modalSig(m, next.moves) : null,
+    buildRef: {
+      key: option.key,
+      source: option.source,
+      coverage: option.coverage,
+      isModal: option.isModal,
+      labelIndex,
+      signature: buildConfigSig(next),
+    },
+  };
+}
+
+export function DamageTab({ dex, natures, items, onRailApi }: {
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
+  onRailApi?: (api: CalcRailApi) => void;
 }) {
   const { adapter } = useRuntime();
   const t = useT();
-  const damageText = useDamageText();
   const { lang } = useLang();
-  const loadModal = useModalFill();
+  const loadBuildOptions = useBuildOptions();
+  const moveVocab = useMovesByName();
 
-  // Deep-link hand-off (design §13): a battery/diagnose fact opens this tab with the
-  // opponent as the attacker (its set auto-fills below), MY member's real build as the
-  // defender, and the threatening move pinned once the learnset arrives.
-  const fill = useRef(takeDamageFill()).current;
-  const pinnedMoves = useRef<string[] | null>(
-    fill?.moves?.length ? fill.moves : fill?.move ? [fill.move] : null);
-
-  const [attacker, setAttacker] = useState<SideState>(
-    fill?.attacker
-      ? { ...EMPTY_SIDE, slug: fill.attacker.slug,
-          ability: fill.attacker.ability ?? "", item: fill.attacker.item ?? "",
-          nature: fill.attacker.nature ?? "",
-          sps: (fill.attacker.sps ?? {}) as SideState["sps"] }
-      : { ...EMPTY_SIDE, slug: fill?.attackerSlug ?? "garchomp" });
-  const [defenders, setDefenders] = useState<SideState[]>(
-    fill?.defender
-      ? [{ ...EMPTY_SIDE, slug: fill.defender.slug,
-           ability: fill.defender.ability ?? "", item: fill.defender.item ?? "",
-           nature: fill.defender.nature ?? "",
-           sps: (fill.defender.sps ?? {}) as SideState["sps"] }]
-      : [{ ...EMPTY_SIDE, slug: "mimikyu" }, { ...EMPTY_SIDE, slug: "garchomp" }]);
-  const [selectedMoves, setSelectedMoves] = useState<string[]>([]);
-  const [format, setFormat] = useState<FormatId>(fill?.format ?? "single");
-  const [weather, setWeather] = useState<Weather | "">("");
-  const [terrain, setTerrain] = useState<Terrain | "">("");
-  const [reflect, setReflect] = useState(false);
-  const [lightScreen, setLightScreen] = useState(false);
-  const [auras, setAuras] = useState<Record<string, boolean>>({});   // doubles partner side flags
-  const [busy, setBusy] = useState(false);
-  const [matrix, setMatrix] = useState<Matrix | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [cell, setCell] = useState<{ r: number; c: number } | null>(null);
-  const resultRef = useRef<HTMLDivElement>(null);
-  const detailRef = useRef<HTMLDivElement>(null);
-
-  const attackerLearnset = useAsync<LearnsetDto | null>(
-    () => (attacker.slug ? loadLearnset(attacker.slug) : Promise.resolve(null)),
-    [attacker.slug]);
-
-  const damagingMoves = useMemo(() => {
-    if (attackerLearnset.status !== "ready" || !attackerLearnset.data) return [];
-    return attackerLearnset.data.moves.filter((m) => m.category !== "Status");
-  }, [attackerLearnset]);
-
-  // Auto-fill the attacker's standard build (ability/item/nature/SP) + top-4 usage moves whenever the
-  // attacker or format changes. Re-fill when the side is bare OR still holds its last (unedited)
-  // auto-fill — the latter is what makes a FORMAT switch update the build instead of freezing the other
-  // format's set (a doubles Garchomp kept singles Focus Sash/moves before — audit 2026-07-14). A
-  // user-edited or swapped-in side has a different signature and is left untouched.
-  const atkFill = useRef<{ key: string; sig: string }>({ key: "", sig: "" });
-  useEffect(() => {
-    if (!attacker.slug) return;
-    const key = `${format}:${attacker.slug}`;
-    if (atkFill.current.key === key) return;
-    const refill = sideIsBare(attacker)
-      || autofillSig(attacker, selectedMoves) === atkFill.current.sig;
-    atkFill.current = { key, sig: atkFill.current.sig };
-    if (!refill) return;
-    let cancel = false;
-    void loadModal(attacker.slug, format).then((m) => {
-      if (cancel || !m) return;
-      setAttacker((s) => ({ ...s, ability: m.ability, item: m.item, nature: m.nature, sps: m.sps }));
-      // Deep-linked moves win over the modal move set — they ARE the facts being verified.
-      const pinned = pinnedMoves.current;
-      const nextMoves = pinned ?? (m.moves.length ? m.moves : selectedMoves);
-      if (pinned || m.moves.length) setSelectedMoves(nextMoves);
-      if (pinned) pinnedMoves.current = null;
-      atkFill.current = { key, sig: modalSig(m, nextMoves) };
-    });
-    return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attacker.slug, format]);
-
-  // A new attacker species invalidates the picked moves (they may not exist on the new learnset);
-  // the fill / fallback effects repopulate from the new mon.
-  useEffect(() => { setSelectedMoves([]); }, [attacker.slug]);
-
-  // Same for each defender (keyed by index): bare or unedited-auto-fill re-fills on a format switch;
-  // a configured/swapped-in defender keeps its build (defenders pick no moves, so the sig omits them).
-  const defFill = useRef<Array<{ key: string; sig: string }>>([]);
-  useEffect(() => {
-    defenders.forEach((d, i) => {
-      if (!d.slug) return;
-      const key = `${format}:${d.slug}`;
-      const prev = defFill.current[i];
-      if (prev && prev.key === key) return;
-      const refill = sideIsBare(d) || (prev !== undefined && autofillSig(d) === prev.sig);
-      defFill.current[i] = { key, sig: prev?.sig ?? "" };
-      if (!refill) return;
-      void loadModal(d.slug, format).then((m) => {
-        if (!m) return;
-        setDefenders((prevD) => prevD.map((x, j) =>
-          j === i ? { ...x, ability: m.ability, item: m.item, nature: m.nature, sps: m.sps } : x));
-        defFill.current[i] = { key, sig: modalSig(m, []) };
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, defenders.map((d) => d.slug).join(",")]);
-
-  // Fallback for an UNRANKED attacker (no modal moves): the deep-linked moves if pinned,
-  // else its first learnset moves.
-  useEffect(() => {
-    if (!selectedMoves.length && damagingMoves.length) {
-      const pinned = pinnedMoves.current;
-      const usable = pinned?.filter((mv) => damagingMoves.some((m) => m.name === mv));
-      if (usable?.length) {
-        pinnedMoves.current = null;
-        setSelectedMoves(usable);
-        return;
-      }
-      setSelectedMoves(damagingMoves.slice(0, 4).map((m) => m.name));
+  // The one hand-off channel every page uses — a single matrix cell and a whole roster arrive the
+  // same way. It is an explicit request for THIS matchup, so it outranks the saved workspace.
+  const teamsFill = useRef(takeCalcTeams()).current;
+  const saved = useRef(teamsFill ? null : loadDuel()).current;
+  const [field, setField] = useState<FieldState>(() => saved?.field
+    ?? { ...EMPTY_FIELD, format: teamsFill?.format ?? "single", sides: { a: {}, b: {} } });
+  const [teams, setTeams] = useState<PerSide<MonState[]>>(() => {
+    if (saved) return saved.teams;
+    if (teamsFill) {
+      // A member may name its species instead of a slug (a team-json carries canonical names); the
+      // dex the page already holds is the resolver, so the hand-off never has to slugify by hand.
+      const slugOf = (m: CalcMember): string => m.slug
+        ?? (m.species ? dex.find((e) => e.name === m.species)?.slug ?? "" : "");
+      const side = (list: CalcMember[]): MonState[] => (list.length
+        ? list.slice(0, TEAM_MAX).map((m) => withMoves({
+            ...makeMon(slugOf(m)), pinned: m.pinned === true,
+            ability: m.ability ?? "", item: m.item ?? "", nature: m.nature ?? "",
+            sps: (m.sps ?? {}) as MonState["sps"],
+          }, m.moves ?? []))
+        : [makeMon()]);
+      return perSide(side(teamsFill.attackers), side(teamsFill.defenders));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [damagingMoves]);
+    return perSide([makeMon("garchomp")], [makeMon("mimikyu")]);
+  });
+  const [active, setActive] = useState<PerSide<number>>(saved?.active ?? perSide(0, 0));
+  const [slot, setSlot] = useState<PerSide<number>>(saved?.slot ?? perSide(0, 0));
+  // An index into the engine's sorted 16 rolls; the top one is what a damage question defaults to.
+  const [roll, setRoll] = useState<PerSide<number>>(saved?.roll ?? perSide(ROLL_TOP, ROLL_TOP));
+  const [crit, setCrit] = useState<PerSide<boolean>>(saved?.crit ?? perSide(false, false));
+  const [single, setSingle] = useState<PerSide<boolean>>(saved?.single ?? perSide(false, false));
+  const [gridFrom, setGridFrom] = useState<SideId>(saved?.gridFrom ?? "a");
 
-  const entryOf = (slug: string) => dex.find((e) => e.slug === slug);
-  const toggleMove = (name: string) => setSelectedMoves((prev) =>
-    prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]);
+  const [duel, setDuel] = useState<PerSide<SlotResult[]>>(perSide([], []));
+  const [duelBusy, setDuelBusy] = useState(false);
+  const [duelError, setDuelError] = useState<string | null>(null);
+  const [gridRun, setGridRun] = useState<{
+    plan: { rows: GridRow[]; cols: GridCol[] };
+    /** The inputs these results were computed FROM, as content. */
+    sig: string;
+    results: Array<DamageResultDto | { error?: unknown } | null>;
+  } | null>(null);
+  const [gridBusy, setGridBusy] = useState(false);
+  const [gridRerun, setGridRerun] = useState(0);
+  const [gridError, setGridError] = useState<string | null>(null);
 
-  // Swap this defender with the attacker (compute the reverse hit). Both sides keep their tuned
-  // build (the fill effects skip a non-bare side); the attacker's moves refill from its new learnset.
-  const swapWithAttacker = (i: number) => {
-    const d = defenders[i]!;
-    const a = attacker;
-    setAttacker(d);
-    setDefenders((prev) => prev.map((x, j) => (j === i ? a : x)));
-  };
+  // Keep the workspace across a page change: only the INPUT is stored, so nothing on screen can
+  // ever be a number that no longer follows from the build printed beside it.
+  useEffect(() => {
+    saveDuel({ teams, active, slot, roll, crit, single, gridFrom, field });
+  }, [teams, active, slot, roll, crit, single, gridFrom, field]);
 
-  const run = async () => {
-    const a = entryOf(attacker.slug);
-    if (!a) return;
-    const defSides = defenders.filter((d) => entryOf(d.slug));
-    const rows = defSides.map((d) => entryOf(d.slug)!);
-    const cols = selectedMoves
-      .map((mv) => damagingMoves.find((m) => m.name === mv))
-      .filter((m): m is NonNullable<typeof m> => !!m)
-      .map((m) => ({ move: m.name, type: m.type, category: m.category }));
-    if (!rows.length || !cols.length) return;
-    // The field is identical for every cell of the grid — build it once.
-    const attackerSide: Record<string, boolean> = {};
-    for (const [flag] of ATTACKER_AURAS) if (auras[flag]) attackerSide[flag] = true;
-    const defenderSide: Record<string, boolean> = {};
-    if (reflect) defenderSide.reflect = true;
-    if (lightScreen) defenderSide.light_screen = true;
-    for (const [flag] of DEFENDER_AURAS) if (auras[flag]) defenderSide[flag] = true;
-    const field: FieldDto = {
-      format,
-      ...(weather ? { weather } : {}),
-      ...(terrain ? { terrain } : {}),
-      ...(Object.keys(attackerSide).length ? { attackerSide } : {}),
-      ...(Object.keys(defenderSide).length ? { defenderSide } : {}),
-    };
-    // Held Mega stones compute as the Mega form (the engine does not auto-mega; withMega).
-    const aEff = withMega(attacker, dex, items);
-    const dEffs = defSides.map((d) => withMega(d, dex, items));
-    const items_: DamageRequestDto[] = [];
-    for (let ri = 0; ri < rows.length; ri++) {
-      for (const col of cols) {
-        items_.push({
-          attacker: cleanSide(aEff.state, aEff.entry?.name ?? a.name),
-          defender: cleanSide(dEffs[ri]!.state, dEffs[ri]!.entry?.name ?? rows[ri]!.name),
-          move: col.move,
-          field,
+  const mon = useMemo(() => perSide(
+    teams.a[Math.min(active.a, teams.a.length - 1)] ?? makeMon(),
+    teams.b[Math.min(active.b, teams.b.length - 1)] ?? makeMon(),
+  ), [teams, active]);
+
+  // A spread move is still flagged as one in singles; the 0.75x reduction simply does not apply
+  // there. Dropping the toggle on the way into singles keeps a stale "single target" from silently
+  // changing the numbers again when the format comes back.
+  useEffect(() => {
+    if (field.format === "single") setSingle(perSide(false, false));
+  }, [field.format]);
+
+  const setMonAt = useCallback((side: SideId, index: number,
+                                update: MonState | ((m: MonState) => MonState)) => {
+    setTeams((prev) => {
+      const current = prev[side][index];
+      if (!current) return prev;
+      const next = typeof update === "function" ? update(current) : update;
+      // MonEditor has a few fact-reconciliation effects. A proven no-op must preserve the team
+      // identity, or those effects can feed themselves and starve the debounced damage run.
+      if (next === current) return prev;
+      const team = [...prev[side]];
+      team[index] = next;
+      return { ...prev, [side]: team };
+    });
+  }, []);
+
+  // Stable per-side Dispatch functions: constructing `setActiveMon(side)` inline gave each
+  // MonEditor a new setter every render. Once the environment picker had identified an exact card,
+  // its reconciliation effect then ran again after every render and could keep the page spinning.
+  const setActiveMon = useMemo<PerSide<(
+    update: MonState | ((m: MonState) => MonState),
+  ) => void>>(() => perSide(
+    (update) => setMonAt("a", active.a, update),
+    (update) => setMonAt("b", active.b, update),
+  ), [active.a, active.b, setMonAt]);
+
+  const pickFromRail = useCallback((target: CalcRailTarget, entry: DexIndexEntry,
+                                    option: BuildOption | null, optionIndex: number) => {
+    const side: SideId = target === "primary" ? "a" : "b";
+    const team = teams[side];
+    const activeEmpty = team[active[side]] && !team[active[side]]!.slug ? active[side] : -1;
+    const emptyIndex = activeEmpty >= 0 ? activeEmpty : team.findIndex((candidate) => !candidate.slug);
+    if (emptyIndex < 0 && team.length >= TEAM_MAX) return { ok: false as const, reason: "full" as const };
+    const base = { ...makeMon(entry.slug), pinned: true };
+    const mon = option ? { ...applyBuildOption(base, option, optionIndex), pinned: true } : base;
+    const index = emptyIndex >= 0 ? emptyIndex : team.length;
+    const next = emptyIndex >= 0
+      ? team.map((candidate, at) => at === emptyIndex ? mon : candidate)
+      : [...team, mon];
+    setTeams((previous) => ({ ...previous, [side]: next }));
+    setActive((previous) => ({ ...previous, [side]: index }));
+    return { ok: true as const };
+  }, [active, teams]);
+
+  const railApi = useMemo<CalcRailApi>(() => ({
+    format: field.format,
+    targets: [
+      { id: "primary", label: t("calc.rail.offense") },
+      { id: "secondary", label: t("calc.rail.defense") },
+    ],
+    pick: pickFromRail,
+  // `useT()` returns a render-local function; language, not that function identity, is the input.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [field.format, pickFromRail, lang]);
+  useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
+
+  const learnsetA = useAsync<LearnsetDto | null>(
+    () => (mon.a.slug ? loadLearnset(mon.a.slug) : Promise.resolve(null)), [mon.a.slug]);
+  const learnsetB = useAsync<LearnsetDto | null>(
+    () => (mon.b.slug ? loadLearnset(mon.b.slug) : Promise.resolve(null)), [mon.b.slug]);
+  const learnset = perSide(
+    learnsetA.status === "ready" ? learnsetA.data : null,
+    learnsetB.status === "ready" ? learnsetB.data : null);
+
+  /** Plain localized move name. The result rows and grid headers print this directly rather than
+   * going through the prose renderer, which would add a type chip and a nested link to every one. */
+  const moveLabel = useCallback((name: string): string => {
+    const ref = moveVocab.get(name);
+    return ref ? displayName(ref, lang) : name;
+  }, [moveVocab, lang]);
+
+  // -- observed-build-first environment auto-fill -----------------------------------------
+  // A freshly picked mon is seeded from the first card: the highest-share joint configuration,
+  // with the stitched Meta card used only when no aggregate exists. A FORMAT switch re-seeds only
+  // the mons still carrying an untouched auto-fill: a doubles
+  // Garchomp must not keep the singles set, and a build the user actually edited must not be reset.
+  const fillTokens = useRef(new Set<string>());
+  const seedable = (m: MonState) =>
+    sideIsBare(m) || (m.autoSig != null && autofillSig(m, m.moves) === m.autoSig);
+  useEffect(() => {
+    for (const side of SIDES) {
+      teams[side].forEach((m, index) => {
+        if (!m.slug || m.pinned || !seedable(m)) return;
+        // One attempt per (format, side, slot, species): once seeded, re-running must not fire a
+        // second fill just because the build now matches its own signature.
+        const token = `${field.format}:${side}:${index}:${m.slug}`;
+        if (fillTokens.current.has(token)) return;
+        fillTokens.current.add(token);
+        void loadBuildOptions(m.slug, field.format).then((options) => {
+          const option = options[0];
+          if (!option) return;
+          // Re-check at APPLY time instead of cancelling on cleanup: the effect is re-run on mount
+          // under StrictMode, and a lifecycle-scoped cancel flag would discard the only in-flight
+          // fill. The slot still has to hold the same species, still un-edited, to be overwritten.
+          setTeams((prev) => {
+            const current = prev[side][index];
+            if (!current || current.slug !== m.slug || !seedable(current)) return prev;
+            const next = [...prev[side]];
+            next[index] = applyBuildOption(current, option, 0, true);
+            return { ...prev, [side]: next };
+          });
         });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [field.format, teams.a, teams.b]);
+
+  // -- import / export --------------------------------------------------------------------
+
+  const matchLocal = <T extends { name: string; nameZh?: string; nameJa?: string },>(
+    pool: T[], raw: string | undefined): T | undefined => {
+    if (!raw) return undefined;
+    const q = raw.trim();
+    if (!q) return undefined;
+    const lower = q.toLowerCase();
+    return pool.find((x) => x.name.toLowerCase() === lower || x.nameZh === q || x.nameJa === q)
+      ?? pool.find((x) => x.name.toLowerCase().replace(/[\s'’.-]/g, "")
+        === lower.replace(/[\s'’.-]/g, ""));
+  };
+
+  const importPaste = async (side: SideId, text: string): Promise<ImportOutcome> => {
+    const { mons: pasted, rescaledEvs } = parsePokepaste(text);
+    if (!pasted.length) return { added: 0, unresolved: [], rescaledEvs };
+
+    // Species: try the dex index we already hold, then ask the resolver ONCE for whatever is left
+    // (a fuzzy or alias spelling is exactly what `resolve` is for; per-name round trips are not).
+    const resolved = new Map<string, DexIndexEntry>();
+    const misses: string[] = [];
+    for (const p of pasted) {
+      const local = matchLocal(dex, p.species)
+        ?? dex.find((e) => e.slug === p.species.trim().toLowerCase());
+      if (local) resolved.set(p.species, local);
+      else misses.push(p.species);
+    }
+    if (misses.length) {
+      try {
+        const entries = await adapter.resolve(misses, "pokemon");
+        entries.forEach((entry, i) => {
+          const hit = entry.ok && entry.canonical
+            ? dex.find((e) => e.name === entry.canonical) : undefined;
+          if (hit) resolved.set(misses[i]!, hit);
+        });
+      } catch (e) {
+        console.error("pokepaste species resolution failed:", e);
       }
     }
-    if (items_.length > 240) { setError(t("calc.tooMany")); return; }
-    setBusy(true); setError(null); setCell(null);
+
+    const unresolved: string[] = [];
+    const built: MonState[] = [];
+    for (const p of pasted.slice(0, TEAM_MAX)) {
+      const entry = resolved.get(p.species);
+      if (!entry) { unresolved.push(p.species); continue; }
+      const next = makeMon(entry.slug);
+      next.sps = { ...p.sps };
+      const item = matchLocal(items, p.item);
+      if (item) next.item = item.name;
+      else if (p.item) unresolved.push(p.item);
+      const ability = matchLocal(entry.abilities, p.ability);
+      if (ability) next.ability = ability.name;
+      else if (p.ability) unresolved.push(p.ability);
+      const nature = matchLocal(natures, p.nature);
+      if (nature) next.nature = nature.name;
+      else if (p.nature) unresolved.push(p.nature);
+      if (p.moves.length) {
+        let pool: LearnsetDto["moves"] = [];
+        try {
+          pool = (await loadLearnset(entry.slug)).moves;
+        } catch (e) {
+          console.error(`learnset load failed for ${entry.slug}:`, e);
+        }
+        const names: string[] = [];
+        for (const raw of p.moves) {
+          const hit = matchLocal(pool, raw);
+          if (hit) names.push(hit.name);
+          else unresolved.push(raw);
+        }
+        next.moves = withMoves(next, names).moves;
+      }
+      built.push(next);
+    }
+    if (!built.length) return { added: 0, unresolved, rescaledEvs };
+    setTeams((prev) => ({ ...prev, [side]: built }));
+    setActive((prev) => ({ ...prev, [side]: 0 }));
+    return { added: built.length, unresolved, rescaledEvs };
+  };
+
+  const exportMon = (side: SideId) => {
+    const target = mon[side];
+    const entry = effectiveEntry(target, dex, items);
+    if (!entry) return;
+    // English canonicals: a Showdown block is a join key document, read by other tools (design §2.1).
+    const text = formatPokepasteMon({
+      species: entry.name, item: target.item, ability: target.ability, nature: target.nature,
+      sps: target.sps, moves: target.moves.filter(Boolean),
+    });
+    void navigator.clipboard.writeText(text).catch((e) => {
+      console.error("copying the set failed:", e);
+    });
+  };
+
+  // -- the duel batch (both directions, all four slots each) ------------------------------
+
+  const duelPlan = useMemo(() => {
+    const requests: DamageRequestDto[] = [];
+    const map: PerSide<Array<number | null>> = perSide([], []);
+    for (const side of SIDES) {
+      const from = mon[side];
+      const to = mon[otherSide(side)];
+      const slots: Array<number | null> = [];
+      for (let i = 0; i < MOVE_SLOTS; i++) {
+        const name = from.moves[i] ?? "";
+        const req = name
+          ? damageRequest(from, to, name, field, side, dex, items,
+              { crit: crit[side], singleTarget: single[side] })
+          : null;
+        if (!req) { slots.push(null); continue; }
+        slots.push(requests.length);
+        requests.push(req);
+      }
+      map[side] = slots;
+    }
+    return { requests, map };
+  }, [mon, field, crit, single, dex, items]);
+
+  useEffect(() => {
+    const { requests, map } = duelPlan;
+    const blank = (side: SideId): SlotResult[] =>
+      Array.from({ length: MOVE_SLOTS }, (_, i) => {
+        const name = mon[side].moves[i] ?? "";
+        const ref = moveVocab.get(name);
+        return { move: name, label: moveLabel(name), category: ref?.category, type: ref?.type,
+                 result: null, failed: false };
+      });
+    if (!requests.length) {
+      setDuel(perSide(blank("a"), blank("b")));
+      setDuelError(null);
+      return;
+    }
+    let cancelled = false;
+    setDuelBusy(true);
+    const timer = window.setTimeout(() => {
+      adapter.damageBatch(requests).then((out) => {
+        if (cancelled) return;
+        const read = (side: SideId): SlotResult[] => blank(side).map((s, i) => {
+          const at = map[side][i];
+          if (at == null) return s;
+          const cell = out[at];
+          if (!cell || isErrorShape(cell)) return { ...s, failed: true };
+          return { ...s, result: cell as DamageResultDto, failed: false };
+        });
+        setDuel(perSide(read("a"), read("b")));
+        setDuelError(null);
+      }).catch((e) => {
+        if (cancelled) return;
+        console.error("Damage calculation failed:", e);
+        setDuel(perSide(blank("a"), blank("b")));
+        setDuelError(t("calc.error"));
+      }).finally(() => { if (!cancelled) setDuelBusy(false); });
+    }, 220);
+    return () => { cancelled = true; window.clearTimeout(timer); setDuelBusy(false); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duelPlan, adapter, moveVocab, moveLabel]);
+
+  // -- the all-pairs grid -----------------------------------------------------------------
+
+  const gridPlan = useMemo(() => {
+    const to = otherSide(gridFrom);
+    const rows: GridRow[] = [];
+    const rowMons: MonState[] = [];
+    for (const m of teams[to]) {
+      const entry = effectiveEntry(m, dex, items);
+      if (entry) { rows.push({ entry, build: buildCardOptionForMon(m, entry, dex) }); rowMons.push(m); }
+    }
+    const cols: GridCol[] = [];
+    const colSources: Array<{ mon: MonState; move: string }> = [];
+    teams[gridFrom].forEach((m, attackerIndex) => {
+      const entry = effectiveEntry(m, dex, items);
+      if (!entry) return;
+      for (const move of m.moves) {
+        if (!move) continue;
+        // Status moves have no damage row; a column of dashes is noise, not a fact.
+        if (moveVocab.get(move)?.category === "Status") continue;
+        cols.push({ attackerIndex, entry, build: buildCardOptionForMon(m, entry, dex),
+          move, label: moveLabel(move) });
+        colSources.push({ mon: m, move });
+      }
+    });
+    const requests: DamageRequestDto[] = [];
+    let complete = true;
+    for (const row of rowMons) {
+      for (const col of colSources) {
+        const req = damageRequest(col.mon, row, col.move, field, gridFrom, dex, items);
+        if (!req) { complete = false; continue; }
+        requests.push(req);
+      }
+    }
+    // Staleness is a question about the NUMBERS, so the signature is the requests and nothing else:
+    // the labels beside them are display, and a language switch must not invalidate a grid whose
+    // every cell is still correct.
+    return { rows, cols, requests, complete, sig: JSON.stringify(requests) };
+  }, [teams, gridFrom, field, dex, items, moveVocab, moveLabel]);
+
+  /** The grid runs ON REQUEST, not on every edit.
+   *
+   * Two full teams are ~144 independent calcs, and re-running them after each keystroke burns the
+   * engine on answers nobody has read yet. The last run stays on screen (results you already paid
+   * for are still worth reading) and is marked stale once its inputs move. */
+  const runGrid = async () => {
+    const plan = gridPlan;
+    if (!plan.rows.length || !plan.cols.length || !plan.complete) return;
+    if (plan.requests.length > BATCH_MAX) {
+      setGridRun({ plan, sig: plan.sig, results: [] }); setGridError(t("calc.tooMany"));
+      return;
+    }
+    setGridBusy(true);
     try {
-      const results = await adapter.damageBatch(items_);
-      setMatrix({ rows, cols, results });
+      const out = await adapter.damageBatch(plan.requests);
+      setGridRun({
+        plan, sig: plan.sig, results: out as Array<DamageResultDto | { error?: unknown }>,
+      });
+      setGridError(null);
     } catch (e) {
-      console.error("Damage calculation failed:", e);
-      setMatrix(null); setError(t("calc.error"));
+      console.error("Matchup grid calculation failed:", e);
+      setGridRun({ plan, sig: plan.sig, results: [] });
+      setGridError(t("calc.error"));
     } finally {
-      setBusy(false);
+      setGridBusy(false);
     }
   };
 
-  const selected = matrix && cell
-    ? matrix.results[cell.r * matrix.cols.length + cell.c] : null;
-  const selectedRow = matrix && cell ? matrix.rows[cell.r] : null;
-  const selectedCol = matrix && cell ? matrix.cols[cell.c] : null;
-  const selectedAttacker = entryOf(attacker.slug);
+  const gridRunnable = gridPlan.complete && gridPlan.rows.length > 0 && gridPlan.cols.length > 0;
+  // Content, not object identity. The plan memo rebuilds whenever `teams` gets a new object — and it
+  // does so for things that change no number at all: selecting another roster slot re-runs the meta
+  // auto-fill, which rewrites the build with the same values it already had. Comparing the requests
+  // themselves means the grid goes stale when, and only when, an answer in it would actually differ.
+  const gridStale = gridRun !== null && gridRun.sig !== gridPlan.sig;
 
+  // A flip re-runs on the NEXT render, when gridPlan has already been rebuilt for the new axis —
+  // calling runGrid inside the click would compute the old direction again.
   useEffect(() => {
-    if (!matrix) return;
-    const frame = requestAnimationFrame(() => resultRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    }));
-    return () => cancelAnimationFrame(frame);
-  }, [matrix]);
+    if (gridRerun > 0) void runGrid();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridRerun]);
 
-  useEffect(() => {
-    if (!cell) return;
-    const frame = requestAnimationFrame(() => detailRef.current?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "center",
-    }));
-    return () => cancelAnimationFrame(frame);
-  }, [cell]);
+  // -- derived view ------------------------------------------------------------------------
+
+  /** The slot actually shown: the picked one when it holds a move, else the first that does. */
+  const shownSlot = (side: SideId): number => {
+    const moves = mon[side].moves;
+    if (moves[slot[side]]) return slot[side];
+    const first = moves.findIndex(Boolean);
+    return first === -1 ? slot[side] : first;
+  };
+
+  const outgoing = (side: SideId): DamageResultDto | null =>
+    duel[side][shownSlot(side)]?.result ?? null;
+
+  /** What this mon has left after the OTHER card's selected move at that card's roll. */
+  const remainingOf = (side: SideId): number => {
+    const maxHP = maxHPOf(mon[side], dex, items);
+    const cur = curHPOf(mon[side], maxHP);
+    const incoming = outgoing(otherSide(side));
+    if (!incoming) return cur;
+    return Math.max(0, cur - rollValue(incoming.damage, roll[otherSide(side)]));
+  };
+
+  const nameOf = (side: SideId): string => {
+    const entry = effectiveEntry(mon[side], dex, items);
+    return entry ? displayName(entry, lang) : t("calc.emptySlot");
+  };
+
+  const sideLabel = perSide(t("calc.attacker"), t("calc.defender"));
+
+  const damageText = useDamageText();
+  /** Caveats for the card showing THIS mon. Two sources, and the split is the point: a note about
+   * the attacker comes from this side's own hit, while a note about the defender comes from the
+   * OTHER side's hit — where this mon is the one being struck. Putting Disguise on the attacker's
+   * card would read as a claim about the wrong Pokemon. */
+  const notesFor = (side: SideId): string[] => [
+    ...(outgoing(side)?.koCaveats ?? []).filter((c) => caveatSubject(c.code) === "attacker"),
+    ...(outgoing(otherSide(side))?.koCaveats ?? []).filter(
+      (c) => caveatSubject(c.code) === "defender"),
+  ].map((cv) => damageText.caveat(cv));
+
+  // A field-setting ability on either active mon, offered next to the picker it would fill. Only
+  // when that field is still empty: an offer to set what is already set says nothing.
+  const abilityNames = useNameMaps().ability;
+  const fieldOffers = <V extends string,>(table: Record<string, V>, current: string) => {
+    if (current) return [];
+    const seen = new Set<string>();
+    return SIDES.flatMap((side) => {
+      const ability = mon[side].ability;
+      const value = ability ? table[ability] : undefined;
+      // Both sides can bring a setter, and which one actually landed is a battle fact the page
+      // cannot know — so it offers both rather than silently picking the attacker's.
+      if (!value || seen.has(ability)) return [];
+      seen.add(ability);
+      return [{ ability, label: localName(abilityNames, ability, lang), value }];
+    });
+  };
+
+  const resetSide = (side: SideId) => {
+    setTeams((prev) => ({ ...prev, [side]: [makeMon()] }));
+    setActive((prev) => ({ ...prev, [side]: 0 }));
+    setSlot((prev) => ({ ...prev, [side]: 0 }));
+  };
+
+  const column = (side: SideId) => (
+    <ResultCard
+      monName={nameOf(side)}
+      entry={effectiveEntry(mon[side], dex, items)}
+      slots={duel[side].length ? duel[side] : Array.from({ length: MOVE_SLOTS }, (_, i) => ({
+        move: mon[side].moves[i] ?? "", label: moveLabel(mon[side].moves[i] ?? ""),
+        type: moveVocab.get(mon[side].moves[i] ?? "")?.type, result: null, failed: false,
+      }))}
+      selected={shownSlot(side)}
+      onSelect={(i) => setSlot((prev) => ({ ...prev, [side]: i }))}
+      roll={roll[side]} onRoll={(m) => setRoll((prev) => ({ ...prev, [side]: m }))}
+      crit={crit[side]} onCrit={(v) => setCrit((prev) => ({ ...prev, [side]: v }))}
+      singleTarget={single[side]}
+      onSingleTarget={(v) => setSingle((prev) => ({ ...prev, [side]: v }))}
+      singleTargetAvailable={field.format !== "single"
+        && (single[side] || !!duel[side][shownSlot(side)]?.result?.isSpread)}
+      maxHP={maxHPOf(mon[side], dex, items)}
+      remaining={remainingOf(side)}
+      notes={notesFor(side)}
+      busy={duelBusy} />
+  );
 
   return (
-    <>
-      <SideForm label={t("calc.attacker")} side={attacker} setSide={setAttacker}
-        dex={dex} natures={natures} items={items} />
+    <div className="calc-duel">
+      {duelError && <div className="notice mono">{duelError}</div>}
 
-      <section className="panel move-picker">
-        <h2>{t("calc.moves")}</h2>
-        <div className="move-chips">
-          {damagingMoves.length === 0 && <span className="muted">{t("calc.noMoves")}</span>}
-          {damagingMoves.map((m) => (
-            <button key={m.name} className={`move-chip${selectedMoves.includes(m.name) ? " on" : ""}`}
-              onClick={() => toggleMove(m.name)}>
-              <EntityHover kind="move" name={m.name} link={false}>
-                <span className="p-inner">
-                  <TypeBadge type={m.type} iconOnly />
-                  {displayName(m, lang)}{m.power != null ? ` ${m.power}` : ""}
-                </span>
-              </EntityHover>
-            </button>
-          ))}
-        </div>
-      </section>
+      <div className="duel-top">
+        {column("a")}
+        {column("b")}
+      </div>
 
-      <div className="panel form-panel" style={{ marginTop: 14 }}>
-        <div className="field-row">
-          <div className="field-controls">
-            <FormatTabs format={format} onChange={setFormat} />
-            <span className="fld-group">
-              <label>{t("calc.weather")}
-                <select value={weather} onChange={(e) => setWeather(e.target.value as Weather | "")}>
-                  <option value="">{t("calc.none")}</option>
-                  {WEATHERS.map((w) => <option key={w} value={w}>{t(`weather.${w}`)}</option>)}
-                </select>
-              </label>
-              <label>{t("calc.terrain")}
-                <select value={terrain} onChange={(e) => setTerrain(e.target.value as Terrain | "")}>
-                  <option value="">{t("calc.none")}</option>
-                  {TERRAINS.map((x) => <option key={x} value={x}>{t(`terrain.${x}`)}</option>)}
-                </select>
-              </label>
-            </span>
-            <span className="fld-group">
-              <FieldCheck label={t("calc.reflect")} checked={reflect} onChange={setReflect} />
-              <FieldCheck label={t("calc.lightScreen")} checked={lightScreen} onChange={setLightScreen} />
-            </span>
-            {format !== "single" && (
-              <span className="fld-group" title={t("calc.aurasHint")}>
-                {[...ATTACKER_AURAS, ...DEFENDER_AURAS].map(([flag, key]) => (
-                  <FieldCheck key={flag} label={t(key)} checked={!!auras[flag]}
-                    onChange={(v) => setAuras((a) => ({ ...a, [flag]: v }))} />
-                ))}
-              </span>
-            )}
-          </div>
-          <button className="primary-btn" onClick={() => void run()}
-            disabled={busy || !attacker.slug || !selectedMoves.length || !defenders.some((d) => d.slug)}>
-            {busy ? t("state.loading") : t("calc.run")}
+      <FieldPanel field={field} setField={setField}
+        sideALabel={t("calc.sideOf").replace("{side}", sideLabel.a)}
+        sideBLabel={t("calc.sideOf").replace("{side}", sideLabel.b)}
+        weatherSuggestions={fieldOffers(WEATHER_ABILITIES, field.weather)}
+        terrainSuggestions={fieldOffers(TERRAIN_ABILITIES, field.terrain)} />
+
+      <div className="duel-teams">
+        <TeamBar label={t("calc.attackerTeam")} team={teams.a} index={active.a}
+          onIndex={(i) => setActive((p) => ({ ...p, a: i }))}
+          onAdd={() => {
+            if (teams.a.length >= TEAM_MAX) return;
+            setTeams((p) => p.a.length >= TEAM_MAX ? p : { ...p, a: [...p.a, makeMon()] });
+            setActive((p) => ({ ...p, a: teams.a.length }));
+          }}
+          onRemove={(i) => {
+            setTeams((p) => ({ ...p, a: p.a.filter((_, j) => j !== i) }));
+            setActive((p) => ({ ...p, a: Math.max(0, Math.min(p.a, teams.a.length - 2)) }));
+          }}
+          dex={dex} items={items} onImport={(text) => importPaste("a", text)} />
+
+        <div className="duel-actions">
+          <button type="button" className="ghost-btn" onClick={() => resetSide("a")}>
+            {t("calc.resetSide").replace("{side}", sideLabel.a)}
+          </button>
+          <button type="button" className="ghost-btn" onClick={() => resetSide("b")}>
+            {t("calc.resetSide").replace("{side}", sideLabel.b)}
           </button>
         </div>
+
+        <TeamBar label={t("calc.defenderTeam")} team={teams.b} index={active.b}
+          onIndex={(i) => setActive((p) => ({ ...p, b: i }))}
+          onAdd={() => {
+            if (teams.b.length >= TEAM_MAX) return;
+            setTeams((p) => p.b.length >= TEAM_MAX ? p : { ...p, b: [...p.b, makeMon()] });
+            setActive((p) => ({ ...p, b: teams.b.length }));
+          }}
+          onRemove={(i) => {
+            setTeams((p) => ({ ...p, b: p.b.filter((_, j) => j !== i) }));
+            setActive((p) => ({ ...p, b: Math.max(0, Math.min(p.b, teams.b.length - 2)) }));
+          }}
+          dex={dex} items={items} onImport={(text) => importPaste("b", text)} mirrored />
       </div>
 
-      <div className="defenders-head">
-        <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("calc.defenders")}</h2>
-        <button className="ghost-btn" onClick={() => setDefenders((d) => [...d, { ...EMPTY_SIDE }])}>
-          + {t("calc.addDefender")}
-        </button>
-      </div>
-      <div className="defenders-grid">
-        {defenders.map((d, i) => (
-          <SideForm key={i} label={`${t("calc.defender")} ${i + 1}`} side={d}
-            setSide={(u) => setDefenders((prev) => prev.map((x, j) =>
-              j === i ? (typeof u === "function" ? (u as (s: SideState) => SideState)(x) : u) : x))}
-            dex={dex} natures={natures} items={items}
-            onSwap={() => swapWithAttacker(i)}
-            onRemove={defenders.length > 1 ? () => setDefenders((prev) =>
-              prev.filter((_, j) => j !== i)) : undefined} />
+      <div className="duel-editors">
+        {SIDES.map((side) => (
+          <MonEditor key={side} label={sideLabel[side]} mon={mon[side]}
+            setMon={setActiveMon[side]} dex={dex} natures={natures} items={items}
+            learnset={learnset[side]}
+            loadSetOptions={() => loadBuildOptions(mon[side].slug, field.format)}
+            onSetPick={(option, index) => setMonAt(
+              side, active[side], (current) => applyBuildOption(current, option, index))}
+            onExport={() => exportMon(side)} />
         ))}
       </div>
 
-      {error && <div className="notice mono" style={{ marginTop: 14 }}>{error}</div>}
-
-      {matrix && (
-        <div ref={resultRef} className="panel matrix-wrap" style={{ marginTop: 14 }}>
-          <div className={`matrix-guide${cell ? " active" : ""}`} aria-live="polite">
-            <span className="matrix-guide-mark" aria-hidden>{cell ? "✓" : "↘"}</span>
-            {t(cell ? "calc.resultSelected" : "calc.resultsReady")}
-          </div>
-          <div className="matrix-scroll">
-            <table className="calc-matrix">
-              <thead>
-                <tr>
-                  <th className="corner">{t("calc.defenders")} \ {t("calc.moves")}</th>
-                  {matrix.cols.map((c) => (
-                    <th key={c.move}>
-                      <EntityHover kind="move" name={c.move} link={false}>
-                        <span className="col-move"><TypeBadge type={c.type} iconOnly />
-                          <CategoryBadge category={c.category} />{damageText.name(c.move)}</span>
-                      </EntityHover>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.rows.map((row, ri) => (
-                  <tr key={row.slug}>
-                    <th className="row-mon">
-                      <EntityHover kind="pokemon" name={row.name} link={false}>
-                        <span className="p-inner">
-                          <GameImage assetKey={row.key} role="dense" alt={displayName(row, lang)}
-                            className="mini" />
-                          <span className="nm">{displayName(row, lang)}</span>
-                        </span>
-                      </EntityHover>
-                    </th>
-                    {matrix.cols.map((c, ci) => {
-                      const res = matrix.results[ri * matrix.cols.length + ci];
-                      if (!res || isErrorShape(res)) {
-                        return <td key={c.move} className="ko-none miss">—</td>;
-                      }
-                      const turns = res.koChance?.n
-                        ?? (res.maxPercent >= 100 ? 1 : Math.ceil(100 / Math.max(res.maxPercent, 0.01)));
-                      const tone = koTone(turns, res.koChance?.guaranteed ?? false, res.max);
-                      const on = cell?.r === ri && cell?.c === ci;
-                      return (
-                        <td key={c.move} className={`ko-${tone}${on ? " on" : ""}`}
-                          role="button" tabIndex={0} aria-pressed={on}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault(); setCell({ r: ri, c: ci });
-                            }
-                          }}
-                          onClick={() => setCell({ r: ri, c: ci })}>
-                          <span className="pct num">{res.maxPercent.toFixed(1)}%</span>
-                          <span className="ko num">
-                            {koLabel(turns, res.max > 0, res.koChance?.guaranteed ?? false, lang)}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {selected && !isErrorShape(selected) && (
-            <div ref={detailRef} className="matrix-detail result-inspector" tabIndex={-1}>
-              <div className="result-inspector-head">
-                <span className="result-kicker">
-                  <span>{selectedAttacker ? displayName(selectedAttacker, lang) : attacker.slug}</span>
-                  <span aria-hidden> → </span>
-                  <span>{selectedRow ? displayName(selectedRow, lang) : ""}</span>
-                  {selectedCol && <strong className="result-move"> · {damageText.name(selectedCol.move)}</strong>}
-                </span>
-                <strong className="result-band num">
-                  {selected.minPercent.toFixed(1)}% – {selected.maxPercent.toFixed(1)}%
-                </strong>
-              </div>
-              <div className="result-summary">{damageText.summary(selected)}</div>
-              {selected.koChance && <div className="result-verdict">{damageText.ko(selected.koChance)}</div>}
-              <div className="result-rolls num">
-                {t("calc.rolls")}: {selected.damage.join(", ")} / HP {selected.defenderHP}
-              </div>
-              {selected.koCaveats?.map((cv) => (
-                <div key={cv.code} className="result-caveat">
-                  {damageText.caveat(cv)}
-                </div>
-              ))}
-            </div>
-          )}
-          {selected && isErrorShape(selected) && (
-            <div ref={detailRef} className="matrix-detail result-inspector notice" tabIndex={-1}>
-              {t("calc.error")}
-            </div>
-          )}
-        </div>
-      )}
-    </>
+      <AllMatchups
+        rows={gridRun?.plan.rows ?? []} cols={gridRun?.plan.cols ?? []}
+        results={gridRun?.results ?? []}
+        onFlip={() => {
+          setGridFrom((s) => otherSide(s));
+          // Flipping asks the same question the other way round; making the reader press compute
+          // again for an answer they already asked for is a step with no decision in it.
+          if (gridRun) setGridRerun((n) => n + 1);
+        }}
+        onRun={() => void runGrid()} runnable={gridRunnable} stale={gridStale}
+        busy={gridBusy} error={gridError}
+        fromLabel={sideLabel[gridFrom]} toLabel={sideLabel[otherSide(gridFrom)]} />
+    </div>
   );
 }

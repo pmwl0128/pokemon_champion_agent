@@ -1,9 +1,11 @@
 import type { FormatId } from "@pokemon-champions/protocol";
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useMemo } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { GameImage } from "../components/GameImage.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
+import { MetaRail, useMetaRails } from "../components/MetaRails.tsx";
+import { RailHandle, useRailEscape } from "../components/SideRail.tsx";
 import { useDexIndex, useRanking } from "../hooks.ts";
 import { displayName, useLang, useT } from "../i18n.ts";
 import { TypeBadge } from "../components/TypeBadge.tsx";
@@ -21,8 +23,19 @@ function rankTier(rank: number): "S" | "A" | "B" | "C" | "D" {
 /** Grid cards (same density as the dex browser): rank badge + sprite + trilingual name +
  * type icons — a full top-50 fits on one screen. */
 export function RankingPage() {
-  const [format, setFormat] = useState<FormatId>("single");
+  const [params, setParams] = useSearchParams();
+  const format = (params.get("format") === "double" ? "double" : "single") as FormatId;
+  const setFormat = (next: FormatId) => {
+    const updated = new URLSearchParams(params);
+    updated.set("format", next);
+    setParams(updated, { replace: true });
+  };
   const ranking = useRanking(format);
+  const rails = useMetaRails();
+  useRailEscape(rails);
+  // The rail's filter scopes the RAIL'S LIST, deliberately not this page's cards: the grid is the
+  // ranking itself, and silently dropping rows out of a ranking would misrepresent it.
+  const ignoreAllowed = useCallback(() => {}, []);
   const dex = useDexIndex();
   const { lang } = useLang();
   const t = useT();
@@ -38,6 +51,8 @@ export function RankingPage() {
 
   return (
     <>
+      <RailHandle state={rails} label={t("rail.search")} />
+      <MetaRail state={rails} format={format} ranking={ranking} onAllowed={ignoreAllowed} />
       <PageHeader title={t("ranking.title")}>
         <FormatTabs format={format} onChange={setFormat} className="page-tabs" />
       </PageHeader>

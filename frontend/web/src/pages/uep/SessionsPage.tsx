@@ -16,7 +16,6 @@ export function SessionsPage() {
   const navigate = useNavigate();
   const sessions = adapter.sessions;
   const [intent, setIntent] = useState("");
-  const [format, setFormat] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -31,7 +30,6 @@ export function SessionsPage() {
     try {
       const meta: Record<string, unknown> = {};
       if (intent.trim()) meta.intent = intent.trim();
-      if (format) meta.format = format;
       const s = await sessions.create(meta);
       navigate(`/sessions/${s.id}`);
     } catch (e) {
@@ -51,33 +49,20 @@ export function SessionsPage() {
             <h2>{t("uep.new")}</h2>
           </header>
           <div className="uep-form">
-            <label>
-              {t("uep.intent")}
-              <textarea
-                value={intent}
-                onChange={(e) => setIntent(e.target.value)}
-                placeholder={t("uep.intentPh")}
-                rows={6}
-              />
-            </label>
-            <fieldset className="uep-format" aria-label={t("a11y.format")}>
-              <legend>{t("uep.format")}</legend>
-              <div className="uep-format-options">
-                {(["single", "double"] as const).map((value) => (
-                  <button type="button" role="radio" aria-checked={format === value}
-                    key={value} className={`uep-format-option${format === value ? " on" : ""}`}
-                    onClick={() => setFormat(value)}>
-                    <span className="uep-format-radio" aria-hidden />
-                    <span>{t(`format.${value}`)}</span>
-                  </button>
-                ))}
-              </div>
-            </fieldset>
+            <textarea
+              value={intent}
+              onChange={(e) => setIntent(e.target.value)}
+              placeholder={t("uep.intentPh")}
+              aria-label={t("uep.intent")}
+              rows={6}
+            />
             {createError && <div className="notice">{createError}</div>}
+            <div className="uep-form-actions">
+              <button type="button" className="primary-btn" onClick={create} disabled={creating}>
+                {t("uep.create")}
+              </button>
+            </div>
           </div>
-          <footer className="uep-create-actions">
-              <button className="primary-btn" onClick={create} disabled={creating}>{t("uep.create")}</button>
-          </footer>
         </section>
 
         <section className="panel sessions-index">

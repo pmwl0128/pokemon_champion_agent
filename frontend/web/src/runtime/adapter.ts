@@ -5,10 +5,11 @@ import type {
   ActualMatchupRequestDto, ActualMatchupResponseDto, ArtifactAppendEventDto, BuilderJobDto,
   BuilderRequestDto, BuilderStartDto, Capabilities,
   DamageBatchResultDto, DamageRequestDto, DamageResultDto, DiagnoseReportDto,
-  DiagnoseRequestDto, FormatId, MetaDetailDto, OppCacheDto, OppCheckGridDto, OppKoGridDto,
+  DiagnoseRequestDto, FormatId, LearnersDto, MetaDetailDto, MetaFacetsDto, MetaKoDto,
+  OppCacheDto, OppCheckGridDto, OppKoGridDto, OppSetCatalogDto,
   PokemonCardDto,
   OnlineQuotaDto, QaAnswerDto, QaRequestDto, RankingDto, ResolveEntryDto, SessionDto, SessionWithLedgerDto,
-  SpeedBatchResultDto, SpeedInputDto, TrendDto, TuneResultDto, UsageTrendDto,
+  MetaKoTrendDto, SpeedBatchResultDto, SpeedInputDto, TrendDto, TuneResultDto, UsageTrendDto,
 } from "@pokemon-champions/protocol";
 
 /** Lightweight dex-browse entry (projection-only shape: full cards stay lazy). */
@@ -61,7 +62,17 @@ export interface RuntimeAdapter {
   detail(format: FormatId, slug: string): Promise<MetaDetailDto>;
   trend(format: FormatId): Promise<TrendDto>;
   usageTrend(format: FormatId, slug: string): Promise<UsageTrendDto>;
+  /** The KO axis for one Pokemon — a separate file family with its own snapshot clock, so it is
+   * its own call rather than another panel on `detail()`. 404 = this snapshot was not collected. */
+  ko(format: FormatId, slug: string): Promise<MetaKoDto>;
+  /** History for the KO panels. Its own call for the same reason `ko()` is: a different capture
+   * clock, so its periods are not the usage trend's periods. */
+  koTrend(format: FormatId, slug: string): Promise<MetaKoTrendDto>;
+  /** Inverted facet index for the filter rail; one lazy document per format. */
+  metaFacets(format: FormatId): Promise<MetaFacetsDto>;
   dexIndex(): Promise<DexIndexEntry[]>;
+  /** Move -> learners index for the dex browse filter; one lazy document for the whole roster. */
+  learners(): Promise<LearnersDto>;
   pokemonCard(nameOrSlug: string): Promise<PokemonCardDto>;
   resolve(names: string[], kind?: string): Promise<ResolveEntryDto[]>;
   damage(req: DamageRequestDto): Promise<DamageResultDto>;
@@ -70,8 +81,10 @@ export interface RuntimeAdapter {
   /** A speed ladder (my mon + opponents) in one fault-isolated batch (calc runtime only). */
   speedBatch(items: SpeedInputDto[]): Promise<SpeedBatchResultDto>;
   /** Opponent standard-set KO matrix (team.matchup). Shipped STATIC cache — served by the bridge live
-   * and exported to the online projection too (the online cut omits `sets`; see matchup.ts). */
+   * and exported to the online projection too. */
   oppCache(format: FormatId): Promise<OppCacheDto>;
+  /** Processed real-build catalog without the damage matrix. */
+  oppSets(format: FormatId): Promise<OppSetCatalogDto>;
   /** Lean default-page KO verdicts; full cell facts stay lazy in `oppCache`. */
   oppKo(format: FormatId): Promise<OppKoGridDto>;
   /** Derived C2/C1/C0 check grid over the same matrix (both runtimes, same static cache). */

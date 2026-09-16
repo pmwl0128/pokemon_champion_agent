@@ -32,6 +32,24 @@ python scripts/meta_query.py search --format both --panel moves --type ground --
 
 Search options can be combined. `--name` may be repeated and all name terms must match one of the entry fields. `--type` and `--category` filter move metadata when the cache provides it.
 
+KO axis:
+
+```bash
+python scripts/meta_query.py ko --format double --pokemon 大狃拉
+python scripts/meta_query.py ko --format single --pokemon Salamence --panel koed_by --output json
+python scripts/meta_query.py ko --format double --pokemon 大狃拉 暴飞龙 --output json
+python scripts/meta_query.py ko --format single
+```
+
+`--panel` accepts `ko_targets` (alias `beats`), `koed_by` (alias `counters`), `ko_moves` and
+`koed_by_moves`. With no `--pokemon` the command returns this snapshot's `coverage` alone — read it
+first to learn whether the move-share tier is collected, because an uncollected panel is `null`, not
+an empty list. Every answer repeats `coverage` and the KO file's own `updated_at`, which is a
+DIFFERENT snapshot clock from `ranking`/`details`.
+
+A season whose KO snapshot was never collected is a graceful `not_found` (exit 0) naming the gap —
+it is a data gap, not an empty metagame. An unknown `--panel` is `bad_input` (exit 1).
+
 Compare single and double:
 
 ```bash

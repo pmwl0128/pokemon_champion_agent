@@ -14,7 +14,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAsync } from "../../hooks.ts";
 import { optionalKey, useLang, useT } from "../../i18n.ts";
 import { useProseRenderer } from "../../lib/prose.tsx";
-import { stashMatchupFill, stashTuneFill } from "../../lib/team.ts";
+import { stashCalcTeams, stashMatchupFill, stashTuneFill, teamToCalcMembers }
+  from "../../lib/team.ts";
 import { HttpError, type SessionApi } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { renderArtifactCard } from "./artifacts.tsx";
@@ -266,6 +267,11 @@ function ResultSection({ draft, intent, sessionId, provisional }: {
     stashMatchupFill({ source: "session", label: intent || t("actual.source.session"), format, team });
     navigate("/matchup?mode=actual");
   };
+  const sendToCalc = (team: unknown) => {
+    const format = (team as { format?: string })?.format === "double" ? "double" : "single";
+    stashCalcTeams({ format, attackers: teamToCalcMembers(team), defenders: [] });
+    navigate("/calc?tab=damage");
+  };
   const tradeoffs = recommended.flatMap((r) => {
     const o = asObj(r);
     return o && Array.isArray(o.tradeoffs) ? o.tradeoffs.filter((x): x is string => typeof x === "string") : [];
@@ -303,16 +309,18 @@ function ResultSection({ draft, intent, sessionId, provisional }: {
                 )}
               </div>
             )}
-            {(can("team.tune") || can("team.matchup")) && (
-              <div className="uep-team-actions">
-                {can("team.tune") && <button className="second-btn" onClick={() => sendToTune(o.team)}>
-                  {t("uep.tune.open")} →
-                </button>}
-                {can("team.matchup") && <button className="second-btn" onClick={() => sendToMatchup(o.team)}>
-                  {t("actual.sendMatchup")} →
-                </button>}
-              </div>
-            )}
+            <div className="uep-team-actions">
+              <button className="second-btn" title={t("team.sendCalcHint")}
+                onClick={() => sendToCalc(o.team)}>
+                {t("team.sendCalc")} →
+              </button>
+              {can("team.tune") && <button className="second-btn" onClick={() => sendToTune(o.team)}>
+                {t("uep.tune.open")} →
+              </button>}
+              {can("team.matchup") && <button className="second-btn" onClick={() => sendToMatchup(o.team)}>
+                {t("actual.sendMatchup")} →
+              </button>}
+            </div>
           </div>
         );
       })}

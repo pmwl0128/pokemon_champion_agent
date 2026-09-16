@@ -89,6 +89,97 @@ export const MetaDetailDtoSchema = z.object({
 });
 export type MetaDetailDto = z.infer<typeof MetaDetailDtoSchema>;
 
+/* ── KO axis ──────────────────────────────────────────────────────────────────────────────
+ * A SECOND data family with its own upstream and its own snapshot clock, so it is NOT folded
+ * into MetaDetailDto: one file carrying both would have to lie about one of the two `updatedAt`s.
+ * Two rules the shapes below encode rather than document:
+ *   - opponent entries carry NO percentage. The source publishes an ORDERING; a nullable pct
+ *     field would read as a measured zero to anything that plots it.
+ *   - the move panels are `null`, never `[]`, until the tier is collected. `[]` would claim the
+ *     source reported no KO moves. `coverage.moveShare` states the same fact at file level.
+ */
+
+/** One KO opponent. SPECIES-level: the source keys these by national dex number with no form, so
+ * `nationalDex` is the identity and `name` is a species name. `slug`/`key` name ONE form, because a
+ * sprite and a link have to — the species itself where the dex names it exactly, otherwise the form
+ * the dex points that bare species name at. `usageRank` pairs the ordering with how often that
+ * pokemon is actually played, which is what lets a reader discount a KO position that is really
+ * just exposure; null = not in this format's ranking. */
+export const KoEntryDtoSchema = z.object({
+  rank: z.number().int().positive(),
+  ...namedFields,
+  nationalDex: z.number().int().positive(),
+  slug: z.string().optional(),
+  key: z.string().regex(/^pokemon:[a-z0-9-]+$/).optional(),
+  usageRank: z.number().int().positive().nullable(),
+  /** The same species appears twice in one list because the underlying rows are per-form and the
+   * source drops the form. Both entries are kept — de-duplicating would delete an observation. */
+  formCollapsed: z.boolean().optional(),
+});
+export type KoEntryDto = z.infer<typeof KoEntryDtoSchema>;
+
+/** Reserved tier. Same shape as the usage move panel because it IS one: when it ships, these
+ * entries carry a real percentage and render with the same in-row bar. */
+export const KoMoveEntryDtoSchema = MovePanelEntryDtoSchema;
+export type KoMoveEntryDto = z.infer<typeof KoMoveEntryDtoSchema>;
+
+export const KoCoverageDtoSchema = z.object({
+  opponents: z.string().min(1),
+  opponentIdentity: z.literal("national_dex"),
+  opponentDepth: z.number().int().nonnegative(),
+  opponentFormCollapsed: z.number().int().nonnegative().optional(),
+  moveShare: z.enum(["absent", "ranked_pct"]),
+  moveDepth: z.number().int().nonnegative().nullable(),
+  rows: z.number().int().nonnegative(),
+  rowsWithMoveShare: z.number().int().nonnegative(),
+  /** A filled move tier comes from a DIFFERENT capture than the object lists — which is why it
+   * states its own time here instead of letting the file's `updatedAt` stand for both — and carries
+   * how far the two captures agreed about each row's KO opponents (0..1, its own denominator).
+   * Both absent while `moveShare` is "absent". */
+  moveShareCapturedAt: z.string().min(1).optional(),
+  moveShareAgreement: z.object({
+    compared: z.number().int().nonnegative(),
+    mean: z.number().min(0).max(1).nullable(),
+    min: z.number().min(0).max(1).nullable(),
+  }).optional(),
+});
+export type KoCoverageDto = z.infer<typeof KoCoverageDtoSchema>;
+
+export const MetaKoDtoSchema = z.object({
+  rank: z.number().int().positive().nullable(),
+  slug: z.string().min(1),
+  key: z.string().regex(/^pokemon:[a-z0-9-]+$/).optional(),
+  ...namedFields,
+  format: FormatIdSchema,
+  season: z.string().min(1),
+  rule: z.string().min(1),
+  /** This axis's OWN data time — a different snapshot clock from ranking/details. */
+  updatedAt: z.string().min(1),
+  snapshotId: z.number().int().positive().optional(),
+  coverage: KoCoverageDtoSchema,
+  panels: z.object({
+    koTargets: z.array(KoEntryDtoSchema),
+    koedBy: z.array(KoEntryDtoSchema),
+    koMoves: z.array(KoMoveEntryDtoSchema).nullable(),
+    koedByMoves: z.array(KoMoveEntryDtoSchema).nullable(),
+  }),
+});
+export type MetaKoDto = z.infer<typeof MetaKoDtoSchema>;
+
+/** Inverted index for the filter rail: every facet value -> the slugs that carry it.
+ * Shipped as ONE lazy file per format because the per-pokemon detail files are lazy too — a
+ * facet filter over the whole roster would otherwise cost 262 fetches to answer one question. */
+export const MetaFacetsDtoSchema = z.object({
+  season: z.string().min(1),
+  rule: z.string().min(1),
+  format: FormatIdSchema,
+  /** facet -> canonical English value -> slugs. Keys: items/moves/abilities/natures/partners/
+   * koTargets/koedBy. Values are English canonicals (the cross-skill join key); the UI localizes
+   * them through the dex at render time. */
+  facets: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+});
+export type MetaFacetsDto = z.infer<typeof MetaFacetsDtoSchema>;
+
 /** Rank-trend store projection: one series per tracked pokemon, `ranks[i]` aligned with
  * `periods[i]` (null = outside the tracked window that period). */
 export const TrendDtoSchema = z.object({
@@ -118,6 +209,18 @@ const UsageSpreadSeriesSchema = z.object({
   values: UsageValuesSchema,
 });
 
+/** History for a SPECIES-LEVEL panel row (a teammate, a KO opponent). Two things separate it from
+ * the usage series above, and both come from the data rather than from taste:
+ *   - the key is the national dex number, because that is the panel's own identity — those rows
+ *     carry no form, so a name could not identify them anyway;
+ *   - the values are RANKS, not percentages. Those panels publish an ordering and no share, so a
+ *     percentage axis would plot a measurement nobody took. null = outside that period's list. */
+export const SpeciesRankSeriesSchema = z.object({
+  nationalDex: z.number().int().positive(),
+  ranks: z.array(z.number().int().positive().nullable()),
+});
+export type SpeciesRankSeries = z.infer<typeof SpeciesRankSeriesSchema>;
+
 /** Lazy per-Pokemon history for the five usage panels. Every values array aligns 1:1 with
  * periods; null means that entry was outside the upstream Top 10, never zero usage. */
 export const UsageTrendDtoSchema = z.object({
@@ -132,12 +235,43 @@ export const UsageTrendDtoSchema = z.object({
     abilities: z.array(UsageNamedSeriesSchema),
     natures: z.array(UsageNamedSeriesSchema),
     spreads: z.array(UsageSpreadSeriesSchema),
+    /** Teammates, as ranks. Defaulted because a projection built before this panel existed is
+     * still a valid document — it simply has no teammate history to show. */
+    partners: z.array(SpeciesRankSeriesSchema).default([]),
   }),
 }).refine((t) => {
   const expected = t.periods.length;
   return [
     ...t.panels.moves, ...t.panels.items, ...t.panels.abilities,
     ...t.panels.natures, ...t.panels.spreads,
-  ].every((series) => series.values.length === expected);
+  ].every((series) => series.values.length === expected)
+    && t.panels.partners.every((series) => series.ranks.length === expected);
 }, { message: "every usage series must align 1:1 with periods" });
 export type UsageTrendDto = z.infer<typeof UsageTrendDtoSchema>;
+
+/** Lazy per-Pokemon history for the KO axis. Its OWN document, not another panel on the usage
+ * trend, for the same reason the KO facts are their own file family: the two axes are captured on
+ * different clocks, so one period list cannot honestly describe both. */
+export const MetaKoTrendDtoSchema = z.object({
+  season: z.string().min(1),
+  rule: z.string().min(1),
+  format: FormatIdSchema,
+  slug: z.string().min(1),
+  periods: z.array(z.string().min(1)).max(10),
+  panels: z.object({
+    koTargets: z.array(SpeciesRankSeriesSchema),
+    koedBy: z.array(SpeciesRankSeriesSchema),
+    /** The move tiers DO carry a share where they are collected at all, so these stay percentages.
+     * A period in which the tier was not collected is null, the same as one in which the move was
+     * outside the list — both are "no measurement", which is what the chart must show. */
+    koMoves: z.array(UsageNamedSeriesSchema),
+    koedByMoves: z.array(UsageNamedSeriesSchema),
+  }),
+}).refine((t) => {
+  const expected = t.periods.length;
+  return [...t.panels.koTargets, ...t.panels.koedBy]
+    .every((series) => series.ranks.length === expected)
+    && [...t.panels.koMoves, ...t.panels.koedByMoves]
+      .every((series) => series.values.length === expected);
+}, { message: "every KO trend series must align 1:1 with periods" });
+export type MetaKoTrendDto = z.infer<typeof MetaKoTrendDtoSchema>;

@@ -121,7 +121,7 @@ function AnswerCard({ entry, quotaLine }: { entry: HistoryEntry; quotaLine: bool
   );
 }
 
-export function QaPage() {
+export function QaPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { adapter } = useRuntime();
   const t = useT();
   const { lang } = useLang();
@@ -174,7 +174,7 @@ export function QaPage() {
 
   return (
     <div>
-      <PageHeader title={t("qa.title")} description={t("online.aiNote")} />
+      {!embedded && <PageHeader title={t("qa.title")} description={t("online.aiNote")} />}
       <p className="notice page-disclosure">{t("qa.disclosure")}</p>
 
       <div className="panel form-panel qa-form">
