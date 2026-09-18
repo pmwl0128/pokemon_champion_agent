@@ -11475,6 +11475,13 @@
                 "type": "string",
                 "pattern": "^pokemon:[a-z0-9-]+$"
               },
+              "types": {
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/RankingDtoSchema/$defs/__schema0"
+                }
+              },
               "name": {
                 "type": "string",
                 "minLength": 1
@@ -11501,7 +11508,33 @@
         "format",
         "rows"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "string",
+          "enum": [
+            "Normal",
+            "Fire",
+            "Water",
+            "Electric",
+            "Grass",
+            "Ice",
+            "Fighting",
+            "Poison",
+            "Ground",
+            "Flying",
+            "Psychic",
+            "Bug",
+            "Rock",
+            "Ghost",
+            "Dragon",
+            "Dark",
+            "Steel",
+            "Fairy",
+            "Typeless"
+          ]
+        }
+      }
     },
     "RankRowDtoSchema": {
       "type": "object",
@@ -11519,6 +11552,13 @@
           "type": "string",
           "pattern": "^pokemon:[a-z0-9-]+$"
         },
+        "types": {
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RankRowDtoSchema/$defs/__schema0"
+          }
+        },
         "name": {
           "type": "string",
           "minLength": 1
@@ -11535,7 +11575,33 @@
         "slug",
         "name"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "string",
+          "enum": [
+            "Normal",
+            "Fire",
+            "Water",
+            "Electric",
+            "Grass",
+            "Ice",
+            "Fighting",
+            "Poison",
+            "Ground",
+            "Flying",
+            "Psychic",
+            "Bug",
+            "Rock",
+            "Ghost",
+            "Dragon",
+            "Dark",
+            "Steel",
+            "Fairy",
+            "Typeless"
+          ]
+        }
+      }
     },
     "ResolveEntryDtoSchema": {
       "type": "object",

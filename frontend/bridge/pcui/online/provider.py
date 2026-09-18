@@ -4,9 +4,12 @@ async while provider + skill-tool calls stay simple synchronous code."""
 from __future__ import annotations
 
 import json
-import time
+import sqlite3
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from typing import Mapping, Protocol
+
+from ..paths import SKILLS_ROOT
 
 
 class LlmUnavailable(RuntimeError):
@@ -64,7 +67,7 @@ class OpenAIChatConfig:
     """
 
     api_key: str
-    provider: str = "openai-compatible"
+    provider: str = "deepseek"
     base_url: str = "https://api.deepseek.com"
     api_path: str = "/chat/completions"
     model: str = "deepseek-flash"
@@ -80,8 +83,8 @@ class OpenAIChatConfig:
 
     @classmethod
     def from_env(cls, values: Mapping[str, str], *,
-                 provider: str = "openai-compatible") -> "OpenAIChatConfig":
-        if provider not in {"openai-compatible", "opencode", "deepseek"}:
+                 provider: str = "deepseek") -> "OpenAIChatConfig":
+        if provider not in {"openai-compatible", "deepseek"}:
             raise ValueError(f"unsupported OpenAI-compatible provider: {provider}")
         api_style = values.get("PCUI_LLM_API_STYLE", "openai-chat-completions").strip()
         if api_style != "openai-chat-completions":
@@ -106,16 +109,7 @@ class OpenAIChatConfig:
         if overlap:
             raise ValueError("PCUI_LLM_EXTRA_BODY_JSON cannot override: "
                              + ", ".join(sorted(overlap)))
-        if provider == "opencode":
-            base_url = values.get(
-                "PCUI_OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1").strip()
-            model = values.get(
-                "PCUI_OPENCODE_MODEL",
-                values.get("PCUI_LLM_MODEL", "deepseek-flash")).strip()
-            api_key = values.get("PCUI_OPENCODE_API_KEY", "").strip()
-            api_path = values.get(
-                "PCUI_OPENCODE_API_PATH", "/chat/completions").strip()
-        elif provider == "deepseek":
+        if provider == "deepseek":
             base_url = values.get(
                 "PCUI_DEEPSEEK_BASE_URL",
                 values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
@@ -235,46 +229,6 @@ class OpenAICompatibleProvider:
                           int(usage.get("prompt_cache_miss_tokens") or 0))
 
 
-class FallbackProvider:
-    """Retry one failed chat call on a separately configured backup provider."""
-
-    def __init__(self, primary: LlmProvider, fallback: LlmProvider):
-        self.primary = primary
-        self.fallback = fallback
-        self.model = getattr(primary, "model", "unknown")
-
-    @property
-    def thinking_enabled(self) -> bool:
-        return bool(getattr(self.primary, "thinking_enabled", False))
-
-    def chat(self, messages: list[dict], tools: list[dict], *, max_tokens: int,
-             tool_choice: str, timeout: float) -> ChatResult:
-        started = time.monotonic()
-        try:
-            return self.primary.chat(
-                messages, tools, max_tokens=max_tokens,
-                tool_choice=tool_choice, timeout=timeout)
-        except LlmUnavailable as primary_error:
-            remaining = timeout - (time.monotonic() - started)
-            if remaining <= 0:
-                raise primary_error
-            try:
-                return self.fallback.chat(
-                    messages, tools, max_tokens=max_tokens,
-                    tool_choice=tool_choice, timeout=remaining)
-            except LlmUnavailable as fallback_error:
-                raise LlmUnavailable(
-                    "primary and fallback LLM providers unavailable "
-                    f"({primary_error}; {fallback_error})") from fallback_error
-
-    def safe_summary(self) -> str:
-        primary = getattr(getattr(self.primary, "config", None), "safe_summary", None)
-        fallback = getattr(getattr(self.fallback, "config", None), "safe_summary", None)
-        primary_text = primary() if primary else type(self.primary).__name__
-        fallback_text = fallback() if fallback else type(self.fallback).__name__
-        return f"{primary_text}; fallback={fallback_text}"
-
-
 class DeepSeekProvider(OpenAICompatibleProvider):
     """Backward-compatible constructor for callers that still use the old class name."""
 
@@ -289,6 +243,33 @@ def _first_name(rows: object, used: set[str] | None = None) -> str | None:
         if isinstance(name, str) and name and (used is None or name not in used):
             return name
     return None
+
+
+@lru_cache(maxsize=1)
+def _mega_stone_hosts() -> dict[str, frozenset[str]]:
+    """Return the dex-authoritative Mega-stone -> base-species relation.
+
+    Echo assembly must screen an own stone that falls outside the size-capped ``mega_options``.
+    The dex already carries both sides of that relation; spelling heuristics duplicate that
+    authority and can drift whenever a non-standard stone name is added.
+    """
+    db = SKILLS_ROOT / "pokemon-champions-dex" / "data" / "champions_dex.sqlite"
+    uri = f"file:{db.as_posix()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as connection:
+        rows = connection.execute(
+            "select i.canonical, p.canonical, p.base_species "
+            "from items i join pokemon p on p.required_item=i.canonical "
+            "where i.category='mega_stone' and p.base_species is not null"
+        ).fetchall()
+    hosts: dict[str, set[str]] = {}
+    for item, form, species in rows:
+        hosts.setdefault(str(item), set()).update((str(form), str(species)))
+    return {item: frozenset(species) for item, species in hosts.items()}
+
+
+def _is_own_mega_stone(species: str, item: str) -> bool:
+    hosts = _mega_stone_hosts().get(item, ())
+    return species in hosts or species.removeprefix("Mega ") in hosts
 
 
 def _echo_builder_reply(messages: list[dict]) -> str | None:
@@ -343,6 +324,12 @@ def _echo_builder_reply(messages: list[dict]) -> str | None:
 
     mega_by_name = {row.get("species"): row for row in mega_options
                     if isinstance(row.get("species"), str)}
+    # A base species holding any registered Mega stone counts toward the team's Mega registration
+    # even when its species label is not prefixed with "Mega ". Reserve every stone for its explicit
+    # Mega option so the deterministic rehearsal cannot accidentally assemble a third Mega from a
+    # base species whose current modal item happens to be its stone.
+    mega_items = {row.get("item") for row in mega_options
+                  if isinstance(row.get("item"), str) and row.get("item")}
     used_items: set[str] = set()
     used_bases: set[str] = set()
     members: list[dict] = []
@@ -364,7 +351,12 @@ def _echo_builder_reply(messages: list[dict]) -> str | None:
                      if isinstance(row, dict) and row.get("name")]
             spread = mega.get("spread")
         else:
-            item = _first_name(detail.get("items"), used_items)
+            excluded_items = used_items | mega_items | {
+                name for row in detail.get("items") or []
+                if isinstance(row, dict) and isinstance((name := row.get("name")), str)
+                and _is_own_mega_stone(species, name)
+            }
+            item = _first_name(detail.get("items"), excluded_items)
             ability = _first_name(detail.get("abilities"))
             nature = _first_name(detail.get("natures"))
             moves = [row.get("name") for row in detail.get("moves") or []

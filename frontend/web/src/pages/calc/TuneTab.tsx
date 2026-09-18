@@ -193,7 +193,7 @@ function AttackerRow({ side, setSide, moves, setMoves, dex, natures, items, form
   );
 
   return (
-    <SideForm label={t("calc.attacker")} side={side} setSide={setSide}
+    <SideForm label={t("speed.theirs")} side={side} setSide={setSide}
       dex={dex} natures={natures} items={items} onRemove={onRemove} onSwap={onSwap} footer={footer} />
   );
 }
@@ -481,8 +481,8 @@ export function TuneTab({ dex, natures, items, initialTeamMode, onRailApi }: {
   const railApi = useMemo<CalcRailApi>(() => ({
     format,
     targets: [
-      { id: "primary", label: t("tune.rail.adjust") },
-      { id: "secondary", label: t("tune.rail.against") },
+      { id: "primary", label: t("speed.ours") },
+      { id: "secondary", label: t("speed.theirs") },
     ],
     pick: pickFromRail,
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -889,7 +889,7 @@ export function TuneTab({ dex, natures, items, initialTeamMode, onRailApi }: {
           </span>
         )}
       </div>
-      <SideForm label={t("tune.defender")} side={defender} setSide={setDefender}
+      <SideForm label={t("speed.ours")} side={defender} setSide={setDefender}
         dex={dex} natures={natures} items={items} />
 
       <div className="tune-command">

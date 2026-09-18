@@ -2,10 +2,11 @@
 API face of the online site. It serves ONLY what the static projection cannot — /api/qa
 (llm.qa), the builder wizard (llm.builder, §7.3), and deterministic team diagnose
 (team.validate, §7.5) — plus optional static hosting for dev
-parity. Trust model is the opposite of the local bridge: no bootstrap cookie, no
-authenticated surface; anonymity + per-identity limits + the daily budget breaker ARE the
-protection (§7.4). Every skill call remains a whitelisted command with controlled argument
-construction (§7.5)."""
+parity. Trust model is the opposite of the local bridge: ordinary use is anonymous and
+protected by per-identity limits plus the daily budget breaker; optional owner/tester
+credentials only bypass those limits and expose no extra skill surface (§7.4). Tester keys are
+device-bound; the owner dev key is reusable across the owner's devices.
+Every skill call remains a whitelisted command with controlled argument construction (§7.5)."""
 from __future__ import annotations
 
 import asyncio
@@ -28,6 +29,8 @@ from . import builder, qa
 from .jobs import JobStore
 from .limits import BudgetExhausted, OnlineLimits, RateLimited
 from .provider import LlmProvider, LlmUnavailable
+from .tester_keys import (AccessDenied, DeviceMismatch, TesterBudgetExhausted,
+                          TesterKeyStore, TesterReservation)
 from ..openapi import install_openapi
 from ..team_matchup import MatchupInputError, run_actual_matchup
 from ..team_tune import TuneInputError, run_team_tune
@@ -52,6 +55,8 @@ MATCHUP_QUEUE_WAIT = 20.0        # deterministic lane: bounded wait, never consu
 MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 12x60 costs 24 units
 TUNE_QUEUE_WAIT = 20.0           # shares the heavy deterministic lane with actual matchup
 _DEPLOYMENT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,80}\Z")
+_ACCESS_PATHS = frozenset(("/api/qa", "/api/builder", "/api/team/diagnose",
+                           "/api/team/matchup", "/api/team/tune", "/api/quota"))
 
 
 def _err(code: str, message: str) -> dict:
@@ -87,6 +92,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                       deterministic_workers: int = 4,
                       idle_reap_seconds: float | None = None,
                       dev_key: str | None = None,
+                      smoke_key: str | None = None,
+                      tester_keys: TesterKeyStore | None = None,
                       unmetered: bool = False,
                       jobs: JobStore | None = None) -> FastAPI:
     app = FastAPI(title="pcui online", docs_url=None, redoc_url=None, openapi_url=None)
@@ -217,7 +224,29 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     def _set_cookie(response: Response, value: str) -> None:
         response.set_cookie(QA_COOKIE, value, httponly=True, samesite="lax",
+                            secure=bool(public_origin and
+                                        public_origin.lower().startswith("https://")),
                             max_age=180 * 24 * 3600)
+
+    def _access_kind(request: Request) -> str:
+        return getattr(request.state, "access_kind", "visitor")
+
+    def _authorized(request: Request) -> bool:
+        return _access_kind(request) in {"dev", "tester", "smoke"}
+
+    def _reserve_authorized(request: Request, amount: int) -> TesterReservation | None:
+        if _access_kind(request) != "tester":
+            return None
+        if tester_keys is None:  # middleware cannot create a tester grant without the store
+            raise AccessDenied("tester key store unavailable")
+        return tester_keys.reserve(request.state.tester_key_id, amount)
+
+    def _settle_authorized(reservation: TesterReservation | None, tokens: int) -> None:
+        if reservation is not None and tester_keys is not None:
+            tester_keys.settle(reservation, tokens)
+        # Device-bound access bypasses the shared breaker, but its actual provider cost must
+        # remain in the operator's aggregate daily spend just like the historical dev bypass.
+        limits.record_spent(tokens)
 
     @app.middleware("http")
     async def gate(request: Request, call_next):
@@ -249,10 +278,57 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         # questions hit 429/503 would never receive a cookie and keep minting fresh device
         # ids (only the IP key would bind).
         new_cookie = None
-        if request.url.path in ("/api/qa", "/api/builder", "/api/team/diagnose",
-                                "/api/team/matchup", "/api/team/tune", "/api/quota"):
+        request.state.access_kind = "visitor"
+        if request.url.path in _ACCESS_PATHS:
             device_id, new_cookie = limits.device_cookie(request.cookies.get(QA_COOKIE))
             request.state.device_id = device_id
+            supplied = {
+                "dev": request.headers.get("x-pcui-dev-key", ""),
+                "tester": request.headers.get("x-pcui-tester-key", ""),
+                "smoke": request.headers.get("x-pcui-smoke-key", ""),
+            }
+            present = [(kind, value) for kind, value in supplied.items() if value]
+            if len(present) > 1:
+                response = Response(
+                    status_code=400, media_type="application/json",
+                    content=json.dumps({"detail": _err(
+                        "ambiguous_access", "multiple access keys supplied")}),
+                )
+                if new_cookie:
+                    _set_cookie(response, new_cookie)
+                return response
+            if present:
+                kind, value = present[0]
+                try:
+                    if kind == "dev":
+                        if not dev_key or not hmac.compare_digest(value, dev_key):
+                            raise AccessDenied("invalid dev key")
+                    elif kind == "tester":
+                        if tester_keys is None:
+                            raise AccessDenied("tester key store unavailable")
+                        grant = tester_keys.authenticate_tester(value, device_id)
+                        request.state.tester_key_id = grant.key_id
+                    elif not smoke_key or not hmac.compare_digest(value, smoke_key):
+                        raise AccessDenied("invalid smoke key")
+                except DeviceMismatch:
+                    response = Response(
+                        status_code=403, media_type="application/json",
+                        content=json.dumps({"detail": _err(
+                            "device_mismatch", "access key is bound to another device")}),
+                    )
+                    if new_cookie:
+                        _set_cookie(response, new_cookie)
+                    return response
+                except AccessDenied:
+                    response = Response(
+                        status_code=401, media_type="application/json",
+                        content=json.dumps({"detail": _err(
+                            "invalid_access_key", "access key is invalid")}),
+                    )
+                    if new_cookie:
+                        _set_cookie(response, new_cookie)
+                    return response
+                request.state.access_kind = kind
         response = await call_next(request)
         if new_cookie:
             _set_cookie(response, new_cookie)
@@ -304,13 +380,10 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
     @app.get("/api/quota")
     async def quota_status(request: Request):
-        # The same maintainer key that exempts the action endpoints must also exempt this
-        # preflight view. The SPA disables actions when the reported visitor allowance is
-        # exhausted, so returning the anonymous IP usage here would prevent an authenticated
-        # release smoke from ever reaching the endpoint that already honours the bypass.
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        if unmetered or dev:
+        # Authorized browser and operational smoke traffic see the same unlimited preflight
+        # as their action endpoints; otherwise the SPA would disable actions before sending
+        # the credential-bearing request that is already allowed to bypass visitor counts.
+        if unmetered or _authorized(request):
             empty = {"used": 0, "limit": 0}
             return {"qa": empty, "diagnose": empty, "builder": empty, "matchup": empty,
                     "tune": empty}
@@ -346,18 +419,21 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"d:{device_id}", f"i:{limits.ip_hash(client_ip)}"]
-        # Dev bypass (maintainer testing / §9 benchmark): a matching X-PCUI-Dev-Key skips
-        # the daily count AND the budget breaker's rejection — but real token spend is
-        # still recorded (record_spent), so the day's cost total never lies.
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        bypass_limits = dev or unmetered
+        debug_access = _access_kind(request) in {"dev", "smoke"}
+        bypass_limits = _authorized(request) or unmetered
         quota_day: str | None = None
         budget_day: str | None = None
-        if unmetered:
+        tester_reservation: TesterReservation | None = None
+        if bypass_limits:
             used, limit = 0, 0
-        elif dev:
-            used, limit = limits.usage(ids[0])
+            try:
+                tester_reservation = _reserve_authorized(
+                    request, limits.cfg.pessimistic_tokens)
+            except TesterBudgetExhausted:
+                raise HTTPException(503, _err(
+                    "tester_budget_exhausted", "tester daily model budget exhausted"))
+            except AccessDenied:
+                raise HTTPException(401, _err("invalid_access_key", "access key was removed"))
         else:
             try:
                 used, limit, quota_day = limits.check_and_consume(ids)
@@ -371,11 +447,10 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                                               "daily model budget exhausted — try tomorrow"))
 
         def fail_cleanup(tokens: int = 0) -> None:
-            """Non-dev: release the reservation (on its booked day) and give the visitor their
-            count back (the failure is ours). Dev: just record what was really burned. Binding
-            the day keeps a midnight-straddling request settling the row it reserved."""
+            """Visitors get their count back on our failure. Authorized traffic settles its
+            own optional tester reservation and always records real aggregate provider spend."""
             if bypass_limits:
-                limits.record_spent(tokens)
+                _settle_authorized(tester_reservation, tokens)
             else:
                 limits.settle_budget(tokens, budget_day)
                 limits.refund(ids, quota_day)
@@ -409,13 +484,13 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         finally:
             qa_slots.release()
         if bypass_limits:
-            limits.record_spent(result["tokens"])
+            _settle_authorized(tester_reservation, result["tokens"])
         else:
             limits.settle_budget(result["tokens"], budget_day)
         payload = {"answer": result["answer"], "toolTrace": result["toolTrace"],
                    "grounded": bool(result.get("grounded", result["toolTrace"])),
                    "quota": {"used": used, "limit": limit}}
-        if dev:
+        if debug_access:
             # Metric split for the maintainer/benchmark only — never sent to real visitors.
             payload["debug"] = {
                 "promptTokens": result.get("promptTokens", 0),
@@ -531,16 +606,10 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"td:{device_id}", f"ti:{limits.ip_hash(client_ip)}"]
         cost = 2 if thinking else 1
-        # Same dev bypass as Q&A and the builder: release smoke and maintainer testing must not
-        # spend a visitor-facing daily allowance, while real token spend is still recorded.
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        bypass_limits = dev or unmetered
+        bypass_limits = _authorized(request) or unmetered
         quota_day: str | None = None
-        if unmetered:
+        if bypass_limits:
             used, limit = 0, 0
-        elif dev:
-            used, limit = limits.usage(ids[0], limits.cfg.diagnose_daily_limit)
         else:
             try:
                 used, limit, quota_day = limits.check_and_consume(
@@ -570,14 +639,21 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         # Optional reading uses the diagnosis allowance, never the separate Q&A allowance.
         if want_explain and selected_provider is not None:
             if bypass_limits:
+                tester_reservation: TesterReservation | None = None
                 try:
+                    tester_reservation = _reserve_authorized(
+                        request, limits.cfg.pessimistic_tokens)
                     async with qa_slots:
                         explanation, tokens = await _in(
                             llm_pool, qa.explain_diagnose, selected_provider, report, lang)
-                    limits.record_spent(tokens)
+                    _settle_authorized(tester_reservation, tokens)
                     report["explanation"] = explanation
+                except TesterBudgetExhausted:
+                    report["explanationError"] = "tester_budget_exhausted"
+                except AccessDenied:
+                    report["explanationError"] = "access_revoked"
                 except Exception as e:
-                    limits.record_spent(getattr(e, "tokens", 0))
+                    _settle_authorized(tester_reservation, getattr(e, "tokens", 0))
                     report["explanationError"] = "llm_failed"
                 return report
             try:
@@ -626,9 +702,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"md:{device_id}", f"mi:{limits.ip_hash(client_ip)}"]
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        bypass_limits = dev or unmetered
+        bypass_limits = _authorized(request) or unmetered
         quota_day: str | None = None
         quota_cost = 0
 
@@ -677,9 +751,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         ids = [f"ud:{device_id}", f"ui:{limits.ip_hash(client_ip)}"]
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        bypass_limits = dev or unmetered
+        bypass_limits = _authorized(request) or unmetered
         quota_day: str | None = None
         quota_cost = 0
 
@@ -694,7 +766,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 result = await _in(
                     det_pool, run_team_tune, pool, body,
                     None if bypass_limits else consume_workload)
-                used, limit = ((0, 0) if unmetered else
+                used, limit = ((0, 0) if bypass_limits else
                                limits.usage(ids[0], limits.cfg.tune_daily_limit))
                 return {**result, "quota": {"used": used, "limit": limit}}
             except RateLimited:
@@ -800,16 +872,21 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         # Distinct identity prefix = a separate daily counter from QA (same table/expiry).
         ids = [f"bd:{device_id}", f"bi:{limits.ip_hash(client_ip)}"]
         cost = 2 if thinking else 1
-        dev = bool(dev_key) and hmac.compare_digest(
-            request.headers.get("x-pcui-dev-key", ""), dev_key or "")
-        bypass_limits = dev or unmetered
+        debug_access = _access_kind(request) in {"dev", "smoke"}
+        bypass_limits = _authorized(request) or unmetered
         pess = limits.cfg.builder_pessimistic_tokens
         quota_day: str | None = None
         budget_day: str | None = None
-        if unmetered:
+        tester_reservation: TesterReservation | None = None
+        if bypass_limits:
             used, limit = 0, 0
-        elif dev:
-            used, limit = limits.usage(ids[0], limits.cfg.builder_daily_limit)
+            try:
+                tester_reservation = _reserve_authorized(request, pess)
+            except TesterBudgetExhausted:
+                raise HTTPException(503, _err(
+                    "tester_budget_exhausted", "tester daily model budget exhausted"))
+            except AccessDenied:
+                raise HTTPException(401, _err("invalid_access_key", "access key was removed"))
         else:
             try:
                 used, limit, quota_day = limits.check_and_consume(
@@ -825,7 +902,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
 
         def fail_cleanup(tokens: int = 0) -> None:
             if bypass_limits:
-                limits.record_spent(tokens)
+                _settle_authorized(tester_reservation, tokens)
             else:
                 limits.settle_budget(tokens, budget_day, pess)
                 limits.refund(ids, quota_day, cost=cost)
@@ -871,7 +948,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                     jobs.fail(job_id, "internal")
                 else:
                     if bypass_limits:
-                        limits.record_spent(result["tokens"])
+                        _settle_authorized(tester_reservation, result["tokens"])
                     else:
                         limits.settle_budget(result["tokens"], budget_day, pess)
                     payload = {k: result[k] for k in
@@ -879,7 +956,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                                 "assumptions", "slateTopK", "repaired", "worstMatchup",
                                 "rationale", "threats", "matchupThreats", "megaCount")
                          if k in result}
-                    if dev:
+                    if debug_access:
                         payload["debug"] = {
                             "tokens": result["tokens"],
                             "promptTokens": result.get("promptTokens", 0),

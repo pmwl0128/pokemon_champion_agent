@@ -1,10 +1,10 @@
 {
-  "built_at": "2026-09-11T09:34:59+00:00",
+  "built_at": "2026-09-18T10:14:58+00:00",
   "counts": {
     "abilities": 216,
     "items": 166,
     "learnset_rows": 21659,
-    "moves": 512,
+    "moves": 511,
     "pokemon": 348
   },
   "moves": [
@@ -5531,23 +5531,6 @@
         "type": "Bug"
       },
       "type": "Bug"
-    },
-    {
-      "accuracy": 100,
-      "canonical": "Pound",
-      "category": "Physical",
-      "display_name": "拍击",
-      "display_name_ja": "はたく",
-      "power": 40,
-      "pp": "",
-      "priority": 0,
-      "raw": {
-        "bp": 40,
-        "category": "Physical",
-        "makesContact": true,
-        "type": "Normal"
-      },
-      "type": "Normal"
     },
     {
       "accuracy": 100,

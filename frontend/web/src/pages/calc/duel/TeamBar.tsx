@@ -8,8 +8,19 @@ import { useEffect, useRef, useState } from "react";
 import { useT } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
+import { FIELD_FLAGS_TOGGLE } from "./FieldPanel.tsx";
 import { MonAvatar } from "./MonEditor.tsx";
 import type { MonState } from "./state.ts";
+
+/** How many active-condition chips the head row previews inline. The row is a fixed height beside
+ * the roster, so a long list can neither wrap nor scroll — it used to scroll with a hidden
+ * scrollbar, which simply made the extra conditions invisible.
+ *
+ * The badge beside the preview carries the TOTAL, not the leftover: at an awkward width one more
+ * chip can still be squeezed off the outer end, and a number that meant "hidden" would then be
+ * wrong by one while a total stays true however the row lays out. It opens the flyout that owns the
+ * full list. */
+const MAX_FLAG_CHIPS = 3;
 
 export interface ImportOutcome {
   added: number;
@@ -20,7 +31,8 @@ export interface ImportOutcome {
 export const TEAM_MAX = 6;
 
 export function TeamBar({
-  label, team, index, onIndex, onAdd, onRemove, dex, items, onImport, mirrored = false,
+  label, team, index, onIndex, onAdd, onRemove, onReset, activeFlags, onClearFlag, onShowFlags,
+  dex, items, onImport, mirrored = false,
 }: {
   label: string;
   team: MonState[];
@@ -28,6 +40,11 @@ export function TeamBar({
   onIndex: (i: number) => void;
   onAdd: () => void;
   onRemove: (i: number) => void;
+  onReset: () => void;
+  activeFlags: Array<{ key: string; label: string }>;
+  onClearFlag: (key: string) => void;
+  /** Opens the side-condition flyout, so the chips that do not fit stay reachable. */
+  onShowFlags: () => void;
   dex: DexIndexEntry[];
   items: ItemRef[];
   onImport: (text: string) => Promise<ImportOutcome>;
@@ -70,10 +87,44 @@ export function TeamBar({
     <div className={`team-bar${mirrored ? " mirrored" : ""}`}>
       <div className="team-bar-head" ref={wrap}>
         <strong>{label}</strong>
-        <button type="button" className="ghost-btn tiny"
-          aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-          {t("calc.importPaste")}
-        </button>
+        <span className="team-bar-actions">
+          <button type="button" className="ghost-btn tiny"
+            aria-label={t("calc.importPaste")} aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}>
+            {t("calc.importShort")}
+          </button>
+          <button type="button" className="ghost-btn tiny" onClick={onReset}
+            title={t("calc.resetSide").replace("{side}", label)}>
+            {t("calc.resetTeam")}
+          </button>
+        </span>
+        <div className="team-active-flags" aria-label={t("calc.activeSideFlags")}>
+          {(() => {
+            const hidden = Math.max(0, activeFlags.length - MAX_FLAG_CHIPS);
+            const shown = hidden ? activeFlags.slice(activeFlags.length - MAX_FLAG_CHIPS) : activeFlags;
+            const label = t("calc.moreSideFlags")
+              .replace("{n}", String(activeFlags.length))
+              .replace("{flags}", activeFlags.map((f) => f.label).join("、"));
+            const more = hidden > 0 && (
+              <button key="more" type="button" className="team-flag-chip more"
+                {...{ [FIELD_FLAGS_TOGGLE]: "" }}
+                title={label} aria-label={label} onClick={onShowFlags}>
+                <span aria-hidden>⋯</span>{activeFlags.length}
+              </button>
+            );
+            const chips = shown.map((flag) => (
+              <button key={flag.key} type="button" className="team-flag-chip"
+                title={t("calc.clearSideFlag").replace("{flag}", flag.label)}
+                aria-label={t("calc.clearSideFlag").replace("{flag}", flag.label)}
+                onClick={() => onClearFlag(flag.key)}>
+                {flag.label}<span aria-hidden>×</span>
+              </button>
+            ));
+            // The count stays beside Import/Reset when space is tight; conditions extend from
+            // those actions toward the centre on either side of the field.
+            return [more, ...chips];
+          })()}
+        </div>
         {open && (
           <div className="paste-pop" role="dialog" aria-label={t("calc.importPaste")}>
             <label className="paste-label">{t("calc.pasteHint")}

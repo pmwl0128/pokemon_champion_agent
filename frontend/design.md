@@ -61,7 +61,7 @@ raw skill 只在 bridge mapper 转换；projection 构建复用同一 mapper。J
 
 FastAPI 使用单主进程。dex、meta、calc 和 speedline 走通用 NDJSON worker；worker 失败可回退一次性子进程，结果必须等价。team 请求通过 `team.py session` 批处理，使批内 sibling 复用；不得把私有 dispatch 当长期接口。
 
-用户配置统一位于 `~/.pokemon-champions-ui/pcui.env`。端口、provider、密钥和主机路径不写入仓库；本地进程只读取自身需要的项。API 只接受白名单操作和受控参数；文件内容由客户端内联，daemon 不接收任意路径或 argv。
+用户配置统一位于 `~/.pokemon-champions/pc.env`。端口、provider、密钥和主机路径不写入仓库，也不按运行目标拆成多个 env 文件；本地进程只读取自身需要的项。API 只接受白名单操作和受控参数；文件内容由客户端内联，daemon 不接收任意路径或 argv。
 
 ### 4.2 会话与 artifact
 
@@ -213,11 +213,15 @@ facet 放页面另一侧要"在右边选、到左边看"，塞进栏内下钻则
 满额时明确拒绝，不覆盖已有配置；耐久调整的单个被调对象则始终替换。抽屉搜索和空白卡片编辑不得触发
 伤害或速度批量计算；速度线只在显式计算时汇总我方多只的实际速度。
 
+实际配置对位页复用同一搜索、筛选和联合配置卡，但只有“我方配置”一个填入方向，因此不显示方向开关；
+它遵守该页最多十二个待比较配置的上限，切换单打／双打时按新赛制重新读取展开项。速度表中的格子选择
+同样是新增动作：先选我方或对方，再把所点速度档加入对应一侧；满额拒绝，不静默覆盖首个配置。
+
 ### 7.2 事实问答
 
 在线 QA 是无历史的单次请求。模型只能通过白名单只读工具获取 dex、meta、公开联合聚合和伤害/速度事实；工具和 provider 结果均有结构、轮数、字节、token 与时间上限。未获工具事实时不得把模型记忆表述为项目事实。
 
-在线版把问答、生成向导和可用的队伍诊断收在同一个“辅助”页面；问答位于生成向导左侧并作为默认子页。各子页保留自己的 capability 门控和浏览器会话状态，不因切换标签取消在途任务。
+在线版把问答、生成向导和可用的队伍诊断收在同一个“AI辅助”页面；问答位于生成向导左侧并作为默认子页。各子页保留自己的 capability 门控和浏览器会话状态，不因切换标签取消在途任务。
 
 provider key 只在服务端。模型、base URL 和额度由部署配置决定。回答使用英文 canonical 实体和界面语言 prose；配置缺省要披露来源与假设。预算先预留、后按真实 usage 结算；用户次数退还与 token 结算是两个独立动作。
 
@@ -242,7 +246,9 @@ normalize -> audit/intake -> frame + grounding -> LLM assembly
 
 额度和预算在服务端原子处理，具体数值只在配置和 quota 响应中维护。模型预算只影响 LLM；静态浏览、浏览器计算和已生成的确定性报告不依赖它。正文不进应用日志，短期任务和计数按生命周期清理。验证码只能是附加门，不能替代预算断路器与端点校验。
 
-🚩 维护者旁路对**所有**计数端点一致生效：`X-PCUI-Dev-Key` 与服务端 `PCUI_DEV_KEY` 相等时跳过每日计数与预算断路器，管线本身完全不变，真实 token 消耗仍照常记账。发布 smoke 依赖它——否则每验证一次部署就吃掉一个面向访客的当日额度，额度耗尽后下一次部署无法通过 observe。新增计数端点必须一并接上，不能只接 QA 和 builder。
+授权旁路对**所有**计数端点一致生效，管线本身完全不变，真实 token 消耗仍进入总账。服务端仍为每个浏览器签发 HttpOnly 签名设备 cookie；owner dev key 只做恒定时间凭据校验，不绑定设备，因此可在 owner 的多台设备上复用。tester key 在第一次成功请求时绑定该 cookie，服务端只持久化凭据和设备标识的摘要；它可独立创建、轮换、移除并配置 UTC 每日 token 预算，缺省预算为无限，且不获得调试字段。清除站点 cookie、复制已绑定 tester key 到另一设备或复用已轮换 tester key 都不能继续旁路。设备绑定不是硬件证明：首次使用前转发 tester key，或连同完整浏览器资料复制，仍不能由服务端可靠区分；轮换、移除和费用上限负责控制这类残余风险。
+
+🚩 发布 smoke 与浏览器凭据严格分离：`PCUI_SMOKE_KEY` 是不绑定 cookie、不得分发的运维凭据，只用于 deploy observe 和基准工具。浏览器 dev key 不能兼作 smoke，避免把可交互 owner 凭据扩散到自动化环境。新增计数端点必须同时接入 visitor、browser-access 与 smoke 三种路径，不能只接 QA 和 builder。
 
 ### 7.5 确定性接口与队伍诊断
 
@@ -322,7 +328,9 @@ NCP 可由进程内 quickjs-ng、常驻 Node 或 Node one-shot 承载。无 Node
 
 ## §12 图片资产
 
-位图 pack 使用内容寻址文件和 manifest；原创图标、placeholder 与品牌 SVG 随 UI bundle。运行时只通过 manifest resolver，以 dex canonical slug 为主键。
+位图 pack 使用内容寻址文件和 manifest；原创图标、placeholder 与品牌 SVG 随 UI bundle。完整 manifest
+是哈希、尺寸与 provenance 的审计权威；projection 从中机械生成只含 key/match/path 的 `runtime.json`，
+浏览器 resolver 只读取该紧凑索引，以 dex canonical slug 为主键，不另造图片身份或路径规则。
 
 resolver 返回 `exact`、`base_fallback` 或 `placeholder`。形态页不得把 base fallback 伪装成 exact；无法确认时用占位图。第三方图片记录 provider、URL/revision、获取时间和 rights note；运行时不热链。新增来源或 roster 变化后重建并校验，不得 fuzzy 猜图。发布用 pack 必须与当前 dex canonical Pokémon/item 集合精确相等，每个 payload 的 size/hash 复验通过；projection 构建同时要求当前 rule 的 single/double opponent cache 都存在、非空且源指纹有效。
 

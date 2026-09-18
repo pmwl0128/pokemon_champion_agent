@@ -1,12 +1,12 @@
 import type { FormatId } from "@pokemon-champions/protocol";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { GameImage } from "../components/GameImage.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { MetaRail, useMetaRails } from "../components/MetaRails.tsx";
 import { RailHandle, useRailEscape } from "../components/SideRail.tsx";
-import { useDexIndex, useRanking } from "../hooks.ts";
+import { useRanking } from "../hooks.ts";
 import { displayName, useLang, useT } from "../i18n.ts";
 import { TypeBadge } from "../components/TypeBadge.tsx";
 
@@ -36,18 +36,8 @@ export function RankingPage() {
   // The rail's filter scopes the RAIL'S LIST, deliberately not this page's cards: the grid is the
   // ranking itself, and silently dropping rows out of a ranking would misrepresent it.
   const ignoreAllowed = useCallback(() => {}, []);
-  const dex = useDexIndex();
   const { lang } = useLang();
   const t = useT();
-
-  // Join the dex by ASSET KEY, not by the row's `slug`: that slug is the upstream meta id and
-  // drifts with the source (lycanroc-midday -> lycanroc), which silently dropped both the sprite
-  // and the type icons for every renamed form. The mapper ships `key` for exactly this.
-  const typesByKey = useMemo(() => {
-    const m = new Map<string, string[]>();
-    if (dex.status === "ready") for (const e of dex.data) m.set(e.key, e.types);
-    return m;
-  }, [dex]);
 
   return (
     <>
@@ -72,7 +62,7 @@ export function RankingPage() {
                 alt={displayName(row, lang)} className="sprite" />
               <span className="nm">{displayName(row, lang)}</span>
               <span className="types">
-                {(typesByKey.get(assetKey) ?? []).map((tp) => (
+                {(row.types ?? []).map((tp) => (
                   <TypeBadge key={tp} type={tp} iconOnly />
                 ))}
               </span>

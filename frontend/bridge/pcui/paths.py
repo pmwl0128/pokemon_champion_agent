@@ -24,6 +24,6 @@ META_DATA = SKILLS_ROOT / "pokemon-champions-meta/data"
 
 
 def data_dir() -> Path:
-    d = Path(os.environ.get("PCUI_DATA_DIR", Path.home() / ".pokemon-champions-ui"))
+    d = Path(os.environ.get("PCUI_DATA_DIR", Path.home() / ".pokemon-champions"))
     d.mkdir(parents=True, exist_ok=True)
     return d

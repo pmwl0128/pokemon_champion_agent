@@ -10,6 +10,7 @@ the dex cannot resolve is a bug and raises rather than shipping a broken join ke
 """
 from __future__ import annotations
 
+import json
 import re
 import sys
 import threading
@@ -194,17 +195,28 @@ def map_resolve_entry(raw: dict) -> dict:
 # --- meta --------------------------------------------------------------------------------
 
 def map_ranking(raw: dict) -> dict:
-    out = {
-        "season": raw["season"], "rule": raw["rule"], "format": raw["format"],
-        "rows": [{
+    def row(r: dict) -> dict:
+        dex = _conn().execute(
+            "select types_json from pokemon where canonical=?", (r["name"],),
+        ).fetchone()
+        if dex is None:
+            raise MappingError(f"dex cannot resolve ranking Pokemon {r['name']!r}")
+        return {
             "rank": r["rank"], "slug": r["slug"],
             # `slug` is the UPSTREAM meta id: it routes and keys the detail cache, and it drifts
             # with the source (lycanroc-midday -> lycanroc, meowstic-f -> meowstic-female). Ship
             # the asset-pack key derived from the canonical English name instead — the same single
             # slug authority item panels use — so the sprite join never rides on that spelling.
             "key": f"pokemon:{slugify(r['name'])}",
+            # Ranking cards need the types, but loading all 189 full dex cards to recover them adds
+            # an otherwise unrelated first-screen request. Keep the authoritative dex join here.
+            "types": json.loads(dex["types_json"] or "[]"),
             **named(r["name"], r.get("name_zh"), r.get("name_ja")),
-        } for r in raw["rows"]],
+        }
+
+    out = {
+        "season": raw["season"], "rule": raw["rule"], "format": raw["format"],
+        "rows": [row(r) for r in raw["rows"]],
     }
     if raw.get("updated_at"):                 # optional field: omit when absent, never null
         out["updatedAt"] = raw["updated_at"]

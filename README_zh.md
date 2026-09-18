@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <b>环境快照</b> · M-6 / M-C · 截至 <b>2026-09-16</b>
+  <b>环境快照</b> · M-6 / M-C · 截至 <b>2026-09-18</b>
 </p>
 
 <p align="center">
@@ -322,7 +322,7 @@ chmod +x start-local.sh
 
 启动成功后，终端会打印一个形如 `http://127.0.0.1:1025/#bootstrap=...` 的一次性地址。首次打开时请使用终端打印的完整地址；页面换取本地会话 cookie 后会自动移除 URL 中的 token。服务默认只监听本机回环地址，按 `Ctrl+C` 停止。
 
-如需修改默认端口，在 `~/.pokemon-champions-ui/pcui.env` 中写入：
+如需修改默认端口，在 `~/.pokemon-champions/pc.env` 中写入：
 
 ```dotenv
 PCUI_LOCAL_PORT=1025
@@ -358,7 +358,7 @@ chmod +x frontend/build-ui.sh frontend/start-ui.sh
 ### 本地数据与在线隐私边界
 
 - 本地运行包默认只监听 `127.0.0.1`，不需要账号或模型 API Key；安装依赖并取得发行包后，普通图鉴、环境、计算、对位、调校与会话操作读取本机数据。
-- 本地会话和 artifact 状态写入 `~/.pokemon-champions-ui/`，不会写回解压后的不可变发行目录。
+- 本地会话和 artifact 状态写入 `~/.pokemon-champions/`，不会写回解压后的不可变发行目录。
 - 在线环境浏览与伤害／速度计算使用公开 projection 和浏览器内计算引擎；事实问答、建队、队伍诊断、自定义实际对位或 AI 解读等服务端功能会把对应输入发送到在线服务。
 - 不希望提交到在线服务的私人队伍、复盘或持有信息，应留在本地运行包或本地 AI 助手项目中处理。
 
@@ -565,18 +565,25 @@ my-champions/
 
 | 来源 | 用途 |
 |---|---|
-| [GameWith](https://gamewith.jp/) Pokémon Champions | 环境排名与招式、道具、特性、性格、SP、队友详情 |
+| [Silph Scope](https://silph-scope.com/) | 主数据源：环境排名，招式、道具、特性、性格、SP、队友详情，以及 KO 关系列表（谁能击倒谁） |
+| [GameWith](https://gamewith.jp/) Pokémon Champions | 独立环境 feed 与交叉验证 |
 | [PokeChamp DB](https://pokechamdb.com/) | 独立环境 feed 与交叉验证 |
 | [MetaRoll](https://metaroll.app/ladder) | 双打排位天梯的 KO 招式占比。Usage data from MetaRoll (metaroll.app) |
 
-### 对战图鉴、名称与计算
+### 对战图鉴与名称
+
+| 来源 | 用途 |
+|---|---|
+| [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions 学习集、特性与招式先制度 |
+| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英显示名、别名与分形态资料 |
+| [PokéAPI](https://pokeapi.co/) | 名称独立校验 |
+
+### 对战计算
 
 | 来源 | 用途 |
 |---|---|
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | 核心实体数据与伤害计算引擎 |
-| [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions 学习集、特性与招式先制度 |
-| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英显示名、别名与分形态资料 |
-| [PokéAPI](https://pokeapi.co/) | 名称独立校验 |
+| [smogon/damage-calc](https://github.com/smogon/damage-calc) | 独立公式 oracle。开发期测试用它的 `@smogon/calc` 引擎（经独立维护的 [EXO Champions 计算器](https://github.com/SebNotFound/champions-calc) 接入）复算同一批用例，与发行版引擎的伤害结果交叉比对；其代码与数据均不随本发行版分发。 |
 
 ### 真实队样本
 

@@ -1,27 +1,33 @@
 import type {
-  ActualDamageFactDto, ActualMatchupCellDto, ActualMatchupResponseDto, FormatId, SpeciesRowDto,
+  ActualDamageFactDto, ActualMatchupCellDto, ActualMatchupResponseDto, FormatId, OppSetDto,
+  SpeciesRowDto,
 } from "@pokemon-champions/protocol";
 import { ActualMatchupResponseDtoSchema } from "@pokemon-champions/protocol";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EntityHover } from "../components/EntityHover.tsx";
 import { AdaptiveCombobox } from "../components/AdaptiveCombobox.tsx";
+import { CalcRail, type CalcRailApi, type CalcRailTarget } from "../components/CalcRail.tsx";
 import { GameImage } from "../components/GameImage.tsx";
+import { RailHandle, useSideRail } from "../components/SideRail.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
 import {
   useAbilities, useDexByName, useDexIndex, useItems, useMoves, useNatures, useOppSets,
 } from "../hooks.ts";
 import { displayName, useLang, useT, type Lang } from "../i18n.ts";
-import { useDamageText } from "../lib/damageText.tsx";
 import { koTone } from "../lib/ko.ts";
 import {
   readMatchupSources, readTeamMembers, stashDamageFill, takeMatchupFill,
   type MatchupTeamSource, type TeamMemberish,
 } from "../lib/team.ts";
-import { CellInspector, SetBlock, type InspectorDamage } from "../components/CellInspector.tsx";
+import {
+  CellInspector, type InspectorBuild, type InspectorDamage,
+} from "../components/CellInspector.tsx";
 import { activeKey, ColHead } from "../components/MatchupHeads.tsx";
 import { useRuntime } from "../runtime/context.tsx";
+import type { DexIndexEntry } from "../runtime/adapter.ts";
+import type { BuildOption } from "./calc/shared.tsx";
 import { slugify } from "./uep/MonChip.tsx";
 
 
@@ -35,7 +41,7 @@ type Spread = Record<"hp" | "atk" | "def" | "spa" | "spd" | "spe", number>;
 interface DraftMember extends TeamMemberish { id: string; spread: Spread; moves: string[] }
 interface NamedOption { name: string; nameZh?: string; nameJa?: string }
 interface ActualVocab {
-  species: NamedOption[]; moves: NamedOption[]; items: NamedOption[];
+  species: DexIndexEntry[]; moves: NamedOption[]; items: NamedOption[];
   abilities: NamedOption[]; natures: NamedOption[];
 }
 
@@ -305,9 +311,9 @@ function actualDamage(fact: ActualDamageFactDto | null | undefined,
            ko, caveats };
 }
 
-/** The member's own registered set, in the shape SetBlock renders. */
+/** The member's own registered set, in the shape the shared build card renders. */
 function sourceAsSet(source: TeamMemberish | null | undefined,
-                     row: { member_run_form?: string | null; member: string }) {
+                     row: { member_run_form?: string | null; member: string }): OppSetDto | undefined {
   if (!source) return undefined;
   return {
     species: row.member, runForm: row.member_run_form ?? null,
@@ -339,7 +345,6 @@ function ActualResult({ response, format, sourceTeam }: {
   const { lang } = useLang();
   const navigate = useNavigate();
   const dex = useDexByName();
-  const damageText = useDamageText();
   const opp = useOppSets(format);
   const sets = opp.status === "ready" ? opp.data.sets : undefined;
   const [view, setView] = useState<ResultView>("ko");
@@ -499,7 +504,40 @@ function ActualResult({ response, format, sourceTeam }: {
         <span key={tone} className={`chip ko-${tone}`}>{i === 0 ? "OHKO" : i === 4 ? "5+" : `${i + 1}HKO`}</span>)}</div>}
     {cell && selectedRow && (() => {
       const ours = mon(selectedMemberName!), theirs = mon(cell.opponent);
-      const targetSet = sets?.[variantKey(cell, theirs.slug)];
+      const targetKey = variantKey(cell, theirs.slug);
+      const targetSet = sets?.[targetKey];
+      const sourceSet = sourceAsSet(source, selectedRow);
+      const targetSpecies = columns.find((column) => column.slug === theirs.slug)?.row;
+      const rawTargetIndex = targetSpecies?.variants?.findIndex(
+        (variant) => variant.key === targetKey,
+      ) ?? -1;
+      const targetIndex = Math.max(0, rawTargetIndex);
+      const targetVariant = rawTargetIndex >= 0
+        ? targetSpecies?.variants?.[rawTargetIndex] : undefined;
+      const builds: InspectorBuild[] = [
+        {
+          label: ours.label,
+          option: sourceSet ? {
+            key: "custom:" + selectedRow.source_id,
+            source: "custom",
+            coverage: null,
+            isModal: true,
+            set: sourceSet,
+          } : null,
+        },
+        {
+          label: theirs.label,
+          index: targetIndex,
+          option: targetSet ? {
+            key: targetKey,
+            source: "aggregate",
+            coverage: targetVariant?.coverage ?? targetSet.coverage ?? null,
+            isModal: targetVariant?.isModal ?? targetSet.isModal ?? false,
+            set: targetSet,
+            labelIndex: targetIndex,
+          } : null,
+        },
+      ];
       const dirs = [
         { label: t("matchup.ourKo"), damage: actualDamage(cell.offense, t) },
         { label: t("matchup.incoming"), damage: actualDamage(cell.incoming, t) },
@@ -507,28 +545,22 @@ function ActualResult({ response, format, sourceTeam }: {
       return (
         <CellInspector
           panelRef={detailRef}
-          head={<><DetailMon name={dir === "in" ? cell.opponent : selectedMemberName!} lang={lang} />
-                 <span>→</span>
-                 <DetailMon name={dir === "in" ? selectedMemberName! : cell.opponent} lang={lang} /></>}
+          head={<><DetailMon name={selectedMemberName!} lang={lang} />
+                 <span>{t("matchup.vs")}</span>
+                 <DetailMon name={cell.opponent} lang={lang} /></>}
           grade={view === "check" ? detailCheck?.grade ?? null : null}
           gradeFacts={view === "check" ? ([
             detailCheck?.c0_kind === "wall_no_ko"
               ? <>· {t("matchup.c0Kind.wall_no_ko")}</> : null,
             detailCheck?.contested ? <>· {t("matchup.resolvability.contested")}</> : null,
           ].filter(Boolean) as ReactNode[]) : undefined}
-          // The direction being viewed reads first.
-          directions={dir === "in" ? [dirs[1]!, dirs[0]!] : dirs}
-          speed={dir === "in"
-            ? { mine: cell.speed.opponent, theirs: cell.speed.member,
-                faster: cell.speed.faster === "member" ? "opponent"
-                  : cell.speed.faster === "opponent" ? "member" : cell.speed.faster }
-            : { mine: cell.speed.member, theirs: cell.speed.opponent,
-                faster: cell.speed.faster }}
-          sets={
-            <>
-              <div className="md-line md-caveat">
-                {t("actual.actualSetNote")}
-                <button type="button" className="second-btn md-verify" onClick={() => {
+          directions={dirs}
+          speed={{ mine: cell.speed.member, theirs: cell.speed.opponent,
+            fasterName: cell.speed.faster === "member" ? ours.label
+              : cell.speed.faster === "opponent" ? theirs.label : null }}
+          builds={builds}
+          calculate={
+            <button type="button" className="second-btn md-verify" onClick={() => {
                   const ourSet = { slug: ours.slug,
                     ...(source?.ability && !selectedRow.member_run_form ? { ability: source.ability } : {}),
                     ...(source?.item ? { item: source.item } : {}),
@@ -546,14 +578,7 @@ function ActualResult({ response, format, sourceTeam }: {
                     : { format, attackerSlug: ours.slug, attacker: ourSet, defender: theirSet,
                         ...(cell.offense?.move ? { move: cell.offense.move } : {}) });
                   navigate("/calc?tab=damage");
-                }}>{t("builder.verifyCalc")}</button>
-              </div>
-              {/* Both sides' sets, the same block the reference grids show. */}
-              <div className="md-sets">
-                <SetBlock title={ours.label} set={sourceAsSet(source, selectedRow)} />
-                <SetBlock title={theirs.label} set={targetSet} />
-              </div>
-            </>
+                }}>{t("matchup.calculate")}</button>
           }
         />
       );
@@ -586,6 +611,37 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     return parsed.success ? parsed.data : null;
   });
   const resultRef = useRef<HTMLDivElement>(null);
+  const rail = useSideRail(380, 760);
+
+  const pickFromRail = useCallback((_target: CalcRailTarget, entry: DexIndexEntry,
+                                    option: BuildOption | null) => {
+    const emptyIndex = members.findIndex((member) => !member.species.trim());
+    if (emptyIndex < 0 && members.length >= 12) {
+      return { ok: false as const, reason: "full" as const };
+    }
+    const picked = newMember({
+      species: entry.name,
+      item: option?.modal.item ?? "",
+      ability: option?.modal.ability ?? "",
+      nature: option?.modal.nature ?? "",
+      moves: option?.modal.moves ?? [],
+      spread: { ...EMPTY_SPREAD, ...(option?.modal.sps ?? {}) },
+    }, emptyIndex >= 0 ? emptyIndex : members.length);
+    setMembers(emptyIndex >= 0
+      ? members.map((member, index) => index === emptyIndex ? picked : member)
+      : [...members, picked]);
+    setMode("manual");
+    setResponse(null);
+    setError(null);
+    return { ok: true as const };
+  }, [members]);
+
+  const railApi = useMemo<CalcRailApi>(() => ({
+    format,
+    targets: [{ id: "primary", label: t("actual.inputTitle") }],
+    maxItems: 12,
+    pick: pickFromRail,
+  }), [format, pickFromRail, t]);
 
   const loadTeam = (team: unknown, nextFormat?: FormatId) => {
     const loaded = membersFromTeam(team);
@@ -668,7 +724,10 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     return cells.some((c) => (seen.has(c.opponent) ? true : (seen.add(c.opponent), false)));
   }, [response]);
 
-  return <div className="actual-workspace">
+  return <>
+    <RailHandle state={rail} label={t("calc.rail.title")} />
+    <CalcRail state={rail} dex={vocab.species} tab="actual" api={railApi} />
+    <div className="actual-workspace">
     <VocabLists vocab={vocab} />
     {/* Both guides sit at the TOP of the tab, exactly where the two reference grids put theirs —
       * they describe how to read the whole tab, not just the results section, and having them
@@ -728,6 +787,7 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     {running && <section className="panel actual-progress" aria-live="polite"><span className="actual-progress-orbit" aria-hidden />
       <div><h3>{t("actual.progressTitle")}</h3><p>{t("actual.progressScope").replace("{sources}", String(mode === "text" ? "—" : readTeamMembers(sourceTeam).length)).replace("{targets}", String(topK))}</p></div><Elapsed /></section>}
     {error && <div className="notice actual-error">{t("actual.error")}<button type="button" className="linkish" onClick={run}>{t("actual.retry")}</button></div>}
-    <div ref={resultRef}>{response && <ActualResult response={response} format={format} sourceTeam={response.team} />}</div>
-  </div>;
+      <div ref={resultRef}>{response && <ActualResult response={response} format={format} sourceTeam={response.team} />}</div>
+    </div>
+  </>;
 }

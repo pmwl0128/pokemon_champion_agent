@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-09-16</b>
+  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-09-18</b>
 </p>
 
 <p align="center">
@@ -334,7 +334,7 @@ chmod +x start-local.sh
 
 Open the complete one-time `http://127.0.0.1:<port>/#bootstrap=...` URL printed by the launcher. The
 service listens on loopback by default. Set `PCUI_LOCAL_PORT` in
-`~/.pokemon-champions-ui/pcui.env` to change the default port.
+`~/.pokemon-champions/pc.env` to change the default port.
 
 ### Build from source
 
@@ -356,7 +356,7 @@ On Linux/macOS use `frontend/build-ui.sh` and `frontend/start-ui.sh` after makin
 ### Privacy and updates
 
 - Local mode listens on `127.0.0.1`, stores session/artifact state under
-  `~/.pokemon-champions-ui/`, and needs no hosted-model key for normal data and calculation tools.
+  `~/.pokemon-champions/`, and needs no hosted-model key for normal data and calculation tools.
 - Online Q&A, builder, diagnosis, actual-team matchup, or AI explanation sends the corresponding input
   to the online service. Keep private rosters and review notes in the local bundle if they should not be
   submitted.
@@ -555,18 +555,25 @@ The release contains transformed, validated query data and scrubbed facts-only p
 
 | Source | Use |
 |---|---|
-| [GameWith](https://gamewith.jp/) Pokémon Champions | Rankings and move, item, ability, nature, SP, and partner details |
+| [Silph Scope](https://silph-scope.com/) | Primary metagame source: rankings, move/item/ability/nature/SP/partner details, and the KO relation lists (who knocks out whom) |
+| [GameWith](https://gamewith.jp/) Pokémon Champions | Independent metagame feed and cross-check |
 | [PokeChamp DB](https://pokechamdb.com/) | Independent metagame feed and cross-check |
 | [MetaRoll](https://metaroll.app/ladder) | Doubles ranked-ladder KO move shares. Usage data from MetaRoll (metaroll.app) |
 
-### Battle Dex, Names, and Calculation
+### Battle Dex and Names
+
+| Source | Use |
+|---|---|
+| [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions learnsets, abilities, and move priority |
+| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | Chinese/Japanese/English display names, aliases, and form-specific facts |
+| [PokéAPI](https://pokeapi.co/) | Independent name validation |
+
+### Battle Calculation
 
 | Source | Use |
 |---|---|
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | Core entity data and damage engine |
-| [Serebii.net](https://www.serebii.net/) Champions Pokédex | Champions learnsets, abilities, and move priority |
-| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | Chinese/Japanese/English display names, aliases, and form-specific facts |
-| [PokéAPI](https://pokeapi.co/) | Independent name validation |
+| [smogon/damage-calc](https://github.com/smogon/damage-calc) | Independent formula oracle. Development tests replay the same cases through its `@smogon/calc` engine — reached via the independently maintained [EXO Champions calculator](https://github.com/SebNotFound/champions-calc) — and compare the rolls against the shipped engine. Neither its code nor its data is distributed here. |
 
 ### Real-Team Samples
 

@@ -14,7 +14,7 @@ import { PLACEHOLDERS } from "../../assets/icons.ts";
 import {
   AdaptiveCombobox, type ComboboxCommitReason,
 } from "../../components/AdaptiveCombobox.tsx";
-import { useDexIndex, useItems } from "../../hooks.ts";
+import { loadOppSetsCached, useDexIndex, useItems } from "../../hooks.ts";
 import { displayName, useLang, useT } from "../../i18n.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { HttpError, type DexIndexEntry } from "../../runtime/adapter.ts";
@@ -346,7 +346,7 @@ export function observedBuildOptions(
 export function useBuildOptions(): (
   slug: string, fmt: FormatId,
 ) => Promise<BuildOption[]> {
-  const { adapter } = useRuntime();
+  const { adapter, capabilities } = useRuntime();
   const dexIndex = useDexIndex();
   const itemVocab = useItems();
   const loadMeta = useMetaFill();
@@ -355,7 +355,7 @@ export function useBuildOptions(): (
   return async (slug: string, fmt: FormatId) => {
     let catalogHit = catalogCache.current.get(fmt);
     if (!catalogHit) {
-      catalogHit = adapter.oppSets(fmt).catch((error) => {
+      catalogHit = loadOppSetsCached(adapter, capabilities.deploymentId, fmt).catch((error) => {
         console.error(`observed build catalog failed for ${fmt}:`, error);
         catalogCache.current.delete(fmt);
         return null;
@@ -498,12 +498,13 @@ export function ItemCombo({ value, onChange, items, disabled }: {
  * and explicit option picks resolve locally, while fuzzy adapter resolution requires Enter.
  * Reused by SideForm and the speed-ladder rows. The sprite always identifies the literal selected
  * entry; an activated held-stone form is disclosed by the adjacent MEGA badge. */
-export function MonPicker({ slug, onSlug, dex, placeholder }: {
+export function MonPicker({ slug, onSlug, dex, placeholder, ariaLabel }: {
   idKey: string;
   slug: string;
   onSlug: (slug: string) => void;
   dex: DexIndexEntry[];
   placeholder?: string;
+  ariaLabel?: string;
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -590,6 +591,7 @@ export function MonPicker({ slug, onSlug, dex, placeholder }: {
       </span>
       <AdaptiveCombobox value={text} options={monOptions}
         onValueChange={edit} onCommit={commit}
+        aria-label={ariaLabel}
         placeholder={placeholder ?? t("calc.pickHint")} />
     </span>
   );

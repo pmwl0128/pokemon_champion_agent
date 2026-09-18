@@ -37,14 +37,15 @@ export function turnsOf(res: DamageResultDto): number | null {
   return Math.ceil(100 / Math.max(res.maxPercent, 0.01));
 }
 
-function HpBar({ entry, name, maxHP, remaining, notes }: {
+function HpBar({ entry, name, maxHP, remaining, notes, result }: {
   entry: DexIndexEntry | undefined;
   name: string;
   maxHP: number;
   remaining: number;
-  /** Caveats about THIS mon, however they arrived. Rendered as a single clipped line so showing or
-   * hiding one can never change the card's height and pull the two columns out of step. */
+  /** Caveats about THIS mon, however they arrived. They collapse into one focusable warning icon so
+   * the complete copy stays available without changing the card's height. */
   notes: string[];
+  result: DamageResultDto | null;
 }) {
   const t = useT();
   const pct = maxHP > 0 ? Math.max(0, Math.min(100, (remaining / maxHP) * 100)) : 0;
@@ -55,12 +56,26 @@ function HpBar({ entry, name, maxHP, remaining, notes }: {
         {entry
           ? <GameImage assetKey={entry.key} role="dense" alt={name} className="hp-bar-sprite" />
           : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-        <span className="hp-bar-name">{name}</span>
-        {notes.length > 0 && (
-          <span className="hp-bar-notes" title={notes.join("\n")}>
-            {notes.map((n, i) => <span key={i} className="hp-note">{n}</span>)}
+        <span className="hp-bar-heading">
+          <span className="hp-bar-title-line">
+            <span className="hp-bar-name-cluster">
+              <span className="hp-bar-name">{name}</span>
+              {entry?.isMega && <span className="mega-badge hp-mega-tag">MEGA</span>}
+              {notes.length > 0 && (
+                <span className="hp-warning" tabIndex={0} role="img"
+                  aria-label={notes.join("；")} data-tooltip={notes.join("\n")}>
+                  <span aria-hidden>!</span>
+                </span>
+              )}
+            </span>
+            <span className="duel-head-nums">
+              <strong className="num">{result ? `${result.min} – ${result.max}` : "—"}</strong>
+              <span className="muted num">
+                {result ? `${result.minPercent.toFixed(1)}% – ${result.maxPercent.toFixed(1)}%` : ""}
+              </span>
+            </span>
           </span>
-        )}
+        </span>
       </div>
       <div className="hp-bar-track" role="img"
         aria-label={`${name}: ${remaining} / ${maxHP} ${t("calc.hpLeft")}`}>
@@ -108,6 +123,7 @@ export function ResultCard({
 
   const active = slots[selected];
   const res = active?.result ?? null;
+  const verdict = res?.koChance ? damageText.ko(res.koChance) : "";
 
   // The engine deals sixteen rolls for any real hit. A result with fewer of them — an immunity, a
   // status move — has no roll structure at all, so the control keeps the standard scale and
@@ -135,7 +151,8 @@ export function ResultCard({
 
   return (
     <div className="duel-result">
-      <HpBar entry={entry} name={monName} maxHP={maxHP} remaining={remaining} notes={notes} />
+      <HpBar entry={entry} name={monName} maxHP={maxHP} remaining={remaining} notes={notes}
+        result={res} />
 
       {/* The four slots sit INSIDE the card, under the health they are about to spend. They are
           picked, not typed, so they read as buttons — the boxes further down the page that look
@@ -183,20 +200,6 @@ export function ResultCard({
       {/* The SAME rows whether or not there is a result: an empty state that swaps in a shorter
           tree changes the card's height, which moves the roster strip under the cursor that is
           clicking it. Placeholders keep the block structurally identical instead. */}
-      <div className="duel-band">
-        <span className="duel-band-nums">
-          <strong className="num">{res ? `${res.min} – ${res.max}` : "—"}</strong>
-          <span className="muted num">
-            {res ? `(${res.minPercent.toFixed(1)}% – ${res.maxPercent.toFixed(1)}%)` : ""}
-          </span>
-        </span>
-        {/* Always rendered, hidden when there is no verdict: the pill is the tallest thing in this
-            row, so dropping the element would shrink the card by its padding. */}
-        <span className="result-verdict">
-          {res?.koChance ? damageText.ko(res.koChance) : ""}
-        </span>
-      </div>
-
       {/* The roll is a slider over the sixteen, not a choice of three: the reader picks the roll they
           want to ask about and the health bar above follows immediately — no recalculation, the
           engine already returned every one of them. The three buttons stay as the three rolls worth
@@ -252,6 +255,10 @@ export function ResultCard({
           {res ? damageText.summary(res)
             : <span className="muted">{busy ? t("state.loading")
               : active?.failed ? t("calc.error") : t("calc.noMoveSelected")}</span>}
+        </span>
+        <span className={`duel-summary-verdict${res?.koChance?.guaranteed ? " guaranteed" : ""}`}
+          title={verdict || undefined}>
+          {verdict}
         </span>
         <button type="button" className="ghost-btn tiny" onClick={copyLine} disabled={!res}>
           {copied ? t("calc.copied") : t("calc.copyLine")}

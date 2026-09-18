@@ -16,6 +16,9 @@ export const RankRowDtoSchema = z.object({
   rank: z.number().int().positive(),
   slug: z.string().min(1),
   key: z.string().regex(/^pokemon:[a-z0-9-]+$/).optional(),
+  /** Carried by current mappers so the ranking does not download the whole dex card index merely
+   * to paint two badges. Optional only for projections built before this field existed. */
+  types: z.array(TypeNameSchema).max(2).optional(),
   ...namedFields,
 });
 export type RankRowDto = z.infer<typeof RankRowDtoSchema>;

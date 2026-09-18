@@ -8,7 +8,7 @@ from pathlib import Path
 from .paths import data_dir
 
 
-CONFIG_ENV_NAME = "pcui.env"
+CONFIG_ENV_NAME = "pc.env"
 _ENV_KEY = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 
 
@@ -25,7 +25,7 @@ class RuntimeConfig:
     online_port: int = 1026
     online_use_api_key: bool = True
     local_online_unlimited: bool = False
-    llm_provider: str = "opencode"
+    llm_provider: str = "deepseek"
 
 
 def env_file_values(path: Path) -> dict[str, str]:
@@ -75,10 +75,10 @@ def load_runtime_config(path: Path | None = None) -> RuntimeConfig:
     """Read non-secret startup defaults without exporting any values into the process."""
     source = path or data_dir() / CONFIG_ENV_NAME
     values = env_file_values(source)
-    provider = values.get("PCUI_LLM_PROVIDER", "opencode").strip().lower()
-    if provider not in {"openai-compatible", "opencode", "deepseek", "echo", "none"}:
+    provider = values.get("PCUI_LLM_PROVIDER", "deepseek").strip().lower()
+    if provider not in {"openai-compatible", "deepseek", "echo", "none"}:
         raise ValueError(
-            "PCUI_LLM_PROVIDER must be openai-compatible, opencode, deepseek, echo, or none")
+            "PCUI_LLM_PROVIDER must be openai-compatible, deepseek, echo, or none")
     return RuntimeConfig(
         local_port=_port(values, "PCUI_LOCAL_PORT", 1025),
         online_port=_port(values, "PCUI_ONLINE_PORT", 1026),

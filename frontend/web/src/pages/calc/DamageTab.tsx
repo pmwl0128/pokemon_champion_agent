@@ -17,7 +17,7 @@ import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx"
 import { useAsync, useMovesByName } from "../../hooks.ts";
 import { useDamageText } from "../../lib/damageText.tsx";
 import { localName, useNameMaps } from "../../lib/names.ts";
-import { displayName, useLang, useT } from "../../i18n.ts";
+import { displayName, useLang, useT, type MsgKey } from "../../i18n.ts";
 import { parsePokepaste, formatPokepasteMon } from "../../lib/pokepaste.ts";
 import { takeCalcTeams, type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
@@ -33,7 +33,8 @@ import { MonEditor, buildCardOptionForMon } from "./duel/MonEditor.tsx";
 import { ResultCard, type SlotResult } from "./duel/ResultCard.tsx";
 import { TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  EMPTY_FIELD, MOVE_SLOTS, TERRAIN_ABILITIES, WEATHER_ABILITIES, caveatSubject, curHPOf,
+  EMPTY_FIELD, MOVE_SLOTS, SIDE_FLAGS, TERRAIN_ABILITIES, WEATHER_ABILITIES,
+  caveatSubject, curHPOf,
   ROLL_TOP, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide, rollValue,
   type FieldState, type MonState, type SideId,
 } from "./duel/state.ts";
@@ -555,6 +556,17 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     setSlot((prev) => ({ ...prev, [side]: 0 }));
   };
 
+  // The flyout lives here rather than inside FieldPanel: a team strip's overflow chip opens it too.
+  const [fieldOpen, setFieldOpen] = useState(false);
+  const activeFlagsFor = (side: SideId) => SIDE_FLAGS
+    .filter((flag) => (field.format === "double" || !flag.doublesOnly)
+      && field.sides[side][flag.key])
+    .map((flag) => ({ key: flag.key, label: t(flag.label as MsgKey) }));
+  const clearFlag = (side: SideId, key: string) => setField((current) => ({
+    ...current,
+    sides: { ...current.sides, [side]: { ...current.sides[side], [key]: false } },
+  }));
+
   const column = (side: SideId) => (
     <ResultCard
       monName={nameOf(side)}
@@ -586,13 +598,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         {column("b")}
       </div>
 
-      <FieldPanel field={field} setField={setField}
-        sideALabel={t("calc.sideOf").replace("{side}", sideLabel.a)}
-        sideBLabel={t("calc.sideOf").replace("{side}", sideLabel.b)}
-        weatherSuggestions={fieldOffers(WEATHER_ABILITIES, field.weather)}
-        terrainSuggestions={fieldOffers(TERRAIN_ABILITIES, field.terrain)} />
-
-      <div className="duel-teams">
+      <div className={`duel-teams${field.weather ? ` weather-${field.weather.toLowerCase()}` : ""}${field.terrain ? ` terrain-${field.terrain.toLowerCase()}` : ""}`}>
         <TeamBar label={t("calc.attackerTeam")} team={teams.a} index={active.a}
           onIndex={(i) => setActive((p) => ({ ...p, a: i }))}
           onAdd={() => {
@@ -604,16 +610,16 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setTeams((p) => ({ ...p, a: p.a.filter((_, j) => j !== i) }));
             setActive((p) => ({ ...p, a: Math.max(0, Math.min(p.a, teams.a.length - 2)) }));
           }}
+          onReset={() => resetSide("a")}
+          activeFlags={activeFlagsFor("a")} onClearFlag={(key) => clearFlag("a", key)}
+          onShowFlags={() => setFieldOpen(true)}
           dex={dex} items={items} onImport={(text) => importPaste("a", text)} />
 
-        <div className="duel-actions">
-          <button type="button" className="ghost-btn" onClick={() => resetSide("a")}>
-            {t("calc.resetSide").replace("{side}", sideLabel.a)}
-          </button>
-          <button type="button" className="ghost-btn" onClick={() => resetSide("b")}>
-            {t("calc.resetSide").replace("{side}", sideLabel.b)}
-          </button>
-        </div>
+        <FieldPanel field={field} setField={setField} open={fieldOpen} setOpen={setFieldOpen}
+          sideALabel={t("calc.sideOf").replace("{side}", sideLabel.a)}
+          sideBLabel={t("calc.sideOf").replace("{side}", sideLabel.b)}
+          weatherSuggestions={fieldOffers(WEATHER_ABILITIES, field.weather)}
+          terrainSuggestions={fieldOffers(TERRAIN_ABILITIES, field.terrain)} />
 
         <TeamBar label={t("calc.defenderTeam")} team={teams.b} index={active.b}
           onIndex={(i) => setActive((p) => ({ ...p, b: i }))}
@@ -626,6 +632,9 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setTeams((p) => ({ ...p, b: p.b.filter((_, j) => j !== i) }));
             setActive((p) => ({ ...p, b: Math.max(0, Math.min(p.b, teams.b.length - 2)) }));
           }}
+          onReset={() => resetSide("b")}
+          activeFlags={activeFlagsFor("b")} onClearFlag={(key) => clearFlag("b", key)}
+          onShowFlags={() => setFieldOpen(true)}
           dex={dex} items={items} onImport={(text) => importPaste("b", text)} mirrored />
       </div>
 

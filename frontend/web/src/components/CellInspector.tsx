@@ -5,9 +5,10 @@
  * `md-line` there), different heads, and different amounts of information — the KO grid showed the
  * engine's caveats and both sides' sets, the actual-sets grid showed neither. Callers now normalise
  * their facts into the shapes below and this component owns the layout. */
-import type { ReactNode } from "react";
-import { optionalKey, useT } from "../i18n.ts";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useT } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
+import { BuildSetSummary, type BuildCardOption } from "./BuildPicker.tsx";
 
 
 /** A KO verdict in the shape `damageText.ko` renders. Callers MUST prefer the engine's
@@ -32,11 +33,18 @@ export interface InspectorDamage {
 export interface InspectorSpeed {
   mine: number | null;
   theirs: number | null;
-  faster?: string | null;
+  fasterName?: string | null;
+}
+
+export interface InspectorBuild {
+  /** Used only by the plain-text copy; the visible title already establishes both names. */
+  label: string;
+  option: BuildCardOption | null;
+  index?: number;
 }
 
 export function CellInspector({
-  panelRef, head, grade, gradeFacts, directions, speed, sets, extra,
+  panelRef, head, grade, gradeFacts, directions, speed, builds, calculate, extra,
 }: {
   panelRef?: React.Ref<HTMLDivElement>;
   head: ReactNode;
@@ -46,46 +54,140 @@ export function CellInspector({
   /** Both directions, in the order the caller wants them read. */
   directions: Array<{ label: ReactNode; damage: InspectorDamage | null }>;
   speed?: InspectorSpeed | null;
-  sets?: ReactNode;
+  /** Same complete configuration cards used by the table-head popover. */
+  builds?: InspectorBuild[];
+  /** Calculator hand-off button, rendered before the copy action in the title row. */
+  calculate?: ReactNode;
   extra?: ReactNode;
 }) {
   const t = useT();
   const damageText = useDamageText();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const resetTimer = useRef<number | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const attachRef = useCallback((node: HTMLDivElement | null) => {
+    rootRef.current = node;
+    if (typeof panelRef === "function") panelRef(node);
+    else if (panelRef) (panelRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  }, [panelRef]);
+
+  useEffect(() => () => {
+    if (resetTimer.current != null) window.clearTimeout(resetTimer.current);
+  }, []);
+
+  const speedResult = speed?.mine != null && speed.theirs != null && speed.mine === speed.theirs
+    ? t("matchup.faster.tie")
+    : speed?.fasterName
+      ? t("matchup.faster.named").replace("{name}", speed.fasterName)
+      : null;
+
+  const copyAll = async () => {
+    const root = rootRef.current;
+    if (!root) return;
+    const clean = (node: Element | null) => (node as HTMLElement | null)?.innerText
+      .split("\n").map((line) => line.trim()).filter(Boolean).join("\n") ?? "";
+    const sections = [clean(root.querySelector(".md-head-summary"))];
+    root.querySelectorAll<HTMLElement>(".md-build-slot").forEach((slot) => {
+      const readAll = (selector: string) => Array.from(slot.querySelectorAll(selector))
+        .map((node) => clean(node)).filter(Boolean);
+      const identity = readAll(".build-card-identity > span:not(.build-card-sep)");
+      const tag = clean(slot.querySelector(".build-card-tag"));
+      const share = clean(slot.querySelector(".build-card-share"));
+      const lines = [
+        [slot.dataset.copyLabel, tag, share].filter(Boolean).join(" · "),
+        t("calc.item") + ": " + (clean(slot.querySelector(".build-card-primary > b")) || "—"),
+        t("calc.ability") + ": " + (identity[0] ?? "—"),
+        t("calc.nature") + ": " + (identity[1] ?? "—"),
+        t("calc.sps") + ": " + (readAll(".build-card-sp-stat").join(" / ") || "—"),
+        t("matchup.copy.moves") + ": "
+          + (readAll(".build-card-move > span:last-child").join(" / ") || "—"),
+        t("matchup.copy.stats") + ": " + (readAll(".build-card-stat").join(" / ") || "—"),
+      ];
+      sections.push(lines.join("\n"));
+    });
+    root.querySelectorAll<HTMLElement>(".md-directions .md-dir").forEach((dir) => {
+      const body = clean(dir);
+      if (body) sections.push(body);
+    });
+    const extraText = clean(root.querySelector(".md-extra"));
+    if (extraText) sections.push(extraText);
+    const text = sections.filter(Boolean).join("\n\n");
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      setCopyState("copied");
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const copied = document.execCommand("copy");
+      area.remove();
+      setCopyState(copied ? "copied" : "failed");
+    }
+    if (resetTimer.current != null) window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setCopyState("idle"), 1800);
+  };
+
   return (
-    <div ref={panelRef} className="panel matchup-detail result-inspector" tabIndex={-1}>
+    <div ref={attachRef} className="panel matchup-detail result-inspector" tabIndex={-1}>
       <div className="md-head">
-        {head}
-        {grade && <span className={`grade-pill grade-${grade}`}>{grade}</span>}
+        <div className="md-head-summary">
+          <span className="md-head-pair">{head}</span>
+          {speed && (
+            <span className="md-head-speed num">
+              {t("matchup.speed")}: {speed.mine ?? "—"} {t("matchup.vs")} {speed.theirs ?? "—"}
+              {speedResult ? ` · ${speedResult}` : ""}
+            </span>
+          )}
+          {grade && <span className={`grade-pill grade-${grade}`}>{grade}</span>}
+          {gradeFacts?.map((fact, index) => <span className="md-head-fact" key={index}>{fact}</span>)}
+        </div>
+        <div className="md-head-actions">
+          {calculate}
+          <button type="button" className="second-btn md-copy" onClick={() => void copyAll()}>
+            {t(copyState === "copied" ? "matchup.copied"
+              : copyState === "failed" ? "matchup.copyFailed" : "matchup.copy")}
+          </button>
+        </div>
       </div>
-      {!!gradeFacts?.length && (
-        <div className="md-lines">
-          {gradeFacts.map((f, i) => <span key={i}>{f}</span>)}
+      {!!builds?.length && (
+        <div className="md-build-cards">
+          {builds.map((build, index) => (
+            <div className="build-card md-build-slot" data-copy-label={build.label}
+                 key={build.option?.key ?? build.label + "-" + index}>
+              {build.option
+                ? <BuildSetSummary option={build.option} index={build.index ?? index} />
+                : <span className="md-build-missing">—</span>}
+            </div>
+          ))}
         </div>
       )}
-      {directions.map(({ label, damage }, di) => (
-        <div key={di} className="md-dir">
-          <div className="md-line md-dir-label">{label}</div>
-          {damage ? (
-            <>
-              <div className="md-line num">
-                {damageText.name(damage.move)} · {damage.minPercent}–{damage.maxPercent}%
-              </div>
-              <div className="md-line">{damageText.ko(damage.ko as never)}</div>
-              {damage.caveats?.map((c, i) => (
-                <div key={i} className="md-line md-caveat">{c}</div>
-              ))}
-            </>
-          ) : <div className="md-line md-caveat">—</div>}
-        </div>
-      ))}
-      {speed && (
-        <div className="md-line md-caveat num">
-          {t("matchup.speed")}: {speed.mine ?? "—"} {t("matchup.vs")} {speed.theirs ?? "—"}
-          {speed.faster ? ` · ${t(optionalKey(`matchup.faster.${speed.faster}`) ?? "matchup.faster.tie")}` : ""}
+      <div className="md-directions">
+        {directions.map(({ label, damage }, di) => (
+          <div key={di} className="md-dir">
+            <div className="md-line md-dir-label">{label}</div>
+            {damage ? (
+              <>
+                <div className="md-line num">
+                  {damageText.name(damage.move)} · {damage.minPercent}–{damage.maxPercent}%
+                </div>
+                <div className="md-line">{damageText.ko(damage.ko as never)}</div>
+                {damage.caveats?.map((c, i) => (
+                  <div key={i} className="md-line md-caveat">{c}</div>
+                ))}
+              </>
+            ) : <div className="md-line md-caveat">—</div>}
+          </div>
+        ))}
+      </div>
+      {extra && (
+        <div className="md-extra">
+          {extra}
         </div>
       )}
-      {extra}
-      {sets}
     </div>
   );
 }

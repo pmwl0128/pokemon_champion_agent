@@ -12,8 +12,12 @@ export function populatedAxes(
 ): { rows: Set<string>; cols: Set<string> } {
   const rows = new Set<string>();
   const cols = new Set<string>();
-  for (const [rowKey, cells] of Object.entries(grid)) {
-    for (const [colKey, cell] of Object.entries(cells)) {
+  // This runs over ~40k cells. `for...in` avoids allocating two full entry arrays (and a tiny pair
+  // for every cell) merely to discover the populated axes.
+  for (const rowKey in grid) {
+    const cells = grid[rowKey];
+    for (const colKey in cells) {
+      const cell = cells[colKey];
       if (cell == null) continue;
       rows.add(rowKey);
       cols.add(colKey);

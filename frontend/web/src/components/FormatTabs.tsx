@@ -4,15 +4,17 @@ import { SegmentedControl } from "./SegmentedControl.tsx";
 
 /** The single/double segmented control shared by the ranking, trend, and calc pages (was
  * copy-pasted verbatim in all three). */
-export function FormatTabs({ format, onChange, className = "" }: {
+export function FormatTabs({ format, onChange, className = "", vertical = false }: {
   format: FormatId;
   onChange: (f: FormatId) => void;
   className?: string;
+  vertical?: boolean;
 }) {
   const t = useT();
   return (
     <SegmentedControl kind="radio" value={format} onChange={onChange}
-      ariaLabel={t("a11y.format")} className={`seg${className ? ` ${className}` : ""}`}
+      ariaLabel={t("a11y.format")} orientation={vertical ? "vertical" : "horizontal"}
+      className={`seg${className ? ` ${className}` : ""}`}
       items={(["single", "double"] as const).map((id) => ({
         id,
         label: t(`format.${id}`),

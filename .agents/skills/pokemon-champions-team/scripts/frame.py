@@ -33,9 +33,19 @@ trims the generic popular tail, and any group carrying a constraint member (anch
 retained regardless — so an expressive / off-meta anchor's low-support-but-real frame is never
 suppressed (that suppression would re-manufacture the very mode-collapse this operator exists to break).
 
-Tier 1 (current): a shallow partition by the profile's speed_control signature + repset attachment —
-mostly orchestration of landscape/repset/team_profile. Tier 2 (profile-vector clustering) lands only if
-Tier-1 groups prove to blend distinct archetypes.
+Tier 1 (current): a shallow partition by ONE structural signature + repset attachment — mostly
+orchestration of landscape/repset/team_profile. The signature is FORMAT-SPECIFIC because the two
+metagames commit to structure on different axes:
+- doubles keys on the DEFINING speed-control modes (Trick Room / Tailwind / weather-ability / scarf);
+- singles keys on the hazard / setup / recovery / pivot commitments, because speed control does not
+  separate singles teams at all (the overwhelming majority carry no defining mode, so a speed-control
+  key collapses the pool into one undifferentiated bucket whose co-occurrence clears no support bar —
+  a zero-skeleton frame, which is the one output this operator exists to prevent).
+A row whose structure is NOT OBSERVABLE (species-only library records: no declared moves, items or
+abilities) carries no signature in either format and is grouped as such — "we could not read its
+structure" is a different fact from "it carries none", and grouping the two together is what makes a
+data gap look like an archetype.
+Tier 2 (profile-vector clustering) lands only if Tier-1 groups prove to blend distinct archetypes.
 """
 from __future__ import annotations
 
@@ -43,6 +53,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+import completeness
 import team_profile
 import team_i18n as i18n
 from canonhash import content_hash as _content_hash
@@ -52,8 +63,16 @@ from repset import MIN_SAMPLE, representative_sets_from_teams
 
 # A species must co-occur in at least this share of a structural GROUP's teams to be a core candidate
 # (the recurring backbone), AND clear MIN_SAMPLE in absolute count. Tunable; 0.5 = "a majority of the
-# archetype's real teams run it". Below it a species is a flex-slot FILLER (observed_facts), not core.
+# archetype's real teams run it".
 CORE_SUPPORT = 0.5
+# The SECOND tier. A species between PARTNER_SUPPORT and CORE_SUPPORT recurs in the group without
+# being its backbone: too frequent to present as an arbitrary filler, not frequent enough to bind a
+# candidate against. It is emitted as a core candidate with role `recurring-partner` so it gets the
+# same REAL repset grounding (the whole value: the AI is handed the right (item,ability) joint), but
+# the slate binding only REPORTS a deviation on it — it never eliminates. A single 0.5 bar sent this
+# whole band to observed_fillers, which carries no grounded set, so the band's real joint evidence
+# was reachable only by a second manual repset call the assembly step does not make.
+PARTNER_SUPPORT = 0.3
 # Cap core candidates so a skeleton always leaves >= 1 open flex slot (never a full-6 skeleton — that
 # would be a verbatim-team by the back door; the library guardrail is the netdeck backstop, not frame).
 MAX_CORE = 5
@@ -94,13 +113,76 @@ _DEFINING_MODES = ("trickroom", "tailwind", "ability", "scarf")
 
 
 def _mode_signature(profile: dict[str, Any]) -> tuple[str, ...]:
-    """The team's structural GROUP key: its DEFINING speed-control modes (Trick Room / Tailwind /
-    weather-ability / scarf), sorted; ('none',) when it carries none of them. Tier-1 shallow partition
-    — the full profile vector is the Tier-2 clustering key if these groups prove to blend archetypes
-    (e.g. sun vs rain both fold to 'ability' here; that is the documented Tier-1 boundary)."""
+    """The DOUBLES structural GROUP key: the team's DEFINING speed-control modes (Trick Room /
+    Tailwind / weather-ability / scarf), sorted; ('none',) when it carries none of them. Tier-1
+    shallow partition — the full profile vector is the Tier-2 clustering key if these groups prove to
+    blend archetypes (e.g. sun vs rain both fold to 'ability' here; that is the documented Tier-1
+    boundary)."""
     modes = set((profile.get("speed_control_mode") or {}).get("modes") or [])
     defining = tuple(sorted(m for m in modes if m in _DEFINING_MODES))
     return defining or ("none",)
+
+
+# The SINGLES defining axes: (signature name, role_composition tag, member count that counts as a
+# commitment). Speed control is NOT one of them — it is reported in structural_profile like `soft` is
+# for doubles, but in singles it is carried by a small minority and cannot key the partition.
+#
+# The count bars are the tuning surface, and they are not all 1 because presence alone is not a
+# commitment for every axis:
+#   hazard_set  >= 1  setting hazards at all is the commitment (a team either invests a slot or not);
+#   setup       >= 2  one setup move is ordinary on a member that is otherwise not a wincon; two or
+#                     more is the team being BUILT around setup;
+#   recovery    >= 2  Leftovers/Sitrus count as recovery via item coverage, so >= 1 is near-universal
+#                     and separates nothing; >= 2 is the genuinely attrition-leaning build;
+#   pivot       >= 1  a pivot move is a deliberate momentum slot, rarely incidental.
+_SINGLE_AXES: tuple[tuple[str, str, int], ...] = (
+    ("hazard", "hazard_set", 1),
+    ("setup", "setup", 2),
+    ("recovery", "recovery", 2),
+    ("pivot", "pivot", 1),
+)
+# The signature of a row whose structure could not be READ (see the module docstring). Kept distinct
+# from ('none',), which is the positive fact "structure was read and it commits to no defining axis".
+_UNPROFILED = ("unprofiled",)
+
+
+def _structure_observed(team: dict[str, Any]) -> bool:
+    """Whether this row's structural signature can be READ at all. Both Tier-1 keys are move-driven
+    (Trick Room / Tailwind; hazard / setup / recovery / pivot), so a species-only library record — a
+    ladder roster published as six names with no set — supports NO signature: its every role count is
+    0 and its only speed-control mode is 'none' because the source never published the set, not
+    because the team commits to nothing. diagnose already refuses to report a phantom gap for such a
+    member; the partition must not invent one either.
+
+    The bar is the same authority diagnose uses (`completeness.moveset_authoritative`), not "did any
+    signal leak through": a bare row of a single-ability species still yields that ability's coverage,
+    and reading a structural commitment out of THAT would put a data gap in a real archetype's bucket.
+    """
+    return any(completeness.moveset_authoritative(m.get("completeness"),
+                                                  has_moves=bool(m.get("moves")))
+               for m in (team.get("pokemon") or []))
+
+
+def _group_signature(team: dict[str, Any], profile: dict[str, Any], fmt: str) -> tuple[str, ...]:
+    """The Tier-1 structural GROUP key for one team, by format (module docstring)."""
+    if not _structure_observed(team):
+        return _UNPROFILED
+    if fmt == "single":
+        rc = profile.get("role_composition") or {}
+        sig = tuple(name for name, tag, bar in _SINGLE_AXES
+                    if (rc.get(tag) or {}).get("count", 0) >= bar)
+        return sig or ("none",)
+    return _mode_signature(profile)
+
+
+def _signature_axis(sig: tuple[str, ...], fmt: str) -> str:
+    """What the group key MEANS, so a reader (and the md/web renderers) never has to infer it from
+    the format or mistake a role signature for a speed-control one."""
+    if sig == ("__all__",):
+        return "unpartitioned_pool"
+    if sig == _UNPROFILED:
+        return "structure_not_observed"
+    return "role_signature" if fmt == "single" else "speed_control"
 
 
 def _cooccurrence(teams: list[dict[str, Any]], exclude: set[str]) -> dict[str, int]:
@@ -176,16 +258,22 @@ def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
                                    for tag, h in sorted(role_hists.items())},
     }
 
-    # --- core candidates: anchor first, then within-group recurring backbone (share >= CORE_SUPPORT) --
-    ranked = sorted(((sp, c) for sp, c in cooccur.items()
-                     if c >= MIN_SAMPLE and c / n >= CORE_SUPPORT),
+    # --- core candidates, TIERED: anchor first, then the within-group backbone (share >=
+    # CORE_SUPPORT), then the recurring-partner band (PARTNER_SUPPORT <= share < CORE_SUPPORT). Both
+    # derived tiers are ordered by prevalence and both get real repset grounding; only the tier NAME
+    # differs, and it is what the slate binding reads to decide report-vs-eliminate. ---------------
+    ranked = sorted(((sp, c) for sp, c in cooccur.items() if c >= MIN_SAMPLE),
                     key=lambda kv: (-kv[1], kv[0]))
     core_list: list[tuple[str, str, str | None]] = [   # (species, role, item_filter)
         (sp, "anchor", anchor_item.get(sp)) for sp in anchor_species]
-    for sp, _c in ranked:
-        if len(core_list) >= MAX_CORE:
-            break
-        core_list.append((sp, "core-partner", None))
+    for role, low, high in (("core-partner", CORE_SUPPORT, None),
+                            ("recurring-partner", PARTNER_SUPPORT, CORE_SUPPORT)):
+        for sp, c in ranked:
+            if len(core_list) >= MAX_CORE:
+                break
+            share = c / n
+            if share >= low and (high is None or share < high):
+                core_list.append((sp, role, None))
 
     core_candidates = []
     for sp, role, item in core_list:
@@ -236,21 +324,47 @@ def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
         "role_composition_norms": structural_profile["role_composition_norms"],
     }
 
+    tiers = Counter(role for _, role, _ in core_list)
+    n_core, n_partner = tiers.get("core-partner", 0), tiers.get("recurring-partner", 0)
+    structure_observed = sig != _UNPROFILED
     thin = n < THIN_BAR
+    # An EMPTY BACKBONE is never `medium`. A skeleton whose co-occurrence clears no support bar states
+    # a real structural distribution and nothing to build on; labelling that "medium" told the reader
+    # the six open slots were a considered result rather than an absence of evidence. The anchor does
+    # not count — it is core by construction, not an observation about the group.
+    if thin:
+        conf, reason = "low", "thin-observed-sample"
+    elif not structure_observed:
+        conf, reason = "low", "structure-not-observed"
+    elif not (n_core or n_partner):
+        conf, reason = "low", "no-recurring-backbone"
+    elif not n_core:
+        conf, reason = "low", "recurring-partners-only"
+    else:
+        conf, reason = "medium", "observed-sample"
     skeleton = {
+        "group_signature": {"axis": _signature_axis(sig, fmt), "key": list(sig)},
         "structural_profile": structural_profile,
         "prevalence": {"count": n, "share": round(n / pool_size, 3) if pool_size else 0.0},
         "core_candidates": core_candidates,
-        "flex_slots": {"open_count": max(0, 6 - len(core_candidates))},
+        "core_tiers": {"anchor": tiers.get("anchor", 0), "core": n_core,
+                       "recurring_partner": n_partner},
+        # open_count = slots this skeleton says nothing about. substitutable_count = the
+        # recurring-partner slots it DOES fill but does not bind, so the reader can see how much of a
+        # "full" skeleton is actually soft.
+        "flex_slots": {"open_count": max(0, 6 - len(core_candidates)),
+                       "substitutable_count": n_partner},
         "observed_facts": observed_facts,
         "thin": thin,
-        "confidence": "low" if thin else "medium",
-        "confidence_reason": "thin-observed-sample" if thin else "observed-sample",
+        "confidence": conf,
+        "confidence_reason": reason,
         "notes": [
-            "core_candidates = within-group co-occurrence (share >= %.2f) + each member's REAL repset "
-            "(item,ability) joint — an aggregate over the group, NOT a verbatim team and NOT a mandated "
-            "roster: substitute freely, but a substitute needs its OWN repset basis or an off_meta "
-            "declaration (the slate binding checks this)." % CORE_SUPPORT,
+            "core_candidates = within-group co-occurrence + each member's REAL repset (item,ability) "
+            "joint, in TWO tiers: role 'core-partner' (share >= %.2f, the group's backbone — a "
+            "substitute needs its OWN repset basis or an off_meta declaration, which the slate "
+            "binding checks) and role 'recurring-partner' (%.2f–%.2f — recurs without being the "
+            "backbone; substituting one costs NO declared basis). An aggregate over the group, NOT a "
+            "verbatim team and NOT a mandated roster." % (CORE_SUPPORT, PARTNER_SUPPORT, CORE_SUPPORT),
             "set_guidance (moves/nature/sps) is a REFERENCE, not a hard lock; only a core-bearer's "
             "(item,ability) leaving its repset clusters WITHOUT an acknowledged deviation is a red flag.",
             "observed_facts is DESCRIPTIVE — how real teams in this group vary at the open slots; "
@@ -258,6 +372,20 @@ def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
             "slot. Second Mega / coverage / utility are the AI's independent calls (flex_slots).",
         ],
     }
+    if not (n_core or n_partner):
+        skeleton["notes"].append(
+            "EMPTY BACKBONE: no species recurs in >= %.2f of this group's teams, so there is NOTHING "
+            "here to assemble on — this skeleton is a structural distribution plus open slots, and "
+            "its confidence is low for exactly that reason (an empty core is never 'medium'). Do not "
+            "read the open slots as freedom: ground every member you pick through repset/search and "
+            "say in the answer that the frame supplied no backbone." % PARTNER_SUPPORT)
+    if not structure_observed:
+        skeleton["notes"].append(
+            "STRUCTURE NOT OBSERVED: these library rows are species-only records (the source "
+            "published the six species, not their moves/items/abilities), so NO structural signature "
+            "could be read from them. They are pooled as one co-occurrence group, which is NOT an "
+            "archetype — their co-occurrence is real evidence, their structure is unknown, and "
+            "'unknown' is not the same fact as 'commits to nothing'.")
     # frame_id is a mechanical content hash (NOT a team-name template): structure + core species + fmt.
     skeleton["frame_id"] = "f" + _content_hash(
         {"sig": list(sig), "core": sorted(core_species), "fmt": fmt}, 10)
@@ -286,12 +414,12 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
     pool_mega_distribution = mega_slot_distribution(profiles)
     pool_cooccur = _cooccurrence(pool, anchor_species)
 
-    # Partition by speed_control signature; a group qualifies at MIN_SAMPLE. >=2 qualifying groups ->
-    # partition; else ONE unpartitioned frame over the whole pool (honest: a pool that does not separate
-    # structurally is one frame, not fabricated sub-archetypes).
+    # Partition by the format's Tier-1 structural signature; a group qualifies at MIN_SAMPLE. >=2
+    # qualifying groups -> partition; else ONE unpartitioned frame over the whole pool (honest: a pool
+    # that does not separate structurally is one frame, not fabricated sub-archetypes).
     groups: dict[tuple, list[tuple[dict, dict]]] = {}
     for t, p in zip(pool, profiles):
-        groups.setdefault(_mode_signature(p), []).append((t, p))
+        groups.setdefault(_group_signature(t, p, fmt), []).append((t, p))
     qual = {sig: g for sig, g in groups.items() if len(g) >= MIN_SAMPLE}
     partitioned = len(qual) >= 2
     residual = sum(len(g) for sig, g in groups.items() if sig not in qual) if partitioned else 0
@@ -307,8 +435,13 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
     # display cap only trims the generic popular/rare tail and NEVER a group carrying a constraint
     # member — in an anchor build the anchor is in every group, so nothing is trimmed (an off-meta
     # anchor's rare frame survives). frames_total vs frames_shown is disclosed.
-    frame_groups.sort(key=lambda kv: (len(kv[1]), sorted(kv[0]))
-                      if order == "rare_first" else (-len(kv[1]), sorted(kv[0])))
+    # The structure-not-observed pool sorts LAST whichever way the knob points. That is a CATEGORY
+    # split, not a ranking: it is not a structural frame at all (see _structure_observed), so it does
+    # not belong anywhere in an ordering of structural frames — and letting its raw prevalence put it
+    # first would spend the display cap on the one group that describes no structure.
+    frame_groups.sort(key=lambda kv: (kv[0] == _UNPROFILED,
+                                      *((len(kv[1]), sorted(kv[0])) if order == "rare_first"
+                                        else (-len(kv[1]), sorted(kv[0])))))
     frames_total = len(frame_groups)
     anchor_members = [{"species": f["species"], "item": f.get("item")} for f in filter_members]
     if filter_members:
@@ -324,11 +457,15 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
     thin = pool_size < THIN_BAR
     meta_fallback = pool_size == 0 or not any(
         cc.get("grounding") for s in skeletons for cc in s["core_candidates"])
+    # Every shown skeleton empty of a derived backbone is a frame-level fact, not a per-group quirk:
+    # the pool does not carry a recurring structure this partition can see.
+    no_backbone = bool(skeletons) and all(
+        not (s["core_tiers"]["core"] or s["core_tiers"]["recurring_partner"]) for s in skeletons)
     notes = [
         "frame HANDS the AI a data-grounded starting skeleton so `[assemble]` is not built from the "
         "training prior; it is a scaffold, NOT a retriever — build YOUR team on it, deviate with a "
         "declared basis. The slate gate binds each candidate's core-bearer sets against this evidence.",
-        "skeletons are ordered by PREVALENCE (a view under the meta_conformance knob: common_first / "
+        "structural skeletons are ordered by PREVALENCE (a view under the meta_conformance knob: common_first / "
         "rare_first) — never a strength ranking; frames_total is every group above support, frames_shown "
         "the displayed subset (an anchor build shows them ALL so an off-meta frame is never dropped).",
         "grounded sets come ONLY from repset (real joint teams); a core candidate with grounding=null "
@@ -343,6 +480,13 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         notes.append("META_FALLBACK: no real joint grammar for this anchor (empty pool or no core "
                      "candidate cleared repset) — this is the data-gated boundary (design §19.8), "
                      "stated honestly; assemble from meta + dex facts and disclose the low confidence.")
+    if no_backbone:
+        notes.append(f"NO BACKBONE in any shown frame: no species recurs in >= {PARTNER_SUPPORT:.2f} "
+                     "of any structural group, so this run hands you structural facts and open slots "
+                     "but no grounded starting roster. Frame confidence is low for that reason; "
+                     "ground each member through repset/search and disclose that the frame was empty "
+                     "— do NOT fill the slots from the training prior, which is the exact failure "
+                     "this operator exists to block.")
     transitioned = sum(1 for t in pool if t.get("target_rule"))
     if transitioned:
         notes.append(
@@ -365,6 +509,7 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         "skeletons": skeletons,
         "thin": thin,
         "meta_fallback": meta_fallback,
+        "no_backbone": no_backbone,
         "handover": ({"rows": transitioned,
                        "evidence_rules": sorted({t.get("evidence_rule") for t in pool
                                                  if t.get("evidence_rule")}),
@@ -373,8 +518,9 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
                        "expires_at": sorted({t.get("expires_at") for t in pool
                                              if t.get("expires_at")})}
                       if transitioned else None),
-        "confidence": "low" if thin else "medium",
-        "confidence_reason": "thin-observed-sample" if thin else "observed-sample",
+        "confidence": "low" if (thin or no_backbone) else "medium",
+        "confidence_reason": ("thin-observed-sample" if thin
+                              else "no-recurring-backbone" if no_backbone else "observed-sample"),
         "notes": notes,
     }
 
@@ -391,14 +537,30 @@ def format_frame_md(d: dict[str, Any]) -> str:
         lines.append("> ⚠️ " + i18n.t('frame_thin', n=d["pool_size"], bar=THIN_BAR))
     if d.get("meta_fallback"):
         lines.append("> ⚠️ " + i18n.t('frame_meta_fallback'))
+    if d.get("no_backbone"):
+        lines.append("> ⚠️ " + i18n.t('frame_no_backbone', bar=f"{PARTNER_SUPPORT:.2f}"))
     for i, s in enumerate(d.get("skeletons") or [], 1):
-        modes = ", ".join(s["structural_profile"]["speed_control_modes"].keys()) or "—"
+        # The GROUP KEY, not the group's mode inventory: the key is format-specific (speed control in
+        # doubles, role commitments in singles), so printing the speed-control modes for a singles
+        # frame would name an axis the partition did not use.
+        gsig = s.get("group_signature") or {}
+        key = (i18n.t('frame_unpartitioned') if gsig.get("axis") == "unpartitioned_pool"
+               else ", ".join(gsig.get("key") or []) or ", ".join(
+                   s["structural_profile"]["speed_control_modes"].keys()) or "—")
         prev = s["prevalence"]
-        lines.append(f"\n## #{i} `{s['frame_id']}` — {i18n.t('frame_structure')}: {modes} "
+        lines.append(f"\n## #{i} `{s['frame_id']}` — {i18n.t('frame_structure')}: {key} "
+                     f"({gsig.get('axis') or 'speed_control'}) "
                      f"· {i18n.t('frame_prevalence')} {prev['count']} ({prev['share']}) "
                      f"· {i18n.t('confidence')} **{s['confidence']}**")
+        if gsig.get("axis") == "structure_not_observed":
+            lines.append("> ⚠️ " + i18n.t('frame_structure_unobserved'))
+        tiers = s.get("core_tiers") or {}
         lines.append(f"**{i18n.t('frame_core')}** ({i18n.t('frame_open_slots')}: "
-                     f"{s['flex_slots']['open_count']})")
+                     f"{s['flex_slots']['open_count']}"
+                     + (f"; {i18n.t('frame_substitutable')}: {tiers.get('recurring_partner')}"
+                        if tiers.get("recurring_partner") else "") + ")")
+        if not (tiers.get("core") or tiers.get("recurring_partner")):
+            lines.append("> ⚠️ " + i18n.t('frame_empty_backbone', bar=f"{PARTNER_SUPPORT:.2f}"))
         for cc in s["core_candidates"]:
             g = cc.get("grounding")
             if g:

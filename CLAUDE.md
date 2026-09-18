@@ -95,7 +95,7 @@ Recommended path — the prebuilt bundle (no Node.js needed):
 1. Fetch `pokemon-champions-ui.zip` from the [`data-latest` release](https://github.com/pmwl0128/pokemon_champion_agent/releases/tag/data-latest).
 2. Extract it into the project directory (or a sibling folder the user designates). Verify the extracted folder contains `dist/`, `projection/`, `bridge/`, `skills/`, `requirements-runtime.txt`, and a platform start script.
 3. Install the locked runtime deps with `python -m pip install -r requirements-runtime.txt` (Python 3.10+; no Node.js).
-4. Launch the platform start script — `start-local.ps1` on Windows, `start-local.sh` on Linux/macOS (mark it executable first). Do not pass `--port`; read `~/.pokemon-champions-ui/pcui.env` for `PCUI_LOCAL_PORT` if the user has set one.
+4. Launch the platform start script — `start-local.ps1` on Windows, `start-local.sh` on Linux/macOS (mark it executable first). Do not pass `--port`; read `~/.pokemon-champions/pc.env` for `PCUI_LOCAL_PORT` if the user has set one.
 5. Surface the full URL printed by the launcher, including its `#bootstrap=...` fragment — a bare `/` is rejected by the local auth check. Tell the user to open that complete URL once.
 
 From a source checkout (when the user wants to build or modify the SPA), run
@@ -103,7 +103,7 @@ From a source checkout (when the user wants to build or modify the SPA), run
 this path needs Node.js 22 and `frontend/requirements-ui.txt`.
 
 The local UI is a verification and browsing aid. It does not produce new facts the agent did not already
-compute through the skills, and UEP session/artifact state under `~/.pokemon-champions-ui/` is a mirror
+compute through the skills, and UEP session/artifact state under `~/.pokemon-champions/` is a mirror
 of the agent's own receipts — do not present a UI-rendered team as if it came from a source the agent
 did not audit. For the online edition, point the user at the URL in the README; it shares no local state.
 

@@ -132,9 +132,14 @@ function FrameCard({ d }: { d: Record<string, unknown> }) {
         const count = prev ? num(prev.count) : null;
         const cores = (arr(s.core_candidates).map(obj).filter(Boolean) as Record<string, unknown>[])
           .map((c) => str(c.species)).filter(Boolean);
-        // hard modes only — `soft` co-occurs with everything and just adds noise
-        const modes = Object.keys(obj(obj(s.structural_profile)?.speed_control_modes ?? null) ?? {})
-          .filter((m) => m !== "soft");
+        // The Tier-1 GROUP KEY, which is format-specific (speed control in doubles, role
+        // commitments in singles) — showing a singles frame's speed-control modes would name an axis
+        // the partition did not use. Older frame outputs carry no group_signature: fall back to the
+        // hard modes, minus `soft`, which co-occurs with everything and just adds noise.
+        const modes = strs(obj(s.group_signature)?.key ?? null).length > 0
+          ? strs(obj(s.group_signature)?.key ?? null)
+          : Object.keys(obj(obj(s.structural_profile)?.speed_control_modes ?? null) ?? {})
+            .filter((m) => m !== "soft");
         return (
           <div key={i} className="uep-frame-row">
             <div className="uep-card-row">

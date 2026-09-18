@@ -305,8 +305,9 @@ def frame_binding(team_c: dict[str, Any], binding: Any, skeletons_by_id: dict[st
     """Bind ONE candidate against the frame it declares. Returns (binding_info, red_reasons) — red
     reasons feed the cheap-stage elimination (design §19.10: an ungrounded core-bearer with no
     declared basis does not bill the expensive battery). Per-candidate contract is minimal — a single
-    `frame_id` (core-bearers are then DERIVED as members ∈ that frame's core_candidates), plus an
-    optional `off_meta`/`deviations` escape."""
+    `frame_id` (core-bearers are then DERIVED as members ∈ that frame's core_candidates at the CORE
+    tier; the frame's `recurring-partner` tier binds softly and is reported under
+    `recurring_partners`), plus an optional `off_meta`/`deviations` escape."""
     members = {m.get("species"): m for m in team_c.get("pokemon", []) if m.get("species")}
     b = binding if isinstance(binding, dict) else {}
     frame_id = b.get("frame_id")
@@ -314,7 +315,8 @@ def frame_binding(team_c: dict[str, Any], binding: Any, skeletons_by_id: dict[st
                                             if isinstance(d, dict)}
     reasons_by_sp = {d.get("species"): d.get("reason") for d in (b.get("deviations") or [])
                      if isinstance(d, dict)}
-    info: dict[str, Any] = {"frame_id": frame_id, "core_bearers": [], "deviations": [], "advisories": []}
+    info: dict[str, Any] = {"frame_id": frame_id, "core_bearers": [], "recurring_partners": [],
+                            "deviations": [], "advisories": []}
     red: list[str] = []
     if b.get("off_meta_build"):
         info["off_meta_build"] = True                # a declared off-meta build: no core-bearer binding
@@ -340,15 +342,24 @@ def frame_binding(team_c: dict[str, Any], binding: Any, skeletons_by_id: dict[st
         base = base_of_form_name(sp)
         core_key = sp if sp in core else (base if base in core else None)
         if core_key is not None:
-            info["core_bearers"].append(sp)
+            tier = core[core_key].get("role")
+            # A `recurring-partner` candidate (frame's 0.3-0.5 support band) is NOT the group's
+            # backbone: it is offered WITH its real repset grounding so the set is available, but it
+            # was never a commitment to bind against. Leaving its clusters is reported (and must be
+            # disclosed at answer-audit) and never eliminates — taxing that band at the core rate
+            # would price a substitution above going with the crowd, which is the behaviour frame
+            # exists to counteract.
+            soft = tier == "recurring-partner"
+            info["recurring_partners" if soft else "core_bearers"].append(sp)
             clusters = ((core[core_key].get("grounding") or {}).get("clusters")) or []
             if clusters and not _pair_in_clusters(item, ability, clusters):
                 ack = sp in acked
                 info["deviations"].append({
                     "species": sp, "declared": {"item": item, "ability": ability},
-                    "grounded_clusters": clusters, "acknowledged": ack,
-                    "reason": reasons_by_sp.get(sp), "severity": "yellow" if ack else "red"})
-                if not ack:
+                    "grounded_clusters": clusters, "acknowledged": ack, "tier": tier,
+                    "reason": reasons_by_sp.get(sp),
+                    "severity": "yellow" if (ack or soft) else "red"})
+                if not (ack or soft):
                     red.append(f"{sp}: item={item!r}/ability={ability!r} is outside this core "
                                f"candidate's repset clusters {clusters} and no deviation rationale / "
                                "off_meta was declared (core-bearer red deviation)")

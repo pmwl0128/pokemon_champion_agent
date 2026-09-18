@@ -15,7 +15,7 @@ import { displayName, useLang, useT } from "../i18n.ts";
 import type { DexIndexEntry } from "../runtime/adapter.ts";
 import { useBuildOptions, type BuildOption } from "../pages/calc/shared.tsx";
 
-export type CalcRailTab = "damage" | "speed" | "tune";
+export type CalcRailTab = "damage" | "speed" | "tune" | "actual";
 export type CalcRailTarget = "primary" | "secondary";
 
 export interface CalcRailPickResult {
@@ -25,10 +25,9 @@ export interface CalcRailPickResult {
 
 export interface CalcRailApi {
   format: FormatId;
-  targets: readonly [
-    { id: "primary"; label: string },
-    { id: "secondary"; label: string },
-  ];
+  targets: ReadonlyArray<{ id: CalcRailTarget; label: string }>;
+  /** Most calculator sides hold six. Actual-matchup comparison intentionally accepts twelve. */
+  maxItems?: number;
   pick: (
     target: CalcRailTarget,
     entry: DexIndexEntry,
@@ -60,7 +59,7 @@ export function CalcRail({ state, dex, tab, api }: {
   const [filters, setFilters] = useState<DexFilters>(freshFilters);
   const [expandedSlug, setExpandedSlug] = useState("");
   const [targetByTab, setTargetByTab] = useState<Record<CalcRailTab, CalcRailTarget>>({
-    damage: "primary", speed: "primary", tune: "primary",
+    damage: "primary", speed: "primary", tune: "primary", actual: "primary",
   });
   const [loaded, setLoaded] = useState<{
     slug: string;
@@ -108,7 +107,7 @@ export function CalcRail({ state, dex, tab, api }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedSlug, api?.format]);
 
-  useEffect(() => { setFeedback(null); }, [tab, target]);
+  useEffect(() => { setFeedback(null); }, [tab, target, api?.format]);
 
   const choose = (entry: DexIndexEntry, option: BuildOption | null, optionIndex: number) => {
     if (!api) return;
@@ -117,7 +116,8 @@ export function CalcRail({ state, dex, tab, api }: {
     setFeedback(result.ok
       ? { ok: true, text: t("calc.rail.added")
         .replace("{name}", displayName(entry, lang)).replace("{side}", side) }
-      : { ok: false, text: t("calc.rail.full").replace("{side}", side) });
+      : { ok: false, text: t("calc.rail.full").replace("{side}", side)
+        .replace("{count}", String(api.maxItems ?? 6)) });
   };
 
   const expansion = (entry: DexIndexEntry) => {
@@ -140,7 +140,7 @@ export function CalcRail({ state, dex, tab, api }: {
     );
   };
 
-  const switcher = api ? (
+  const switcher = api && api.targets.length > 1 ? (
     <div className="calc-rail-target" role="group" aria-label={t("calc.rail.target")}>
       {api.targets.map((candidate) => (
         <button type="button" key={candidate.id}

@@ -204,45 +204,38 @@ export function MonEditor({
       ? { ...current, buildRef } : current);
   }, [currentBuildSig, matchedSet?.key, matchedSetIndex, setMon]);
 
+  const editorActions = (
+    <span className="mon-editor-actions">
+      <button ref={setButtonRef} className="ghost-btn tiny" onClick={openSetPicker}
+        disabled={!mon.slug} aria-expanded={setPickerOpen}
+        title={t("calc.metaSetHint")}>{t("calc.metaSet")}</button>
+      {setPickerOpen && (
+        <BuildPicker options={setOptions} currentKey={currentSetKey}
+          anchorRef={setButtonRef} busy={setPickerBusy}
+          hint={t("calc.setPickHint")}
+          onPick={(option) => {
+            const picked = setOptions.find((candidate) => candidate.key === option.key);
+            if (picked) onSetPick(picked, setOptions.indexOf(picked));
+          }}
+          onClose={() => setSetPickerOpen(false)} />
+      )}
+      <button className="ghost-btn tiny" disabled={!mon.slug}
+        onClick={() => {
+          onExport();
+          setExported(true);
+          window.setTimeout(() => setExported(false), 1600);
+        }}>
+        {exported ? t("calc.copied") : t("calc.exportMon")}
+      </button>
+    </span>
+  );
+
   return (
     <section className="panel mon-editor">
-      <header className="mon-editor-head">
-        <strong>{label}</strong>
-        {mega && (
-          <span className="mega-note">
-            <span className="mega-badge">MEGA</span>
-            <span className="mega-name">{displayName(mega, lang)}</span>
-          </span>
-        )}
-        <span className="mon-editor-actions">
-          <button ref={setButtonRef} className="ghost-btn tiny" onClick={openSetPicker}
-            disabled={!mon.slug} aria-expanded={setPickerOpen}
-            title={t("calc.metaSetHint")}>{t("calc.metaSet")}</button>
-          {setPickerOpen && (
-            <BuildPicker options={setOptions} currentKey={currentSetKey}
-              anchorRef={setButtonRef} busy={setPickerBusy}
-              hint={t("calc.setPickHint")}
-              onPick={(option) => {
-                const picked = setOptions.find((candidate) => candidate.key === option.key);
-                if (picked) onSetPick(picked, setOptions.indexOf(picked));
-              }}
-              onClose={() => setSetPickerOpen(false)} />
-          )}
-          <button className="ghost-btn tiny" disabled={!mon.slug}
-            onClick={() => {
-              onExport();
-              setExported(true);
-              window.setTimeout(() => setExported(false), 1600);
-            }}>
-            {exported ? t("calc.copied") : t("calc.exportMon")}
-          </button>
-        </span>
-      </header>
-
       <div className="mon-editor-id">
         <div className="mon-editor-art">
           {entry
-            ? <GameImage assetKey={entry.key} role="card" alt={displayName(entry, lang)}
+            ? <GameImage assetKey={entry.key} role="dense" alt={displayName(entry, lang)}
                 className="mon-editor-sprite" />
             : <img className="mon-editor-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
         </div>
@@ -250,13 +243,26 @@ export function MonEditor({
           {/* Species and forme are one identity, so they sit on one row when both exist — a forme
               select stacked underneath would push the card taller than its partner across the page. */}
           <div className={`mon-editor-namerow${formes.length ? " split" : ""}`}>
-          <label>{t("ranking.pokemon")}
+          <div className="mon-editor-namefield">
+            <span className="mon-editor-label-line">
+              <span>{t("calc.name")}</span>
+              <span className="mon-editor-types">
+                {(entry?.types ?? []).map((ty) => <TypeBadge key={ty} type={ty} />)}
+              </span>
+              {!formes.length && editorActions}
+            </span>
             <MonPicker idKey={label} slug={mon.slug} dex={dex}
+              ariaLabel={t("calc.name")}
               onSlug={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))} />
-          </label>
+          </div>
           {formes.length > 0 && (
-            <label>{t("calc.forme")}
-              <select value={entry?.slug ?? ""}
+            <div className="mon-editor-namefield">
+              <span className="mon-editor-form-heading">
+                {t("calc.forme")}
+                {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
+                {editorActions}
+              </span>
+              <select value={entry?.slug ?? ""} aria-label={t("calc.forme")}
                 onChange={(e) => {
                   const next = dex.find((x) => x.slug === e.target.value);
                   // A forme switch keeps the build — only the species changes. Dropping back to the
@@ -272,11 +278,8 @@ export function MonEditor({
                   <option key={f.slug} value={f.slug}>{displayName(f, lang)}</option>
                 ))}
               </select>
-            </label>
+            </div>
           )}
-          </div>
-          <div className="mon-editor-types">
-            {(entry?.types ?? []).map((ty) => <TypeBadge key={ty} type={ty} />)}
           </div>
         </div>
       </div>

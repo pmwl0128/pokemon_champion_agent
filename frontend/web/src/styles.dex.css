@@ -1,0 +1,66 @@
+/* Dex-route filter rail. Kept with the lazy DexPage chunk instead of the ranking critical path. */
+.rail-section { border-bottom: 1px solid var(--line); padding: 12px 14px 14px; }
+.rail-section:last-child { border-bottom: 0; }
+.rail-section > h4 {
+  margin: 0 0 9px; display: flex; align-items: baseline; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--sub);
+}
+.rail-section > h4 .aside { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11px; }
+.type-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.type-grid .type-pick { width: 100%; justify-content: flex-start; }
+.type-pick {
+  display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: 12.5px;
+  padding: 5px 8px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+}
+.type-pick img, .type-pick svg { width: 15px; height: 15px; flex: none; }
+.type-pick .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.type-pick:hover { border-color: var(--sub); }
+.type-pick.on { color: #fff; font-weight: 650; box-shadow: var(--shadow); }
+.type-pick.on .nm { color: #fff; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip-row .pill {
+  font: inherit; font-size: 12px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: var(--panel-2); color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.chip-row .pill:hover { border-color: var(--sub); }
+.chip-row .pill.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand-strong); font-weight: 650; }
+.range-rows { display: grid; gap: 6px; }
+.range-row { display: grid; grid-template-columns: 52px 1fr 10px 1fr; align-items: center; gap: 6px; }
+.range-row .lbl { font-size: 12px; color: var(--sub); }
+.range-row.on .lbl { color: var(--brand-strong); font-weight: 650; }
+.range-row input {
+  width: 100%; min-width: 0; font: inherit; font-size: 12.5px; padding: 5px 8px;
+  border: 1px solid var(--line-strong); border-radius: 7px; background: var(--panel-2);
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.range-row.on input { border-color: var(--brand); }
+.range-row .dash { color: var(--sub); text-align: center; font-size: 12px; }
+.pick-list { display: grid; gap: 7px; }
+.pick-list > input {
+  width: 100%; font: inherit; font-size: 12.5px; padding: 6px 9px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2); color: var(--ink);
+}
+.pick-options {
+  max-height: 208px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel-2);
+}
+.pick-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 9px;
+  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink);
+}
+.pick-row:last-child { border-bottom: 0; }
+.pick-row:hover { background: var(--panel); }
+.pick-row.on { background: var(--brand-soft); }
+.pick-row .box {
+  width: 15px; height: 15px; flex: none; border-radius: 4px; display: grid; place-items: center;
+  border: 1px solid var(--line-strong); font-size: 10px; color: var(--brand-strong); background: var(--panel);
+}
+.pick-row .box.radio { border-radius: 50%; }
+.pick-row.on .box { border-color: var(--brand); }
+.pick-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-row .c { font-size: 10.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.rank-badge.dex-no { font-size: 11px; }

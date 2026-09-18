@@ -8,7 +8,7 @@ import type {
   PokemonCardDto, RankingDto,
   MetaKoTrendDto, TrendDto, UsageTrendDto,
 } from "@pokemon-champions/protocol";
-import { HttpError, type DexIndexEntry } from "./runtime/adapter.ts";
+import { HttpError, type DexIndexEntry, type RuntimeAdapter } from "./runtime/adapter.ts";
 import { useRuntime } from "./runtime/context.tsx";
 import { watchTeamExpiry } from "./runtime/teamEvidence.ts";
 
@@ -56,17 +56,32 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): Async<T> {
 interface QueryEntry<T> {
   promise: Promise<T>;
   state: Async<T>;
+  /** Approximate retained JSON characters. Good enough for a coarse browser-memory budget. */
+  bytes: number;
 }
 
 /** Session-scoped static-fact cache. Pending work is shared across consumers and allowed to finish
  * across route changes; a later page reuses it instead of aborting and fetching the same immutable
  * deployment data again. Rejections are evicted so revisiting retries a transient failure. Ready
- * entries use a bounded LRU: detail/card browsing is keyed per Pokemon and must not retain the whole
- * dex forever on low-memory clients. */
-class QueryCache {
-  delete(key: string): void { this.entries.delete(key); }
+ * entries use a two-dimensional LRU: many small detail/card rows are bounded by count, while large
+ * expensive-to-parse matchup documents are retained until the byte budget is actually under
+ * pressure. A render-only `peek` is deliberately not an access, otherwise every render would
+ * rewrite Map insertion order and make React's render frequency decide eviction. */
+export class QueryCache {
   private entries = new Map<string, QueryEntry<unknown>>();
-  private readonly maxReady = 128;
+  private retainedBytes = 0;
+
+  constructor(
+    private readonly maxSmallReady = 128,
+    private readonly maxBytes = 48 * 1024 * 1024,
+    private readonly largeEntryBytes = 1024 * 1024,
+  ) {}
+
+  delete(key: string): void {
+    const entry = this.entries.get(key);
+    if (entry?.state.status === "ready") this.retainedBytes -= entry.bytes;
+    this.entries.delete(key);
+  }
 
   private touch(key: string, entry: QueryEntry<unknown>): void {
     this.entries.delete(key);
@@ -74,17 +89,31 @@ class QueryCache {
   }
 
   private evictReady(): void {
-    while (this.entries.size > this.maxReady) {
-      const victim = [...this.entries].find(([, entry]) => entry.state.status === "ready");
-      if (!victim) return; // never evict in-flight work; it remains shared until it settles
-      this.entries.delete(victim[0]);
+    while (true) {
+      let smallReady = 0;
+      let oldestReady: string | undefined;
+      let oldestSmall: string | undefined;
+      for (const [key, entry] of this.entries) {
+        if (entry.state.status !== "ready") continue;
+        oldestReady ??= key;
+        if (entry.bytes < this.largeEntryBytes) {
+          smallReady += 1;
+          oldestSmall ??= key;
+        }
+      }
+      const overCount = smallReady > this.maxSmallReady;
+      const overBytes = this.retainedBytes > this.maxBytes;
+      if (!overCount && !overBytes) return;
+      // Count churn should evict another cheap row, not a 16 MiB parsed matrix. Under genuine
+      // memory pressure the ordinary LRU order applies to every ready entry.
+      const victim = overCount ? oldestSmall : oldestReady;
+      if (victim === undefined) return; // pending work is always shared until it settles
+      this.delete(victim);
     }
   }
 
   peek<T>(key: string): Async<T> | undefined {
-    const entry = this.entries.get(key);
-    if (entry) this.touch(key, entry);
-    return entry?.state as Async<T> | undefined;
+    return this.entries.get(key)?.state as Async<T> | undefined;
   }
 
   get<T>(key: string, make: () => Promise<T>): Promise<T> {
@@ -93,18 +122,25 @@ class QueryCache {
       this.touch(key, hit as QueryEntry<unknown>);
       return hit.promise;
     }
-    const entry: QueryEntry<T> = { promise: Promise.resolve(undefined as T), state: LOADING };
+    const entry: QueryEntry<T> = {
+      promise: Promise.resolve(undefined as T), state: LOADING, bytes: 0,
+    };
     const promise = make().then(
       (data) => {
         entry.state = { status: "ready", data };
+        // Do this once when the response settles, never during eviction. JSON DTOs are the cache's
+        // contract; stringify length is intentionally approximate and avoids retaining a second
+        // encoded copy merely to obtain exact UTF-8 bytes.
+        try { entry.bytes = JSON.stringify(data).length; } catch { entry.bytes = 0; }
         if (this.entries.get(key) === entry) {
+          this.retainedBytes += entry.bytes;
           this.touch(key, entry as QueryEntry<unknown>);
           this.evictReady();
         }
         return data;
       },
       (error) => {
-        if (this.entries.get(key) === entry) this.entries.delete(key);
+        if (this.entries.get(key) === entry) this.delete(key);
         throw error;
       },
     );
@@ -228,6 +264,15 @@ export function useOppCache(format: FormatId, enabled = true): Async<OppCacheDto
 export function useOppSets(format: FormatId): Async<OppSetCatalogDto> {
   const { adapter } = useRuntime();
   return useQuery(`matchup:sets:${format}`, () => adapter.oppSets(format), [format, adapter]);
+}
+
+/** Imperative consumers (the calculator's async auto-fill callbacks) share the exact same cache
+ * entry as `useOppSets`. Keeping a second per-hook Map made the three lazy calculator tabs fetch
+ * the same catalog independently and then fetch it once more on the Matchup route. */
+export function loadOppSetsCached(
+  adapter: RuntimeAdapter, deploymentId: string, format: FormatId,
+): Promise<OppSetCatalogDto> {
+  return queries.get(`${deploymentId}:matchup:sets:${format}`, () => adapter.oppSets(format));
 }
 
 export function useOppKo(format: FormatId): Async<OppKoGridDto> {

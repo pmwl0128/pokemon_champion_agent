@@ -162,14 +162,17 @@ export function RowHead({
   const headRef = useRef<HTMLTableCellElement>(null);
   // No usage-rank digit here either: it sat right beside the A/B/C build badge and the two small
   // numbers read as one confusing pair. The full configuration lives in the explicit preview.
-  const inner = (
+  const content = (
     <span className="row-head-inner">
-      <CurrentBuildIcon s={s} picks={picks} sets={sets} showSetHover={showSetHover && !open}>
-        <GameImage assetKey={`pokemon:${s.slug}`} role="dense" alt={displayName(s, lang)} className="mini" />
-      </CurrentBuildIcon>
+      <GameImage assetKey={`pokemon:${s.slug}`} role="dense" alt={displayName(s, lang)} className="mini" />
       <span className="nm">{displayName(s, lang)}</span>
       {build && !isModal && <span className="row-build">{build}</span>}
     </span>
+  );
+  const inner = (
+    <CurrentBuildIcon s={s} picks={picks} sets={sets} showSetHover={showSetHover && !open}>
+      {content}
+    </CurrentBuildIcon>
   );
   return (
     <th ref={headRef} className={`row-head${v && !v.isModal ? " variant-active" : ""}${open ? " picking" : ""}`}>

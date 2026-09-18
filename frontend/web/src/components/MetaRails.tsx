@@ -57,13 +57,14 @@ export function FunnelIcon() {
 /** English canonical -> localized label, through the same projection vocabularies the hover cards
  * use. The facet VALUE stays the canonical (design §2.1: the join key never changes with the
  * language, only the label does). */
-function useFacetLabel() {
+function useFacetLabel(enabledFacets: ReadonlySet<FacetKey>) {
   const { lang } = useLang();
-  const dex = useDexByName();
-  const items = useItemsByName();
-  const moves = useMovesByName();
-  const abilities = useAbilitiesByName();
-  const natures = useNatures();
+  const needs = (...facets: FacetKey[]) => facets.some((facet) => enabledFacets.has(facet));
+  const dex = useDexByName(needs("partners", "koTargets", "koedBy"));
+  const items = useItemsByName(needs("items"));
+  const moves = useMovesByName(needs("moves"));
+  const abilities = useAbilitiesByName(needs("abilities"));
+  const natures = useNatures(needs("natures"));
   return (facet: FacetKey, name: string): string => {
     const hit = facet === "items" ? items.get(name)
       : facet === "moves" ? moves.get(name)
@@ -89,8 +90,10 @@ function FilterFlyout({ facets, picks, matching, onToggle, onClear, onClose }: {
   onClose: () => void;
 }) {
   const t = useT();
-  const facetLabel = useFacetLabel();
   const [facet, setFacet] = useState<FacetKey>("items");
+  // Load only the active vocabulary. Opening the item facet must not also parse every move,
+  // ability, nature and Pokemon card; those arrive if and when their tabs are selected.
+  const facetLabel = useFacetLabel(new Set([facet]));
   const [q, setQ] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => { setQ(""); searchRef.current?.focus(); }, [facet]);
@@ -193,10 +196,14 @@ export function MetaRail({ state, format, ranking, activeSlug = "", onAllowed }:
   const { lang } = useLang();
   const t = useT();
   const navigate = useNavigate();
-  const facetLabel = useFacetLabel();
   const [q, setQ] = useState("");
   const [picks, setPicks] = useState<Picks>({});
   const [filterOpen, setFilterOpen] = useState(false);
+  // A closed rail has no labels to paint. After the flyout closes, load only vocabularies for the
+  // active chips that remain visible in the open rail.
+  const labelFacets = new Set<FacetKey>();
+  if (state.open) for (const facet of Object.keys(picks) as FacetKey[]) labelFacets.add(facet);
+  const facetLabel = useFacetLabel(labelFacets);
   // The index is fetched once the filter is opened OR a filter is already active — never on page load.
   const facets = useMetaFacets(format, filterOpen || Object.keys(picks).length > 0);
 

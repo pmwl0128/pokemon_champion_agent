@@ -9,8 +9,9 @@ import type {
   OppOffenseDto, OppSetDto,
   SpeciesRowDto,
 } from "@pokemon-champions/protocol";
+import "../styles.matchup.css";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { stashDamageFill } from "../lib/team.ts";
@@ -27,8 +28,14 @@ import { displayName, optionalKey, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
 import { koLabel, koTone } from "../lib/ko.ts";
 import { populatedAxes } from "../lib/matchupGrid.ts";
-import { CellInspector, SetBlock, type InspectorDamage } from "../components/CellInspector.tsx";
-import { ActualMatchupWorkspace } from "./ActualMatchupWorkspace.tsx";
+import {
+  CellInspector, type InspectorBuild, type InspectorDamage,
+} from "../components/CellInspector.tsx";
+
+// Actual-set input owns large editors, vocabularies and the shared search rail. Keep all of it out
+// of the default KO/check graph until that tab is selected.
+const ActualMatchupWorkspace = lazy(() => import("./ActualMatchupWorkspace.tsx")
+  .then((module) => ({ default: module.ActualMatchupWorkspace })));
 
 function offenseKoChance(off: Pick<OppOffenseDto,
   "ko" | "koChance" | "koGuaranteed" | "koPossible">) {
@@ -81,41 +88,30 @@ export function fillFromSet(key: string, set: OppSetDto | undefined) {
   };
 }
 
-function CellSets({ sets, aSlug, bSlug, aTitle, bTitle, format, move }: {
+function CellCalculate({ sets, aSlug, bSlug, format, move }: {
   sets: Record<string, OppSetDto> | undefined;
   aSlug: string; bSlug: string;
-  aTitle: ReactNode; bTitle: ReactNode;
   format: FormatId;
   /** The cell's own move: pre-selected in the calculator hand-off. */
   move?: string | null;
 }) {
   const t = useT();
-  const damageText = useDamageText();
   const navigate = useNavigate();
   if (!sets || (!sets[aSlug] && !sets[bSlug])) return null;
   return (
-    <>
-      <div className="md-line md-caveat">
-        {t("matchup.setUsed")}
-        <button type="button" className="second-btn md-verify"
-                onClick={() => {
-                  const attacker = fillFromSet(aSlug, sets[aSlug]);
-                  stashDamageFill({
-                    format, attackerSlug: attacker.slug,
-                    attacker,
-                    defender: fillFromSet(bSlug, sets[bSlug]),
-                    ...(move ? { move } : {}),
-                  });
-                  navigate("/calc?tab=damage");
-                }}>
-          {t("builder.verifyCalc")}
-        </button>
-      </div>
-      <div className="md-sets">
-        <SetBlock title={aTitle} set={sets[aSlug]} prose={damageText.name} />
-        <SetBlock title={bTitle} set={sets[bSlug]} prose={damageText.name} />
-      </div>
-    </>
+    <button type="button" className="second-btn md-verify"
+            onClick={() => {
+              const attacker = fillFromSet(aSlug, sets[aSlug]);
+              stashDamageFill({
+                format, attackerSlug: attacker.slug,
+                attacker,
+                defender: fillFromSet(bSlug, sets[bSlug]),
+                ...(move ? { move } : {}),
+              });
+              navigate("/calc?tab=damage");
+            }}>
+      {t("matchup.calculate")}
+    </button>
   );
 }
 
@@ -146,6 +142,38 @@ function variantTitle(s: SpeciesRowDto | undefined, set: OppSetDto | undefined,
   if (!s) return set?.species ?? "—";
   const name = displayName(s, lang);
   return set?.item && set.isModal === false ? `${name} · ${set.item}` : name;
+}
+
+function inspectorBuild(key: string, set: OppSetDto | undefined,
+                        species: SpeciesRowDto | undefined, lang: Lang): InspectorBuild {
+  const label = variantTitle(species, set, lang);
+  if (!set) return { label, option: null };
+  const rawIndex = species?.variants?.findIndex((variant) => variant.key === key) ?? -1;
+  const index = Math.max(0, rawIndex);
+  const variant = rawIndex >= 0 ? species?.variants?.[rawIndex] : undefined;
+  return {
+    label,
+    index,
+    option: {
+      key,
+      source: "aggregate",
+      coverage: variant?.coverage ?? set.coverage ?? null,
+      isModal: variant?.isModal ?? set.isModal ?? false,
+      set,
+      labelIndex: index,
+    },
+  };
+}
+
+function inspectorBuilds(sets: Record<string, OppSetDto> | undefined,
+                         aKey: string, bKey: string,
+                         aSpecies: SpeciesRowDto | undefined,
+                         bSpecies: SpeciesRowDto | undefined,
+                         lang: Lang): InspectorBuild[] {
+  return [
+    inspectorBuild(aKey, sets?.[aKey], aSpecies, lang),
+    inspectorBuild(bKey, sets?.[bKey], bSpecies, lang),
+  ];
 }
 
 
@@ -183,7 +211,9 @@ function KoGrid({ format }: { format: FormatId }) {
     return () => cancelAnimationFrame(frame);
   }, [sel, cacheState.status]);
 
-  const view = useMemo(() => {
+  // The 40k-cell axis scan and variant index depend only on the downloaded overview. Build picks
+  // merely select one key per species and must not redo that work on every picker click.
+  const prepared = useMemo(() => {
     if (state.status !== "ready") return null;
     const overview: OppKoGridDto = state.data;
     const all = [...overview.species].sort(byRank);
@@ -192,10 +222,6 @@ function KoGrid({ format }: { format: FormatId }) {
     // all-empty axis when every calculation for an active build failed or was unavailable: absence
     // is not damage data.
     const available = populatedAxes(overview.grid);
-    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
-    // Attacker rows are decided by the ACTIVE build: switching a species to a build that has no
-    // offense row (meta-only) correctly drops it from the rows.
-    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     // Variant key -> its species row, so the detail panel can name a selected cell whose
     // coordinates are variant keys rather than species slugs.
     const byVariant = new Map<string, SpeciesRowDto>();
@@ -203,8 +229,18 @@ function KoGrid({ format }: { format: FormatId }) {
       for (const v of sp.variants ?? []) byVariant.set(v.key, sp);
       byVariant.set(sp.slug, sp);                     // legacy grid: key IS the species slug
     }
+    return { overview, all, available, byVariant };
+  }, [state]);
+
+  const view = useMemo(() => {
+    if (!prepared) return null;
+    const { overview, all, available, byVariant } = prepared;
+    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
+    // Attacker rows are decided by the ACTIVE build: switching a species to a build that has no
+    // offense row (meta-only) correctly drops it from the rows.
+    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     return { overview, cols, rows, byVariant, omittedCols: all.length - cols.length };
-  }, [state, rowPicks, colPicks]);
+  }, [prepared, rowPicks, colPicks]);
 
   if (state.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
   if (state.status === "error") {
@@ -324,19 +360,22 @@ function KoGrid({ format }: { format: FormatId }) {
       {sel && detailOff && detailCell && detailCache && (() => {
         // Both directions: the reverse cell is this same grid read the other way.
         const back = detailCache.matrix[sel.d]?.[sel.a]?.offense ?? null;
+        const left = byVariant.get(sel.a)!;
+        const right = byVariant.get(sel.d)!;
         return (
           <CellInspector
             panelRef={detailRef}
-            head={<><DetailMon s={byVariant.get(sel.a)!} lang={lang} /> → <DetailMon s={byVariant.get(sel.d)!} lang={lang} /></>}
+            head={<><DetailMon s={left} lang={lang} /> {t("matchup.vs")}{" "}
+                   <DetailMon s={right} lang={lang} /></>}
             directions={[
               { label: t("matchup.ourKo"), damage: inspectorDamage(detailOff, t, damageText) },
               { label: t("matchup.incoming"), damage: inspectorDamage(back, t, damageText) },
             ]}
             speed={{ mine: detailCell.speed.attacker, theirs: detailCell.speed.defender,
-                     faster: detailCell.speed.faster }}
-            sets={<CellSets sets={detailCache.sets} aSlug={sel.a} bSlug={sel.d}
-              aTitle={variantTitle(byVariant.get(sel.a), detailCache.sets?.[sel.a], lang)}
-              bTitle={variantTitle(byVariant.get(sel.d), detailCache.sets?.[sel.d], lang)}
+                     fasterName: detailCell.speed.faster === "attacker" ? displayName(left, lang)
+                       : detailCell.speed.faster === "defender" ? displayName(right, lang) : null }}
+            builds={inspectorBuilds(detailCache.sets, sel.a, sel.d, left, right, lang)}
+            calculate={<CellCalculate sets={detailCache.sets} aSlug={sel.a} bSlug={sel.d}
               format={format} move={detailOff.move} />}
           />
         );
@@ -389,22 +428,29 @@ function CheckGrid({ format }: { format: FormatId }) {
     return () => cancelAnimationFrame(frame);
   }, [sel]);
 
-  const view = useMemo(() => {
+  // Keep the full-grid preparation independent from the cheap active-build projection below.
+  const prepared = useMemo(() => {
     if (state.status !== "ready") return null;
     const checks: OppCheckGridDto = state.data;
     const all = [...checks.species].sort(byRank);
     // Every grade is derived from an ordered ATTACKER pair, so a build with no offense row is
     // neither a row nor a column here — leaving it in painted a blank column across the table.
     const available = populatedAxes(checks.grid);
-    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
-    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     const byVariant = new Map<string, SpeciesRowDto>();
     for (const sp of checks.species) {
       for (const v of sp.variants ?? []) byVariant.set(v.key, sp);
       byVariant.set(sp.slug, sp);
     }
+    return { checks, all, available, byVariant };
+  }, [state]);
+
+  const view = useMemo(() => {
+    if (!prepared) return null;
+    const { checks, all, available, byVariant } = prepared;
+    const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
+    const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
     return { checks, cols, rows, byVariant, omittedCols: all.length - cols.length };
-  }, [state, rowPicks, colPicks]);
+  }, [prepared, rowPicks, colPicks]);
 
   // Each cell is exactly the two builds it names — the grid holds every ordered build pair, so a
   // column reads its own build rather than an aggregate over the species.
@@ -493,11 +539,14 @@ function CheckGrid({ format }: { format: FormatId }) {
         </table>
       </div>
       <CheckLegend />
-      {sel && selCell && (
+      {sel && selCell && (() => {
+        const left = byVariant.get(sel.m)!;
+        const right = byVariant.get(sel.o)!;
+        return (
         <CellInspector
           panelRef={detailRef}
-          head={<><DetailMon s={byVariant.get(sel.m)!} lang={lang} /> {t("matchup.vs")}{" "}
-                 <DetailMon s={byVariant.get(sel.o)!} lang={lang} /></>}
+          head={<><DetailMon s={left} lang={lang} /> {t("matchup.vs")}{" "}
+                 <DetailMon s={right} lang={lang} /></>}
           grade={selCell.grade}
           gradeFacts={[
             selCell.c0Kind === "wall_no_ko"
@@ -513,14 +562,15 @@ function CheckGrid({ format }: { format: FormatId }) {
           ]}
           speed={koCell?.speed
             ? { mine: koCell.speed.attacker, theirs: koCell.speed.defender,
-                faster: koCell.speed.faster }
+                fasterName: koCell.speed.faster === "attacker" ? displayName(left, lang)
+                  : koCell.speed.faster === "defender" ? displayName(right, lang) : null }
             : null}
-          sets={<CellSets sets={sets} aSlug={sel.m} bSlug={sel.o}
-            aTitle={variantTitle(byVariant.get(sel.m), sets?.[sel.m], lang)}
-            bTitle={variantTitle(byVariant.get(sel.o), sets?.[sel.o], lang)}
+          builds={inspectorBuilds(sets, sel.m, sel.o, left, right, lang)}
+          calculate={<CellCalculate sets={sets} aSlug={sel.m} bSlug={sel.o}
             format={format} move={koCell?.offense?.move} />}
         />
-      )}
+        );
+      })()}
     </>
   );
 }
@@ -571,7 +621,9 @@ export function MatchupPage() {
         aria-labelledby={segmentedTabId("matchup-view", view)}>
         {view === "ko" ? <KoGrid format={format} /> : view === "check"
           ? <CheckGrid format={format} />
-          : <ActualMatchupWorkspace format={format} onFormatChange={setFormat} />}
+          : <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
+              <ActualMatchupWorkspace format={format} onFormatChange={setFormat} />
+            </Suspense>}
       </div>
     </div>
   );

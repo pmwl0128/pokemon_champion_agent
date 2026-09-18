@@ -7,6 +7,7 @@
  * power range means nothing on the ability list, so it is not on screen there. Each tab keeps its
  * own query and its own filters, so switching away and back does not discard what you set up. */
 import { useEffect, useMemo, useState } from "react";
+import "../styles.dex.css";
 import { Link, useSearchParams } from "react-router-dom";
 import { GameImage } from "../components/GameImage.tsx";
 import { PageHeader } from "../components/PageHeader.tsx";
@@ -164,8 +165,8 @@ export function DexPage() {
   const query = queries[tab];
   const setQuery = (q: string) => setQueries((prev) => ({ ...prev, [tab]: q }));
   const [filters, setFilters] = useState<DexFilters>(EMPTY_FILTERS);
-  const moves = useMoves();
-  const items = useItems();
+  const moves = useMoves(tab === "moves");
+  const items = useItems(tab === "items");
   // Wider than the metagame rail (it holds a type grid and stat rows), and it pushes further down
   // before covering: a card grid keeps reflowing where a panel layout would stop being readable.
   const rail = useSideRail(360, 620);

@@ -68,6 +68,12 @@ class _SpaStaticFiles(StaticFiles):
 
     async def get_response(self, path: str, scope):  # type: ignore[override]
         from starlette.exceptions import HTTPException as StarletteHTTPException
+        # A stale tab may request a chunk from the previous Vite build. Returning index.html
+        # with 200 for /assets/*.js turns that into a misleading module/MIME error; keep the
+        # real 404 so the client can offer a reload while SPA routes still fall back below.
+        asset_path = path.lstrip("./\\")
+        if asset_path == "assets" or asset_path.startswith(("assets/", "assets\\")):
+            return await super().get_response(path, scope)
         served_index = False
         try:
             response = await super().get_response(path, scope)

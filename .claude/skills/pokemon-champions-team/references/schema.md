@@ -441,15 +441,20 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 {
   "kind": "frame", "format": "double", "anchor": ["Maushold"], "order": "common_first",
   "pool_size": 223, "partitioned": true, "frames_total": 11, "frames_shown": 11,
-  "thin": false, "meta_fallback": false,
+  "thin": false, "meta_fallback": false, "no_backbone": false,
   "handover": null,
   "skeletons": [{
     "frame_id": "fa1a799e1ab",                 // MECHANICAL hash, never a team-name/type label
+    "group_signature": {"axis": "speed_control", "key": ["tailwind"]},  // the Tier-1 key ACTUALLY used
+    // axis: "speed_control" (doubles) | "role_signature" (singles: hazard/setup/recovery/pivot)
+    //     | "structure_not_observed" (species-only rows: structure was never published, so no
+    //       signature can be read — real co-occurrence, unknown structure, NOT an archetype)
+    //     | "unpartitioned_pool" (the pool did not separate structurally)
     "structural_profile": {"speed_control_modes": {...}, "structural_signals": {...},
                            "role_composition_norms": {...}},   // profile FACTS, no archetype label
     "prevalence": {"count": 48, "share": 0.215},               // a VIEW ordering, never a score
     "core_candidates": [{
-      "species": "Maushold", "role": "anchor",  // or "core-partner"
+      "species": "Maushold", "role": "anchor",  // or "core-partner" / "recurring-partner"
       "within_group_share": 1.0, "pool_share": 1.0,   // two views (glue vs archetype-defining), no composite
       "grounding": {"primary": {"item": "...", "ability": "...", "nature": "...", "moves": [...],
                                 "sps": {...}, "share": ..., "confidence": ...},
@@ -460,7 +465,9 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
       // grounding=null (+ set_guidance=null) when no real joint set exists (thin/off-meta) — build it
       // yourself + disclose; NEVER stitch a joint set from meta marginals
     }],
-    "flex_slots": {"open_count": 5},           // 2nd Mega / coverage / utility are YOURS (>=1 always open)
+    "core_tiers": {"anchor": 1, "core": 2, "recurring_partner": 1},   // counts per role, all facts
+    "flex_slots": {"open_count": 2,            // 2nd Mega / coverage / utility are YOURS (>=1 always open)
+                   "substitutable_count": 1},  // recurring-partner slots: filled, but not binding
     "observed_facts": {"observed_mega_slots": {...},
                        "mega_registration_reference": { // group distribution when sample>=30,
                          "basis": "frame_group|frame_pool", // else whole-pool fallback
@@ -475,8 +482,19 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 
 - Ordering is PREVALENCE under the `meta_conformance` knob (common_first / rare_first); an ANCHOR
   build shows every frame meeting the minimum sample threshold (`frames_shown == frames_total`) so an off-meta frame is
-  never dropped. `frame_receipt` extends the chain (audit → frame →
+  never dropped. The `structure_not_observed` pool always sorts LAST — a category split, not a
+  ranking: it is not a structural frame. `frame_receipt` extends the chain (audit → frame →
   slate); its fingerprint is TAMPER-EVIDENT (slate recomputes it from the saved skeletons).
+- The two candidate TIERS carry different weight. `core-partner` (within-group share >=
+  `CORE_SUPPORT`) is the backbone the slate binding enforces. `recurring-partner`
+  (`PARTNER_SUPPORT`..`CORE_SUPPORT`) recurs below that bar and arrives equally grounded, but leaving
+  its clusters is only REPORTED (yellow, owed a disclosure, never eliminated) — the tier is offered,
+  not committed to, and pricing a substitution there at the core rate would cost more than going with
+  the crowd.
+- An EMPTY skeleton is never `confidence: medium`. With no tier above the support bar it reports
+  `low` + `no-recurring-backbone`, and `no_backbone: true` says the same for the whole run: the
+  library carries no recurring structure here, so ground every member through repset/search and
+  disclose that the frame supplied no roster.
 - Build-flow contexts/slates should carry `frame_required:true`. With that flag, `slate-evaluate`
   refuses a missing `--frame-output`, and `answer-audit` reports a violation if the saved slate output
   has no `frame_fingerprint` in its receipt chain.
@@ -487,9 +505,11 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 **The two fields the AI PRODUCES for the binding:**
 - `slate.frame_bindings[i]` (aligned with `teams[i]`): `{frame_id, off_meta?:[species], deviations?:
   [{species, reason}], mega_deviation?:str|{reason,...}, off_meta_build?:bool}`. `frame_id` declares which skeleton the candidate builds
-  on; a core-bearer (member ∈ that frame's `core_candidates`) whose `(item,ability)` is outside its
-  repset `clusters` is a deviation — RED (no `off_meta`/`deviations` ack) eliminates in the funnel,
-  YELLOW (acknowledged) survives. `off_meta_build:true` = a deliberate off-meta build (no core-bearer
+  on; a core-bearer (member ∈ that frame's `core_candidates` at the `core-partner`/`anchor` tier)
+  whose `(item,ability)` is outside its repset `clusters` is a deviation — RED (no
+  `off_meta`/`deviations` ack) eliminates in the funnel, YELLOW (acknowledged) survives. A member
+  matching a `recurring-partner` candidate is always YELLOW (reported under
+  `frame_binding.recurring_partners`, never eliminated). `off_meta_build:true` = a deliberate off-meta build (no core-bearer
   binding). Only `(item,ability)` is checked — `set_guidance` is soft. Independently,
   `mega_deviation` acknowledges a deliberate Mega-registration count outside a reliable frame's
   common lanes; without it, an observed minority/rare lane is eliminated under `proven`.

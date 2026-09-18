@@ -46,7 +46,7 @@ function calcEngineDigest(): string {
 function daemonFile(): { secret?: string; port?: number } {
   try {
     return JSON.parse(
-      readFileSync(join(homedir(), ".pokemon-champions-ui", "daemon.json"), "utf-8"));
+      readFileSync(join(homedir(), ".pokemon-champions", "daemon.json"), "utf-8"));
   } catch {
     return {};
   }

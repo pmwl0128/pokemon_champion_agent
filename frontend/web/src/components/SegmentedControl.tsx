@@ -12,6 +12,7 @@ type CommonProps<T extends string> = {
   ariaLabel: string;
   className?: string;
   buttonClassName?: string;
+  orientation?: "horizontal" | "vertical";
 };
 
 type TabProps<T extends string> = CommonProps<T> & {
@@ -58,7 +59,7 @@ export function SegmentedControl<T extends string>(props: TabProps<T> | RadioPro
 
   return (
     <div className={props.className} role={props.kind === "tabs" ? "tablist" : "radiogroup"}
-      aria-label={props.ariaLabel} aria-orientation="horizontal">
+      aria-label={props.ariaLabel} aria-orientation={props.orientation ?? "horizontal"}>
       {props.items.map((item, index) => {
         const selected = index === current;
         return (

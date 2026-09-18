@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>環境スナップショット</b> · M-6 / M-C · 更新日 <b>2026-09-16</b>
+  <b>環境スナップショット</b> · M-6 / M-C · 更新日 <b>2026-09-18</b>
 </p>
 
 <p align="center">
@@ -321,7 +321,7 @@ chmod +x start-local.sh
 
 起動時に表示される`http://127.0.0.1:<port>/#bootstrap=...`の完全な一回限りURLを開いてください。
 既定ではloopbackだけをlistenします。ポートを変える場合は
-`~/.pokemon-champions-ui/pcui.env`に`PCUI_LOCAL_PORT`を設定します。
+`~/.pokemon-champions/pc.env`に`PCUI_LOCAL_PORT`を設定します。
 
 ### ソースからビルドする
 
@@ -341,7 +341,7 @@ Linux/macOSでは実行権限を付けた`frontend/build-ui.sh`と`frontend/star
 
 ### プライバシーと更新
 
-- ローカル版は`127.0.0.1`だけをlistenし、session/artifactを`~/.pokemon-champions-ui/`へ保存します。
+- ローカル版は`127.0.0.1`だけをlistenし、session/artifactを`~/.pokemon-champions/`へ保存します。
   通常の図鑑・環境・計算機能にホスト型モデルのKeyは不要です。
 - オンラインQ&A、構築、診断、実構成対面、AI解説では、該当する入力がオンラインサービスへ送信されます。
   非公開の所持リストや対戦メモはローカル版で扱ってください。
@@ -539,18 +539,25 @@ matchup-notes.mdの負け筋を踏まえて変更し、固定した軸は残し�
 
 | ソース | 用途 |
 |---|---|
-| [GameWith](https://gamewith.jp/) ポケモンチャンピオンズ | 順位、技、道具、特性、性格、SP、相方の詳細 |
+| [Silph Scope](https://silph-scope.com/) | 主要データソース：順位、技・道具・特性・性格・SP・相方の詳細、およびKO関係リスト（誰が誰を倒すか） |
+| [GameWith](https://gamewith.jp/) ポケモンチャンピオンズ | 独立した環境データフィードとクロスチェック |
 | [PokeChamp DB](https://pokechamdb.com/) | 独立した環境データフィードとクロスチェック |
 | [MetaRoll](https://metaroll.app/ladder) | ダブルのランクバトルにおけるKO技採用率。Usage data from MetaRoll (metaroll.app) |
 
-### 対戦図鑑・名称・計算
+### 対戦図鑑・名称
+
+| ソース | 用途 |
+|---|---|
+| [Serebii.net](https://www.serebii.net/) Champions Pokédex | チャンピオンズの習得技、特性、技優先度 |
+| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英の表示名、別名、フォルム別情報 |
+| [PokéAPI](https://pokeapi.co/) | 名称の独立検証 |
+
+### バトル計算
 
 | ソース | 用途 |
 |---|---|
 | [NCP VGC Damage Calculator](https://github.com/nerd-of-now/NCP-VGC-Damage-Calculator) | 基礎エンティティデータとダメージ計算エンジン |
-| [Serebii.net](https://www.serebii.net/) Champions Pokédex | チャンピオンズの習得技、特性、技優先度 |
-| [52Poke / 神奇宝贝百科](https://wiki.52poke.com/) | 中日英の表示名、別名、フォルム別情報 |
-| [PokéAPI](https://pokeapi.co/) | 名称の独立検証 |
+| [smogon/damage-calc](https://github.com/smogon/damage-calc) | 独立した計算式オラクル。開発時のテストは同じケースをその`@smogon/calc`エンジン（独立に維持されている[EXO Champions計算機](https://github.com/SebNotFound/champions-calc)経由）で再計算し、配布版エンジンのダメージ結果と突き合わせます。そのコードとデータは配布物には含まれません。 |
 
 ### 実在構築サンプル
 

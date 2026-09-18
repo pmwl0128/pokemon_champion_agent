@@ -66,7 +66,19 @@ Two standing assumptions (do not relax them):
    `(item,ability)` leaves its repset clusters with no `off_meta`/`deviations` declaration is RED and
    is eliminated in the funnel. `core_candidates` is a starting point, NOT a roster — substitute
    freely, but a substitute needs its OWN repset basis or an off_meta declaration; the flex slots
-   (second Mega / coverage / utility) are assembled by you. Frame's `observed_facts` never reserves a
+   (second Mega / coverage / utility) are assembled by you.
+   Read the two candidate TIERS differently: `role: "core-partner"` is the group's backbone and is
+   what the RED rule above applies to; `role: "recurring-partner"` recurs below that bar, arrives just
+   as grounded, and an off-cluster set there is only REPORTED (yellow — disclose it, never eliminated),
+   so substituting one costs you nothing. `group_signature.axis` tells you which key produced the
+   group — `speed_control` (doubles), `role_signature` (singles: hazard/setup/recovery/pivot), or
+   `structure_not_observed` for the pool of species-only library rows whose structure was never
+   published (real co-occurrence, unknown structure — not an archetype).
+   An EMPTY skeleton is a real answer, not a blank form: `core_tiers` all zero comes with
+   `confidence: low` / `no-recurring-backbone` (and `no_backbone: true` when every shown frame is like
+   that). It means the library carries no recurring structure here — ground each member you pick
+   through repset/search and SAY the frame supplied no backbone. Do not read the open slots as a
+   licence to fill them from your prior; that is precisely the failure frame exists to block. Frame's `observed_facts` never reserves a
    slot, but its reliable `mega_registration_reference` is load-bearing at slate time: under the
    default `mega_posture:environment`, observed minority/rare registration counts need a declared
    `mega_deviation`, and the surviving candidate set retains at least one candidate that is modal
@@ -156,8 +168,9 @@ any build/diagnose/evaluate/rework/tune request
 fact base         ranking · landscape · repset/search/observed · oppmatrix · fill · validate   (mandates 1–2)
   ▼
 [front door]      `team.py frame --game-format … --context ctx.json --audit-receipt <ctx-audit out>`
-                  (BUILD flows) — grounded skeletons you assemble ON: core_candidates with their real
-                  repset (item,ability) joint + set_guidance, structural_profile, observed_facts.
+                  (BUILD flows) — grounded skeletons you assemble ON: core_candidates (tiered
+                  core-partner / recurring-partner) with their real repset (item,ability) joint +
+                  set_guidance, group_signature, structural_profile, observed_facts.
                   Consumes audit_receipt, emits frame_receipt. SAVE the output JSON (slate binds it).
   ▼
 [assemble 2–5 candidates]   the ONLY creative step — yours, built ON the frame's grounded evidence

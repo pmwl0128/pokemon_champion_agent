@@ -18,7 +18,7 @@ Output (default frontend/web/public/projection/, gitignored):
     meta/ko_{single,double}/<slug>.json       MetaKoDto (lazy per-pokemon; own snapshot clock)
     meta/ko_trend_{single,double}/<slug>.json MetaKoTrendDto (lazy; the KO axis's own history)
     meta/facets_{single,double}.json          MetaFacetsDto (filter-rail inverted index)
-    assets/                           the image pack (manifest + content-hashed files)
+    assets/                           image pack (full audit manifest + compact runtime index + files)
 
     python frontend/web/scripts/build_projection.py [--out DIR] [--ui-build-id ID]
 """
@@ -77,6 +77,24 @@ def strip_matchup_provenance(doc: dict) -> dict:
             row.pop("setSource", None)
             row.pop("setConfidence", None)
     return doc
+
+
+def runtime_asset_index(manifest: dict) -> dict:
+    """Project the audited asset manifest down to fields the browser resolver actually reads.
+
+    The full manifest remains beside it as the integrity/provenance authority. Shipping that same
+    600+ KiB document through the first image request made every repeated hash, dimension and
+    provenance string part of the ranking page's critical path even though the UI uses only paths
+    and match tiers.
+    """
+    return {
+        "schema_version": "1",
+        "assets": [{
+            "key": asset["key"],
+            "match": asset["match"],
+            "files": {role: file["path"] for role, file in asset["files"].items()},
+        } for asset in manifest["assets"]],
+    }
 
 
 def load_usage_trend_store(path: Path, detail_slugs: set[str], fmt: str) -> dict:
@@ -391,6 +409,8 @@ def main() -> int:
         pool.shutdown()
 
     shutil.copytree(PACK, out / "assets")
+    asset_manifest = json.loads((PACK / "manifest.json").read_text(encoding="utf-8"))
+    write(out / "assets" / "runtime.json", runtime_asset_index(asset_manifest))
     total = sum(f.stat().st_size for f in out.rglob("*") if f.is_file())
 
     # Swap staging into place. Directory os.replace needs an absent destination on Windows, so

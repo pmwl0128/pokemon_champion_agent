@@ -1,11 +1,59 @@
 import type { FormatId } from "@pokemon-champions/protocol";
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Component, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { BRAND_LOGO } from "./assets/icons.ts";
-import { RailHandle, RailLayer, type RailState } from "./components/SideRail.tsx";
+import { FormatTabs } from "./components/FormatTabs.tsx";
+import { RailHandle, RailLayer, useRailEscape, type RailState } from "./components/SideRail.tsx";
 import { LangContext, detectLang, saveLang, useLang, useT, type Lang } from "./i18n.ts";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RuntimeProvider, useRuntime } from "./runtime/context.tsx";
+
+type Theme = "light" | "dark";
+const THEME_KEY = "pcui-theme";
+
+function detectTheme(): Theme {
+  let theme: Theme = "light";
+  try {
+    const saved = window.localStorage.getItem(THEME_KEY);
+    theme = saved === "light" || saved === "dark"
+      ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  return theme;
+}
+
+function saveTheme(theme: Theme) {
+  try { window.localStorage.setItem(THEME_KEY, theme); } catch { /* storage may be unavailable */ }
+}
+
+function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (theme: Theme) => void }) {
+  const t = useT();
+  return (
+    <div className="theme-toggle" role="group" aria-label={t("theme.selector")}>
+      {/* Icon only: sun and moon are unambiguous at this size, and the words cost more width in the
+          top bar than they add. The selected state carries its own daylight/night hue so the active
+          mode reads at a glance instead of as one more blue-tinted control. */}
+      <button type="button" className={`day${theme === "light" ? " on" : ""}`}
+        aria-pressed={theme === "light"} title={t("theme.toLight")}
+        aria-label={t("theme.toLight")} onClick={() => onChange("light")}>
+        <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+        </svg>
+      </button>
+      <button type="button" className={`night${theme === "dark" ? " on" : ""}`}
+        aria-pressed={theme === "dark"} title={t("theme.toDark")}
+        aria-label={t("theme.toDark")} onClick={() => onChange("dark")}>
+        <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+          <path d="M20.2 15.3A8.7 8.7 0 0 1 8.7 3.8 8.7 8.7 0 1 0 20.2 15.3Z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
 // Keep the ranking route in the entry chunk and split every secondary surface. Navigation intent
 // preloads the relevant module, so desktop hover/keyboard focus hides the network boundary while a
@@ -50,6 +98,37 @@ function RouteLoading() {
   return <div className="spinner route-loading" role="status" aria-live="polite">{t("state.loading")}</div>;
 }
 
+function PageCrashFallback() {
+  const t = useT();
+  return (
+    <main className="content" role="alert">
+      <section className="panel route-missing">
+        <h1>{t("state.pageCrashTitle")}</h1>
+        <p>{t("state.pageCrashBody")}</p>
+        <button type="button" className="primary-btn" onClick={() => window.location.reload()}>
+          {t("state.reload")}
+        </button>
+      </section>
+    </main>
+  );
+}
+
+class AppErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("UI render failed", error);
+  }
+
+  render() {
+    return this.state.failed ? <PageCrashFallback /> : this.props.children;
+  }
+}
+
 function RouteScrollReset() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -92,25 +171,31 @@ function EnvironmentTrendRail() {
   // The URL marker is authoritative across detail navigation and reloads. This rail is a
   // viewport overlay, not a gutter rail: it never writes shell padding or resizes the page.
   const state: RailState = { open, setOpen, overlay: false, width: 320, side: "right" };
+  useRailEscape(state);
 
   if (!environmentRoute) return null;
   return (
     <>
       <RailHandle state={state} label={t("nav.trend")} />
       {state.open && (
-        <Suspense fallback={
-          <RailLayer state={state} label={t("trend.title")} className="trend-overlay">
+        /* Keep the animated rail shell mounted while the first lazy chunk resolves. Replacing one
+         * RailLayer with another restarted its entrance animation and made the underlying page look
+         * as though it had refreshed. Only the body crosses the Suspense boundary now. */
+        <RailLayer state={state} label={t("trend.title")} className="trend-overlay"
+          headDescription={t("trend.description")}
+          headActions={<FormatTabs format={format} onChange={setFormat} className="page-tabs" />}>
+          <Suspense fallback={
             <div className="spinner trend-rail-loading">{t("state.loading")}</div>
-          </RailLayer>
-        }>
-          <TrendDrawer state={state} format={format} onFormatChange={setFormat} />
-        </Suspense>
+          }>
+            <TrendDrawer format={format} />
+          </Suspense>
+        </RailLayer>
       )}
     </>
   );
 }
 
-function Shell() {
+function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => void }) {
   const { capabilities, can } = useRuntime();
   const t = useT();
   const { lang, setLang } = useLang();
@@ -146,6 +231,7 @@ function Shell() {
             <span className="env-date"> · {capabilities.environment.asOf}</span>
           )}
         </span>
+        <ThemeToggle theme={theme} onChange={setTheme} />
         <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("a11y.language")}>
           <option value="zh">中文</option>
           <option value="en">English</option>
@@ -186,6 +272,7 @@ function Shell() {
 // Lang state lives above RuntimeProvider so error screens localize too.
 export function App() {
   const [lang, setLangState] = useState<Lang>(detectLang());
+  const [theme, setThemeState] = useState<Theme>(detectTheme);
   useEffect(() => {
     document.documentElement.lang = { zh: "zh-CN", en: "en", ja: "ja" }[lang];
     document.title = {
@@ -194,15 +281,25 @@ export function App() {
       ja: "Pokémon Champions 構築アシスタント",
     }[lang];
   }, [lang]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+  }, [theme]);
   const setLang = (l: Lang) => {
     saveLang(l);
     setLangState(l);
   };
+  const setTheme = (next: Theme) => {
+    saveTheme(next);
+    setThemeState(next);
+  };
   return (
     <LangContext.Provider value={{ lang, setLang }}>
-      <RuntimeProvider>
-        <Shell />
-      </RuntimeProvider>
+      <AppErrorBoundary>
+        <RuntimeProvider>
+          <Shell theme={theme} setTheme={setTheme} />
+        </RuntimeProvider>
+      </AppErrorBoundary>
     </LangContext.Provider>
   );
 }

@@ -155,9 +155,9 @@ def cmd_online_serve(ns) -> int:
 
     from .online.jobs import JobStore
     from .online.limits import OnlineLimits, QaLimitConfig
-    from .online.provider import (EchoProvider, FallbackProvider, OpenAIChatConfig,
-                                  OpenAICompatibleProvider)
+    from .online.provider import EchoProvider, OpenAIChatConfig, OpenAICompatibleProvider
     from .online.server import create_online_app
+    from .online.tester_keys import TesterKeyStore
     from .worker import WorkerPool
 
     _load_env_file(Path(ns.env_file))
@@ -176,23 +176,14 @@ def cmd_online_serve(ns) -> int:
     if ns.provider == "echo":
         provider = EchoProvider()
         thinking_provider = provider
-    elif ns.provider in {"openai-compatible", "opencode", "deepseek"}:
+    elif ns.provider in {"openai-compatible", "deepseek"}:
         try:
             llm_config = OpenAIChatConfig.from_env(os.environ, provider=ns.provider)
-            fallback_config = (OpenAIChatConfig.from_env(os.environ, provider="deepseek")
-                               if ns.provider == "opencode" else None)
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
         base_provider = OpenAICompatibleProvider(llm_config) if llm_config.api_key else None
         provider = base_provider.with_thinking(False) if base_provider else None
         thinking_provider = base_provider.with_thinking(True) if base_provider else None
-        if fallback_config and fallback_config.api_key:
-            fallback_base = OpenAICompatibleProvider(fallback_config)
-            fallback = fallback_base.with_thinking(False)
-            thinking_fallback = fallback_base.with_thinking(True)
-            provider = FallbackProvider(provider, fallback) if provider else fallback
-            thinking_provider = (FallbackProvider(thinking_provider, thinking_fallback)
-                                 if thinking_provider else thinking_fallback)
         if provider is None:
             print(i18n.t("llm_key_missing"))
     else:
@@ -207,6 +198,8 @@ def cmd_online_serve(ns) -> int:
                           QaLimitConfig(daily_limit=ns.qa_daily_limit,
                                         daily_token_budget=ns.qa_token_budget))
     dev_key = os.environ.get("PCUI_DEV_KEY") or None
+    smoke_key = os.environ.get("PCUI_SMOKE_KEY") or None
+    tester_keys = TesterKeyStore(data_dir() / "tester-keys.db")
     pool = WorkerPool()
     app = create_online_app(
         pool, provider, limits, thinking_provider=thinking_provider,
@@ -217,6 +210,8 @@ def cmd_online_serve(ns) -> int:
         idle_reap_seconds=ns.worker_idle if ns.worker_idle > 0 else None,
         deterministic_workers=ns.deterministic_workers,
         dev_key=dev_key,
+        smoke_key=smoke_key,
+        tester_keys=tester_keys,
         unmetered=unmetered,
         # web_jobs (§7.3): transient builder-job rows share online.db — same retention
         # discipline as the limits tables, swept on traffic.
@@ -229,7 +224,8 @@ def cmd_online_serve(ns) -> int:
     print(f"pcui online API: http://127.0.0.1:{ns.port}/ "
           f"(provider: {provider_text}"
           f"{', local unmetered' if unmetered else ''}"
-          f"{', dev bypass enabled' if dev_key else ''})", flush=True)
+          f"{', browser access enabled' if dev_key else ''}"
+          f"{', smoke access enabled' if smoke_key else ''})", flush=True)
     try:
         uvicorn.run(app, host=ns.host, port=ns.port, log_level="warning")
     finally:
@@ -433,7 +429,7 @@ def main(argv: list[str] | None = None) -> int:
     online.add_argument("--port", type=int, default=runtime_config.online_port)
     online.add_argument("--host", default="127.0.0.1")
     online.add_argument("--provider",
-                        choices=["openai-compatible", "opencode", "deepseek", "echo", "none"],
+                        choices=["openai-compatible", "deepseek", "echo", "none"],
                         default=runtime_config.llm_provider
                         if runtime_config.online_use_api_key else "none",
                         help=i18n.t("provider_help"))
