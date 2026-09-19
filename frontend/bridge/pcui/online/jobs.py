@@ -153,7 +153,24 @@ class JobStore:
                      expires_at=time.time() + JOB_TTL_SECONDS)
 
     def fail(self, job_id: str, error_code: str) -> None:
-        self._update(job_id, status="failed", error_code=error_code)
+        # Keep the timeline consistent with the terminal job state. A builder failure used
+        # to leave the active gate as "running" forever (typically evaluate), so even a
+        # correctly delivered failed snapshot still looked stuck at matchup checks.
+        with self._lock:
+            row = self._con.execute("SELECT gates_json FROM web_jobs WHERE id=?",
+                                    (job_id,)).fetchone()
+            if row is None:
+                return
+            gates = json.loads(row[0])
+            for entry in gates:
+                if entry.get("status") == "running":
+                    entry["status"] = "failed"
+            with self._con:
+                self._con.execute(
+                    "UPDATE web_jobs SET status='failed', error_code=?, gates_json=? WHERE id=?",
+                    (error_code, json.dumps(gates, ensure_ascii=False), job_id),
+                )
+        self._notify(job_id)
 
     def delete(self, job_id: str) -> None:
         with self._lock, self._con:

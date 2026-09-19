@@ -847,10 +847,17 @@ def _slate_problems(slate_out: dict) -> dict | None:
     survived = 0 in (slate_out.get("survivors") or [])
     if survived and legality.get("status") == "valid":
         return None
+    eliminated = cand.get("eliminated") if isinstance(cand.get("eliminated"), dict) else {}
+    funnel_reasons = [str(reason) for reason in (eliminated.get("reasons") or []) if reason]
     return {
         "legality_errors": legality.get("errors") or [],
         "legality_status": legality.get("status"),
-        "funnel_flags": cand.get("funnel_flags") or [],
+        # The cheap funnel records the actionable cause under eliminated.reasons. The old
+        # builder looked for a non-existent funnel_flags field, so a frame-binding failure
+        # reached the repair model as "valid, no errors". It returned the same team and the
+        # job appeared to stall on matchup checks before failing. Preserve the exact reasons;
+        # they name the member and the grounded item/ability pair the repair must restore.
+        "funnel_reasons": funnel_reasons,
         "mega_registration": cand.get("mega_registration_assessment"),
     }
 
