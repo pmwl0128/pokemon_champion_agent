@@ -860,6 +860,13 @@ def _map_check(chk: dict | None) -> dict | None:
     }
 
 
+def _bounded_share(value):
+    """Keep source-rounded probability shares inside the public DTO's [0, 1] domain."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return max(0.0, min(1.0, value))
+    return value
+
+
 def _species_columns(species_rows: list[dict], sets: dict | None = None) -> list[dict]:
     """One entry per species (preferring its modal row) WITH its build list, so a grid keyed by
     variant is still presented as one row/column per Pokemon and switched build-by-build.
@@ -999,7 +1006,7 @@ def map_diagnose_report(team: dict, validate_raw: dict, diagnose_raw: dict) -> d
             cells_by_opp.setdefault(c["opponent"], []).append({
                 "member": member,
                 "variantId": c.get("opponent_variant") or c.get("opponent"),
-                "coverage": c.get("opponent_coverage"),
+                "coverage": _bounded_share(c.get("opponent_coverage")),
                 "offense": _map_offense(c.get("offense")),
                 "incoming": _map_offense(dd.get("worst")),
                 "speed": {"member": sp.get("member"), "opponent": sp.get("opponent"),
@@ -1027,7 +1034,8 @@ def map_diagnose_report(team: dict, validate_raw: dict, diagnose_raw: dict) -> d
             "witnessVariantIds": witnesses,
             "floorBy": floor_by,
             "representativeGrade": (o.get("representative") or {}).get("grade"),
-            "representedCoverage": (o.get("coverage") or {}).get("represented"),
+            "representedCoverage": _bounded_share(
+                (o.get("coverage") or {}).get("represented")),
             "calculationComplete": bool(o.get("calculation_complete")),
             "cells": cells_by_opp.get(o.get("opponent"), []),
         })

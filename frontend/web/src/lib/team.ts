@@ -256,8 +256,11 @@ export function takeCalcTeams(): CalcTeamsFill | null {
     const parsed = JSON.parse(raw) as CalcTeamsFill;
     if (!parsed || typeof parsed !== "object") return null;
     const members = (list: unknown): CalcMember[] => (Array.isArray(list) ? list : [])
-      .filter((m): m is CalcMember =>
-        !!m && typeof m === "object" && typeof (m as CalcMember).slug === "string")
+      .filter((m): m is CalcMember => {
+        if (!m || typeof m !== "object") return false;
+        const member = m as CalcMember;
+        return typeof member.slug === "string" || typeof member.species === "string";
+      })
       .slice(0, 6);
     return {
       format: parsed.format === "double" ? "double" : "single",

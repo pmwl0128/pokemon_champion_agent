@@ -721,9 +721,17 @@ def coverage_summary(members: list[dict[str, Any]]) -> dict[str, Any]:
         witnesses = [v["variant_id"] for v in calculated if v["grade"] == floor]
         representative = next((v for v in variants if v["is_modal"]), variants[0] if variants else None)
         numeric = [float(v["coverage"]) for v in variants if isinstance(v.get("coverage"), (int, float))]
-        represented = round(sum(numeric), 4) if numeric else None
-        calculated_coverage = (round(sum(float(v["coverage"]) for v in calculated
-                                         if isinstance(v.get("coverage"), (int, float))), 4)
+        # Retained variant shares are rounded independently by the evidence source. Their sum can
+        # therefore land a hair outside the probability domain (for example 1.0001), even though
+        # the underlying sample covers exactly 100%. Keep every aggregate share in [0, 1]; public
+        # consumers validate that invariant and should not lose the whole diagnosis to source
+        # rounding noise.
+        represented = (round(min(1.0, max(0.0, sum(numeric))), 4)
+                       if numeric else None)
+        calculated_coverage = (round(min(1.0, max(0.0, sum(
+                                           float(v["coverage"]) for v in calculated
+                                           if isinstance(v.get("coverage"), (int, float))
+                                       ))), 4)
                                if numeric else None)
         row = {
             "opponent": opp,

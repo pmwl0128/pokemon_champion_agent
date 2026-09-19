@@ -371,7 +371,11 @@ def resolve_opponent_variants(species: str, fmt: str, *, season: str | None = No
         except Exception:
             meta = None
 
-    represented = round(sum(float(a.get("coverage") or 0) for a in arches), 4)
+    # Archetype shares are rounded independently. Clamp their aggregate to the probability domain
+    # so a 100.01% rounding sum cannot leak into CLI or web contracts as 1.0001.
+    represented = round(min(1.0, max(
+        0.0, sum(float(a.get("coverage") or 0) for a in arches)
+    )), 4)
     out: list[dict[str, Any]] = []
     for arch in arches:
         run_form = mega_run_form(species, arch.get("item")) or species
