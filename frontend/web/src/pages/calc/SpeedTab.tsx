@@ -144,6 +144,14 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, format, 
       <strong className="side-head">
         <span className="speed-heading-label">{label}
           {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
+          {/* Adding extends the list this card ends, so it reads as part of the card's own label. */}
+          {add && (
+            <button type="button" className="ghost-btn tiny speed-add" onClick={add.onAdd}
+              disabled={add.full} title={add.full ? t("calc.maxSix") : add.label}
+              aria-label={add.full ? t("calc.maxSix") : add.label}>
+              + {t("speed.addShort")}
+            </button>
+          )}
         </span>
         {/* A speed row holds only the Speed half of a build, so it claims no "current" card — it
             reads one off the environment and never pretends the row still IS that card. */}
@@ -160,13 +168,6 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, format, 
                 pinned: true,
               }));
             }} />
-          {add && (
-            <button type="button" className="ghost-btn tiny speed-add" onClick={add.onAdd}
-              disabled={add.full} title={add.full ? t("calc.maxSix") : add.label}
-              aria-label={add.full ? t("calc.maxSix") : add.label}>
-              + {t("speed.addShort")}
-            </button>
-          )}
           {/* Kept on the last row too, disabled: the cluster is the same three pixels wide on every
               card, so the buttons beside it do not shift when a row is added or dropped. */}
           <button type="button" className="mini-x" onClick={onRemove} disabled={!onRemove}

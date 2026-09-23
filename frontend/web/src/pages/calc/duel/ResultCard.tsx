@@ -6,9 +6,7 @@
  * side's remaining health under its own name. */
 import type { DamageResultDto, LearnsetDto } from "@pokemon-champions/protocol";
 import { useState } from "react";
-import { GameImage } from "../../../components/GameImage.tsx";
 import { TypeBadge } from "../../../components/TypeBadge.tsx";
-import { PLACEHOLDERS, typeColor } from "../../../assets/icons.ts";
 import { useLang, useT } from "../../../i18n.ts";
 import { useDamageText } from "../../../lib/damageText.tsx";
 import { koLabel, koTone } from "../../../lib/ko.ts";
@@ -45,15 +43,9 @@ function Headline({ entry, name, result }: {
 }) {
   const turns = result ? turnsOf(result) : null;
   const tone = result ? koTone(turns, result.koChance?.guaranteed ?? false, result.max) : "none";
-  const primary = entry?.types[0];
+  // No portrait here: the roster bar right above already shows who is up; the build below carries it.
   return (
     <div className="duel-head">
-      <span className="duel-portrait"
-        style={primary ? { ["--mt" as string]: typeColor(primary) } : undefined}>
-        {entry
-          ? <GameImage assetKey={entry.key} role="dense" alt={name} className="hp-bar-sprite" />
-          : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-      </span>
       <span className="duel-ident">
         <span className="duel-name-line">
           <span className="duel-name">{name}</span>

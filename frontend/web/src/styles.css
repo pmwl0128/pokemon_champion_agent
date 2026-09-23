@@ -3172,7 +3172,7 @@ input.stat-cur.hp-cur { text-align: center; }
 .speed-side-column { min-width: 0; }
 /* The append control lives on each column's last card; an emptied opponent column keeps a slim
    stand-in so the side can still be refilled. */
-.speed-row .side-actions .speed-add { white-space: nowrap; }
+.speed-heading-label .speed-add { margin-left: 2px; white-space: nowrap; font-weight: 650; }
 .speed-add-empty {
   min-height: 42px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
   background: transparent; color: var(--brand); font-weight: 600; cursor: pointer;
@@ -3416,6 +3416,10 @@ input.stat-cur.hp-cur { text-align: center; }
 }
 .duel-teams:has(.field-flyout) { z-index: 11; }
 .duel-teams:has(.field-flyout) .field-panel { z-index: 30; }
+/* The import popover lives inside a roster that is its own layer (z 1, like the field console after
+   it), and the bar is an isolated layer under the result panels — so an open popover lifts both. */
+.duel-teams:has(.paste-pop) { z-index: 11; }
+.duel-teams > .team-bar:has(.paste-pop) { z-index: 30; }
 /* The visible controls sit directly on the shared strip. The popover carries the dense flags. */
 .duel-teams .field-global {
   display: grid; gap: 4px; justify-items: center; width: 100%;
@@ -3586,10 +3590,11 @@ input.stat-cur.hp-cur { text-align: center; }
 
 /* -- headline: who, and what the selected hit does ------------------------------------- */
 .duel-head {
-  display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px;
   min-width: 0; height: 52px;
 }
-/* The portrait sits on a soft wash of its primary type, so the two sides read apart at a glance. */
+/* The portrait (beside a build's name) sits on a soft wash of its primary type, so the two sides read
+   apart at a glance. */
 .duel-portrait {
   --mt: var(--line-strong);
   display: grid; place-items: center; width: 50px; height: 50px; border-radius: 14px;
@@ -3652,6 +3657,16 @@ input.stat-cur.hp-cur { text-align: center; }
   font-weight: 750; color: var(--ink); background: color-mix(in srgb, var(--panel) 72%, transparent);
 }
 
+/* -- a build's identity: portrait beside the name row (calculator and bulk tool) ----------- */
+.mon-id { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: end; gap: 12px; min-width: 0; }
+.mon-id .duel-portrait { width: 56px; height: 56px; }
+.mon-id .duel-portrait .hp-bar-sprite { width: 48px; height: 48px; }
+@media (max-width: 560px) {
+  .mon-id { grid-template-columns: 46px minmax(0, 1fr); gap: 9px; }
+  .mon-id .duel-portrait { width: 46px; height: 46px; }
+  .mon-id .duel-portrait .hp-bar-sprite { width: 40px; height: 40px; }
+}
+
 /* -- move cells, shared with the bulk tool ------------------------------------------------ */
 .move-cell {
   --mv: var(--line-strong);
@@ -3709,9 +3724,7 @@ input.stat-cur.hp-cur { text-align: center; }
   /* Species and forme stack on a phone: side by side, the forme heading and its two actions have
      no room left and wrap letter by letter. */
   .mon-editor-namerow.split { grid-template-columns: minmax(0, 1fr); }
-  .duel-head { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; }
-  .duel-portrait { width: 44px; height: 44px; }
-  .duel-portrait .hp-bar-sprite { width: 38px; height: 38px; }
+  .duel-head { gap: 9px; }
   .duel-name { font-size: 17px; }
   .duel-dmg-pct { font-size: 18px; }
   .duel-move-grid { grid-template-columns: minmax(0, 1fr); }
@@ -3727,49 +3740,28 @@ input.stat-cur.hp-cur { text-align: center; }
 .tw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 
 /* -- roster bar ------------------------------------------------------------------------ */
-/* Hairline frame, no fill — the same treatment as the calculator's roster bar. The middle holds the
-   four solver-supported conditions in the open instead of a folded condition console. */
-.tw-strip {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end;
-  gap: 16px; min-width: 0; padding: 8px 12px 9px;
-  border: 1px solid var(--line); border-radius: var(--radius); background: transparent;
+/* The calculator's own bar (`.duel-teams` + TeamBar + the console line), so the two tabs line up
+   pixel for pixel. Only the line above the console differs: our three screens as toggles, where the
+   calculator lists its active conditions. */
+.tw-teams .tw-walls { gap: 5px; }
+/* Two formats and no condition button: widened to the calculator's three-button segment, so the
+   weather and terrain selects stay where they were when the tab changes. */
+.tw-teams .field-global .field-format button { min-width: 71px; }
+.tw-walls-cap { margin-right: 1px; font-size: 11px; color: var(--sub); white-space: nowrap; }
+.tw-teams .tw-wall {
+  border-style: dashed; border-color: var(--line-strong); background: transparent; color: var(--sub);
 }
-.tw-roster { position: relative; display: grid; grid-template-rows: 24px 48px; gap: 2px; min-width: 0; }
-.tw-roster-head { display: flex; align-items: center; gap: 6px; min-width: 0; height: 24px; }
-.tw-roster-head strong { font-size: 12px; color: var(--ink); white-space: nowrap; }
-.tw-roster-head .num { margin-right: 2px; font-size: 11px; color: var(--sub); }
-.tw-roster-list { display: flex; align-items: flex-end; gap: 6px; min-width: 0; flex-wrap: nowrap; }
-.tw-roster.foe .tw-roster-head, .tw-roster.foe .tw-roster-list { flex-direction: row-reverse; }
+.tw-teams .tw-wall:hover { border-color: var(--brand); color: var(--brand-strong); }
+.tw-teams .tw-wall.on {
+  border-style: solid; border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: var(--brand-soft); color: var(--brand-strong); font-weight: 700;
+}
 .tw-text-btn {
   border: 1px dashed var(--line); border-radius: 6px; padding: 1px 7px; background: transparent;
   cursor: pointer; color: var(--brand-strong); font: inherit; font-size: 11.5px; font-weight: 650;
   white-space: nowrap;
 }
 .tw-text-btn:hover { border-color: var(--brand); }
-/* The paste popover opens under its roster, toward the page edge that roster sits on. */
-.tw-roster .paste-pop { top: calc(100% + 6px); }
-.tw-roster.mine .paste-pop { left: 0; right: auto; }
-.tw-roster.foe .paste-pop { left: auto; right: 0; }
-
-.tw-field { display: grid; grid-template-rows: 30px 30px; justify-items: center; align-items: center; gap: 8px; }
-.tw-field-line { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
-.tw-field label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub); }
-.tw-field select {
-  height: 30px; min-width: 104px; padding: 0 26px 0 9px; font: inherit; font-size: 12.5px; font-weight: 600;
-  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink);
-}
-.tw-format { padding: 2px; }
-.tw-format button { padding: 3px 14px; font-size: 12.5px; }
-.tw-screens { gap: 6px; font-size: 12px; color: var(--sub); }
-.tw-screens > span { margin-right: 2px; }
-.tw-screens button {
-  height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
-  background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap;
-}
-.tw-screens button:hover { border-color: var(--brand); }
-.tw-screens button.on {
-  border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); font-weight: 700;
-}
 
 /* -- shared vocabulary -------------------------------------------------------------------- */
 .tw-matchup { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; font-size: 13.5px; }
@@ -3977,9 +3969,6 @@ input.stat-cur.hp-cur { text-align: center; }
 /* -- builds ------------------------------------------------------------------------------- */
 .tw-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; min-width: 0; }
 .tw-mon { align-content: start; }
-.tw-id { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: end; gap: 12px; min-width: 0; }
-.tw-id .duel-portrait { width: 56px; height: 56px; }
-.tw-id .duel-portrait .hp-bar-sprite { width: 48px; height: 48px; }
 .tw-sp { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .tw-sp-head { display: flex; align-items: baseline; gap: 12px; font-size: 12px; color: var(--sub); }
 .tw-sp-title { flex: none; }
@@ -4104,13 +4093,6 @@ input.stat-cur.hp-cur { text-align: center; }
 
 /* -- narrower screens ------------------------------------------------------------------------ */
 @media (max-width: 1180px) {
-  .tw-strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "mine foe" "field field"; }
-  .tw-roster.mine { grid-area: mine; }
-  .tw-roster.foe { grid-area: foe; }
-  .tw-field {
-    grid-area: field; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
-    padding-top: 8px; border-top: 1px solid var(--line);
-  }
   .tw-verdict-body { grid-template-columns: 170px minmax(0, 1fr) 156px; gap: 18px; }
 }
 @media (max-width: 860px) {
@@ -4126,11 +4108,6 @@ input.stat-cur.hp-cur { text-align: center; }
   .tw-lane-change { grid-column: 1 / -1; grid-row: 2; }
 }
 @media (max-width: 600px) {
-  .tw-strip { grid-template-columns: minmax(0, 1fr); grid-template-areas: "mine" "foe" "field"; }
-  .tw-roster.foe .tw-roster-head, .tw-roster.foe .tw-roster-list { flex-direction: row; }
-  .tw-roster-list { flex-wrap: wrap; }
-  .tw-roster { grid-template-rows: 24px auto; }
-  .tw-field-line { flex-wrap: wrap; justify-content: center; white-space: normal; }
   .tw-offense { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .tw-move-grid { grid-template-columns: minmax(0, 1fr); }
   .tw-sp-row { grid-template-columns: 30px 40px minmax(0, 1fr) 46px 64px; gap: 6px; }

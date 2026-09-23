@@ -1,16 +1,16 @@
-/** The bar that opens the bulk tool: our roster on the left, theirs on the right, and between them
- * the few field conditions the solver can actually carry (format, weather, terrain, our screens).
- * They are laid out in the open rather than folded into the calculator's condition flyout — there
- * are only four of them, and a toggle the solver would silently drop does not belong here at all:
- * it would make the live number and the solved number disagree. */
+/** The bar that opens the bulk tool: the calculator's roster bar, so switching tabs does not move a
+ * pixel — the same two `TeamBar`s (label, import, reset, avatars) and the same centre console lines.
+ * The centre carries only the conditions the solver can actually carry: format, weather and terrain
+ * on the console line, our screens on the line above it where the calculator lists its active
+ * conditions. A toggle the solver would silently drop does not belong here: it would make the live
+ * number and the solved number disagree. */
 import type { FormatId, Terrain, Weather } from "@pokemon-champions/protocol";
 import { TERRAINS, WEATHERS } from "@pokemon-champions/protocol";
 import { memo, type Dispatch, type SetStateAction } from "react";
 import { useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
-import { MonAvatar } from "../duel/MonEditor.tsx";
-import { PasteImport, TEAM_MAX, type ImportOutcome } from "../duel/TeamBar.tsx";
+import { TeamBar, type ImportOutcome } from "../duel/TeamBar.tsx";
 import type { FieldState, MonState } from "../duel/state.ts";
 import type { TuneSide } from "./model.ts";
 
@@ -21,43 +21,8 @@ export const SCREEN_FLAGS: Array<{ key: string; label: MsgKey }> = [
   { key: "aurora_veil", label: "calc.auroraVeil" },
 ];
 
-function Roster({ side, team, active, dex, items, onActive, onAdd, onRemove, onReset, onImport }: {
-  side: TuneSide;
-  team: MonState[];
-  active: number;
-  dex: DexIndexEntry[];
-  items: ItemRef[];
-  onActive: (side: TuneSide, index: number) => void;
-  onAdd: (side: TuneSide) => void;
-  onRemove: (side: TuneSide, index: number) => void;
-  onReset: (side: TuneSide) => void;
-  onImport: (side: TuneSide, text: string) => Promise<ImportOutcome>;
-}) {
-  const t = useT();
-  const label = side === "mine" ? t("speed.ours") : t("speed.theirs");
-  const full = team.length >= TEAM_MAX;
-  return (
-    <div className={`tw-roster ${side}`} role="group" aria-label={label}>
-      <div className="tw-roster-head">
-        <strong>{label}</strong>
-        <span className="num">{team.length}/{TEAM_MAX}</span>
-        <PasteImport className="tw-text-btn" onImport={(text) => onImport(side, text)} />
-        <button type="button" className="tw-text-btn" onClick={() => onReset(side)}
-          title={t("calc.resetSide").replace("{side}", label)}>{t("calc.resetTeam")}</button>
-      </div>
-      <div className="tw-roster-list">
-        {team.map((mon, index) => (
-          <MonAvatar key={mon.uid} mon={mon} dex={dex} items={items} active={index === active}
-            onClick={() => onActive(side, index)}
-            onRemove={team.length > 1 ? () => onRemove(side, index) : undefined} />
-        ))}
-        <button type="button" className="team-add" onClick={() => onAdd(side)} disabled={full}
-          aria-label={full ? t("calc.maxSix") : t("calc.addMon")}
-          title={full ? t("calc.maxSix") : t("calc.addMon")}>+</button>
-      </div>
-    </div>
-  );
-}
+const NO_FLAGS: Array<{ key: string; label: string }> = [];
+const noop = () => {};
 
 export const TeamStrip = memo(function TeamStrip({ teams, active, field, setField, dex, items, onActive,
   onAdd, onRemove, onReset, onImport }: {
@@ -79,51 +44,68 @@ export const TeamStrip = memo(function TeamStrip({ teams, active, field, setFiel
     ...current,
     sides: { ...current.sides, a: { ...current.sides.a, [key]: !current.sides.a[key] } },
   }));
-  const roster = { dex, items, onActive, onAdd, onRemove, onReset, onImport };
+  const roster = (side: TuneSide) => ({
+    team: teams[side], index: active[side], dex, items,
+    onIndex: (index: number) => onActive(side, index),
+    onAdd: () => onAdd(side),
+    onRemove: (index: number) => onRemove(side, index),
+    onReset: () => onReset(side),
+    onImport: (text: string) => onImport(side, text),
+    // The side conditions the calculator lists here are not the solver's; ours are in the centre.
+    activeFlags: NO_FLAGS, onClearFlag: noop, onShowFlags: noop,
+  });
+  const weather = field.weather ? ` weather-${field.weather.toLowerCase()}` : "";
+  const terrain = field.terrain ? ` terrain-${field.terrain.toLowerCase()}` : "";
   return (
-    <div className="tw-strip">
-      <Roster side="mine" team={teams.mine} active={active.mine} {...roster} />
-      <div className="tw-field">
-        <div className="tw-field-line">
-          <label>
-            <span>{t("calc.weather")}</span>
-            <select value={field.weather}
-              onChange={(event) => setField((current) => ({ ...current,
-                weather: event.target.value as Weather | "" }))}>
-              <option value="">{t("calc.none")}</option>
-              {WEATHERS.map((weather) => <option key={weather} value={weather}>{t(`weather.${weather}`)}</option>)}
-            </select>
-          </label>
-          <div className="seg tw-format" role="group" aria-label={t("a11y.format")}>
-            {(["single", "double"] as const).map((format) => (
-              <button key={format} type="button" className={field.format === format ? "on" : ""}
-                aria-pressed={field.format === format} onClick={() => setFormat(format)}>
-                {t(`format.${format}`)}
-              </button>
-            ))}
+    <div className={`duel-teams tw-teams${weather}${terrain}`}>
+      <TeamBar label={t("calc.attackerTeam")} {...roster("mine")} />
+      <section className="field-panel" aria-label={t("calc.fieldOptions")}>
+        <div className="field-global">
+          <div className="field-active-common tw-walls" role="group" aria-label={t("tune.ws.screens")}>
+            <span className="tw-walls-cap">{t("tune.ws.screens")}</span>
+            {SCREEN_FLAGS.map((flag) => {
+              const on = !!field.sides.a[flag.key];
+              return (
+                <button key={flag.key} type="button" className={`team-flag-chip tw-wall${on ? " on" : ""}`}
+                  aria-pressed={on} onClick={() => toggleScreen(flag.key)}>{t(flag.label)}</button>
+              );
+            })}
           </div>
-          <label>
-            <span>{t("calc.terrain")}</span>
-            <select value={field.terrain}
-              onChange={(event) => setField((current) => ({ ...current,
-                terrain: event.target.value as Terrain | "" }))}>
-              <option value="">{t("calc.none")}</option>
-              {TERRAINS.map((terrain) => <option key={terrain} value={terrain}>{t(`terrain.${terrain}`)}</option>)}
-            </select>
-          </label>
+          <div className="field-line">
+            <div className="field-weather">
+              <label className="field-control-label">
+                <span className="field-cap">{t("calc.weather")}</span>
+                <select value={field.weather}
+                  onChange={(event) => setField((current) => ({ ...current,
+                    weather: event.target.value as Weather | "" }))}>
+                  <option value="">{t("calc.none")}</option>
+                  {WEATHERS.map((value) => <option key={value} value={value}>{t(`weather.${value}`)}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="seg field-format" role="group" aria-label={t("a11y.format")}>
+              {(["single", "double"] as const).map((format) => (
+                <button key={format} type="button" className={field.format === format ? "on" : ""}
+                  aria-pressed={field.format === format} onClick={() => setFormat(format)}>
+                  {t(`format.${format}`)}
+                </button>
+              ))}
+            </div>
+            <div className="field-terrain">
+              <label className="field-control-label">
+                <span className="field-cap">{t("calc.terrain")}</span>
+                <select value={field.terrain}
+                  onChange={(event) => setField((current) => ({ ...current,
+                    terrain: event.target.value as Terrain | "" }))}>
+                  <option value="">{t("calc.none")}</option>
+                  {TERRAINS.map((value) => <option key={value} value={value}>{t(`terrain.${value}`)}</option>)}
+                </select>
+              </label>
+            </div>
+          </div>
         </div>
-        <div className="tw-field-line tw-screens" role="group" aria-label={t("tune.ws.screens")}>
-          <span>{t("tune.ws.screens")}</span>
-          {SCREEN_FLAGS.map((flag) => {
-            const on = !!field.sides.a[flag.key];
-            return (
-              <button key={flag.key} type="button" className={on ? "on" : ""} aria-pressed={on}
-                onClick={() => toggleScreen(flag.key)}>{t(flag.label)}</button>
-            );
-          })}
-        </div>
-      </div>
-      <Roster side="foe" team={teams.foe} active={active.foe} {...roster} />
+      </section>
+      <TeamBar label={t("calc.defenderTeam")} {...roster("foe")} mirrored />
     </div>
   );
 });

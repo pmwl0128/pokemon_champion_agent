@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetSt
 import { BuildSetSummary, type BuildCardOption } from "../../../components/BuildPicker.tsx";
 import { EntityHover } from "../../../components/EntityHover.tsx";
 import { GameImage } from "../../../components/GameImage.tsx";
-import { PLACEHOLDERS } from "../../../assets/icons.ts";
+import { PLACEHOLDERS, typeColor } from "../../../assets/icons.ts";
 import { TypeBadge } from "../../../components/TypeBadge.tsx";
 import { displayName, useLang, useT } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
@@ -28,6 +28,19 @@ import {
 /** Species (and, for a species with Mega forms, the forme) as one identity row: a single field, or
  * two side by side when a forme exists. Shared by the calculator and the bulk tool so the same mon
  * is named the same way on both. `actions` rides on the row's label line. */
+/** The mon's portrait on a soft wash of its primary type, beside the name row of a build. */
+export function MonPortrait({ entry, name }: { entry: DexIndexEntry | undefined; name: string }) {
+  const primary = entry?.types[0];
+  return (
+    <span className="duel-portrait"
+      style={primary ? { ["--mt" as string]: typeColor(primary) } : undefined}>
+      {entry
+        ? <GameImage assetKey={entry.key} role="dense" alt={name} className="hp-bar-sprite" />
+        : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
+    </span>
+  );
+}
+
 export function MonNameRow({ slug, item, dex, items, pickerKey, actions, identityShown = false,
   onSpecies, onForme }: {
   slug: string;
@@ -205,12 +218,15 @@ export function MonEditor({
 
   return (
     <div className="mon-editor">
-      <MonNameRow slug={mon.slug} item={mon.item} dex={dex} items={items} pickerKey={label}
-        actions={editorActions} identityShown
-        onSpecies={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))}
-        // A Mega picked here is stored as the Mega species; its stone is pinned by the effect above,
-        // so the two controls can never disagree again.
-        onForme={(slug, dropStone) => setMon((s) => ({ ...s, slug, ...(dropStone ? { item: "" } : {}) }))} />
+      <div className="mon-id">
+        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} />
+        <MonNameRow slug={mon.slug} item={mon.item} dex={dex} items={items} pickerKey={label}
+          actions={editorActions} identityShown
+          onSpecies={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))}
+          // A Mega picked here is stored as the Mega species; its stone is pinned by the effect
+          // above, so the two controls can never disagree again.
+          onForme={(slug, dropStone) => setMon((s) => ({ ...s, slug, ...(dropStone ? { item: "" } : {}) }))} />
+      </div>
 
       <div className="mon-build-row">
         <label>{t("calc.ability")}

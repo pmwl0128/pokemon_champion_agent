@@ -3,8 +3,6 @@
  * both tabs — and differ only in between: our side edits the bulk spread, theirs its offence. */
 import type { FormatId, LearnsetDto, NatureDto } from "@pokemon-champions/protocol";
 import { memo, useCallback, useEffect, useMemo } from "react";
-import { GameImage } from "../../../components/GameImage.tsx";
-import { PLACEHOLDERS, typeColor } from "../../../assets/icons.ts";
 import { displayName, useLang, useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
@@ -12,7 +10,7 @@ import {
   BOOST_STAGES, BuildPickerButton, ItemCombo, STATUSES, boostLabel, clampNum, megaFor,
   natureLabel, spSum, spSumClass, type BuildOption,
 } from "../shared.tsx";
-import { MonNameRow } from "../duel/MonEditor.tsx";
+import { MonNameRow, MonPortrait } from "../duel/MonEditor.tsx";
 import { MoveCell } from "../duel/MoveCell.tsx";
 import { boostedStat, effectiveEntry, finalStat, type MonState } from "../duel/state.ts";
 import { attackIndex, pressedStat, type Baseline, type BulkStat, type Rolls } from "./model.ts";
@@ -85,18 +83,10 @@ const Identity = memo(function Identity({ slug, ability, nature, item, status, d
       )}
     </>
   );
-  const primary = entry?.types[0];
   return (
     <>
-      {/* Unlike the calculator, no headline above these cards shows the mon, so the portrait (on the
-          same type-tinted tile the calculator's result uses) sits beside the name here. */}
-      <div className="tw-id">
-        <span className="duel-portrait"
-          style={primary ? { ["--mt" as string]: typeColor(primary) } : undefined}>
-          {entry
-            ? <GameImage assetKey={entry.key} role="dense" alt={displayName(entry, lang)} className="hp-bar-sprite" />
-            : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-        </span>
+      <div className="mon-id">
+        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} />
         <MonNameRow slug={slug} item={item} dex={dex} items={items} pickerKey={idKey} actions={actions}
           onSpecies={onSpecies}
           onForme={(next, dropStone) => onChange((current) => ({
