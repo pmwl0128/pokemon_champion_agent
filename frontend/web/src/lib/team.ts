@@ -55,6 +55,10 @@ export interface TuneFill {
   team: unknown;          // the full team-json (format rides inside it)
   label?: string;         // where it came from, for the tab header (e.g. the session intent)
   sessionId?: string;     // UEP session of origin — enables writing the tune request back
+  /** Set once the team has been loaded into the calc roster. The stash itself stays (the bulk tool
+   * still reads the source team's own fields), but the roster must not be overwritten again on a
+   * later visit, after the reader has built on it. */
+  applied?: boolean;
 }
 
 const FILL_KEY = "pc-tune-fill";
@@ -63,6 +67,11 @@ export function stashTuneFill(fill: TuneFill): void {
   try {
     sessionStorage.setItem(FILL_KEY, JSON.stringify(fill));
   } catch { /* storage blocked — the calc page just won't offer the team mode */ }
+}
+
+export function markTuneFillApplied(): void {
+  const fill = takeTuneFill();
+  if (fill) stashTuneFill({ ...fill, applied: true });
 }
 
 export function clearTuneFill(): void {

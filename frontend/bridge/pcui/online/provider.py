@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Mapping, Protocol
@@ -26,8 +27,8 @@ class ChatResult:
     message: dict          # assistant message verbatim: content and/or tool_calls
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    # DeepSeek prefix-cache split (§9 pricing: hit ¥0.02/M vs miss ¥1/M) — 0 when the
-    # upstream doesn't report it.
+    # Provider cache split for benchmark/accounting visibility — 0 when the upstream
+    # doesn't report it.
     cache_hit_tokens: int = 0
     cache_miss_tokens: int = 0
 
@@ -57,6 +58,55 @@ def _optional_int(values: Mapping[str, str], key: str) -> int | None:
         raise ValueError(f"{key} must be an integer or empty") from exc
 
 
+def _extra_body(values: Mapping[str, str], reserved: set[str]) -> dict:
+    raw = values.get("PCUI_LLM_EXTRA_BODY_JSON", "{}").strip() or "{}"
+    try:
+        extra = json.loads(raw)
+    except ValueError as exc:
+        raise ValueError("PCUI_LLM_EXTRA_BODY_JSON must be a JSON object") from exc
+    if not isinstance(extra, dict):
+        raise ValueError("PCUI_LLM_EXTRA_BODY_JSON must be a JSON object")
+    overlap = reserved.intersection(extra)
+    if overlap:
+        raise ValueError("PCUI_LLM_EXTRA_BODY_JSON cannot override: "
+                         + ", ".join(sorted(overlap)))
+    return extra
+
+
+def _thinking_controls(values: Mapping[str, str]) -> tuple[str | None, str | None]:
+    thinking = values.get("PCUI_LLM_THINKING", "enabled").strip().lower()
+    if thinking not in {"enabled", "disabled", ""}:
+        raise ValueError("PCUI_LLM_THINKING must be enabled, disabled, or empty")
+    effort = values.get("PCUI_LLM_REASONING_EFFORT", "high").strip().lower()
+    if effort not in {"high", "max", ""}:
+        raise ValueError("PCUI_LLM_REASONING_EFFORT must be high, max, or empty")
+    return thinking or None, effort or None
+
+
+def _post_json(url: str, payload: dict, headers: dict[str, str], timeout: float) -> dict:
+    import httpx
+    try:
+        response = httpx.post(url, json=payload, headers=headers, timeout=timeout)
+    except httpx.HTTPError as exc:
+        raise LlmUnavailable(f"llm request failed: {type(exc).__name__}") from exc
+    except ImportError as exc:
+        # httpx can fail while constructing a proxy transport when an optional extra is absent.
+        raise LlmUnavailable(f"llm transport unavailable: {exc}") from exc
+    except OSError as exc:
+        raise LlmUnavailable(
+            f"llm transport failed: {type(exc).__name__}: {exc}") from exc
+    if response.status_code != 200:
+        # Never include the body: upstream errors can echo request fragments or credentials.
+        raise LlmUnavailable(f"llm upstream returned {response.status_code}")
+    try:
+        document = response.json()
+    except ValueError as exc:
+        raise LlmUnavailable("llm upstream returned an unparseable response") from exc
+    if not isinstance(document, dict):
+        raise LlmUnavailable("llm upstream returned an unparseable response")
+    return document
+
+
 @dataclass(frozen=True)
 class OpenAIChatConfig:
     """One environment-backed seam for OpenAI-compatible chat-completions providers.
@@ -67,10 +117,10 @@ class OpenAIChatConfig:
     """
 
     api_key: str
-    provider: str = "deepseek"
-    base_url: str = "https://api.deepseek.com"
+    provider: str = "openai-compatible"
+    base_url: str = "https://api.openai.com/v1"
     api_path: str = "/chat/completions"
-    model: str = "deepseek-flash"
+    model: str = ""
     api_style: str = "openai-chat-completions"
     temperature: float | None = 0.3
     top_p: float | None = None
@@ -83,56 +133,21 @@ class OpenAIChatConfig:
 
     @classmethod
     def from_env(cls, values: Mapping[str, str], *,
-                 provider: str = "deepseek") -> "OpenAIChatConfig":
-        if provider not in {"openai-compatible", "deepseek"}:
+                 provider: str = "openai-compatible") -> "OpenAIChatConfig":
+        if provider != "openai-compatible":
             raise ValueError(f"unsupported OpenAI-compatible provider: {provider}")
         api_style = values.get("PCUI_LLM_API_STYLE", "openai-chat-completions").strip()
         if api_style != "openai-chat-completions":
             raise ValueError("PCUI_LLM_API_STYLE currently supports only openai-chat-completions")
-        thinking_raw = values.get("PCUI_LLM_THINKING", "enabled").strip().lower()
-        if thinking_raw not in {"enabled", "disabled", ""}:
-            raise ValueError("PCUI_LLM_THINKING must be enabled, disabled, or empty")
-        effort_raw = values.get("PCUI_LLM_REASONING_EFFORT", "high").strip().lower()
-        if effort_raw not in {"high", "max", ""}:
-            raise ValueError("PCUI_LLM_REASONING_EFFORT must be high, max, or empty")
-        raw_extra = values.get("PCUI_LLM_EXTRA_BODY_JSON", "{}").strip() or "{}"
-        try:
-            extra = json.loads(raw_extra)
-        except ValueError as exc:
-            raise ValueError("PCUI_LLM_EXTRA_BODY_JSON must be a JSON object") from exc
-        if not isinstance(extra, dict):
-            raise ValueError("PCUI_LLM_EXTRA_BODY_JSON must be a JSON object")
+        thinking, effort = _thinking_controls(values)
         reserved = {"model", "messages", "stream", "max_tokens", "tools", "tool_choice",
                     "temperature", "top_p", "presence_penalty", "frequency_penalty", "seed",
                     "thinking", "reasoning_effort"}
-        overlap = reserved.intersection(extra)
-        if overlap:
-            raise ValueError("PCUI_LLM_EXTRA_BODY_JSON cannot override: "
-                             + ", ".join(sorted(overlap)))
-        if provider == "deepseek":
-            base_url = values.get(
-                "PCUI_DEEPSEEK_BASE_URL",
-                values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
-            model = values.get(
-                "PCUI_DEEPSEEK_MODEL",
-                values.get("DEEPSEEK_MODEL", "deepseek-flash")).strip()
-            api_key = values.get(
-                "PCUI_DEEPSEEK_API_KEY",
-                values.get("PCUI_LLM_API_KEY",
-                           values.get("DEEPSEEK_API_KEY", ""))).strip()
-            api_path = values.get(
-                "PCUI_DEEPSEEK_API_PATH", "/chat/completions").strip()
-        else:
-            base_url = values.get(
-                "PCUI_LLM_BASE_URL",
-                values.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).strip()
-            model = values.get(
-                "PCUI_LLM_MODEL",
-                values.get("DEEPSEEK_MODEL", "deepseek-flash")).strip()
-            api_key = values.get(
-                "PCUI_LLM_API_KEY",
-                values.get("DEEPSEEK_API_KEY", "")).strip()
-            api_path = values.get("PCUI_LLM_API_PATH", "/chat/completions").strip()
+        extra = _extra_body(values, reserved)
+        base_url = values.get("PCUI_LLM_BASE_URL", "https://api.openai.com/v1").strip()
+        model = values.get("PCUI_LLM_MODEL", "").strip()
+        api_key = values.get("PCUI_LLM_API_KEY", "").strip()
+        api_path = values.get("PCUI_LLM_API_PATH", "/chat/completions").strip()
         if not base_url or not model or not api_path.startswith("/"):
             raise ValueError(
                 f"{provider} base URL/model must be non-empty and API path must start with /")
@@ -146,8 +161,8 @@ class OpenAIChatConfig:
             presence_penalty=_optional_float(values, "PCUI_LLM_PRESENCE_PENALTY"),
             frequency_penalty=_optional_float(values, "PCUI_LLM_FREQUENCY_PENALTY"),
             seed=_optional_int(values, "PCUI_LLM_SEED"),
-            thinking=thinking_raw or None,
-            reasoning_effort=effort_raw or None,
+            thinking=thinking,
+            reasoning_effort=effort,
             extra_body=extra,
         )
 
@@ -179,7 +194,6 @@ class OpenAICompatibleProvider:
 
     def chat(self, messages: list[dict], tools: list[dict], *, max_tokens: int,
              tool_choice: str, timeout: float) -> ChatResult:
-        import httpx
         cfg = self.config
         payload: dict = {"model": cfg.model, "messages": messages, "stream": False,
                          "max_tokens": max_tokens, **cfg.extra_body}
@@ -198,30 +212,13 @@ class OpenAICompatibleProvider:
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = tool_choice
+        doc = _post_json(
+            f"{cfg.base_url.rstrip('/')}{cfg.api_path}", payload,
+            {"Authorization": f"Bearer {cfg.api_key}"}, timeout)
         try:
-            resp = httpx.post(f"{cfg.base_url.rstrip('/')}{cfg.api_path}", json=payload,
-                              headers={"Authorization": f"Bearer {cfg.api_key}"},
-                              timeout=timeout)
-        except httpx.HTTPError as e:
-            raise LlmUnavailable(f"llm request failed: {type(e).__name__}") from e
-        except ImportError as e:
-            # httpx fails to even BUILD its transport when the environment selects a proxy scheme
-            # whose optional extra is missing (ALL_PROXY=socks5h://... without `httpx[socks]`).
-            # That is a deployment/config fault, not a model fault — but it is not an HTTPError, so
-            # it used to escape this handler and surface as a bare 500 "pipeline failed", which said
-            # nothing about the actual cause. Report it as an unavailable transport, with the reason.
-            raise LlmUnavailable(f"llm transport unavailable: {e}") from e
-        except OSError as e:
-            # Connection-level faults (proxy refused, DNS, TLS) — same class of operator problem.
-            raise LlmUnavailable(f"llm transport failed: {type(e).__name__}: {e}") from e
-        if resp.status_code != 200:
-            # No body in the message: upstream errors can echo request fragments.
-            raise LlmUnavailable(f"llm upstream returned {resp.status_code}")
-        try:
-            doc = resp.json()
             message = doc["choices"][0]["message"]
-        except (ValueError, LookupError, TypeError) as e:
-            raise LlmUnavailable("llm upstream returned an unparseable response") from e
+        except (LookupError, TypeError) as exc:
+            raise LlmUnavailable("llm upstream returned an unparseable response") from exc
         usage = doc.get("usage") or {}
         return ChatResult(message, int(usage.get("prompt_tokens") or 0),
                           int(usage.get("completion_tokens") or 0),
@@ -229,12 +226,264 @@ class OpenAICompatibleProvider:
                           int(usage.get("prompt_cache_miss_tokens") or 0))
 
 
-class DeepSeekProvider(OpenAICompatibleProvider):
-    """Backward-compatible constructor for callers that still use the old class name."""
+@dataclass(frozen=True)
+class AnthropicMessagesConfig:
+    """Provider-specific configuration for Anthropic Messages-compatible endpoints."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.deepseek.com",
+    api_key: str
+    provider: str = "mimo"
+    base_url: str = "https://api.xiaomimimo.com/anthropic"
+    api_path: str = "/v1/messages"
+    model: str = "mimo-v2.6-pro"
+    api_style: str = "anthropic-messages"
+    temperature: float | None = 0.3
+    top_p: float | None = None
+    thinking: str | None = "enabled"
+    reasoning_effort: str | None = "high"
+    extra_body: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_env(cls, values: Mapping[str, str], *,
+                 provider: str = "mimo") -> "AnthropicMessagesConfig":
+        if provider not in {"mimo", "deepseek"}:
+            raise ValueError(f"unsupported Anthropic Messages provider: {provider}")
+        # Named providers have a fixed wire protocol.  Do not reuse the generic style flag:
+        # keeping its legacy OpenAI value lets the next release be staged alongside the
+        # currently running release without making an unexpected old-process restart fail.
+        api_style = "anthropic-messages"
+        thinking, effort = _thinking_controls(values)
+        reserved = {"model", "messages", "system", "stream", "max_tokens", "tools",
+                    "tool_choice", "temperature", "top_p", "thinking", "output_config"}
+        extra = _extra_body(values, reserved)
+        if provider == "mimo":
+            base_url = values.get(
+                "PCUI_MIMO_BASE_URL", "https://api.xiaomimimo.com/anthropic").strip()
+            api_path = values.get("PCUI_MIMO_API_PATH", "/v1/messages").strip()
+            model = values.get("PCUI_MIMO_MODEL", "mimo-v2.6-pro").strip()
+            api_key = values.get("PCUI_MIMO_API_KEY", "").strip()
+        else:
+            base_url = values.get(
+                "PCUI_DEEPSEEK_ANTHROPIC_BASE_URL",
+                "https://api.deepseek.com/anthropic").strip()
+            api_path = values.get(
+                "PCUI_DEEPSEEK_ANTHROPIC_API_PATH", "/v1/messages").strip()
+            model = values.get(
+                "PCUI_DEEPSEEK_MODEL",
+                values.get("DEEPSEEK_MODEL", "deepseek-flash")).strip()
+            api_key = values.get(
+                "PCUI_DEEPSEEK_API_KEY",
+                values.get("PCUI_LLM_API_KEY",
+                           values.get("DEEPSEEK_API_KEY", ""))).strip()
+        if not base_url or not model or not api_path.startswith("/"):
+            raise ValueError(
+                f"{provider} base URL/model must be non-empty and API path must start with /")
+        return cls(
+            api_key=api_key, provider=provider, base_url=base_url, api_path=api_path,
+            model=model, api_style=api_style,
+            temperature=_optional_float(values, "PCUI_LLM_TEMPERATURE")
+            if "PCUI_LLM_TEMPERATURE" in values else 0.3,
+            top_p=_optional_float(values, "PCUI_LLM_TOP_P"),
+            thinking=thinking, reasoning_effort=effort, extra_body=extra,
+        )
+
+    def safe_summary(self) -> str:
+        thinking = self.thinking or "provider-default"
+        effort = (self.reasoning_effort if self.provider == "deepseek"
+                  and self.thinking == "enabled" else "provider-default")
+        return (f"{self.provider}/{self.api_style}, model={self.model}, thinking={thinking}, "
+                f"reasoning_effort={effort}")
+
+
+def _anthropic_request_messages(messages: list[dict]) -> tuple[str | None, list[dict]]:
+    system: list[str] = []
+    converted: list[dict] = []
+
+    def append(role: str, blocks: list[dict]) -> None:
+        if not blocks:
+            return
+        if converted and converted[-1]["role"] == role:
+            converted[-1]["content"].extend(blocks)
+        else:
+            converted.append({"role": role, "content": blocks})
+
+    for message in messages:
+        role = message.get("role")
+        if role == "system":
+            content = str(message.get("content") or "").strip()
+            if content:
+                system.append(content)
+            continue
+        if role == "tool":
+            append("user", [{"type": "tool_result",
+                             "tool_use_id": str(message.get("tool_call_id") or ""),
+                             "content": str(message.get("content") or "")}])
+            continue
+        if role not in {"user", "assistant"}:
+            raise ValueError(f"unsupported chat role for Anthropic Messages: {role!r}")
+        blocks: list[dict] = []
+        content = message.get("content")
+        if isinstance(content, str) and content:
+            blocks.append({"type": "text", "text": content})
+        elif isinstance(content, list):
+            blocks.extend(block for block in content if isinstance(block, dict))
+        if role == "assistant":
+            for call in message.get("tool_calls") or []:
+                function = call.get("function") or {}
+                arguments = function.get("arguments") or "{}"
+                try:
+                    parsed = json.loads(arguments) if isinstance(arguments, str) else arguments
+                except ValueError:
+                    parsed = {}
+                if not isinstance(parsed, dict):
+                    parsed = {}
+                blocks.append({"type": "tool_use", "id": str(call.get("id") or ""),
+                               "name": str(function.get("name") or ""), "input": parsed})
+        append(str(role), blocks)
+    return "\n\n".join(system) or None, converted
+
+
+def _anthropic_tools(tools: list[dict]) -> list[dict]:
+    converted = []
+    for tool in tools:
+        function = tool.get("function") or {}
+        row = {"name": str(function.get("name") or ""),
+               "input_schema": function.get("parameters") or {"type": "object"}}
+        if function.get("description"):
+            row["description"] = str(function["description"])
+        converted.append(row)
+    return converted
+
+
+def _anthropic_response_message(content: object) -> dict:
+    if not isinstance(content, list):
+        raise LlmUnavailable("llm upstream returned an unparseable response")
+    text_parts: list[str] = []
+    tool_calls: list[dict] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "text" and isinstance(block.get("text"), str):
+            text_parts.append(block["text"])
+        elif block.get("type") == "tool_use":
+            arguments = block.get("input") if isinstance(block.get("input"), dict) else {}
+            tool_calls.append({
+                "id": str(block.get("id") or ""), "type": "function",
+                "function": {"name": str(block.get("name") or ""),
+                             "arguments": json.dumps(arguments, ensure_ascii=False)},
+            })
+    message: dict = {"role": "assistant", "content": "\n".join(text_parts) or None}
+    if tool_calls:
+        message["tool_calls"] = tool_calls
+    return message
+
+
+class AnthropicMessagesProvider:
+    """Blocking Anthropic Messages adapter exposed through the app's OpenAI-shaped seam."""
+
+    def __init__(self, config: AnthropicMessagesConfig):
+        self.config = config
+        self.model = config.model
+
+    @property
+    def thinking_enabled(self) -> bool:
+        return self.config.thinking == "enabled"
+
+    def safe_summary(self) -> str:
+        return self.config.safe_summary()
+
+    def with_thinking(self, enabled: bool) -> "AnthropicMessagesProvider":
+        return AnthropicMessagesProvider(replace(
+            self.config, thinking="enabled" if enabled else "disabled"))
+
+    def chat(self, messages: list[dict], tools: list[dict], *, max_tokens: int,
+             tool_choice: str, timeout: float) -> ChatResult:
+        cfg = self.config
+        system, anthropic_messages = _anthropic_request_messages(messages)
+        payload: dict = {"model": cfg.model, "messages": anthropic_messages,
+                         "stream": False, "max_tokens": max_tokens, **cfg.extra_body}
+        if system:
+            payload["system"] = system
+        if cfg.thinking is not None:
+            payload["thinking"] = {"type": cfg.thinking}
+        if cfg.thinking != "enabled":
+            if cfg.temperature is not None:
+                payload["temperature"] = cfg.temperature
+            if cfg.top_p is not None:
+                payload["top_p"] = cfg.top_p
+        # MiMo currently documents only auto tool choice. Omitting tools on the forced-final
+        # call makes `none` an actual hard gate on both providers instead of relying on an
+        # ignored field. The orchestration still keeps the full tool loop internally.
+        if tools and tool_choice != "none":
+            payload["tools"] = _anthropic_tools(tools)
+            payload["tool_choice"] = {"type": "auto"}
+        if (cfg.provider == "deepseek" and cfg.thinking == "enabled"
+                and cfg.reasoning_effort is not None):
+            payload["output_config"] = {"effort": cfg.reasoning_effort}
+        if cfg.provider == "mimo":
+            headers = {"Authorization": f"Bearer {cfg.api_key}",
+                       "Content-Type": "application/json"}
+        else:
+            headers = {"x-api-key": cfg.api_key, "anthropic-version": "2023-06-01",
+                       "Content-Type": "application/json"}
+        doc = _post_json(
+            f"{cfg.base_url.rstrip('/')}{cfg.api_path}", payload, headers, timeout)
+        try:
+            message = _anthropic_response_message(doc["content"])
+        except (LookupError, TypeError) as exc:
+            raise LlmUnavailable("llm upstream returned an unparseable response") from exc
+        usage = doc.get("usage") or {}
+        cache_hit = int(usage.get("cache_read_input_tokens") or 0)
+        cache_create = int(usage.get("cache_creation_input_tokens") or 0)
+        input_tokens = int(usage.get("input_tokens") or 0) + cache_hit + cache_create
+        return ChatResult(message, input_tokens, int(usage.get("output_tokens") or 0),
+                          cache_hit, int(usage.get("input_tokens") or 0) + cache_create)
+
+
+class FallbackProvider:
+    """Retry an unavailable primary once on an independently configured provider."""
+
+    def __init__(self, primary: LlmProvider, fallback: LlmProvider):
+        self.primary = primary
+        self.fallback = fallback
+        self.model = getattr(primary, "model", "unknown")
+
+    @property
+    def thinking_enabled(self) -> bool:
+        return bool(getattr(self.primary, "thinking_enabled", False))
+
+    def chat(self, messages: list[dict], tools: list[dict], *, max_tokens: int,
+             tool_choice: str, timeout: float) -> ChatResult:
+        started = time.monotonic()
+        try:
+            return self.primary.chat(messages, tools, max_tokens=max_tokens,
+                                     tool_choice=tool_choice, timeout=timeout)
+        except LlmUnavailable as primary_error:
+            remaining = timeout - (time.monotonic() - started)
+            if remaining <= 0:
+                raise primary_error
+            try:
+                return self.fallback.chat(messages, tools, max_tokens=max_tokens,
+                                          tool_choice=tool_choice, timeout=remaining)
+            except LlmUnavailable as fallback_error:
+                raise LlmUnavailable(
+                    "primary and fallback LLM providers unavailable "
+                    f"({primary_error}; {fallback_error})") from fallback_error
+
+    def safe_summary(self) -> str:
+        primary = getattr(self.primary, "safe_summary", None)
+        fallback = getattr(self.fallback, "safe_summary", None)
+        primary_text = primary() if primary else type(self.primary).__name__
+        fallback_text = fallback() if fallback else type(self.fallback).__name__
+        return f"{primary_text}; fallback={fallback_text}"
+
+
+class DeepSeekProvider(AnthropicMessagesProvider):
+    """Backward-compatible constructor using DeepSeek's Anthropic Messages endpoint."""
+
+    def __init__(self, api_key: str, base_url: str = "https://api.deepseek.com/anthropic",
                  model: str = "deepseek-flash"):
-        super().__init__(OpenAIChatConfig(api_key=api_key, base_url=base_url, model=model))
+        super().__init__(AnthropicMessagesConfig(
+            api_key=api_key, provider="deepseek", base_url=base_url, model=model))
 
 
 def _first_name(rows: object, used: set[str] | None = None) -> str | None:

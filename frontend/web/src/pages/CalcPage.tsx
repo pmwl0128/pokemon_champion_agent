@@ -1,7 +1,8 @@
 /** Calc page shell: one place to pick a mon set, three tools over the same live engine —
- * 伤害矩阵 (damage matrix), 速度线 (speed line), 耐久调整 (bulk tune). The shell owns the
- * capability gate and the shared vocab load (dex / natures / items); each tool is a tab that keeps
- * its own state once visited (hidden, not unmounted, when you switch away). */
+ * 伤害矩阵 (damage matrix), 耐久调整 (bulk tune), 速度线 (speed line). The shell owns the
+ * capability gate, the shared vocab load (dex / natures / items) and the shared roster (both teams
+ * and the battle frame, see calc/roster.tsx) that the damage and bulk tools read and edit; each tool
+ * is a tab that keeps its own view state once visited (hidden, not unmounted, when you switch away). */
 import { lazy, Suspense, useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useDexIndex, useItems, useNatures } from "../hooks.ts";
@@ -12,6 +13,7 @@ import { RailHandle, useSideRail } from "../components/SideRail.tsx";
 import { SegmentedControl, segmentedPanelId, segmentedTabId }
   from "../components/SegmentedControl.tsx";
 import { useRuntime } from "../runtime/context.tsx";
+import { RosterProvider } from "./calc/roster.tsx";
 
 // Each calculator owns a substantial form and result renderer. Load only the initial tool, then
 // preserve the existing "mounted once visited" behaviour so switching back never loses work.
@@ -19,8 +21,8 @@ const DamageTab = lazy(() => import("./calc/DamageTab.tsx")
   .then((module) => ({ default: module.DamageTab })));
 const SpeedTab = lazy(() => import("./calc/SpeedTab.tsx")
   .then((module) => ({ default: module.SpeedTab })));
-const TuneTab = lazy(() => import("./calc/TuneTab.tsx")
-  .then((module) => ({ default: module.TuneTab })));
+const TuneWorkspace = lazy(() => import("./calc/TuneWorkspace.tsx")
+  .then((module) => ({ default: module.TuneWorkspace })));
 
 type Tab = "damage" | "speed" | "tune";
 
@@ -43,8 +45,8 @@ export function CalcPage() {
   const hasSpeed = can("calc.speedline");
   const allTabs: Array<{ id: Tab; label: string; on: boolean }> = [
     { id: "damage", label: t("calc.tab.damage"), on: hasDamage },
-    { id: "speed", label: t("calc.tab.speed"), on: hasSpeed },
     { id: "tune", label: t("calc.tab.tune"), on: hasDamage },
+    { id: "speed", label: t("calc.tab.speed"), on: hasSpeed },
   ];
   const tabs = allTabs.filter((x) => x.on);
 
@@ -54,7 +56,6 @@ export function CalcPage() {
   const initialTab: Tab = (urlTab === "tune" || urlTab === "speed" || urlTab === "damage")
     && allTabs.find((x) => x.id === urlTab)?.on
     ? urlTab : hasDamage ? "damage" : "speed";
-  const teamMode = params.get("mode") === "team";
   const [tab, setTab] = useState<Tab>(initialTab);
   // Keep a tab mounted once visited so switching away doesn't wipe a half-built matrix/ladder.
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set<Tab>([initialTab]));
@@ -82,12 +83,22 @@ export function CalcPage() {
           items={tabs} />
       </PageHeader>
 
+      <RosterProvider dex={dex.data}>
       {visited.has("damage") && hasDamage && (
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "damage")}
           aria-labelledby={segmentedTabId("calc-tool", "damage")} hidden={tab !== "damage"}>
           <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
             <DamageTab dex={dex.data} natures={natures.data} items={items.data}
               onRailApi={registerDamage} />
+          </Suspense>
+        </div>
+      )}
+      {visited.has("tune") && hasDamage && (
+        <div role="tabpanel" id={segmentedPanelId("calc-tool", "tune")}
+          aria-labelledby={segmentedTabId("calc-tool", "tune")} hidden={tab !== "tune"}>
+          <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
+            <TuneWorkspace dex={dex.data} natures={natures.data} items={items.data}
+              onRailApi={registerTune} />
           </Suspense>
         </div>
       )}
@@ -100,15 +111,7 @@ export function CalcPage() {
           </Suspense>
         </div>
       )}
-      {visited.has("tune") && hasDamage && (
-        <div role="tabpanel" id={segmentedPanelId("calc-tool", "tune")}
-          aria-labelledby={segmentedTabId("calc-tool", "tune")} hidden={tab !== "tune"}>
-          <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
-            <TuneTab dex={dex.data} natures={natures.data} items={items.data}
-                     initialTeamMode={teamMode} onRailApi={registerTune} />
-          </Suspense>
-        </div>
-      )}
+      </RosterProvider>
     </>
   );
 }

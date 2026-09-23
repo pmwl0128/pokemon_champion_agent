@@ -1,18 +1,19 @@
-/** One side's result column: its four moves with what each does to the other side, and the detail
- * card for whichever move is selected.
+/** One side's result block: who it is, what its selected move does to the other side, how much of
+ * its own health is left, and its four moves — typed in place — with what each of them does.
  *
  * The HP bar belongs to THIS mon and is depleted by the OPPOSING card's selected move at that card's
  * roll — so the two columns together read as one turn: each side's output on its own card, each
  * side's remaining health under its own name. */
-import type { DamageResultDto } from "@pokemon-champions/protocol";
+import type { DamageResultDto, LearnsetDto } from "@pokemon-champions/protocol";
 import { useState } from "react";
 import { GameImage } from "../../../components/GameImage.tsx";
-import { PLACEHOLDERS } from "../../../assets/icons.ts";
+import { TypeBadge } from "../../../components/TypeBadge.tsx";
+import { PLACEHOLDERS, typeColor } from "../../../assets/icons.ts";
 import { useLang, useT } from "../../../i18n.ts";
 import { useDamageText } from "../../../lib/damageText.tsx";
 import { koLabel, koTone } from "../../../lib/ko.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
-import { typeColor } from "../../../assets/icons.ts";
+import { MoveCell } from "./MoveCell.tsx";
 import {
   ROLL_COUNT, ROLL_MODES, rollIndexOf, rollModeAt, rollModifier, rollValue,
 } from "./state.ts";
@@ -37,70 +38,90 @@ export function turnsOf(res: DamageResultDto): number | null {
   return Math.ceil(100 / Math.max(res.maxPercent, 0.01));
 }
 
-function HpBar({ entry, name, maxHP, remaining, notes, result }: {
+function Headline({ entry, name, result }: {
   entry: DexIndexEntry | undefined;
   name: string;
-  maxHP: number;
-  remaining: number;
-  /** Caveats about THIS mon, however they arrived. They collapse into one focusable warning icon so
-   * the complete copy stays available without changing the card's height. */
-  notes: string[];
   result: DamageResultDto | null;
 }) {
-  const t = useT();
-  const pct = maxHP > 0 ? Math.max(0, Math.min(100, (remaining / maxHP) * 100)) : 0;
-  const tone = pct > 50 ? "ok" : pct > 20 ? "warn" : pct > 0 ? "low" : "out";
+  const turns = result ? turnsOf(result) : null;
+  const tone = result ? koTone(turns, result.koChance?.guaranteed ?? false, result.max) : "none";
+  const primary = entry?.types[0];
   return (
-    <div className="hp-bar-card">
-      <div className="hp-bar-mon">
+    <div className="duel-head">
+      <span className="duel-portrait"
+        style={primary ? { ["--mt" as string]: typeColor(primary) } : undefined}>
         {entry
           ? <GameImage assetKey={entry.key} role="dense" alt={name} className="hp-bar-sprite" />
           : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-        <span className="hp-bar-heading">
-          <span className="hp-bar-title-line">
-            <span className="hp-bar-name-cluster">
-              <span className="hp-bar-name">{name}</span>
-              {entry?.isMega && <span className="mega-badge hp-mega-tag">MEGA</span>}
-              {notes.length > 0 && (
-                <span className="hp-warning" tabIndex={0} role="img"
-                  aria-label={notes.join("；")} data-tooltip={notes.join("\n")}>
-                  <span aria-hidden>!</span>
-                </span>
-              )}
-            </span>
-            <span className="duel-head-nums">
-              <strong className="num">{result ? `${result.min} – ${result.max}` : "—"}</strong>
-              <span className="muted num">
-                {result ? `${result.minPercent.toFixed(1)}% – ${result.maxPercent.toFixed(1)}%` : ""}
-              </span>
-            </span>
-          </span>
+      </span>
+      <span className="duel-ident">
+        <span className="duel-name-line">
+          <span className="duel-name">{name}</span>
+          {entry?.isMega && <span className="mega-badge hp-mega-tag">MEGA</span>}
         </span>
-      </div>
-      <div className="hp-bar-track" role="img"
-        aria-label={`${name}: ${remaining} / ${maxHP} ${t("calc.hpLeft")}`}>
-        <span className={`hp-bar-fill ${tone}`} style={{ width: `${pct}%` }} />
-        {/* An empty track is ambiguous on its own — it reads as "nothing computed" just as easily
-            as "nothing left". Say which one it is. */}
-        {maxHP > 0 && remaining <= 0 && <span className="hp-bar-out">{t("calc.fainted")}</span>}
-        <span className="hp-bar-read num">
-          <strong>{maxHP > 0 ? remaining : "—"}</strong>
-          <span className="hp-bar-max">/{maxHP || "—"}</span>
+        <span className="duel-types">
+          {(entry?.types ?? []).map((type) => <TypeBadge key={type} type={type} />)}
         </span>
-      </div>
+      </span>
+      {/* Percent first: it is the number a damage question is asked in. The HP figures under it
+          are the same band in absolute terms. */}
+      <span className="duel-dmg">
+        <strong className={`duel-dmg-pct num ko-text-${tone}`}>
+          {result ? <>{result.minPercent.toFixed(1)} – {result.maxPercent.toFixed(1)}<small>%</small></> : "—"}
+        </strong>
+        <span className="duel-dmg-hp num">
+          {result ? <>{result.min} – {result.max} <small>HP</small></> : ""}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function HpBar({ name, maxHP, remaining, band }: {
+  name: string;
+  maxHP: number;
+  remaining: number;
+  /** Where the opposing hit can leave this mon across its whole roll range, in HP. */
+  band: { lo: number; hi: number } | null;
+}) {
+  const t = useT();
+  const share = (hp: number) => (maxHP > 0 ? Math.max(0, Math.min(100, (hp / maxHP) * 100)) : 0);
+  const pct = share(remaining);
+  const tone = pct > 50 ? "ok" : pct > 20 ? "warn" : pct > 0 ? "low" : "out";
+  const out = maxHP > 0 && remaining <= 0;
+  const bandLo = band ? share(band.lo) : 0;
+  const bandHi = band ? share(band.hi) : 0;
+  return (
+    <div className="hp-bar-track" role="img"
+      aria-label={`${name}: ${remaining} / ${maxHP} ${t("calc.hpLeft")}`}>
+      <span className={`hp-bar-fill ${tone}`} style={{ width: `${pct}%` }} />
+      {band && bandHi > bandLo && (
+        <span className="hp-bar-band" aria-hidden
+          style={{ left: `${bandLo}%`, width: `${bandHi - bandLo}%` }} />
+      )}
+      {/* An empty track is ambiguous on its own — it reads as "nothing computed" just as easily
+          as "nothing left". Say which one it is. */}
+      <span className={`hp-bar-tag${out ? " out" : ""}`}>{out ? t("calc.fainted") : "HP"}</span>
+      <span className="hp-bar-read num">
+        <strong>{maxHP > 0 ? remaining : "—"}</strong>
+        <span className="hp-bar-max">/ {maxHP || "—"}</span>
+        {maxHP > 0 && <span className="hp-bar-pct">{Math.round(pct)}%</span>}
+      </span>
     </div>
   );
 }
 
 export function ResultCard({
-  monName, entry, slots, selected, onSelect, roll, onRoll, crit, onCrit,
-  singleTarget, onSingleTarget, singleTargetAvailable, maxHP, remaining, busy, notes,
+  monName, entry, slots, learnset, selected, onSelect, onMove, roll, onRoll, crit, onCrit,
+  singleTarget, onSingleTarget, singleTargetAvailable, maxHP, remaining, band, busy, notes,
 }: {
   monName: string;
   entry: DexIndexEntry | undefined;
   slots: SlotResult[];
+  learnset: LearnsetDto | null;
   selected: number;
   onSelect: (index: number) => void;
+  onMove: (index: number, name: string) => void;
   /** Index into the engine's sorted 16 rolls. */
   roll: number;
   onRoll: (index: number) => void;
@@ -113,6 +134,7 @@ export function ResultCard({
   singleTargetAvailable: boolean;
   maxHP: number;
   remaining: number;
+  band: { lo: number; hi: number } | null;
   busy: boolean;
   notes: string[];
 }) {
@@ -151,12 +173,11 @@ export function ResultCard({
 
   return (
     <div className="duel-result">
-      <HpBar entry={entry} name={monName} maxHP={maxHP} remaining={remaining} notes={notes}
-        result={res} />
+      <Headline entry={entry} name={monName} result={res} />
+      <HpBar name={monName} maxHP={maxHP} remaining={remaining} band={band} />
 
-      {/* The four slots sit INSIDE the card, under the health they are about to spend. They are
-          picked, not typed, so they read as buttons — the boxes further down the page that look
-          like fields are the ones you can edit. */}
+      {/* The four slots sit INSIDE the result, under the health they are about to spend: typing a
+          move and reading what it does happen in the same place. */}
       <div className="duel-move-grid">
         {slots.map((slot, i) => {
           const r = slot.result;
@@ -167,32 +188,22 @@ export function ResultCard({
           const tone = r && !status
             ? koTone(turns, r.koChance?.guaranteed ?? false, r.max) : "none";
           return (
-            <button key={i} type="button"
-              className={`duel-move-cell${i === selected ? " on" : ""}`}
-              aria-pressed={i === selected}
-              disabled={!slot.move}
-              // The type is carried as a colour VARIABLE, not as a fill: several types are dark
-              // enough that printing text on the flat colour is unreadable, so the cell uses it for
-              // an edge and a wash and keeps the page's own ink.
-              style={slot.type
-                ? ({ ["--mv" as string]: typeColor(slot.type) }) : undefined}
-              onClick={() => onSelect(i)}>
-              <span className="duel-move-name">
-                {slot.move ? slot.label : <span className="muted">—</span>}
-              </span>
-              <span className={`duel-move-pct num ko-text-${tone}`}>
-                {status ? <span className="muted">{t("category.Status")}</span>
+            <MoveCell key={i} index={i} value={slot.move} learnset={learnset}
+              selected={i === selected} onSelect={onSelect} onChange={onMove}>
+              {status ? <span className="muted">{t("category.Status")}</span>
+                : !slot.move ? null
                   : slot.failed ? "—"
-                    : r && r.max > 0
-                      ? `${r.minPercent.toFixed(1)} – ${r.maxPercent.toFixed(1)}%`
-                      : r ? "0%" : busy ? "…" : "—"}
-                {!status && r && r.max > 0 && (
-                  <span className="duel-move-ko">
-                    {koLabel(turns, true, r.koChance?.guaranteed ?? false, lang)}
-                  </span>
-                )}
-              </span>
-            </button>
+                    : r && r.max > 0 ? (
+                      <>
+                        <span className={`ko-text-${tone}`}>
+                          {r.minPercent.toFixed(1)} – {r.maxPercent.toFixed(1)}%
+                        </span>
+                        <span className="duel-move-ko">
+                          {koLabel(turns, true, r.koChance?.guaranteed ?? false, lang)}
+                        </span>
+                      </>
+                    ) : r ? "0%" : busy ? "…" : "—"}
+            </MoveCell>
           );
         })}
       </div>
@@ -256,6 +267,14 @@ export function ResultCard({
             : <span className="muted">{busy ? t("state.loading")
               : active?.failed ? t("calc.error") : t("calc.noMoveSelected")}</span>}
         </span>
+        {/* Caveats about THIS mon, however they arrived, collapse into one focusable glyph after the
+            sentence they qualify: the full copy stays available without changing the card's height. */}
+        {notes.length > 0 && (
+          <span className="hp-warning" tabIndex={0} role="img"
+            aria-label={notes.join("；")} data-tooltip={notes.join("\n")}>
+            <span aria-hidden>!</span>
+          </span>
+        )}
         <span className={`duel-summary-verdict${res?.koChance?.guaranteed ? " guaranteed" : ""}`}
           title={verdict || undefined}>
           {verdict}

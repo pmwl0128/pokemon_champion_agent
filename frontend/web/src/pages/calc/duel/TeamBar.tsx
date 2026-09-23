@@ -53,46 +53,13 @@ export function TeamBar({
   mirrored?: boolean;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
-  const wrap = useRef<HTMLDivElement>(null);
-
-  // A popover that only closes on its own button strands itself the moment you click past it.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const run = async () => {
-    setBusy(true);
-    try {
-      setOutcome(await onImport(text));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   return (
     <div className={`team-bar${mirrored ? " mirrored" : ""}`}>
-      <div className="team-bar-head" ref={wrap}>
+      <div className="team-bar-head">
         <strong>{label}</strong>
         <span className="team-bar-actions">
-          <button type="button" className="ghost-btn tiny"
-            aria-label={t("calc.importPaste")} aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}>
-            {t("calc.importShort")}
-          </button>
+          <PasteImport onImport={onImport} />
           <button type="button" className="ghost-btn tiny" onClick={onReset}
             title={t("calc.resetSide").replace("{side}", label)}>
             {t("calc.resetTeam")}
@@ -125,40 +92,10 @@ export function TeamBar({
             return [more, ...chips];
           })()}
         </div>
-        {open && (
-          <div className="paste-pop" role="dialog" aria-label={t("calc.importPaste")}>
-            <label className="paste-label">{t("calc.pasteHint")}
-              <textarea rows={8} value={text} spellCheck={false} autoFocus
-                placeholder={"Garchomp @ Life Orb\nAbility: Rough Skin\nJolly Nature\nSPs: 32 Atk / 32 Spe\n- Earthquake"}
-                onChange={(e) => setText(e.target.value)} />
-            </label>
-            <div className="paste-actions">
-              <button type="button" className="primary-btn" disabled={busy || !text.trim()}
-                onClick={() => void run()}>
-                {busy ? t("state.loading") : t("calc.pasteApply")}
-              </button>
-              <button type="button" className="ghost-btn"
-                onClick={() => { setOpen(false); setOutcome(null); }}>
-                {t("calc.pasteClose")}
-              </button>
-            </div>
-            {outcome && (
-              <div className="paste-outcome">
-                <div>{t("calc.pasteResult").replace("{n}", String(outcome.added))}</div>
-                {outcome.rescaledEvs && <div className="paste-note">{t("calc.pasteEvNote")}</div>}
-                {outcome.unresolved.length > 0 && (
-                  <div className="paste-note warn">
-                    {t("calc.pasteUnresolved").replace("{names}", outcome.unresolved.join("、"))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </div>
       <div className="team-strip">
         {team.map((mon, i) => (
-          <MonAvatar key={i} mon={mon} dex={dex} items={items} active={i === index}
+          <MonAvatar key={mon.uid || i} mon={mon} dex={dex} items={items} active={i === index}
             onClick={() => onIndex(i)}
             onRemove={team.length > 1 ? () => onRemove(i) : undefined} />
         ))}
@@ -168,5 +105,89 @@ export function TeamBar({
           title={team.length >= TEAM_MAX ? t("calc.maxSix") : t("calc.addMon")}>+</button>
       </div>
     </div>
+  );
+}
+
+/** Pokepaste import: a trigger button plus the popover that reads the paste back.
+ *
+ * The popover positions against the caller's nearest positioned ancestor, so each surface decides
+ * where it opens (the calculator's strip head, the bulk tool's roster column) without this control
+ * wrapping itself in a box that would change the surrounding layout. */
+export function PasteImport({ onImport, className = "ghost-btn tiny", label }: {
+  onImport: (text: string) => Promise<ImportOutcome>;
+  className?: string;
+  label?: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+
+  // A popover that only closes on its own button strands itself the moment you click past it.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (!trigger.current?.contains(target) && !pop.current?.contains(target)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const run = async () => {
+    setBusy(true);
+    try {
+      setOutcome(await onImport(text));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <button ref={trigger} type="button" className={className}
+        aria-label={t("calc.importPaste")} aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}>
+        {label ?? t("calc.importShort")}
+      </button>
+      {open && (
+        <div ref={pop} className="paste-pop" role="dialog" aria-label={t("calc.importPaste")}>
+          <label className="paste-label">{t("calc.pasteHint")}
+            <textarea rows={8} value={text} spellCheck={false} autoFocus
+              placeholder={"Garchomp @ Life Orb\nAbility: Rough Skin\nJolly Nature\nSPs: 32 Atk / 32 Spe\n- Earthquake"}
+              onChange={(e) => setText(e.target.value)} />
+          </label>
+          <div className="paste-actions">
+            <button type="button" className="primary-btn" disabled={busy || !text.trim()}
+              onClick={() => void run()}>
+              {busy ? t("state.loading") : t("calc.pasteApply")}
+            </button>
+            <button type="button" className="ghost-btn"
+              onClick={() => { setOpen(false); setOutcome(null); }}>
+              {t("calc.pasteClose")}
+            </button>
+          </div>
+          {outcome && (
+            <div className="paste-outcome">
+              <div>{t("calc.pasteResult").replace("{n}", String(outcome.added))}</div>
+              {outcome.rescaledEvs && <div className="paste-note">{t("calc.pasteEvNote")}</div>}
+              {outcome.unresolved.length > 0 && (
+                <div className="paste-note warn">
+                  {t("calc.pasteUnresolved").replace("{names}", outcome.unresolved.join("、"))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }

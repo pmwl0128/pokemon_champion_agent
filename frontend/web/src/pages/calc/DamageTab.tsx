@@ -1,10 +1,13 @@
 /** Damage workspace: two teams, side by side, both directions live.
  *
- * Layout mirrors the two-column calculators battlers already use — each side owns a column (its
- * roster, its build, its four moves, its own result card), the shared field sits under both, and the
- * results ride at the TOP where they are read, not at the bottom where they were computed. Below
- * everything sits the all-pairs grid: the same two teams, every attacker × move against every
- * defender, on a flippable axis.
+ * Top to bottom: the two rosters with the shared field between them, then one column per side —
+ * its result (health, the selected hit, its four moves, typed in place) directly above the build
+ * that produced it — and finally the all-pairs grid: the same two teams, every attacker × move of
+ * ours against every defender of theirs. Swapping attack and defence swaps the teams themselves.
+ *
+ * The rosters, who is up, the selected moves and the battle frame belong to the calc page's shared
+ * roster (roster.tsx), so the bulk tool opens on the same teams; this tab owns only its reading
+ * state (roll, crit, single target) and its results.
  *
  * Every number on the page comes from ONE fault-isolated batch per section, so a bad cell (an
  * unknown move on a swapped-in mon) never blanks the rest. */
@@ -19,25 +22,22 @@ import { useDamageText } from "../../lib/damageText.tsx";
 import { localName, useNameMaps } from "../../lib/names.ts";
 import { displayName, useLang, useT, type MsgKey } from "../../i18n.ts";
 import { parsePokepaste, formatPokepasteMon } from "../../lib/pokepaste.ts";
-import { takeCalcTeams, type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
-import {
-  autofillSig, buildConfigSig, modalSig, sideIsBare, useBuildOptions, type BuildOption,
-} from "./shared.tsx";
+import type { BuildOption } from "./shared.tsx";
 import { AllMatchups, type GridCol, type GridRow } from "./duel/AllMatchups.tsx";
-import { loadDuel, saveDuel } from "./duel/persist.ts";
+import { loadDuelView, saveDuelView } from "./duel/persist.ts";
 import { FieldPanel } from "./duel/FieldPanel.tsx";
 import { MonEditor, buildCardOptionForMon } from "./duel/MonEditor.tsx";
 import { ResultCard, type SlotResult } from "./duel/ResultCard.tsx";
 import { TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  EMPTY_FIELD, MOVE_SLOTS, SIDE_FLAGS, TERRAIN_ABILITIES, WEATHER_ABILITIES,
-  caveatSubject, curHPOf,
-  ROLL_TOP, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide, rollValue,
-  type FieldState, type MonState, type SideId,
+  MOVE_SLOTS, SIDE_FLAGS, TERRAIN_ABILITIES, WEATHER_ABILITIES,
+  ROLL_TOP, applyBuildOption, curHPOf, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide,
+  rollValue, withMoves, type MonState, type SideId,
 } from "./duel/state.ts";
+import { useRoster } from "./roster.tsx";
 
 const SIDES: SideId[] = ["a", "b"];
 /** The calc batch bound (DamageBatchRequestDtoSchema). The duel takes at most 8 of it. */
@@ -45,35 +45,6 @@ const BATCH_MAX = 240;
 
 type PerSide<T> = Record<SideId, T>;
 const perSide = <T,>(a: T, b: T): PerSide<T> => ({ a, b });
-
-function withMoves(mon: MonState, moves: string[]): MonState {
-  const slots = [...moves.slice(0, MOVE_SLOTS)];
-  while (slots.length < MOVE_SLOTS) slots.push("");
-  return { ...mon, moves: slots };
-}
-
-/** Apply one environment card. Only an automatic seed carries `autoSig`: a card the user explicitly
- * chose must survive a later format switch and must never be replaced by the first card. */
-export function applyBuildOption(
-  mon: MonState, option: BuildOption, labelIndex = 0, automatic = false,
-): MonState {
-  const m = option.modal;
-  const next = withMoves(
-    { ...mon, ability: m.ability, item: m.item, nature: m.nature, sps: { ...m.sps } },
-    m.moves.length ? m.moves : mon.moves);
-  return {
-    ...next,
-    autoSig: automatic ? modalSig(m, next.moves) : null,
-    buildRef: {
-      key: option.key,
-      source: option.source,
-      coverage: option.coverage,
-      isModal: option.isModal,
-      labelIndex,
-      signature: buildConfigSig(next),
-    },
-  };
-}
 
 export function DamageTab({ dex, natures, items, onRailApi }: {
   dex: DexIndexEntry[];
@@ -84,40 +55,23 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const { adapter } = useRuntime();
   const t = useT();
   const { lang } = useLang();
-  const loadBuildOptions = useBuildOptions();
   const moveVocab = useMovesByName();
+  const { teams, setTeams, active, setActive, slot, setSlot, field, setField, swaps, swapSides } = useRoster();
 
-  // The one hand-off channel every page uses — a single matrix cell and a whole roster arrive the
-  // same way. It is an explicit request for THIS matchup, so it outranks the saved workspace.
-  const teamsFill = useRef(takeCalcTeams()).current;
-  const saved = useRef(teamsFill ? null : loadDuel()).current;
-  const [field, setField] = useState<FieldState>(() => saved?.field
-    ?? { ...EMPTY_FIELD, format: teamsFill?.format ?? "single", sides: { a: {}, b: {} } });
-  const [teams, setTeams] = useState<PerSide<MonState[]>>(() => {
-    if (saved) return saved.teams;
-    if (teamsFill) {
-      // A member may name its species instead of a slug (a team-json carries canonical names); the
-      // dex the page already holds is the resolver, so the hand-off never has to slugify by hand.
-      const slugOf = (m: CalcMember): string => m.slug
-        ?? (m.species ? dex.find((e) => e.name === m.species)?.slug ?? "" : "");
-      const side = (list: CalcMember[]): MonState[] => (list.length
-        ? list.slice(0, TEAM_MAX).map((m) => withMoves({
-            ...makeMon(slugOf(m)), pinned: m.pinned === true,
-            ability: m.ability ?? "", item: m.item ?? "", nature: m.nature ?? "",
-            sps: (m.sps ?? {}) as MonState["sps"],
-          }, m.moves ?? []))
-        : [makeMon()]);
-      return perSide(side(teamsFill.attackers), side(teamsFill.defenders));
-    }
-    return perSide([makeMon("garchomp")], [makeMon("mimikyu")]);
-  });
-  const [active, setActive] = useState<PerSide<number>>(saved?.active ?? perSide(0, 0));
-  const [slot, setSlot] = useState<PerSide<number>>(saved?.slot ?? perSide(0, 0));
+  // This tab's own reading state. It is bound to a SIDE, so a swap of the two teams carries it
+  // across with them (below).
+  const savedView = useRef(loadDuelView()).current;
   // An index into the engine's sorted 16 rolls; the top one is what a damage question defaults to.
-  const [roll, setRoll] = useState<PerSide<number>>(saved?.roll ?? perSide(ROLL_TOP, ROLL_TOP));
-  const [crit, setCrit] = useState<PerSide<boolean>>(saved?.crit ?? perSide(false, false));
-  const [single, setSingle] = useState<PerSide<boolean>>(saved?.single ?? perSide(false, false));
-  const [gridFrom, setGridFrom] = useState<SideId>(saved?.gridFrom ?? "a");
+  const [roll, setRoll] = useState<PerSide<number>>(savedView?.roll ?? perSide(ROLL_TOP, ROLL_TOP));
+  const [crit, setCrit] = useState<PerSide<boolean>>(savedView?.crit ?? perSide(false, false));
+  const [single, setSingle] = useState<PerSide<boolean>>(savedView?.single ?? perSide(false, false));
+  const seenSwaps = useRef(swaps);
+  useEffect(() => {
+    if (seenSwaps.current === swaps) return;
+    seenSwaps.current = swaps;
+    const flip = <T,>(value: PerSide<T>): PerSide<T> => ({ a: value.b, b: value.a });
+    setRoll(flip); setCrit(flip); setSingle(flip);
+  }, [swaps]);
 
   const [duel, setDuel] = useState<PerSide<SlotResult[]>>(perSide([], []));
   const [duelBusy, setDuelBusy] = useState(false);
@@ -132,11 +86,11 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const [gridRerun, setGridRerun] = useState(0);
   const [gridError, setGridError] = useState<string | null>(null);
 
-  // Keep the workspace across a page change: only the INPUT is stored, so nothing on screen can
-  // ever be a number that no longer follows from the build printed beside it.
+  // Keep the reading state across a page change (the roster persists itself): only INPUT is
+  // stored, so nothing on screen can be a number that no longer follows from the build beside it.
   useEffect(() => {
-    saveDuel({ teams, active, slot, roll, crit, single, gridFrom, field });
-  }, [teams, active, slot, roll, crit, single, gridFrom, field]);
+    saveDuelView({ roll, crit, single });
+  }, [roll, crit, single]);
 
   const mon = useMemo(() => perSide(
     teams.a[Math.min(active.a, teams.a.length - 1)] ?? makeMon(),
@@ -152,7 +106,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
 
   const setMonAt = useCallback((side: SideId, index: number,
                                 update: MonState | ((m: MonState) => MonState)) => {
-    setTeams((prev) => {
+    setTeams((prev: PerSide<MonState[]>) => {
       const current = prev[side][index];
       if (!current) return prev;
       const next = typeof update === "function" ? update(current) : update;
@@ -163,7 +117,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
       team[index] = next;
       return { ...prev, [side]: team };
     });
-  }, []);
+  }, [setTeams]);
 
   // Stable per-side Dispatch functions: constructing `setActiveMon(side)` inline gave each
   // MonEditor a new setter every render. Once the environment picker had identified an exact card,
@@ -219,42 +173,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     const ref = moveVocab.get(name);
     return ref ? displayName(ref, lang) : name;
   }, [moveVocab, lang]);
-
-  // -- observed-build-first environment auto-fill -----------------------------------------
-  // A freshly picked mon is seeded from the first card: the highest-share joint configuration,
-  // with the stitched Meta card used only when no aggregate exists. A FORMAT switch re-seeds only
-  // the mons still carrying an untouched auto-fill: a doubles
-  // Garchomp must not keep the singles set, and a build the user actually edited must not be reset.
-  const fillTokens = useRef(new Set<string>());
-  const seedable = (m: MonState) =>
-    sideIsBare(m) || (m.autoSig != null && autofillSig(m, m.moves) === m.autoSig);
-  useEffect(() => {
-    for (const side of SIDES) {
-      teams[side].forEach((m, index) => {
-        if (!m.slug || m.pinned || !seedable(m)) return;
-        // One attempt per (format, side, slot, species): once seeded, re-running must not fire a
-        // second fill just because the build now matches its own signature.
-        const token = `${field.format}:${side}:${index}:${m.slug}`;
-        if (fillTokens.current.has(token)) return;
-        fillTokens.current.add(token);
-        void loadBuildOptions(m.slug, field.format).then((options) => {
-          const option = options[0];
-          if (!option) return;
-          // Re-check at APPLY time instead of cancelling on cleanup: the effect is re-run on mount
-          // under StrictMode, and a lifecycle-scoped cancel flag would discard the only in-flight
-          // fill. The slot still has to hold the same species, still un-edited, to be overwritten.
-          setTeams((prev) => {
-            const current = prev[side][index];
-            if (!current || current.slug !== m.slug || !seedable(current)) return prev;
-            const next = [...prev[side]];
-            next[index] = applyBuildOption(current, option, 0, true);
-            return { ...prev, [side]: next };
-          });
-        });
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field.format, teams.a, teams.b]);
 
   // -- import / export --------------------------------------------------------------------
 
@@ -415,6 +333,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   // -- the all-pairs grid -----------------------------------------------------------------
 
   const gridPlan = useMemo(() => {
+    const gridFrom: SideId = "a";
     const to = otherSide(gridFrom);
     const rows: GridRow[] = [];
     const rowMons: MonState[] = [];
@@ -449,7 +368,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     // the labels beside them are display, and a language switch must not invalidate a grid whose
     // every cell is still correct.
     return { rows, cols, requests, complete, sig: JSON.stringify(requests) };
-  }, [teams, gridFrom, field, dex, items, moveVocab, moveLabel]);
+  }, [teams, field, dex, items, moveVocab, moveLabel]);
 
   /** The grid runs ON REQUEST, not on every edit.
    *
@@ -486,8 +405,8 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   // themselves means the grid goes stale when, and only when, an answer in it would actually differ.
   const gridStale = gridRun !== null && gridRun.sig !== gridPlan.sig;
 
-  // A flip re-runs on the NEXT render, when gridPlan has already been rebuilt for the new axis —
-  // calling runGrid inside the click would compute the old direction again.
+  // A swap re-runs on the NEXT render, when gridPlan has already been rebuilt from the swapped
+  // teams — calling runGrid inside the click would compute the old direction again.
   useEffect(() => {
     if (gridRerun > 0) void runGrid();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -515,6 +434,30 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     return Math.max(0, cur - rollValue(incoming.damage, roll[otherSide(side)]));
   };
 
+  /** Where the OTHER card's selected move can leave this mon across its whole roll range. */
+  const bandOf = (side: SideId): { lo: number; hi: number } | null => {
+    const incoming = outgoing(otherSide(side));
+    if (!incoming) return null;
+    const cur = curHPOf(mon[side], maxHPOf(mon[side], dex, items));
+    return { lo: Math.max(0, cur - incoming.max), hi: Math.max(0, cur - incoming.min) };
+  };
+
+  const setMove = (side: SideId, index: number, name: string) => {
+    setMonAt(side, active[side], (current) => {
+      const moves = [...current.moves];
+      while (moves.length < MOVE_SLOTS) moves.push("");
+      if (moves[index] === name) return current;
+      moves[index] = name;
+      return { ...current, moves };
+    });
+  };
+  // Stable per side: each move input is memoised on its change handler.
+  const moveSetters = useMemo(() => perSide(
+    (index: number, name: string) => setMove("a", index, name),
+    (index: number, name: string) => setMove("b", index, name),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [active.a, active.b, setMonAt]);
+
   const nameOf = (side: SideId): string => {
     const entry = effectiveEntry(mon[side], dex, items);
     return entry ? displayName(entry, lang) : t("calc.emptySlot");
@@ -523,15 +466,12 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const sideLabel = perSide(t("calc.attacker"), t("calc.defender"));
 
   const damageText = useDamageText();
-  /** Caveats for the card showing THIS mon. Two sources, and the split is the point: a note about
-   * the attacker comes from this side's own hit, while a note about the defender comes from the
-   * OTHER side's hit — where this mon is the one being struck. Putting Disguise on the attacker's
-   * card would read as a claim about the wrong Pokemon. */
-  const notesFor = (side: SideId): string[] => [
-    ...(outgoing(side)?.koCaveats ?? []).filter((c) => caveatSubject(c.code) === "attacker"),
-    ...(outgoing(otherSide(side))?.koCaveats ?? []).filter(
-      (c) => caveatSubject(c.code) === "defender"),
-  ].map((cv) => damageText.caveat(cv));
+  /** Caveats for the HIT this card's sentence describes: the glyph sits right after "X uses M on Y",
+   * so it carries every caveat that hit raised — about the attacker (a self-drop) and about the
+   * target (Disguise) alike. A note about the defender therefore lands on the ATTACKER's card, next
+   * to the attack it qualifies, not beside the struck mon's own, unrelated sentence. */
+  const notesFor = (side: SideId): string[] =>
+    (outgoing(side)?.koCaveats ?? []).map((cv) => damageText.caveat(cv));
 
   // A field-setting ability on either active mon, offered next to the picker it would fill. Only
   // when that field is still empty: an offer to set what is already set says nothing.
@@ -575,8 +515,10 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         move: mon[side].moves[i] ?? "", label: moveLabel(mon[side].moves[i] ?? ""),
         type: moveVocab.get(mon[side].moves[i] ?? "")?.type, result: null, failed: false,
       }))}
+      learnset={learnset[side]}
       selected={shownSlot(side)}
-      onSelect={(i) => setSlot((prev) => ({ ...prev, [side]: i }))}
+      onSelect={(i) => setSlot((prev) => prev[side] === i ? prev : { ...prev, [side]: i })}
+      onMove={moveSetters[side]}
       roll={roll[side]} onRoll={(m) => setRoll((prev) => ({ ...prev, [side]: m }))}
       crit={crit[side]} onCrit={(v) => setCrit((prev) => ({ ...prev, [side]: v }))}
       singleTarget={single[side]}
@@ -585,6 +527,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         && (single[side] || !!duel[side][shownSlot(side)]?.result?.isSpread)}
       maxHP={maxHPOf(mon[side], dex, items)}
       remaining={remainingOf(side)}
+      band={bandOf(side)}
       notes={notesFor(side)}
       busy={duelBusy} />
   );
@@ -592,11 +535,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   return (
     <div className="calc-duel">
       {duelError && <div className="notice mono">{duelError}</div>}
-
-      <div className="duel-top">
-        {column("a")}
-        {column("b")}
-      </div>
 
       <div className={`duel-teams${field.weather ? ` weather-${field.weather.toLowerCase()}` : ""}${field.terrain ? ` terrain-${field.terrain.toLowerCase()}` : ""}`}>
         <TeamBar label={t("calc.attackerTeam")} team={teams.a} index={active.a}
@@ -638,15 +576,18 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
           dex={dex} items={items} onImport={(text) => importPaste("b", text)} mirrored />
       </div>
 
-      <div className="duel-editors">
+      {/* Each side is one panel: what it does on top, the build that does it underneath. */}
+      <div className="duel-sides">
         {SIDES.map((side) => (
-          <MonEditor key={side} label={sideLabel[side]} mon={mon[side]}
-            setMon={setActiveMon[side]} dex={dex} natures={natures} items={items}
-            learnset={learnset[side]}
-            loadSetOptions={() => loadBuildOptions(mon[side].slug, field.format)}
-            onSetPick={(option, index) => setMonAt(
-              side, active[side], (current) => applyBuildOption(current, option, index))}
-            onExport={() => exportMon(side)} />
+          <section key={side} className="panel duel-side">
+            {column(side)}
+            <MonEditor label={sideLabel[side]} mon={mon[side]}
+              setMon={setActiveMon[side]} dex={dex} natures={natures} items={items}
+              format={field.format}
+              onSetPick={(option, index) => setMonAt(
+                side, active[side], (current) => applyBuildOption(current, option, index))}
+              onExport={() => exportMon(side)} />
+          </section>
         ))}
       </div>
 
@@ -654,14 +595,16 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         rows={gridRun?.plan.rows ?? []} cols={gridRun?.plan.cols ?? []}
         results={gridRun?.results ?? []}
         onFlip={() => {
-          setGridFrom((s) => otherSide(s));
-          // Flipping asks the same question the other way round; making the reader press compute
+          // Attack and defence change places for real: the two teams, who is up, their moves and
+          // side conditions all swap — on this tab and on every tool reading the same roster.
+          swapSides();
+          // The grid asks the same question the other way round; making the reader press compute
           // again for an answer they already asked for is a step with no decision in it.
           if (gridRun) setGridRerun((n) => n + 1);
         }}
         onRun={() => void runGrid()} runnable={gridRunnable} stale={gridStale}
         busy={gridBusy} error={gridError}
-        fromLabel={sideLabel[gridFrom]} toLabel={sideLabel[otherSide(gridFrom)]} />
+        fromLabel={sideLabel.a} toLabel={sideLabel.b} />
     </div>
   );
 }

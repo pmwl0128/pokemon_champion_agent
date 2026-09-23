@@ -200,7 +200,10 @@
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel-2) 58%, var(--panel)); }
 .actual-member-head .mini { width: 28px; height: 28px; }.actual-member-head strong { min-width: 0; overflow: hidden; text-overflow: ellipsis;
   white-space: nowrap; font-size: 13px; }.actual-member-index { color: var(--brand-strong); font-size: 10px; letter-spacing: .06em; }
-.actual-member-actions { display: flex; gap: 8px; margin-left: auto; }.actual-member-actions button { font-size: 11px; }
+/* Same 环境配置 / ✕ cluster the calculator and speed cards wear, so one mon card reads the same
+   wherever it is edited. The badge's own margin is dropped: the header lays out on gap. */
+.actual-member-head .mega-badge { flex: none; margin-left: 0; }
+.actual-member-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .actual-member-fields, .actual-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 10px; padding: 11px 12px 0; }
 .actual-member-fields label, .actual-moves label, .actual-text-import label { min-width: 0; display: grid; gap: 4px; color: var(--sub); font-size: 10.5px; }
 .actual-member-fields input, .actual-moves input, .actual-text-import textarea, .actual-topk input { width: 100%; min-width: 0; border: 1px solid var(--line);

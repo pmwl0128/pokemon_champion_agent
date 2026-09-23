@@ -1,16 +1,14 @@
-/** One combatant's full editable build: species + forme, ability, nature, item, status, the SP /
- * boost / final-stat table, current HP, and the four move slots.
+/** One combatant's editable build: species + forme, ability, nature, item, status and the SP /
+ * boost / final-stat table with current HP. The four moves are edited in the result grid above it,
+ * where their damage is read, and the portrait lives there too.
  *
  * The stat table shows base, investment and RESULT side by side because that is the number the calc
  * actually used — a spread that reads "32 Spe" tells you nothing about whether it clears a
  * benchmark, and re-deriving it in your head is exactly the arithmetic this page exists to remove. */
-import type { LearnsetDto, NatureDto } from "@pokemon-champions/protocol";
+import type { FormatId, NatureDto } from "@pokemon-champions/protocol";
 import { STAT_KEYS } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { AdaptiveCombobox } from "../../../components/AdaptiveCombobox.tsx";
-import {
-  BuildPicker, BuildSetSummary, type BuildCardOption,
-} from "../../../components/BuildPicker.tsx";
+import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { BuildSetSummary, type BuildCardOption } from "../../../components/BuildPicker.tsx";
 import { EntityHover } from "../../../components/EntityHover.tsx";
 import { GameImage } from "../../../components/GameImage.tsx";
 import { PLACEHOLDERS } from "../../../assets/icons.ts";
@@ -19,76 +17,94 @@ import { displayName, useLang, useT } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import {
-  ItemCombo, MonPicker, STATUSES, boostLabel, clampNum, megaFor, natureLabel,
+  BuildPickerButton, ItemCombo, MonPicker, STATUSES, boostLabel, clampNum, megaFor, natureLabel,
   buildConfigSig, spSum, spSumClass, type BuildOption,
 } from "../shared.tsx";
 import {
-  ABILITY_NEEDS_TRIGGER, MOVE_SLOTS, boostedStat, curHPOf, effectiveEntry, finalStat, makeMon,
+  ABILITY_NEEDS_TRIGGER, boostedStat, curHPOf, effectiveEntry, finalStat, makeMon,
   maxHPOf, type MonState,
 } from "./state.ts";
 
-/** A learnset-restricted move input: typing resolves against this mon's own legal moves in any of
- * the three languages, so a slot can never hold a move the calc would reject. */
-function MoveSlot({ value, onChange, learnset, index }: {
-  value: string;
-  onChange: (name: string) => void;
-  learnset: LearnsetDto | null;
-  index: number;
+/** Species (and, for a species with Mega forms, the forme) as one identity row: a single field, or
+ * two side by side when a forme exists. Shared by the calculator and the bulk tool so the same mon
+ * is named the same way on both. `actions` rides on the row's label line. */
+export function MonNameRow({ slug, item, dex, items, pickerKey, actions, identityShown = false,
+  onSpecies, onForme }: {
+  slug: string;
+  item: string;
+  dex: DexIndexEntry[];
+  items: ItemRef[];
+  pickerKey: string;
+  actions?: ReactNode;
+  /** The surface already prints this mon's types and Mega state beside its portrait (the damage
+   * calculator's result headline), so the row leaves them out instead of saying them twice. */
+  identityShown?: boolean;
+  /** A different species: the caller decides what of the old build survives. */
+  onSpecies: (slug: string) => void;
+  /** A forme switch keeps the build; `dropStone` asks the caller to clear a held Mega stone. */
+  onForme: (slug: string, dropStone: boolean) => void;
 }) {
   const { lang } = useLang();
   const t = useT();
-  const [text, setText] = useState("");
-  const moves = learnset?.moves ?? [];
+  const literal = dex.find((e) => e.slug === slug);
+  const mega = literal?.isMega ? literal : megaFor(slug, item, dex, items);
+  const entry = mega ?? literal;
+  // Forme picker: the base species plus every Mega form the dex lists for it. Derived from the
+  // browse index that is already loaded — a forme switch must not cost a round trip.
+  const baseName = entry?.isMega ? entry.baseSpecies : entry?.name;
+  const formes = useMemo(() => {
+    if (!baseName) return [];
+    const base = dex.find((e) => e.name === baseName && !e.isMega);
+    const megas = dex.filter((e) => e.isMega && e.baseSpecies === baseName);
+    return megas.length && base ? [base, ...megas] : [];
+  }, [dex, baseName]);
+  const actionBox = actions ? <span className="mon-editor-actions">{actions}</span> : null;
 
-  useEffect(() => {
-    const hit = moves.find((m) => m.name === value);
-    setText(hit ? displayName(hit, lang) : value);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, lang, moves.length]);
-
-  const options = useMemo(() => moves.map((m) => ({
-    key: m.name,
-    value: displayName(m, lang),
-    secondary: `${m.type}${m.power != null ? ` · ${m.power}` : ""}`,
-  })), [moves, lang]);
-
-  const resolve = (raw: string): string | null => {
-    const q = raw.trim();
-    if (!q) return "";
-    const lower = q.toLowerCase();
-    const exact = moves.find((m) => m.name.toLowerCase() === lower
-      || m.nameZh === q || m.nameJa === q || displayName(m, lang).toLowerCase() === lower);
-    if (exact) return exact.name;
-    const part = moves.find((m) => m.name.toLowerCase().includes(lower)
-      || (m.nameZh ?? "").includes(q) || (m.nameJa ?? "").includes(q));
-    return part ? part.name : null;
-  };
-
-  const current = moves.find((m) => m.name === value);
   return (
-    <div className="move-slot">
-      <span className="move-slot-mark">
-        {current ? <TypeBadge type={current.type} iconOnly /> : <span className="move-slot-dot" />}
-      </span>
-      <AdaptiveCombobox value={text} options={options}
-        placeholder={`${t("calc.move")} ${index + 1}`}
-        onValueChange={(next) => {
-          setText(next);
-          const hit = resolve(next);
-          if (hit !== null && (hit === "" || moves.some((m) => m.name === hit
-            && displayName(m, lang) === next.trim()))) onChange(hit);
-        }}
-        onCommit={(raw) => {
-          const hit = resolve(raw);
-          if (hit !== null) onChange(hit);
-          else setText(current ? displayName(current, lang) : "");
-        }} />
+    // Species and forme are one identity, so they sit on one row when both exist — a forme select
+    // stacked underneath would push the card taller than its partner across the page.
+    <div className={`mon-editor-namerow${formes.length ? " split" : ""}`}>
+      <div className="mon-editor-namefield">
+        <span className="mon-editor-label-line">
+          <span>{t("calc.name")}</span>
+          {!identityShown && (
+            <span className="mon-editor-types">
+              {(entry?.types ?? []).map((ty) => <TypeBadge key={ty} type={ty} />)}
+            </span>
+          )}
+          {!formes.length && actionBox}
+        </span>
+        <MonPicker idKey={pickerKey} slug={slug} dex={dex} ariaLabel={t("calc.name")}
+          onSlug={(next) => { if (next !== slug) onSpecies(next); }} />
+      </div>
+      {formes.length > 0 && (
+        <div className="mon-editor-namefield">
+          <span className="mon-editor-form-heading">
+            {t("calc.forme")}
+            {mega && !identityShown && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
+            {actionBox}
+          </span>
+          <select value={entry?.slug ?? ""} aria-label={t("calc.forme")}
+            onChange={(e) => {
+              const next = dex.find((x) => x.slug === e.target.value);
+              // Dropping back to the base must also drop the stone, or the held item would silently
+              // re-Mega it and the picker would disagree with the numbers.
+              const dropStone = !!next && !next.isMega
+                && items.some((i) => i.name === item && i.requiredBy?.length);
+              onForme(e.target.value, dropStone);
+            }}>
+            {formes.map((f) => (
+              <option key={f.slug} value={f.slug}>{displayName(f, lang)}</option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
 
 export function MonEditor({
-  label, mon, setMon, dex, natures, items, learnset, loadSetOptions, onSetPick, onExport,
+  label, mon, setMon, dex, natures, items, format, onSetPick, onExport,
 }: {
   label: string;
   mon: MonState;
@@ -96,8 +112,7 @@ export function MonEditor({
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
-  learnset: LearnsetDto | null;
-  loadSetOptions: () => Promise<BuildOption[]>;
+  format: FormatId;
   onSetPick: (set: BuildOption, index: number) => void;
   onExport: () => void;
 }) {
@@ -131,16 +146,6 @@ export function MonEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mega?.slug, mon.item]);
 
-  // Forme picker: the base species plus every Mega form the dex lists for it. Derived from the
-  // browse index that is already loaded — a forme switch must not cost a round trip.
-  const baseName = entry?.isMega ? entry.baseSpecies : entry?.name;
-  const formes = useMemo(() => {
-    if (!baseName) return [];
-    const base = dex.find((e) => e.name === baseName && !e.isMega);
-    const megas = dex.filter((e) => e.isMega && e.baseSpecies === baseName);
-    return megas.length && base ? [base, ...megas] : [];
-  }, [dex, baseName]);
-
   /** Which way this mon's nature bends a stat — "" when it does not touch it. */
   const nature = natures.find((n) => n.name === mon.nature);
   const natureTone = (key: string) =>
@@ -152,30 +157,9 @@ export function MonEditor({
   const curHP = curHPOf(mon, maxHP);
   const spTotal = spSum(mon.sps);
   const needsTrigger = !!mon.ability && ABILITY_NEEDS_TRIGGER.has(mon.ability);
-  const setButtonRef = useRef<HTMLButtonElement>(null);
-  const requestSeq = useRef(0);
-  const [setPickerOpen, setSetPickerOpen] = useState(false);
-  const [setPickerBusy, setSetPickerBusy] = useState(false);
+  // The cards the button last loaded, mirrored here only so the build below can be recognised as
+  // one of them; the popover itself owns its own loading.
   const [setOptions, setSetOptions] = useState<BuildOption[]>([]);
-
-  useEffect(() => {
-    requestSeq.current += 1;
-    setSetPickerOpen(false);
-    setSetOptions([]);
-    setSetPickerBusy(false);
-  }, [mon.slug]);
-
-  const openSetPicker = () => {
-    if (setPickerOpen) { setSetPickerOpen(false); return; }
-    setSetPickerOpen(true);
-    setSetPickerBusy(true);
-    const seq = ++requestSeq.current;
-    void loadSetOptions().then((next) => {
-      if (requestSeq.current === seq) setSetOptions(next);
-    }).finally(() => {
-      if (requestSeq.current === seq) setSetPickerBusy(false);
-    });
-  };
   const currentBuildSig = buildConfigSig(mon);
   const matchedSet = setOptions.find((option) => buildConfigSig(option.modal) === currentBuildSig);
   const matchedSetIndex = matchedSet ? setOptions.indexOf(matchedSet) : -1;
@@ -205,20 +189,9 @@ export function MonEditor({
   }, [currentBuildSig, matchedSet?.key, matchedSetIndex, setMon]);
 
   const editorActions = (
-    <span className="mon-editor-actions">
-      <button ref={setButtonRef} className="ghost-btn tiny" onClick={openSetPicker}
-        disabled={!mon.slug} aria-expanded={setPickerOpen}
-        title={t("calc.metaSetHint")}>{t("calc.metaSet")}</button>
-      {setPickerOpen && (
-        <BuildPicker options={setOptions} currentKey={currentSetKey}
-          anchorRef={setButtonRef} busy={setPickerBusy}
-          hint={t("calc.setPickHint")}
-          onPick={(option) => {
-            const picked = setOptions.find((candidate) => candidate.key === option.key);
-            if (picked) onSetPick(picked, setOptions.indexOf(picked));
-          }}
-          onClose={() => setSetPickerOpen(false)} />
-      )}
+    <>
+      <BuildPickerButton slug={mon.slug} format={format} currentKey={currentSetKey}
+        onOptions={setSetOptions} onPick={onSetPick} />
       <button className="ghost-btn tiny" disabled={!mon.slug}
         onClick={() => {
           onExport();
@@ -227,62 +200,17 @@ export function MonEditor({
         }}>
         {exported ? t("calc.copied") : t("calc.exportMon")}
       </button>
-    </span>
+    </>
   );
 
   return (
-    <section className="panel mon-editor">
-      <div className="mon-editor-id">
-        <div className="mon-editor-art">
-          {entry
-            ? <GameImage assetKey={entry.key} role="dense" alt={displayName(entry, lang)}
-                className="mon-editor-sprite" />
-            : <img className="mon-editor-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-        </div>
-        <div className="mon-editor-idfields">
-          {/* Species and forme are one identity, so they sit on one row when both exist — a forme
-              select stacked underneath would push the card taller than its partner across the page. */}
-          <div className={`mon-editor-namerow${formes.length ? " split" : ""}`}>
-          <div className="mon-editor-namefield">
-            <span className="mon-editor-label-line">
-              <span>{t("calc.name")}</span>
-              <span className="mon-editor-types">
-                {(entry?.types ?? []).map((ty) => <TypeBadge key={ty} type={ty} />)}
-              </span>
-              {!formes.length && editorActions}
-            </span>
-            <MonPicker idKey={label} slug={mon.slug} dex={dex}
-              ariaLabel={t("calc.name")}
-              onSlug={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))} />
-          </div>
-          {formes.length > 0 && (
-            <div className="mon-editor-namefield">
-              <span className="mon-editor-form-heading">
-                {t("calc.forme")}
-                {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
-                {editorActions}
-              </span>
-              <select value={entry?.slug ?? ""} aria-label={t("calc.forme")}
-                onChange={(e) => {
-                  const next = dex.find((x) => x.slug === e.target.value);
-                  // A forme switch keeps the build — only the species changes. Dropping back to the
-                  // base must also drop the stone, or the held item would silently re-Mega it and
-                  // the picker would disagree with the numbers.
-                  const dropStone = next && !next.isMega
-                    && items.some((i) => i.name === mon.item && i.requiredBy?.length);
-                  // A Mega picked here is stored as the Mega species; its stone is pinned by the
-                  // effect above, so the two controls can never disagree again.
-                  setMon((s) => ({ ...s, slug: e.target.value, ...(dropStone ? { item: "" } : {}) }));
-                }}>
-                {formes.map((f) => (
-                  <option key={f.slug} value={f.slug}>{displayName(f, lang)}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          </div>
-        </div>
-      </div>
+    <div className="mon-editor">
+      <MonNameRow slug={mon.slug} item={mon.item} dex={dex} items={items} pickerKey={label}
+        actions={editorActions} identityShown
+        onSpecies={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))}
+        // A Mega picked here is stored as the Mega species; its stone is pinned by the effect above,
+        // so the two controls can never disagree again.
+        onForme={(slug, dropStone) => setMon((s) => ({ ...s, slug, ...(dropStone ? { item: "" } : {}) }))} />
 
       <div className="mon-build-row">
         <label>{t("calc.ability")}
@@ -417,22 +345,7 @@ export function MonEditor({
         ))}
       </div>
 
-      <div className="move-slots">
-        <span className="mon-editor-cap">{t("calc.moveSlots")}</span>
-        {Array.from({ length: MOVE_SLOTS }, (_, i) => (
-          <MoveSlot key={i} index={i} learnset={learnset} value={mon.moves[i] ?? ""}
-            onChange={(name) => setMon((s) => {
-              const moves = [...s.moves];
-              while (moves.length < MOVE_SLOTS) moves.push("");
-              moves[i] = name;
-              return { ...s, moves };
-            })} />
-        ))}
-        {learnset && learnset.moves.length === 0 && (
-          <span className="muted">{t("calc.noMoves")}</span>
-        )}
-      </div>
-    </section>
+    </div>
   );
 }
 

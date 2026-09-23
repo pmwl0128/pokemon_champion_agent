@@ -25,14 +25,16 @@ export interface FieldSuggestion {
  * so a plain "clicked outside the panel" test would close the flyout on the same click. */
 export const FIELD_FLAGS_TOGGLE = "data-field-flags-toggle";
 
-function SideFlagColumn({ side, title, field, setField }: {
+function SideFlagColumn({ side, title, field, setField, allowedFlags }: {
   side: SideId;
   title: string;
   field: FieldState;
   setField: Dispatch<SetStateAction<FieldState>>;
+  allowedFlags?: ReadonlySet<string>;
 }) {
   const t = useT();
-  const flags = SIDE_FLAGS.filter((f) => !(f.doublesOnly && field.format === "single"));
+  const flags = SIDE_FLAGS.filter((flag) => !(flag.doublesOnly && field.format === "single")
+    && (!allowedFlags || allowedFlags.has(flag.key)));
   const set = (key: string, on: boolean) => setField((s) => ({
     ...s,
     sides: { ...s.sides, [side]: { ...s.sides[side], [key]: on } },
@@ -53,6 +55,7 @@ function SideFlagColumn({ side, title, field, setField }: {
 
 export function FieldPanel({
   field, setField, sideALabel, sideBLabel, weatherSuggestions, terrainSuggestions, open, setOpen,
+  allowedSideFlags, showSharedFlags = true,
 }: {
   field: FieldState;
   setField: Dispatch<SetStateAction<FieldState>>;
@@ -66,6 +69,10 @@ export function FieldPanel({
   /** Owned by the page: the team strips' overflow chips open this same flyout. */
   open: boolean;
   setOpen: Dispatch<SetStateAction<boolean>>;
+  /** A tool may expose only the conditions its solver can preserve. Omitted means the full damage
+   * calculator vocabulary; an empty set intentionally leaves that side without flag controls. */
+  allowedSideFlags?: Partial<Record<SideId, ReadonlySet<string>>>;
+  showSharedFlags?: boolean;
 }) {
   const t = useT();
   const setFormat = (format: FormatId) => setField((s) => ({ ...s, format }));
@@ -97,11 +104,11 @@ export function FieldPanel({
   useEffect(() => () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
   }, []);
-  const commonFlags = [
+  const commonFlags = showSharedFlags ? [
     { key: "gravity", label: t("calc.gravity"), active: field.gravity },
     { key: "foresight", label: t("calc.foresight"), active: field.foresight },
     { key: "switchInDrops", label: t("calc.switchInDrops"), active: field.switchInDrops },
-  ] as const;
+  ] as const : [];
   return (
     <section className="field-panel" ref={wrap} aria-label={t("calc.fieldOptions")}
       onMouseEnter={cancelClose} onMouseLeave={scheduleClose}
@@ -112,8 +119,9 @@ export function FieldPanel({
         <div id="calc-field-flags" className="field-flyout" role="group"
           aria-label={t("calc.fieldOptions")}>
           <div className="field-flyout-row">
-            <SideFlagColumn side="a" title={sideALabel} field={field} setField={setField} />
-            <div className="field-shared-flags" role="group" aria-label={t("calc.fieldOptions")}>
+            <SideFlagColumn side="a" title={sideALabel} field={field} setField={setField}
+              allowedFlags={allowedSideFlags?.a} />
+            {showSharedFlags && <div className="field-shared-flags" role="group" aria-label={t("calc.fieldOptions")}>
               <FieldCheck label={t("calc.gravity")} title={t("calc.gravityHint")}
                 checked={field.gravity} onChange={(v) => setField((s) => ({ ...s, gravity: v }))} />
               <FieldCheck label={t("calc.foresight")} title={t("calc.foresightHint")}
@@ -121,8 +129,9 @@ export function FieldPanel({
               <FieldCheck label={t("calc.switchInDrops")} title={t("calc.switchInDropsHint")}
                 checked={field.switchInDrops}
                 onChange={(v) => setField((s) => ({ ...s, switchInDrops: v }))} />
-            </div>
-            <SideFlagColumn side="b" title={sideBLabel} field={field} setField={setField} />
+            </div>}
+            <SideFlagColumn side="b" title={sideBLabel} field={field} setField={setField}
+              allowedFlags={allowedSideFlags?.b} />
           </div>
         </div>
       )}

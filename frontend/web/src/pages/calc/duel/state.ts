@@ -16,7 +16,9 @@ import { STAT_KEYS } from "@pokemon-champions/protocol";
 import { actualStat } from "../../../lib/stats.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
-import { BOOST_KEYS, EMPTY_SIDE, withMega, type SideState } from "../shared.tsx";
+import {
+  BOOST_KEYS, EMPTY_SIDE, buildConfigSig, modalSig, withMega, type BuildOption, type SideState,
+} from "../shared.tsx";
 
 export const MOVE_SLOTS = 4;
 
@@ -31,6 +33,10 @@ export interface BuildReference {
 }
 
 export interface MonState extends SideState {
+  /** Stable identity of this roster slot's Pokémon across tools and edits. A new species is a new
+   * Pokémon (`makeMon` issues a fresh uid); editing a build, or swapping sides, keeps it. Tools key
+   * what they remember about a mon — the bulk tool's targets and loaded spread — on it. */
+  uid: string;
   /** Four fixed slots; "" is an empty slot, so a move keeps its position while you edit around it. */
   moves: string[];
   /** null = at full health. Stored as an absolute value, like the engine's `curHP`. */
@@ -50,12 +56,46 @@ export interface MonState extends SideState {
 }
 
 export const EMPTY_MON: MonState = {
-  ...EMPTY_SIDE, moves: ["", "", "", ""], curHP: null, abilityOn: null, autoSig: null,
+  ...EMPTY_SIDE, uid: "", moves: ["", "", "", ""], curHP: null, abilityOn: null, autoSig: null,
   buildRef: null, pinned: false,
 };
 
+let uidSerial = 0;
+const uidSession = Math.random().toString(36).slice(2, 8);
+/** Unique within the browser session and across reloads of a persisted roster. */
+export const newMonUid = (): string => `m-${uidSession}-${(++uidSerial).toString(36)}`;
+
 export function makeMon(slug = ""): MonState {
-  return { ...EMPTY_MON, slug, moves: ["", "", "", ""], sps: {}, boosts: {} };
+  return { ...EMPTY_MON, uid: newMonUid(), slug, moves: ["", "", "", ""], sps: {}, boosts: {} };
+}
+
+export function withMoves(mon: MonState, moves: string[]): MonState {
+  const slots = [...moves.slice(0, MOVE_SLOTS)];
+  while (slots.length < MOVE_SLOTS) slots.push("");
+  return { ...mon, moves: slots };
+}
+
+/** Apply one environment card. Only an automatic seed carries `autoSig`: a card the user explicitly
+ * chose must survive a later format switch and must never be replaced by the first card. */
+export function applyBuildOption(
+  mon: MonState, option: BuildOption, labelIndex = 0, automatic = false,
+): MonState {
+  const m = option.modal;
+  const next = withMoves(
+    { ...mon, ability: m.ability, item: m.item, nature: m.nature, sps: { ...m.sps } },
+    m.moves.length ? m.moves : mon.moves);
+  return {
+    ...next,
+    autoSig: automatic ? modalSig(m, next.moves) : null,
+    buildRef: {
+      key: option.key,
+      source: option.source,
+      coverage: option.coverage,
+      isModal: option.isModal,
+      labelIndex,
+      signature: buildConfigSig(next),
+    },
+  };
 }
 
 /** Abilities the calc ships toggled OFF because their trigger is invisible to a single damage frame,
@@ -107,17 +147,6 @@ export function finalStat(mon: MonState, entry: DexIndexEntry | undefined, natur
                           key: (typeof STAT_KEYS)[number]): number {
   if (!entry) return 0;
   return actualStat(entry.stats[key], key, mon.sps[key] ?? 0, natureMult(natures, mon.nature, key));
-}
-
-/** Which of the two combatants a KO caveat is actually about.
- *
- * It decides which result card the note belongs on, and getting it wrong inverts the reading:
- * Disguise is a fact about the mon being HIT (so it belongs beside that mon's name), while Draco
- * Meteor's self-drop is a fact about the mon swinging. Codes are the calc's own
- * (`detectKoCaveats`), and anything unrecognised falls to the attacker — the move's own side. */
-export function caveatSubject(code: string): "attacker" | "defender" {
-  return code.startsWith("defender_") || code.startsWith("target_") || code === "item_removal"
-    ? "defender" : "attacker";
 }
 
 // -- field --------------------------------------------------------------------------------

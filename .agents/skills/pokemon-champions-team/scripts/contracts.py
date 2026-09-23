@@ -27,11 +27,16 @@ SUPPORTED_SCHEMA_VERSIONS = {1}        # versions it accepts as input
 FORMATS = {"single", "double"}
 COMPLETENESS = {"observed_full_set", "observed_species_only", "extracted_set", "inferred_set"}
 BENCHMARK_KINDS = {"survive", "outspeed", "ohko", "2hko"}
-PROBABILITIES = {"guaranteed", "likely", "any"}
+PROBABILITIES = {"guaranteed", "near_guaranteed", "likely", "three_quarters", "half", "any"}
 CONFIDENCE = {"high", "medium", "low"}
 CONDITION_KEYS = {"stealth_rock", "spikes", "tailwind", "opponent_tailwind", "trickroom",
                   "weather", "terrain", "screens"}
 SCREEN_VALUES = {"reflect", "light_screen", "aurora_veil"}    # plus bare boolean true
+# A survive benchmark's `member_state`: OUR member's stated battle state, in the calc's input
+# vocabulary (conventions §2: statuses are the calc's capitalised English; stages use canonical keys).
+MEMBER_STATE_FIELDS = {"status", "boosts"}
+MEMBER_STATUSES = {"Healthy", "Burned", "Paralyzed", "Poisoned", "Badly Poisoned", "Asleep", "Frozen"}
+BOOST_STAT_KEYS = {"atk", "def", "spa", "spd", "spe"}
 STAT_KEYS = SPREAD_STAT_KEYS            # single source for the SP stat keys: rules.py
 # Negative tactic tokens for build-context.exclude_tactics — the playstyle a user does NOT want (the
 # assisted-build flow's "不想用受队/空间/天气…"). An enumerated vocab (unlike free-form `wants`) so a typo'd
@@ -59,8 +64,8 @@ STYLE_LEAN = {"offense", "balance", "defense"}
 # dex accuracy facts — diagnose surfaces the luck-line list either way, the knob only flags it. Never a score.
 VARIANCE_TOLERANCE = {"averse", "tolerant"}
 BENCHMARK_FIELDS = {
-    "member", "kind", "vs", "move", "conditions", "probability",
-    "attacker_set", "opponent_set",
+    "member", "kind", "vs", "move", "hits", "conditions", "probability",
+    "attacker_set", "opponent_set", "member_state",
 }
 
 
@@ -290,6 +295,36 @@ def check_need(n: Any, path: str = "need") -> list[ContractError]:
     return out
 
 
+def _check_member_state(state: Any, kind: Any, path: str, out: list[ContractError]) -> None:
+    """`member_state` is a survive-only condition: our member's status and stat stages while it takes
+    the hit. Speed and kill cliffs are not solved under a stated state, so it is refused there rather
+    than silently dropped."""
+    if state is None:
+        return
+    if not isinstance(state, dict):
+        _err(out, Code.TYPE, path, "member_state must be an object")
+        return
+    if kind != "survive":
+        _err(out, Code.RANGE, path, "member_state is only valid for survive")
+    _check_unknown(state, MEMBER_STATE_FIELDS, path, out)
+    status = state.get("status")
+    if status is not None and (not _is_str(status) or status not in MEMBER_STATUSES):
+        _err(out, Code.ENUM, f"{path}.status",
+             f"member_state.status must be one of {sorted(MEMBER_STATUSES)}")
+    boosts = state.get("boosts")
+    if boosts is None:
+        return
+    if not isinstance(boosts, dict):
+        _err(out, Code.TYPE, f"{path}.boosts", "member_state.boosts must be an object")
+        return
+    for key, value in boosts.items():
+        if key not in BOOST_STAT_KEYS:
+            _err(out, Code.ENUM, f"{path}.boosts.{key}",
+                 f"member_state.boosts keys must be among {sorted(BOOST_STAT_KEYS)}")
+        elif not _is_int(value) or not -6 <= value <= 6:
+            _err(out, Code.RANGE, f"{path}.boosts.{key}", "a stat stage must be an integer -6..6")
+
+
 def check_benchmark(b: Any, path: str = "benchmark") -> list[ContractError]:
     """Validate one tune benchmark. Encodes the `vs`/`conditions`/`screens` contract that drifted."""
     out: list[ContractError] = []
@@ -311,12 +346,16 @@ def check_benchmark(b: Any, path: str = "benchmark") -> list[ContractError]:
         _err(out, Code.TYPE, f"{path}.vs", i18n.Msg('ct_vs_outspeed_only', kind=kind))
     if kind in ("survive", "ohko", "2hko") and not _is_str(b.get("move")):
         _err(out, Code.MISSING, f"{path}.move", i18n.Msg('ct_kind_needs_move', kind=kind))
+    hits = b.get("hits")
+    if hits is not None and (not _is_int(hits) or hits not in (1, 2) or kind != "survive"):
+        _err(out, Code.RANGE, f"{path}.hits", "hits must be 1 or 2 and is only valid for survive")
     prob = b.get("probability")
     if prob is not None and (not _is_str(prob) or prob not in PROBABILITIES):
         _err(out, Code.ENUM, f"{path}.probability", i18n.Msg('ct_probability_enum', allowed=sorted(PROBABILITIES)))
     for set_field in ("attacker_set", "opponent_set"):
         if b.get(set_field) is not None and not isinstance(b.get(set_field), dict):
             _err(out, Code.TYPE, f"{path}.{set_field}", f"{set_field} must be an object")
+    _check_member_state(b.get("member_state"), kind, f"{path}.member_state", out)
     conds = b.get("conditions")
     if conds is not None:
         if not isinstance(conds, dict):

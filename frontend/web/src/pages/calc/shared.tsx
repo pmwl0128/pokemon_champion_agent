@@ -9,6 +9,7 @@ import {
   useEffect, useMemo, useRef, useState,
   type Dispatch, type ReactNode, type SetStateAction,
 } from "react";
+import { BuildPicker } from "../../components/BuildPicker.tsx";
 import { GameImage } from "../../components/GameImage.tsx";
 import { PLACEHOLDERS } from "../../assets/icons.ts";
 import {
@@ -395,6 +396,79 @@ export function useBuildOptions(): (
 export function useModalFill(): (slug: string, fmt: FormatId) => Promise<ModalSet | null> {
   const loadOptions = useBuildOptions();
   return async (slug: string, fmt: FormatId) => (await loadOptions(slug, fmt))[0]?.modal ?? null;
+}
+
+/** The environment-build control a mon card wears: one button that loads THIS species'
+ * configurations on demand (observed builds first, Meta stitch last) and hands the picked card
+ * back. Every card surface — damage editor, speed row, simulation member — opens the same popover,
+ * so the loading, the discard-on-species-change and the anchoring live here instead of being
+ * re-derived beside each card.
+ *
+ * `onOptions` exists for a caller that has to reconcile its own fields against the loaded cards
+ * (the damage editor proves a hand-typed build IS an environment card that way); it must be a
+ * stable reference, a `useState` setter being the intended shape. */
+export function BuildPickerButton({
+  slug, format, currentKey, onPick, onOptions, disabled = false,
+  className = "ghost-btn tiny", label,
+}: {
+  slug: string;
+  format: FormatId;
+  currentKey?: string;
+  onPick: (option: BuildOption, index: number) => void;
+  onOptions?: (options: BuildOption[]) => void;
+  disabled?: boolean;
+  className?: string;
+  label?: ReactNode;
+}) {
+  const t = useT();
+  const loadBuildOptions = useBuildOptions();
+  const anchor = useRef<HTMLButtonElement>(null);
+  const requestSeq = useRef(0);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [options, setOptions] = useState<BuildOption[]>([]);
+
+  // A species or format change invalidates both the request in flight and the cards already on
+  // screen: they describe an environment this card is no longer in.
+  useEffect(() => {
+    requestSeq.current += 1;
+    setOpen(false);
+    setBusy(false);
+    setOptions([]);
+    onOptions?.([]);
+  }, [slug, format, onOptions]);
+
+  const toggle = () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    setBusy(true);
+    const seq = ++requestSeq.current;
+    void loadBuildOptions(slug, format).then((next) => {
+      if (requestSeq.current !== seq) return;
+      setOptions(next);
+      onOptions?.(next);
+    }).finally(() => {
+      if (requestSeq.current === seq) setBusy(false);
+    });
+  };
+
+  return (
+    <>
+      <button ref={anchor} type="button" className={className} onClick={toggle}
+        disabled={disabled || !slug} aria-expanded={open}
+        title={t("calc.metaSetHint")}>{label ?? t("calc.metaSet")}</button>
+      {open && (
+        <BuildPicker options={options} currentKey={currentKey}
+          anchorRef={anchor} busy={busy} hint={t("calc.setPickHint")}
+          onPick={(picked) => {
+            const index = options.findIndex((candidate) => candidate.key === picked.key);
+            const option = options[index];
+            if (option) onPick(option, index);
+          }}
+          onClose={() => setOpen(false)} />
+      )}
+    </>
+  );
 }
 
 /** The Mega form this side's held stone unlocks for its species, or null. The engine does

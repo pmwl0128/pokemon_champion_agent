@@ -27,7 +27,10 @@ import {
 import { activeKey, ColHead } from "../components/MatchupHeads.tsx";
 import { useRuntime } from "../runtime/context.tsx";
 import type { DexIndexEntry } from "../runtime/adapter.ts";
-import type { BuildOption } from "./calc/shared.tsx";
+import type { ItemRef } from "../runtime/projection.ts";
+import {
+  BuildPickerButton, buildConfigSig, megaFor, type BuildOption,
+} from "./calc/shared.tsx";
 import { slugify } from "./uep/MonChip.tsx";
 
 
@@ -41,7 +44,7 @@ type Spread = Record<"hp" | "atk" | "def" | "spa" | "spd" | "spe", number>;
 interface DraftMember extends TeamMemberish { id: string; spread: Spread; moves: string[] }
 interface NamedOption { name: string; nameZh?: string; nameJa?: string }
 interface ActualVocab {
-  species: DexIndexEntry[]; moves: NamedOption[]; items: NamedOption[];
+  species: DexIndexEntry[]; moves: NamedOption[]; items: ItemRef[];
   abilities: NamedOption[]; natures: NamedOption[];
 }
 
@@ -180,25 +183,48 @@ function VocabLists({ vocab }: { vocab: ActualVocab }) {
   </>;
 }
 
-function MemberEditor({ member, index, count, vocab, onChange, onRemove, onDuplicate }: {
+function MemberEditor({ member, index, count, vocab, format, onChange, onRemove }: {
   member: DraftMember; index: number; count: number;
-  vocab: ActualVocab;
-  onChange: (next: DraftMember) => void; onRemove: () => void; onDuplicate: () => void;
+  vocab: ActualVocab; format: FormatId;
+  onChange: (next: DraftMember) => void; onRemove: () => void;
 }) {
   const t = useT();
   const dex = useDexByName();
   const { lang } = useLang();
   const entry = dex.get(member.species);
   const name = entry ? displayName(entry, lang) : member.species || t("actual.member.empty");
+  // Same badge the calculator and speed rows wear: a held stone IS the Mega for every number the
+  // battery computes, so the card says so rather than leaving it to the item field.
+  const mega = entry?.isMega ? entry
+    : entry ? megaFor(entry.slug, member.item ?? "", vocab.species, vocab.items) : null;
+  // The cards the environment picker last loaded, kept only to mark which one this member IS.
+  const [setOptions, setSetOptions] = useState<BuildOption[]>([]);
+  const buildSig = buildConfigSig({
+    ability: member.ability ?? "", item: member.item ?? "", nature: member.nature ?? "",
+    sps: member.spread, moves: member.moves,
+  });
+  const currentSetKey = setOptions.find(
+    (option) => buildConfigSig(option.modal) === buildSig)?.key;
   return (
     <article className="actual-member-card">
       <header className="actual-member-head">
         <span className="actual-member-index num">{String(index + 1).padStart(2, "0")}</span>
         {entry && <GameImage assetKey={`pokemon:${entry.slug}`} role="dense" alt="" className="mini" />}
         <strong>{name}</strong>
+        {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
         <span className="actual-member-actions">
-          <button type="button" className="linkish" onClick={onDuplicate}>{t("actual.duplicate")}</button>
-          <button type="button" className="linkish" onClick={onRemove} disabled={count === 1}>{t("actual.remove")}</button>
+          <BuildPickerButton slug={entry?.slug ?? ""} format={format} currentKey={currentSetKey}
+            onOptions={setSetOptions}
+            onPick={(option) => onChange({
+              ...member,
+              item: option.modal.item,
+              ability: option.modal.ability,
+              nature: option.modal.nature,
+              moves: [...option.modal.moves, "", "", "", ""].slice(0, 4),
+              spread: { ...EMPTY_SPREAD, ...option.modal.sps },
+            })} />
+          <button type="button" className="mini-x" onClick={onRemove} disabled={count === 1}
+            aria-label={t("actual.remove")} title={t("actual.remove")}>✕</button>
         </span>
       </header>
       <div className="actual-member-fields">
@@ -748,10 +774,9 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
       </div>
       {mode === "manual" && <div className="actual-members">
         {members.map((member, index) => <MemberEditor key={member.id} member={member} index={index} count={members.length}
-          vocab={vocab}
+          vocab={vocab} format={format}
           onChange={(next) => setMembers((rows) => rows.map((row) => row.id === member.id ? next : row))}
-          onRemove={() => setMembers((rows) => rows.filter((row) => row.id !== member.id))}
-          onDuplicate={() => setMembers((rows) => rows.length < 12 ? [...rows, newMember(member, rows.length)] : rows)} />)}
+          onRemove={() => setMembers((rows) => rows.filter((row) => row.id !== member.id))} />)}
         <button type="button" className="actual-add-member" disabled={members.length >= 12}
           onClick={() => setMembers((rows) => [...rows, newMember(undefined, rows.length)])}>
           <span>＋</span><b>{t("actual.addMember")}</b><small>{t("actual.addMemberHint")}</small></button>

@@ -228,14 +228,34 @@ def solve_outspeed(base: int, nature: str | None, target_speed: int,
 # Survival cliffs
 # --------------------------------------------------------------------------- #
 
-def survival_prob(damage_rolls: list[int], hp: int) -> float:
-    """Fraction of damage rolls the defender survives (damage strictly below max HP)."""
+def survival_prob_hits(damage_rolls: list[int], hp: int, hits: int = 1) -> float:
+    """Exact independent-roll survival probability for one or two unchanged hits.
+
+    A tie with the available HP faints, so the accumulated damage must stay strictly below ``hp``.
+    This is exact for the damage-roll distribution itself; callers remain responsible for effects
+    that change state between hits (healing, stat changes, Multiscale, and similar mechanics).
+    """
     if not damage_rolls:
         return 1.0
-    return sum(1 for d in damage_rolls if d < hp) / len(damage_rolls)
+    if hits <= 1:
+        return sum(1 for damage in damage_rolls if damage < hp) / len(damage_rolls)
+    totals = [first + second for first in damage_rolls for second in damage_rolls]
+    return sum(1 for damage in totals if damage < hp) / len(totals)
+
+
+def survival_prob(damage_rolls: list[int], hp: int) -> float:
+    """Backward-compatible one-hit survival probability."""
+    return survival_prob_hits(damage_rolls, hp, 1)
 
 # Discrete probability cliffs: "guaranteed" = survive every roll.
-PROB_TARGETS = {"guaranteed": 1.0, "likely": 13 / 16, "any": 1 / 16}
+PROB_TARGETS = {
+    "guaranteed": 1.0,
+    "near_guaranteed": 15 / 16,
+    "likely": 13 / 16,
+    "three_quarters": 12 / 16,
+    "half": 8 / 16,
+    "any": 1 / 16,
+}
 
 
 def meets_target(prob: float, target: str) -> bool:

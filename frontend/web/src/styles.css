@@ -477,10 +477,13 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 
 /* ---- calc: move picker + defenders + matrix ------------------------------------- */
 .side-head { display: flex; align-items: center; justify-content: space-between; }
-.side-actions { display: flex; gap: 6px; }
+.side-actions { display: flex; align-items: center; gap: 6px; }
 .mini-x { border: 0; background: var(--panel-2); color: var(--sub); border-radius: 6px;
   width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
 .mini-x:hover { color: var(--ink); }
+/* The last member of a roster cannot be removed, and a control that still looks pressable is a
+   click the reader has to discover is a no-op. */
+.mini-x:disabled, .mini-x:disabled:hover { opacity: .35; color: var(--sub); cursor: default; }
 .mini-x.swap:hover { color: var(--brand); }
 /* boost-stage dropdown: as compact as the SP number cells it sits beside in the boosts grid. */
 .boost-sel { padding: 5px 2px; text-align: center; min-width: 0; }
@@ -498,8 +501,8 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
    illegal over (red). Shared by the side-form caption (.sp-sum) and the tune heading (.sp-total). */
 .sp-sep { color: var(--line); margin: 0 5px; }
 .sp-sum.under { color: var(--sub); }
-.sp-sum.full, .sp-total.full { color: #2b7a2b; font-weight: 700; }
-.sp-sum.over, .sp-total.over { color: #b3261e; font-weight: 700; }
+.sp-sum.full { color: #2b7a2b; font-weight: 700; }
+.sp-sum.over { color: #b3261e; font-weight: 700; }
 .chk { display: flex; gap: 5px; align-items: center; font-size: 13px; }
 .move-picker { margin-top: 14px; padding-bottom: 12px; }
 .move-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 16px; }
@@ -618,7 +621,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .speed-row { padding: 12px 14px; gap: 8px; }
 .speed-row .side-head { min-height: 24px; }
 .speed-heading-label { display: inline-flex; align-items: center; gap: 7px; }
-.speed-row .side-head .mini-x { margin-left: auto; }
+.speed-row .side-head .side-actions { margin-left: auto; }
 .mon-config { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
 .speed-presets { display: flex; gap: 6px; flex-wrap: wrap; }
 .speed-presets button { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
@@ -664,6 +667,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .tier-legend .lg { padding: 3px 9px; border-radius: 999px; font-weight: 650; }
 .tier-legend .lg.faster { background: color-mix(in srgb, var(--danger) 12%, var(--panel)); color: var(--danger); }
 .tier-legend .lg.slower { background: color-mix(in srgb, var(--success) 12%, var(--panel)); color: var(--success); }
+.speed-tier-shell { position: relative; }
 .speed-tier-wrap { padding: 0; overflow: hidden; border-color: var(--line-strong); }
 .speed-tier-scroll { overflow: auto; max-height: 68vh; }
 .speed-tier { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
@@ -729,53 +733,36 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 35%, var(--line)); }
 .rung-you { font-size: 10px; background: var(--brand); color: #fff; border-radius: 999px; padding: 1px 7px; font-weight: 700; }
 .rung-you.custom { background: var(--build-b); }
+/* Scroll minimap: green = mine, red = opponent. It lives just outside the table so the original
+   column widths stay untouched; the two lanes remain separately clickable at similar speeds. */
+.speed-row-markers {
+  position: absolute; z-index: 5; top: 44px; bottom: 8px; left: calc(100% + 5px); width: 28px;
+  pointer-events: none;
+}
+.speed-row-marker {
+  position: absolute; width: 14px; height: 22px; padding: 0; border: 0; background: transparent;
+  color: var(--success); cursor: pointer; pointer-events: auto; transform: translateY(-50%);
+  touch-action: manipulation;
+}
+.speed-row-marker::before {
+  content: ""; position: absolute; top: 6px; left: 3px; width: 0; height: 0;
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent;
+  border-right: 8px solid currentColor; filter: drop-shadow(0 1px 1px rgb(0 0 0 / .18));
+}
+.speed-row-marker.mine { left: 0; color: var(--success); }
+.speed-row-marker.custom { left: 14px; color: var(--danger); }
+/* The global button:active transform would replace translateY(-50%), shifting this small
+   target off the pointer between down and up so the browser never dispatches its click. */
+button.speed-row-marker:active:not(:disabled) { transform: translateY(-50%); opacity: .72; }
+.speed-row-marker:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .speed-row-markers { left: auto; right: 13px; }
+}
 
-/* ---- bulk tune: defender SP total + per-attack survival verdict ------------------ */
-.tune-head { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 8px; }
-.sp-total { font-size: 12.5px; color: var(--sub); font-family: var(--font-mono); }
-.sp-total.over { color: #b3261e; font-weight: 700; }
-/* align-items:end so the survive chips / atk-index sit on the move SELECT's row, not its caption. */
-.tune-ctl { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line);
-  padding-top: 10px; margin-top: 2px; }
-.tune-ctl .tune-move { font-size: 12px; color: var(--sub); display: grid; gap: 4px; min-width: 150px; }
-.tune-verdict { display: flex; align-items: center; gap: 7px; flex: 1; padding-bottom: 5px; }
-.verdict-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.verdict-dot.safe { background: #2b7a2b; }
-.verdict-dot.ko { background: #b3261e; }
-.tune-verdict .dmg-band { font-size: 15px; }
-.verdict-label { font-size: 12px; font-weight: 700; }
-.verdict-label.safe { color: #2b7a2b; }
-.verdict-label.ko { color: #b3261e; }
-.tune-note { font-size: 12px; font-weight: 600; color: var(--brand); margin-top: 8px; }
-/* Quick-solve suggestion bar: shows the proposed Def/SpD targets for review only (no write-back — the
-   apply step would have to re-check the 66 SP budget, so we surface the numbers and let the user set
-   them by hand). */
-.tune-proposal { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px;
-  padding: 9px 12px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); }
-.tune-proposal .tp-head { font-size: 13px; font-weight: 700; }
-.tune-proposal .tp-vals { display: flex; gap: 8px; flex-wrap: wrap; }
-.tune-proposal .tp-vals .vchip { background: color-mix(in srgb, var(--brand) 12%, var(--panel));
-  color: var(--ink); font-weight: 600; }
-.tune-hint { font-size: 12px; margin-top: 14px; line-height: 1.6; }
-/* central-bar solve buttons (right-aligned like the damage tab's Calculate button) */
-.field-row .tune-solve-btns { margin-left: auto; align-self: end; display: flex; gap: 8px; flex: none; }
-.field-row .tune-solve-btns .primary-btn { margin-left: 0; }
-/* live bulk indices next to the defender heading */
-.bulk-index { display: flex; gap: 12px; font-size: 12px; }
-.bulk-index .bi { color: var(--sub); }
-.bulk-index .bi b { color: var(--ink); font-size: 13px; margin-left: 2px; }
-.bulk-index .bi.phys b { color: #b3261e; }
-.bulk-index .bi.spec b { color: #2f5aa8; }
-/* per-attack survive-1 / survive-2 chips + attacker power index */
+/* ---- tune result cards (bulk solver + session artifacts) ------------------------ */
 .vchip { font-size: 12px; font-weight: 700; border-radius: 5px; padding: 1px 7px; white-space: nowrap; }
 .vchip.safe { background: color-mix(in srgb, #2b7a2b 16%, var(--panel-2)); color: #2b7a2b; }
 .vchip.ko { background: color-mix(in srgb, #b3261e 14%, var(--panel-2)); color: #b3261e; }
-.atk-index { font-size: 11.5px; color: var(--sub); margin-left: auto; white-space: nowrap; }
-.atk-index b { color: var(--ink); margin-left: 2px; }
-.subtabs.tune-mode { margin-bottom: 12px; }
-.tune-precise { margin-top: 16px; }
-.tune-precise-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.tune-precise-head .muted { font-size: 12px; line-height: 1.5; flex: 1; min-width: 220px; }
 .tune-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 12px; }
 .tune-card { padding: 12px 14px; display: grid; gap: 7px; border-left: 4px solid var(--line); }
 .tune-card.safe { border-left-color: #2b7a2b; }
@@ -1006,47 +993,12 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .uep-team-actions { padding: 0 16px 8px; display: flex; gap: 8px; flex-wrap: wrap; }
 .uep-tune { padding: 4px 16px 14px; display: grid; gap: 10px; }
 .uep-tune .tune-cards { margin-top: 4px; }
-.tune-bench { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.tune-bench select { max-width: 180px; }
 
-/* tune team strip + write-back */
-.tune-team-strip { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
-.tune-team-hint { font-size: 12px; flex-basis: 100%; }
-.tune-writeback { display: grid; gap: 8px; margin-top: 14px; max-width: 680px; }
-.tune-writeback textarea {
-  width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--panel); color: var(--ink); font: inherit; resize: vertical;
-}
 .uep-flag-item { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
 
-/* tune AI lane */
-.tune-ai { margin-top: 18px; padding: 0; overflow: hidden; }
-.tune-ai-head { display: grid; gap: 7px; padding: 22px 22px 0; }
-.tune-ai-head h2 { margin: 0; font-size: 18px; }
-.tune-ai-head p { margin: 0; max-width: none; line-height: 1.7; }
-.tune-ai .tune-writeback { max-width: none; margin: 0; padding: 18px 22px 0; gap: 0; }
-.tune-ai .tune-writeback textarea {
-  min-height: 132px; padding: 13px 15px; border-radius: 10px;
-  background: var(--panel); line-height: 1.6;
-}
-.tune-ai .tune-writeback textarea:focus { border-color: var(--brand); outline: 3px solid var(--brand-soft); }
-.tune-ai-actions {
-  display: flex; align-items: center; gap: 10px; margin: 18px -22px 0;
-  padding: 14px 22px; border-top: 1px solid var(--line); background: var(--panel-2);
-}
-.tune-ai-actions .primary-btn, .tune-ai-actions .second-btn { min-height: 38px; }
-.tune-ai-sent { margin-left: auto; font-size: 12px; }
-.tune-ai-result-head {
-  margin: 20px 22px 8px; color: var(--sub); font-size: 12px;
-  text-transform: uppercase; letter-spacing: 0.05em;
-}
-.tune-ai > .tune-cards { margin: 0 22px 22px; }
+/* UEP tune note + tune card localized head */
 .uep-tune-note { font-size: 13.5px; line-height: 1.6; }
 
-/* multi-move attacker rows + tune card localized head */
-.tune-ctl-multi { display: grid; gap: 6px; }
-.tune-move-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.tune-add-move { align-self: start; font-size: 12px; padding: 3px 10px; }
 .tc-kind { background: var(--panel-2); border-radius: 5px; padding: 1px 7px; font-size: 12px; margin: 0 6px; color: var(--sub); }
 .tc-move { color: var(--sub); font-weight: 400; margin-left: 4px; }
 .tc-need { font-size: 12px; font-weight: 700; }
@@ -1966,12 +1918,6 @@ input:focus, select:focus, textarea:focus {
   .session-info { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
   .uep-create-head { padding: 18px 16px 0; }
   .uep-form { padding: 15px 16px 18px; }
-  .tune-ai-head { padding: 18px 16px 0; }
-  .tune-ai .tune-writeback { padding: 16px 16px 0; }
-  .tune-ai-actions { margin-left: -16px; margin-right: -16px; padding: 13px 16px; flex-wrap: wrap; }
-  .tune-ai-sent { width: 100%; margin-left: 0; }
-  .tune-ai-result-head { margin-left: 16px; margin-right: 16px; }
-  .tune-ai > .tune-cards { margin-left: 16px; margin-right: 16px; }
   .session-card-head .session-id { width: 100%; max-width: 100%; margin-left: 0; }
   .session-hero { padding: 16px; }
   .diag-checks-table thead th { top: var(--topbar-offset); }
@@ -2001,7 +1947,6 @@ input:focus, select:focus, textarea:focus {
   .party-calc { width: 34px; height: 34px; opacity: 1; }
   .party-copy-row .second-btn { min-height: 36px; }
   .speed-presets button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
-  .tune-add-move { min-height: 40px; }
   .linkish { min-height: 36px; display: inline-flex; align-items: center; padding: 6px 4px; }
   .actual-topk-presets > button, .actual-topk-presets input { min-height: 36px; height: 36px; }
 }
@@ -2280,31 +2225,7 @@ input:focus, select:focus, textarea:focus {
 .calc-duel { display: grid; gap: 14px; }
 
 /* -- result band ------------------------------------------------------------------ */
-.duel-top { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
-.duel-col { display: grid; gap: 10px; min-width: 0; }
 
-.duel-moves { display: grid; gap: 4px; min-width: 0; }
-.duel-moves-cap {
-  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
-  font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--sub);
-}
-.duel-moves-cap strong { color: var(--ink); font-size: 12.5px; }
-.duel-moves-cap .muted { text-transform: none; letter-spacing: 0; font-size: 11.5px; }
-.duel-move-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; min-width: 0; padding: 7px 11px; cursor: pointer; text-align: left;
-  border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink);
-  font: inherit; font-size: 13px;
-}
-.duel-move-row:disabled { cursor: default; opacity: 0.55; }
-.duel-move-row:not(:disabled):hover { border-color: var(--line-strong); }
-.duel-move-row.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
-.duel-move-name {
-  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.duel-move-pct { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap;
-  font-weight: 650; }
 .duel-move-ko { font-size: 11px; font-weight: 600; color: var(--sub); }
 /* The move list needs the KO ramp as TEXT, not as a filled cell: a column of solid blocks would
    out-shout the result card under it, and the grid at the bottom already owns the filled version. */
@@ -2326,30 +2247,10 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--panel); box-shadow: var(--shadow);
 }
-.duel-empty { text-align: center; padding: 18px 0; font-size: 13px; }
 
 /* -- HP bar ------------------------------------------------------------------------ */
-.hp-bar-card { display: grid; gap: 6px; }
-.hp-bar-mon {
-  display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center;
-  gap: 8px; min-width: 0;
-}
 .hp-bar-sprite { width: 40px; height: 40px; flex: none; object-fit: contain; }
 .hp-bar-sprite.placeholder { border-radius: 8px; background: var(--panel-2); }
-.hp-bar-name { font-weight: 700; font-size: 13.5px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
-.hp-bar-heading { display: grid; grid-template-rows: 28px 38px; min-width: 0; }
-.hp-bar-title-line { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-.hp-bar-title-line .hp-bar-name { flex: 0 1 auto; max-width: 38%; }
-.duel-head-nums { display: inline-flex; align-items: baseline; gap: 7px; min-width: 0; }
-.duel-head-nums strong { font-size: clamp(18px, 2.2vw, 23px); line-height: 1; white-space: nowrap; }
-.duel-head-nums .muted { font-size: 11.5px; white-space: nowrap; }
-.duel-head-verdict {
-  box-sizing: border-box; flex: 0 1 auto; min-width: 108px; max-width: 56%; height: 36px;
-  display: flex; align-items: center; padding: 4px 9px; border-radius: 8px;
-  line-height: 1.25; white-space: normal; overflow: hidden;
-}
-.duel-head-verdict:empty { visibility: hidden; }
 .hp-bar-track {
   position: relative; height: 34px; border-radius: 9px; overflow: hidden;
   background: var(--panel-3); border: 1px solid var(--line);
@@ -2456,23 +2357,11 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* -- per-mon editor ----------------------------------------------------------------- */
-.duel-editors { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .mon-editor { display: grid; gap: 11px; padding: 16px; min-width: 0; }
-.mon-editor-head { display: flex; align-items: center; gap: 8px; }
-.mon-editor-head strong { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--sub); }
 .mon-editor-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .ghost-btn.tiny { padding: 3px 9px; font-size: 11.5px; border-radius: 7px; }
 
-.mon-editor-id { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: center; }
-.mon-editor-art { display: grid; place-items: center; height: 96px; border-radius: 10px;
-  background: var(--panel-2); }
-.mon-editor-sprite { max-width: 88px; max-height: 88px; object-fit: contain; }
-.mon-editor-sprite.placeholder { display: block; width: 60px; height: 60px; border-radius: 10px;
-  background: var(--panel-3); }
-.mon-editor-idfields { display: grid; gap: 7px; min-width: 0; }
-.mon-editor-idfields > label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
-.mon-editor-idfields select { min-height: 33px; padding: 5px 9px; border: 1px solid var(--line);
+.mon-editor-namerow select { min-height: 33px; padding: 5px 9px; border: 1px solid var(--line);
   border-radius: 8px; background: var(--panel-2); color: var(--ink); }
 .mon-editor-types { display: flex; gap: 6px; flex-wrap: wrap; }
 .mon-editor-cap { font-size: 12px; color: var(--sub); }
@@ -2506,7 +2395,6 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink); }
 .hp-range { grid-column: 1 / -1; width: 100%; accent-color: var(--brand); cursor: pointer; }
 
-.move-slots { display: grid; gap: 5px; }
 .move-slot { display: grid; grid-template-columns: 22px 1fr auto; gap: 6px; align-items: center; }
 .move-slot-mark { display: grid; place-items: center; }
 .move-slot-dot { display: block; width: 9px; height: 9px; border-radius: 50%;
@@ -2554,10 +2442,7 @@ input:focus, select:focus, textarea:focus {
   .duel-actions { grid-auto-flow: column; justify-content: start; padding-top: 0; }
 }
 @media (max-width: 860px) {
-  .duel-top, .duel-editors, .field-sides { grid-template-columns: 1fr; }
-  .mon-editor-id { grid-template-columns: 76px 1fr; }
-  .mon-editor-art { height: 76px; }
-  .mon-editor-sprite { max-width: 68px; max-height: 68px; }
+  .field-sides { grid-template-columns: 1fr; }
   .duel-actions { grid-auto-flow: row; }
   .duel-actions .ghost-btn { width: 100%; }
 }
@@ -2571,8 +2456,8 @@ input:focus, select:focus, textarea:focus {
 .mon-editor label, .field-panel label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
 .mon-editor .mini-fields select,
 .mon-editor .mini-fields input:not([type="checkbox"]):not([type="radio"]),
-.mon-editor-idfields select,
-.mon-editor-idfields input:not([type="checkbox"]):not([type="radio"]),
+.mon-editor-namerow select,
+.mon-editor-namerow input:not([type="checkbox"]):not([type="radio"]),
 .field-panel select {
   width: 100%; min-height: 38px; padding: 7px 10px;
   border: 1px solid var(--line); border-radius: var(--radius-sm);
@@ -2589,8 +2474,8 @@ input:focus, select:focus, textarea:focus {
 
 /* The editor already shows the calculated form as full art, so the picker's own thumbnail would be
    a second, DIFFERENT sprite of the same mon (base vs. activated Mega) sitting next to it. */
-.mon-editor-idfields .mon-picker-slot { display: none; }
-.mon-editor-idfields .mon-picker { display: block; }
+.mon-editor-namerow .mon-picker-slot { display: none; }
+.mon-editor-namerow .mon-picker { display: block; }
 .mega-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .mega-note .mega-name { font-size: 12px; color: var(--sub); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
@@ -2609,7 +2494,6 @@ input:focus, select:focus, textarea:focus {
 
 /* An empty slot is still a row: keeping the height constant stops the list from changing shape as
    moves are filled in, which is exactly when the percentages beside it are being compared. */
-.duel-move-row { min-height: 36px; }
 
 /* The offer is a suggestion, not a state: it uses the warning hue the page reserves for "look at
    this", and disappears the moment the field it fills is set. */
@@ -2625,14 +2509,8 @@ input:focus, select:focus, textarea:focus {
 /* ==== calc workspace, second pass ================================================= */
 
 /* -- move list: the row is the click target, so the name is plain text -------------- */
-.duel-moves-cap { justify-content: flex-start; }
-.duel-move-name { font-weight: 600; }
 
 /* -- an emptied HP bar has to say so ------------------------------------------------ */
-.hp-bar-out {
-  position: absolute; left: 11px; top: 0; line-height: 34px;
-  font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; color: var(--danger);
-}
 
 /* -- caveats sit under BOTH cards, so neither column stretches ---------------------- */
 .duel-caveats { display: grid; gap: 6px; }
@@ -2722,8 +2600,6 @@ input:focus, select:focus, textarea:focus {
 /* -- 1. the two cards are one row, so they end at the same line ---------------------
    Line counts differ between sides (a two-line English verdict, a wrapped summary), and a card
    sized to its own content drags every row under it out of step. Stretch instead. */
-.duel-top { align-items: stretch; }
-.duel-col { grid-template-rows: auto 1fr; }
 .duel-result { align-content: start; }
 
 /* The 16 rolls are reference detail, so they ride in the control row rather than owning one.
@@ -2798,9 +2674,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* -- 7. blank slots show the bundled placeholder, not a grey rectangle ---------------- */
-.team-chip-empty, .mon-editor-sprite, .hp-bar-sprite { object-fit: contain; }
+.team-chip-empty, .hp-bar-sprite { object-fit: contain; }
 .team-chip-btn img.team-chip-empty { width: 30px; height: 30px; opacity: 0.55; }
-img.mon-editor-sprite[alt=""] { opacity: 0.5; }
 img.hp-bar-sprite[alt=""] { opacity: 0.5; }
 
 /* The card keeps the same rows whether or not it has a result, so the only remaining source of a
@@ -2817,7 +2692,6 @@ img.hp-bar-sprite[alt=""] { opacity: 0.5; }
 
 /* The header reserves a two-line verdict row. Switching between short and long localized KO prose
    therefore never resizes the result card. */
-.hp-bar-mon { height: 66px; }
 /* The prose renderer puts inline portraits in this line, and those measure a pixel taller than the
    plain text the empty state shows — enough to move everything below when you switch mons. Pin the
    line box and cap the chips to it. */
@@ -2827,10 +2701,7 @@ img.hp-bar-sprite[alt=""] { opacity: 0.5; }
 /* A `1fr` track still refuses to shrink below its content's min-content width, and the no-wrap roll
    row has a wide one. Cap the tracks, and let that row wrap on a phone — "one line" is a two-column
    desktop rule, not a reason to push the page sideways. */
-.duel-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.duel-editors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 860px) {
-  .duel-top, .duel-editors { grid-template-columns: minmax(0, 1fr); }
   .duel-rolls { flex-wrap: wrap; }
 }
 
@@ -2963,28 +2834,14 @@ input.stat-cur.hp-cur {
 /* ==== calc workspace, seventh pass ================================================ */
 
 /* -- the four slots live in the card, as a 2x2 of BUTTONS ---------------------------
-   Type colour arrives as an edge and a wash, never as a flat fill: Dark, Ghost, Dragon and Fighting
-   are dark enough that text on the solid colour stops being readable, and a move list that is only
-   legible for half the type chart is not a type system. The page's own ink stays. */
+   Type colour is reserved for the SELECTED slot. Four coloured cells tell the reader which types
+   the mon carries — a fact the move names already carry — while hiding the one thing the card has
+   to answer: which slot the health bar, the band, the roll and the sentence below are about. The
+   three it is not about stay achromatic, so the live one is the only colour on the card.
+
+   Even on the selected cell the colour arrives as an edge and a wash, never as a flat fill: Dark,
+   Ghost, Dragon and Fighting are dark enough that text on the solid colour stops being readable. */
 .duel-move-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 6px; }
-.duel-move-cell {
-  --mv: var(--line-strong);
-  display: grid; gap: 3px; min-width: 0; padding: 7px 10px 7px 11px; cursor: pointer;
-  text-align: left; font: inherit; font-size: 12.5px; color: var(--ink);
-  border: 1px solid var(--line); border-left: 4px solid var(--mv); border-radius: 9px;
-  background: color-mix(in srgb, var(--mv) 7%, var(--panel));
-}
-.duel-move-cell:disabled { cursor: default; --mv: var(--line); opacity: 0.6; }
-.duel-move-cell:not(:disabled):hover { background: color-mix(in srgb, var(--mv) 14%, var(--panel)); }
-.duel-move-cell.on {
-  border-color: var(--mv); background: color-mix(in srgb, var(--mv) 17%, var(--panel));
-  box-shadow: 0 0 0 1px var(--mv) inset;
-}
-.duel-move-cell .duel-move-name {
-  font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.duel-move-cell .duel-move-pct { display: flex; justify-content: space-between; gap: 6px; }
-.duel-move-cell .duel-move-ko { font-size: 10.5px; }
 
 /* -- summary and its copy control share a line ------------------------------------- */
 .duel-summary-row { display: flex; align-items: center; gap: 10px; }
@@ -3223,8 +3080,6 @@ a.ko-nm:hover { color: var(--brand-strong); }
    The same shape as the result card's move grid, so the slot you type into and the button you then
    press sit in the same place. The power number leaves with the third column: the dropdown prints
    it beside every option, which is where it is actually read. */
-.move-slots { grid-template-columns: 1fr 1fr; gap: 6px 8px; }
-.move-slots > .mon-editor-cap, .move-slots > .muted { grid-column: 1 / -1; }
 .move-slot { grid-template-columns: 20px 1fr; gap: 5px; }
 
 /* -- 3. two value columns: what the build is, and what it is playing at --------------- */
@@ -3257,18 +3112,9 @@ input.stat-cur.hp-cur { text-align: center; }
 
 /* -- 4. the selected move has to be unmistakable -------------------------------------
    It decides every number under it — the health bar, the band, the roll, the sentence — so "which
-   one is live" cannot be a shade apart from its three neighbours. Ring, deeper wash, a thicker type
-   edge and a heavier name, all at once: the pale types carry it on shape, the dark ones on colour. */
-.duel-move-cell { transition: background-color 120ms ease, box-shadow 130ms ease; }
-.duel-move-cell.on {
-  border-color: color-mix(in srgb, var(--mv) 70%, var(--line));
-  border-left-width: 7px;
-  background: color-mix(in srgb, var(--mv) 26%, var(--panel));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mv) 62%, transparent),
-              0 2px 8px color-mix(in srgb, var(--mv) 26%, transparent);
-}
-.duel-move-cell.on .duel-move-name { font-weight: 800; color: var(--ink); }
-.duel-move-cell.on .duel-move-ko { color: var(--ink); }
+   one is live" cannot be a shade apart from its three neighbours. It is the ONLY cell that wears
+   its move's type: ring, wash, a thicker type edge and a heavier name, all at once, against three
+   achromatic siblings. The pale types carry it on shape, the dark ones on colour. */
 
 @media (max-width: 720px) {
   .duel-rolls { flex-wrap: wrap; }
@@ -3324,7 +3170,14 @@ input.stat-cur.hp-cur { text-align: center; }
 /* Speed query cards mirror custom opponents; both columns grow downward independently. */
 .speed-side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .speed-side-column { min-width: 0; }
-.speed-side-head { margin: 0 0 8px; }
+/* The append control lives on each column's last card; an emptied opponent column keeps a slim
+   stand-in so the side can still be refilled. */
+.speed-row .side-actions .speed-add { white-space: nowrap; }
+.speed-add-empty {
+  min-height: 42px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  background: transparent; color: var(--brand); font-weight: 600; cursor: pointer;
+}
+.speed-add-empty:hover { border-color: var(--brand); background: var(--brand-soft); }
 .speed-side-cards { display: grid; gap: 10px; }
 .speed-table-target { margin-left: 0; }
 .speed-table-feedback { margin: -4px 0 10px; border: 1px solid var(--line); border-radius: 8px; }
@@ -3346,7 +3199,7 @@ input.stat-cur.hp-cur { text-align: center; }
   font: 600 12px/1.2 var(--font-ui);
 }
 .calc-command-bar .fld-group { align-self: center; align-items: center; gap: 10px; }
-.calc-command-bar .primary-btn, .calc-command-bar .tune-solve-btns {
+.calc-command-bar .primary-btn {
   align-self: center; margin-left: auto;
 }
 .tune-command > .tune-note, .tune-command > .tune-proposal { margin-top: 10px; }
@@ -3433,26 +3286,7 @@ input.stat-cur.hp-cur { text-align: center; }
    focusable warning glyph so exceptional mechanics remain available without resizing both cards. */
 .duel-result { grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .duel-result > * { min-width: 0; }
-.hp-bar-card { gap: 4px; }
-.hp-bar-mon { height: 44px; grid-template-columns: 42px minmax(0, 1fr); align-items: center; }
 .hp-bar-sprite { width: 42px; height: 42px; }
-.hp-bar-heading {
-  display: block; height: auto; min-width: 0;
-}
-.hp-bar-title-line {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0;
-}
-.hp-bar-name-cluster {
-  display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1 1 auto;
-}
-.hp-bar-title-line .hp-bar-name {
-  flex: 0 1 auto; max-width: 100%; font-size: 19px; line-height: 1.1; font-weight: 800;
-}
-.duel-head-nums {
-  flex: none; display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap;
-}
-.duel-head-nums strong { font-size: 19px; line-height: 1.1; letter-spacing: -.025em; }
-.duel-head-nums .muted { font-size: 11px; }
 .hp-mega-tag {
   flex: none; margin-left: 0; height: 17px; padding: 0 5px; display: grid; place-items: center;
   font-size: 8.5px; line-height: 1;
@@ -3484,7 +3318,6 @@ input.stat-cur.hp-cur { text-align: center; }
 .duel-summary-row .duel-summary { white-space: nowrap; text-overflow: ellipsis; }
 .duel-move-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 8px; }
 .duel-result { gap: 6px; padding: 7px 14px 11px; }
-.duel-move-cell { padding-top: 7px; padding-bottom: 7px; }
 .duel-line {
   height: 49px; min-height: 49px; max-height: 49px;
   padding-top: 7px; padding-bottom: 7px;
@@ -3681,10 +3514,6 @@ input.stat-cur.hp-cur { text-align: center; }
    identity controls; type badges sit with the Pokémon label and Mega sits beside the form label. */
 .mon-editor { gap: 8px; padding: 12px 14px; }
 .mon-editor-form-heading { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 22px; }
-.mon-editor-id { grid-template-columns: 54px minmax(0, 1fr); gap: 10px; }
-.mon-editor-art { height: 54px; }
-.mon-editor-sprite { max-width: 48px; max-height: 48px; }
-.mon-editor-idfields { gap: 0; }
 .mon-editor-namerow.split { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
 .mon-editor-label-line { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 22px; }
 .mon-editor-label-line .mon-editor-types { display: inline-flex; align-items: center; gap: 3px; }
@@ -3713,14 +3542,605 @@ input.stat-cur.hp-cur { text-align: center; }
   .field-weather { grid-column: 1; grid-row: 2; flex-wrap: wrap; justify-content: flex-end; }
   .field-terrain { grid-column: 2; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
   .duel-teams .field-global select { min-width: 84px; }
-  .duel-head-nums { flex-direction: row; align-items: baseline; gap: 5px; }
-  .duel-head-nums strong, .hp-bar-title-line .hp-bar-name { font-size: 18px; }
   .hp-warning::after { max-width: min(260px, 70vw); }
-  .hp-bar-mon { height: 44px; }
   .duel-summary-row {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 6px;
   }
   .duel-summary-row .duel-summary { grid-column: 1 / -1; }
   .duel-summary-verdict { grid-column: 1; grid-row: 2; justify-self: start; }
   .duel-summary-row .ghost-btn { grid-column: 2; grid-row: 2; }
+}
+
+/* ==== calc workspace: rosters → results → builds ======================================= */
+/* The roster bar opens the page. It is framed by a hairline and left unfilled: the weather art is
+   the only thing painted on it, and a terrain adds its colour as the bottom edge. */
+.duel-teams {
+  padding: 8px 12px 9px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: transparent;
+}
+.duel-teams[class*="terrain-"] { box-shadow: inset 0 -3px 0 var(--terrain-edge); }
+.duel-teams > .team-bar:first-child { margin-left: 0; }
+.duel-teams > .team-bar:last-child { margin-right: 0; }
+/* With the bar at the top of the page, the condition flyout opens downward, over the results. */
+.field-flyout { top: calc(100% + 6px); bottom: auto; }
+.field-flyout::after { top: auto; bottom: 100%; }
+
+/* Each side is one panel: its result on top, the build that produced it underneath. The two halves
+   are told apart by a hairline and a faint wash on the build, not by two separate cards. */
+.duel-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.duel-side { display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+.duel-side > .duel-result {
+  padding: 12px 16px 12px; border: 0; border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent; box-shadow: none;
+}
+.duel-side > .mon-editor {
+  align-content: start; padding: 13px 16px 16px; border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: color-mix(in srgb, var(--panel-2) 55%, var(--panel));
+}
+.duel-result { gap: 8px; }
+/* The caveat glyph sits right after the sentence it qualifies; the verdict keeps the far end. */
+.duel-summary-row .duel-summary { flex: 0 1 auto; }
+.duel-summary-row .hp-warning { flex: none; }
+.duel-summary-row .duel-summary-verdict { margin-left: auto; }
+
+/* -- headline: who, and what the selected hit does ------------------------------------- */
+.duel-head {
+  display: grid; grid-template-columns: 50px minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  min-width: 0; height: 52px;
+}
+/* The portrait sits on a soft wash of its primary type, so the two sides read apart at a glance. */
+.duel-portrait {
+  --mt: var(--line-strong);
+  display: grid; place-items: center; width: 50px; height: 50px; border-radius: 14px;
+  background: radial-gradient(circle at 50% 60%, color-mix(in srgb, var(--mt) 30%, var(--panel)) 0%,
+    color-mix(in srgb, var(--mt) 10%, var(--panel)) 72%);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mt) 26%, transparent);
+}
+.duel-portrait .hp-bar-sprite { width: 44px; height: 44px; }
+.duel-ident { display: grid; gap: 3px; min-width: 0; }
+.duel-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.duel-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 19px; line-height: 1.15; font-weight: 800; letter-spacing: -.01em;
+}
+.duel-types { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.duel-types .type-badge { gap: 3px; font-size: 11.5px; color: var(--sub); }
+.duel-types .type-badge img { width: 15px; height: 15px; }
+.duel-dmg { display: grid; justify-items: end; gap: 2px; white-space: nowrap; }
+.duel-dmg-pct { font-size: 22px; line-height: 1.05; font-weight: 800; letter-spacing: -.02em; }
+.duel-dmg-pct small { margin-left: 1px; font-size: 13px; font-weight: 700; }
+.duel-dmg-pct.ko-text-none { color: var(--sub); }
+.duel-dmg-hp { font-size: 12px; font-weight: 650; color: var(--sub); }
+.duel-dmg-hp small { font-size: 10.5px; font-weight: 600; }
+
+/* -- health: the bar at the selected roll, the band across all sixteen ---------------------- */
+.hp-bar-track {
+  position: relative; height: 30px; overflow: hidden; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel-3);
+}
+.hp-bar-fill { border-radius: 7px 0 0 7px; }
+.hp-bar-fill.ok { background: linear-gradient(180deg, color-mix(in srgb, var(--success) 58%, var(--panel)),
+  color-mix(in srgb, var(--success) 76%, var(--panel))); }
+.hp-bar-fill.warn { background: linear-gradient(180deg, color-mix(in srgb, var(--warning) 55%, var(--panel)),
+  color-mix(in srgb, var(--warning) 74%, var(--panel))); }
+.hp-bar-fill.low { background: linear-gradient(180deg, color-mix(in srgb, var(--danger) 55%, var(--panel)),
+  color-mix(in srgb, var(--danger) 74%, var(--panel))); }
+/* Where the opposing roll range can leave this mon: a hatched span, so the solid fill still reads
+   as the one roll being asked about. */
+.hp-bar-band {
+  position: absolute; top: 0; bottom: 0; pointer-events: none;
+  background: repeating-linear-gradient(135deg,
+    color-mix(in srgb, var(--ink) 16%, transparent) 0 3px, transparent 3px 7px);
+  border-left: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+}
+.hp-bar-tag {
+  position: absolute; left: 7px; top: 50%; transform: translateY(-50%);
+  padding: 1px 7px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em;
+  color: var(--ink); background: color-mix(in srgb, var(--panel) 78%, transparent);
+}
+.hp-bar-tag.out { color: #fff; background: var(--danger); letter-spacing: .02em; }
+.hp-bar-read {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end;
+  gap: 4px; padding: 0 10px; font-weight: 800;
+}
+.hp-bar-read strong { font-size: 17px; line-height: 1; }
+.hp-bar-max { font-size: 12px; line-height: 1; color: var(--sub); font-weight: 700; }
+.hp-bar-pct {
+  margin-left: 4px; padding: 1px 6px; border-radius: 6px; font-size: 11px; line-height: 1.3;
+  font-weight: 750; color: var(--ink); background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+/* -- move cells, shared with the bulk tool ------------------------------------------------ */
+.move-cell {
+  --mv: var(--line-strong);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px;
+  min-width: 0; min-height: 40px; padding: 3px 10px 3px 4px; cursor: pointer;
+  border: 1px solid var(--line); border-left: 5px solid color-mix(in srgb, var(--mv) 45%, var(--line));
+  border-radius: 9px; background: var(--panel);
+  transition: background-color 120ms ease, box-shadow 130ms ease, border-color 130ms ease;
+}
+.move-cell:hover { border-color: var(--line-strong); border-left-color: color-mix(in srgb, var(--mv) 70%, var(--line)); }
+/* The selected move decides every number around it, so it is the ONLY cell that wears its type in
+   full: edge, ring and wash. The pale types carry it on shape, the dark ones on colour. */
+.move-cell.on {
+  border-color: color-mix(in srgb, var(--mv) 70%, var(--line)); border-left-color: var(--mv);
+  background: color-mix(in srgb, var(--mv) 20%, var(--panel));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mv) 55%, transparent),
+              0 2px 8px color-mix(in srgb, var(--mv) 22%, transparent);
+}
+.move-cell .move-slot { grid-template-columns: 20px auto; gap: 5px; }
+/* One box width for every move on both tabs and in all three languages, so switching language never
+   moves the grid. It fits roughly nine in ten names in every language (Chinese nearly all of them);
+   the longer rest ellipsise, with the full name in the tooltip. Everything outside the box is the
+   cell's selection area.
+   At rest the box is invisible — no outline, the cell's own fill — so a move reads as a name, not a
+   form; it turns into a field only while being typed in. The border stays (transparent) so the text
+   never shifts between the two. */
+.move-cell .move-slot input {
+  width: 8.4em; height: 28px; min-height: 28px; padding: 0 7px;
+  border: 1px solid transparent; border-radius: 6px; background: transparent;
+  font-weight: 650; font-size: 13px; text-overflow: ellipsis; cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+/* Chrome reserves room inside a datalist input for its dropdown arrow; in a box this short that room
+   is what the name needs. The suggestions still open as you type. */
+.move-cell .move-slot input::-webkit-calendar-picker-indicator { display: none !important; }
+.move-cell .move-slot input:focus {
+  outline: none; cursor: text; background: var(--panel);
+  border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft);
+}
+.move-cell.on .move-slot input { font-weight: 800; }
+.move-cell-read {
+  justify-self: end; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end;
+  column-gap: 6px; row-gap: 0; min-width: 0; line-height: 1.3; white-space: nowrap;
+  font-size: 12.5px; font-weight: 700;
+}
+.move-cell-read .duel-move-ko { font-size: 11px; }
+.move-cell.on .move-cell-read .duel-move-ko { color: var(--ink); }
+.move-cell.pending .move-cell-read { opacity: .5; }
+.duel-move-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+@media (max-width: 860px) {
+  .duel-sides { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  /* Species and forme stack on a phone: side by side, the forme heading and its two actions have
+     no room left and wrap letter by letter. */
+  .mon-editor-namerow.split { grid-template-columns: minmax(0, 1fr); }
+  .duel-head { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 9px; }
+  .duel-portrait { width: 44px; height: 44px; }
+  .duel-portrait .hp-bar-sprite { width: 38px; height: 38px; }
+  .duel-name { font-size: 17px; }
+  .duel-dmg-pct { font-size: 18px; }
+  .duel-move-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .field-flyout { top: calc(100% + 6px); bottom: auto; }
+}
+
+/* ==== durability workbench (耐久调整) ============================================== */
+/* Rosters → results → builds, the same order as the damage calculator. The two builds reuse the
+   calculator's editor shell (.mon-editor, .mon-editor-namerow, .mon-build-row, .move-cell);
+   everything else is specific to this tool and namespaced `tw-`. */
+.tw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+
+/* -- roster bar ------------------------------------------------------------------------ */
+/* Hairline frame, no fill — the same treatment as the calculator's roster bar. The middle holds the
+   four solver-supported conditions in the open instead of a folded condition console. */
+.tw-strip {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end;
+  gap: 16px; min-width: 0; padding: 8px 12px 9px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: transparent;
+}
+.tw-roster { position: relative; display: grid; grid-template-rows: 24px 48px; gap: 2px; min-width: 0; }
+.tw-roster-head { display: flex; align-items: center; gap: 6px; min-width: 0; height: 24px; }
+.tw-roster-head strong { font-size: 12px; color: var(--ink); white-space: nowrap; }
+.tw-roster-head .num { margin-right: 2px; font-size: 11px; color: var(--sub); }
+.tw-roster-list { display: flex; align-items: flex-end; gap: 6px; min-width: 0; flex-wrap: nowrap; }
+.tw-roster.foe .tw-roster-head, .tw-roster.foe .tw-roster-list { flex-direction: row-reverse; }
+.tw-text-btn {
+  border: 1px dashed var(--line); border-radius: 6px; padding: 1px 7px; background: transparent;
+  cursor: pointer; color: var(--brand-strong); font: inherit; font-size: 11.5px; font-weight: 650;
+  white-space: nowrap;
+}
+.tw-text-btn:hover { border-color: var(--brand); }
+/* The paste popover opens under its roster, toward the page edge that roster sits on. */
+.tw-roster .paste-pop { top: calc(100% + 6px); }
+.tw-roster.mine .paste-pop { left: 0; right: auto; }
+.tw-roster.foe .paste-pop { left: auto; right: 0; }
+
+.tw-field { display: grid; grid-template-rows: 30px 30px; justify-items: center; align-items: center; gap: 8px; }
+.tw-field-line { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+.tw-field label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub); }
+.tw-field select {
+  height: 30px; min-width: 104px; padding: 0 26px 0 9px; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink);
+}
+.tw-format { padding: 2px; }
+.tw-format button { padding: 3px 14px; font-size: 12.5px; }
+.tw-screens { gap: 6px; font-size: 12px; color: var(--sub); }
+.tw-screens > span { margin-right: 2px; }
+.tw-screens button {
+  height: 28px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; white-space: nowrap;
+}
+.tw-screens button:hover { border-color: var(--brand); }
+.tw-screens button.on {
+  border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); font-weight: 700;
+}
+
+/* -- shared vocabulary -------------------------------------------------------------------- */
+.tw-matchup { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; font-size: 13.5px; }
+.tw-who { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.tw-matchup img.mini { width: 28px; height: 28px; object-fit: contain; }
+.tw-matchup-move {
+  padding: 1px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel-2);
+  font-size: 12px; font-weight: 650; white-space: nowrap;
+}
+.tw-arrow { color: var(--sub); }
+.tw-matchup .tw-swap { margin-left: 4px; padding: 3px 9px; font-size: 12px; white-space: nowrap; }
+.tw-state {
+  display: inline-flex; align-items: center; justify-content: center; padding: 2px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.tw-state.pass { color: var(--success); background: color-mix(in srgb, var(--success) 12%, var(--panel)); }
+.tw-state.fail { color: var(--danger); background: color-mix(in srgb, var(--danger) 11%, var(--panel)); }
+.tw-state.warn { color: var(--warning); background: color-mix(in srgb, var(--warning) 13%, var(--panel)); }
+.tw-state.idle { color: var(--sub); background: var(--panel-2); }
+.tw-hits button { padding: 4px 12px; font-size: 12px; }
+.tw-target-select {
+  min-width: 0; height: 32px; padding: 0 8px; font: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel); color: var(--ink);
+}
+/* The verdict's pin button and the solver's button are one box: same size, same right edge, so they
+   stack as one column and swapping a label never resizes anything. */
+.tw-action {
+  flex: none; width: 156px; height: 38px; padding: 0 12px; cursor: pointer;
+  border: 1px solid var(--brand); border-radius: 9px; background: var(--brand); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--brand) 22%, transparent);
+  transition: background-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+}
+.tw-action:hover:not(:disabled) { background: var(--brand-strong); border-color: var(--brand-strong); }
+.tw-action.done {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--line)); box-shadow: none;
+  background: color-mix(in srgb, var(--success) 9%, var(--panel)); color: var(--success);
+}
+.tw-action.done:hover:not(:disabled) { background: color-mix(in srgb, var(--success) 14%, var(--panel)); }
+.tw-action:disabled { opacity: .5; cursor: default; box-shadow: none; }
+
+/* -- verdict -------------------------------------------------------------------------------- */
+.tw-verdict { display: grid; gap: 12px; padding: 14px 18px 16px; }
+.tw-verdict-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.tw-verdict-controls { display: flex; align-items: center; gap: 10px; }
+.tw-target-field { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--sub); }
+.tw-verdict-controls .tw-state { min-width: 64px; }
+.tw-verdict-body {
+  display: grid; grid-template-columns: 200px minmax(0, 1fr) 156px; gap: 24px; align-items: center;
+  min-height: 62px;
+}
+.tw-verdict-empty { grid-column: 1 / 3; color: var(--sub); font-size: 13px; }
+.tw-rate { display: grid; gap: 5px; }
+.tw-rate b { font-size: 38px; line-height: 1; font-weight: 800; letter-spacing: -.03em; }
+.tw-rate b.pass { color: var(--success); }
+.tw-rate b.fail { color: var(--danger); }
+.tw-rate-cap { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; font-weight: 650; white-space: nowrap; }
+.tw-rate-cap small { font-size: 11.5px; font-weight: 500; color: var(--sub); }
+.tw-rolls { display: grid; gap: 7px; min-width: 0; }
+.tw-roll-strip {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; height: 30px;
+}
+/* Each cell is one first-hit roll: green for the share of outcomes survived, red for the rest. */
+.tw-roll-strip i {
+  position: relative; overflow: hidden; border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 72%, var(--panel));
+}
+.tw-roll-strip i::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--alive, 0%);
+  background: color-mix(in srgb, var(--success) 74%, var(--panel));
+}
+.tw-roll-scale { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; }
+.tw-verdict.pending .tw-rate b, .tw-verdict.pending .tw-roll-strip { opacity: .55; }
+
+/* -- targets + solver ------------------------------------------------------------------------- */
+.tw-targets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px 18px; }
+.tw-section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.panel .tw-section-head h2 {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; border: 0;
+  font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--ink);
+}
+.tw-section-head h2 .num {
+  min-width: 20px; padding: 0 7px; border-radius: 999px; text-align: center;
+  background: var(--panel-2); color: var(--sub); font-size: 11.5px; font-weight: 700;
+}
+.tw-section-head p { margin: 5px 0 0; max-width: 820px; color: var(--sub); font-size: 12.5px; line-height: 1.65; }
+/* A fixed-height tray: adding or dropping a target scrolls inside it and never moves the page. */
+.tw-chips {
+  display: flex; align-items: center; gap: 8px; height: 50px; padding: 0 8px; overflow-x: auto;
+  overflow-y: hidden; scrollbar-width: thin; border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-2) 70%, var(--panel));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tw-chips-empty {
+  min-width: 0; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--sub); font-size: 12.5px;
+}
+.tw-chip {
+  flex: none; display: inline-flex; align-items: center; height: 36px; overflow: hidden;
+  border: 1px solid var(--line); border-left: 3px solid var(--line-strong); border-radius: 8px;
+  background: var(--panel);
+}
+.tw-chip.pass { border-left-color: var(--success); }
+.tw-chip.fail { border-left-color: var(--danger); }
+.tw-chip.on {
+  border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); background: var(--brand-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+.tw-chip.on.pass { border-left-color: var(--success); }
+.tw-chip.on.fail { border-left-color: var(--danger); }
+.tw-chip-main {
+  display: inline-flex; align-items: center; gap: 5px; height: 100%; padding: 0 6px 0 7px;
+  border: 0; background: transparent; cursor: pointer; color: var(--ink); font: inherit; font-size: 12.5px;
+}
+.tw-chip-main img.mini { width: 24px; height: 24px; object-fit: contain; }
+.tw-chip-main b { font-weight: 700; }
+.tw-chip-goal { margin-left: 3px; color: var(--sub); font-size: 11.5px; }
+.tw-chip-rate { margin-left: 4px; font-weight: 800; }
+.tw-chip-rate.pass { color: var(--success); }
+.tw-chip-rate.fail { color: var(--danger); }
+.tw-chip-x {
+  align-self: stretch; width: 26px; padding: 0; border: 0; border-left: 1px solid var(--line);
+  background: transparent; color: var(--sub); cursor: pointer; font-size: 11px;
+}
+.tw-chip-x:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.tw-solve {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding-top: 12px; border-top: 1px solid var(--line);
+}
+.tw-solve-copy {
+  display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--sub); font-size: 12.5px;
+}
+.tw-solve-copy strong { flex: none; color: var(--ink); font-size: 13px; }
+.tw-solve-copy .tw-state { flex: none; }
+.tw-solve-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tw-note { color: var(--sub); font-size: 12.5px; }
+.tw-solutions {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 540px), 1fr)); gap: 12px;
+  align-items: start; transition: opacity 120ms ease;
+}
+.tw-solutions.busy { opacity: .55; }
+.tw-solution {
+  display: grid; gap: 10px; align-content: start; padding: 12px 14px;
+  border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: var(--panel);
+}
+.tw-solution.pass { border-left-color: var(--success); }
+.tw-solution.warn { border-left-color: var(--warning); }
+.tw-solution.fail { border-left-color: var(--danger); }
+.tw-solution-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.tw-solution-head .tw-matchup { flex: 1 1 auto; font-size: 13px; }
+.tw-solution-head .tw-matchup img.mini { width: 26px; height: 26px; }
+.tw-solution-goal { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.tw-lanes { display: grid; gap: 4px; }
+.tw-lane {
+  display: grid; grid-template-columns: 112px minmax(0, 1fr) 74px 62px; gap: 10px; align-items: center;
+  padding: 6px 8px; border-radius: 7px; background: var(--panel-2); font-size: 12.5px;
+}
+.tw-lane.best {
+  background: color-mix(in srgb, var(--success) 9%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 32%, transparent);
+}
+.tw-lane.off { opacity: .6; }
+.tw-lane-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; }
+.tw-lane-name em {
+  padding: 0 6px; border-radius: 999px; font-style: normal; font-size: 10.5px; font-weight: 700;
+  background: var(--success); color: var(--panel);
+}
+.tw-lane-change { display: flex; flex-wrap: wrap; gap: 3px 12px; min-width: 0; color: var(--sub); }
+.tw-lane-change b { color: var(--ink); }
+.tw-lane-cost { text-align: right; font-weight: 700; white-space: nowrap; }
+.tw-lane-cost.saves { color: var(--success); }
+.tw-lane-act { display: flex; justify-content: flex-end; }
+.tw-lane-current { color: var(--success); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.tw-lane-note {
+  grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px 10px;
+  color: var(--warning); font-size: 11.5px; line-height: 1.5;
+}
+.tw-lane-note > span + span { color: var(--sub); }
+/* Probability rungs wrap on the left; the other hit count keeps its own column on the right. */
+.tw-ladder {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 6px 12px;
+  font-size: 11.5px;
+}
+.tw-ladder-probs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.tw-ladder-cap { margin-right: 2px; color: var(--sub); }
+.tw-rung {
+  display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 8px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub);
+}
+.tw-rung b { color: var(--ink); }
+.tw-rung.primary { border-color: var(--brand); color: var(--brand-strong); }
+.tw-rung.pass b { color: var(--success); }
+.tw-rung.fail b { color: var(--danger); }
+.tw-rung.other { border-style: dashed; }
+.tw-more {
+  justify-self: start; padding: 0; border: 0; background: none; cursor: pointer;
+  color: var(--brand); font: inherit; font-size: 12px;
+}
+.tw-solution-detail {
+  display: grid; gap: 3px; padding-top: 6px; border-top: 1px dashed var(--line);
+  color: var(--sub); font-size: 11.5px; line-height: 1.55;
+}
+
+/* -- builds ------------------------------------------------------------------------------- */
+.tw-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; min-width: 0; }
+.tw-mon { align-content: start; }
+.tw-id { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: end; gap: 12px; min-width: 0; }
+.tw-id .duel-portrait { width: 56px; height: 56px; }
+.tw-id .duel-portrait .hp-bar-sprite { width: 48px; height: 48px; }
+.tw-sp { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tw-sp-head { display: flex; align-items: baseline; gap: 12px; font-size: 12px; color: var(--sub); }
+.tw-sp-title { flex: none; }
+.tw-sp-total { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.tw-sp-total .sp-sum { font-size: 12.5px; }
+.tw-bulk {
+  display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 12px; min-width: 0;
+  margin-left: auto; font-size: 11.5px; cursor: help;
+}
+.tw-bulk b { margin-left: 3px; color: var(--ink); font-weight: 700; }
+/* name | SP box | slider | stage | value — the order the reader edits and then reads a stat in. */
+.tw-sp-row {
+  display: grid; grid-template-columns: 38px 44px minmax(0, 1fr) 50px 78px;
+  gap: 10px; align-items: center; min-width: 0;
+}
+.tw-sp-name { font-size: 12px; font-weight: 700; color: var(--sub); white-space: nowrap; }
+/* Same track grammar as the calculator's boost sliders: a 4px rail inset by the thumb radius, the
+   filled part in brand blue, and a tick where the loaded spread sat. */
+.tw-sp-slider { position: relative; display: flex; align-items: center; height: 22px; min-width: 0; }
+.tw-sp-track {
+  position: absolute; left: 7px; right: 7px; top: 50%; height: 4px; transform: translateY(-50%);
+  border-radius: 2px; background: var(--panel-3); pointer-events: none;
+}
+.tw-sp-track::after {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+  width: calc(100% * var(--fill, 0)); border-radius: 2px; background: var(--brand);
+}
+.tw-sp-base {
+  position: absolute; top: 4px; bottom: 4px; width: 2px; border-radius: 1px; pointer-events: none;
+  left: calc(7px + (100% - 14px) * var(--base, 0) - 1px);
+  background: color-mix(in srgb, var(--sub) 70%, transparent);
+}
+.tw-sp-slider input[type="range"] {
+  position: relative; -webkit-appearance: none; appearance: none;
+  width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer;
+}
+.tw-sp-slider input[type="range"]::-webkit-slider-runnable-track { height: 22px; background: transparent; }
+.tw-sp-slider input[type="range"]::-moz-range-track { height: 22px; background: transparent; }
+.tw-sp-slider input[type="range"]::-moz-range-progress { background: transparent; }
+.tw-sp-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%;
+  background: var(--panel); border: 2px solid var(--brand); box-shadow: 0 1px 3px rgb(16 26 47 / .22);
+}
+.tw-sp-slider input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%; box-sizing: border-box;
+  background: var(--panel); border: 2px solid var(--brand); box-shadow: 0 1px 3px rgb(16 26 47 / .22);
+}
+.tw-sp-slider input[type="range"]:focus-visible { outline: none; }
+.tw-sp-slider input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+.tw-sp-slider input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+.tw-sp-input {
+  width: 100%; min-width: 0; height: 30px; padding: 0 2px; text-align: center; font-weight: 650;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
+}
+/* A stage is narrow on purpose (-6..+6 is all it holds) and takes the direction's colour once moved. */
+.tw-stage-sel {
+  width: 100%; min-width: 0; height: 28px; padding: 0 0 0 4px; font: inherit; font-size: 12px; font-weight: 650;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--sub);
+}
+.tw-stage-sel.up {
+  color: var(--success); border-color: color-mix(in srgb, var(--success) 45%, var(--line));
+  background: color-mix(in srgb, var(--success) 8%, var(--panel));
+}
+.tw-stage-sel.down {
+  color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+}
+.tw-sp-final {
+  display: inline-flex; align-items: baseline; justify-content: flex-end; gap: 4px;
+  font-size: 14.5px; font-weight: 750;
+}
+.tw-sp-final b { font-weight: 750; }
+.tw-sp-final b.up { color: var(--success); }
+.tw-sp-final b.down { color: var(--danger); }
+/* A staged value is a battle state, not the build: filled chip, as in the calculator's 当前值. */
+.tw-sp-final b.boost-up, .tw-sp-final b.boost-down { padding: 0 5px; border-radius: 6px; }
+.tw-sp-final b.boost-up { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+.tw-sp-final b.boost-down { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.tw-sp-final small { min-width: 22px; font-size: 10.5px; font-weight: 700; text-align: left; color: var(--sub); }
+.tw-sp-final small.up { color: var(--success); }
+.tw-sp-final small.down { color: var(--danger); }
+.tw-sp-rest {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: center;
+  padding-top: 8px; border-top: 1px dashed var(--line);
+}
+/* name | SP box | short slider | unlabelled stage */
+.tw-stat-strip {
+  display: grid; grid-template-columns: auto 38px minmax(24px, 1fr) 44px; align-items: center; gap: 6px;
+  min-width: 0; font-size: 11.5px; color: var(--sub); white-space: nowrap;
+}
+.tw-stat-strip .tw-sp-input { height: 26px; }
+.tw-stat-strip .tw-stage-sel { height: 26px; font-size: 11.5px; }
+.tw-sp-slider.mini { height: 18px; }
+.tw-sp-slider.mini .tw-sp-track { left: 6px; right: 6px; height: 3px; }
+.tw-sp-slider.mini input[type="range"] { height: 18px; }
+.tw-sp-slider.mini input[type="range"]::-webkit-slider-runnable-track { height: 18px; }
+.tw-sp-slider.mini input[type="range"]::-moz-range-track { height: 18px; }
+.tw-sp-slider.mini input[type="range"]::-webkit-slider-thumb { width: 12px; height: 12px; margin-top: 3px; }
+.tw-sp-slider.mini input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; }
+.tw-offense {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: center;
+  padding-top: 10px; border-top: 1px solid var(--line);
+}
+.tw-offense .tw-stat-strip { font-size: 12px; }
+.tw-solution-state {
+  margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 11.5px; font-weight: 650;
+  color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, var(--panel));
+}
+.tw-moves { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+.tw-moves-hint { margin-left: 8px; font-size: 11px; opacity: .8; }
+.tw-moves-head { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.tw-moves-head .tw-bulk { color: var(--sub); }
+/* The pair to compare: the selected move's attack index and the bulk it presses on. */
+.tw-bulk .on { color: var(--ink); font-weight: 650; }
+.tw-bulk .on b { color: var(--brand-strong); }
+.tw-move-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+
+/* -- narrower screens ------------------------------------------------------------------------ */
+@media (max-width: 1180px) {
+  .tw-strip { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "mine foe" "field field"; }
+  .tw-roster.mine { grid-area: mine; }
+  .tw-roster.foe { grid-area: foe; }
+  .tw-field {
+    grid-area: field; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
+    padding-top: 8px; border-top: 1px solid var(--line);
+  }
+  .tw-verdict-body { grid-template-columns: 170px minmax(0, 1fr) 156px; gap: 18px; }
+}
+@media (max-width: 860px) {
+  .tw-stage { grid-template-columns: minmax(0, 1fr); }
+  .tw-verdict-body { grid-template-columns: minmax(0, 1fr) 156px; }
+  .tw-rolls { grid-column: 1 / -1; grid-row: 2; }
+  .tw-verdict-empty { grid-column: 1; }
+  .tw-verdict-head { align-items: flex-start; }
+  .tw-verdict-controls { flex-wrap: wrap; }
+  .tw-solve { flex-wrap: wrap; }
+  .tw-solve-copy { flex: 1 1 100%; }
+  .tw-lane { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .tw-lane-change { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (max-width: 600px) {
+  .tw-strip { grid-template-columns: minmax(0, 1fr); grid-template-areas: "mine" "foe" "field"; }
+  .tw-roster.foe .tw-roster-head, .tw-roster.foe .tw-roster-list { flex-direction: row; }
+  .tw-roster-list { flex-wrap: wrap; }
+  .tw-roster { grid-template-rows: 24px auto; }
+  .tw-field-line { flex-wrap: wrap; justify-content: center; white-space: normal; }
+  .tw-offense { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .tw-move-grid { grid-template-columns: minmax(0, 1fr); }
+  .tw-sp-row { grid-template-columns: 30px 40px minmax(0, 1fr) 46px 64px; gap: 6px; }
+  .tw-sp-head { flex-wrap: wrap; }
+  .tw-sp-rest { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .tw-verdict-body { grid-template-columns: minmax(0, 1fr); }
+  .tw-action { width: 100%; }
+  /* Still a fixed-height tray (pinning must not move the page), tall enough for the empty-state
+     sentence to wrap instead of being cut off. */
+  .tw-chips { height: 68px; }
+  .tw-chips-empty { white-space: normal; line-height: 1.4; }
+  .tw-solve .tw-action { width: 100%; }
 }

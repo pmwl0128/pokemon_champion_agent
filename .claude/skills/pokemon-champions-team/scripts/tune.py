@@ -18,7 +18,8 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cliffs import (  # noqa: E402
-    SP_CAP, champ_speed, solve_outspeed, solve_min_sp, survival_prob, meets_target, ko_roll,
+    SP_CAP, champ_speed, solve_outspeed, solve_min_sp, survival_prob, survival_prob_hits,
+    meets_target, ko_roll,
     candidate_natures, weather_speed_mult, effective_speed,
 )
 from typechart import effectiveness  # noqa: E402
@@ -54,6 +55,7 @@ OFF_SPS = {"physical": "at", "special": "sa"}
 OFF_SPREAD = {"physical": "atk", "special": "spa"}    # offensive stat as a team-json spread key
 OFF_NATURE = {"physical": "Adamant", "special": "Modest"}
 KILL_HITS = {"ohko": 1, "2hko": 2}                    # benchmark kind -> hits the KO needs
+BOOST_KEYS = ("atk", "def", "spa", "spd", "spe")       # stat stages a member_state may set
 NATURE_LANE_MIN_SAVINGS = 1   # a meta-grounded improvement is a fact; opportunity cost stays explicit
 
 # --- Mega form + phase-specific ability judgments (design §9) ------------------------------
@@ -369,8 +371,38 @@ def _sps_from_spread(spread: dict[str, int] | None) -> dict[str, int]:
 
 
 def _member_ncp(member: dict[str, Any], sps: dict[str, int]) -> dict[str, Any]:
-    return {"name": member.get("species"), "ability": member.get("ability"),
-            "item": member.get("item"), "nature": member.get("nature") or "Hardy", "sps": sps}
+    out = {"name": member.get("species"), "ability": member.get("ability"),
+           "item": member.get("item"), "nature": member.get("nature") or "Hardy", "sps": sps}
+    # A survive benchmark's explicit `member_state` rides on its calc member (see `_survive_card`).
+    # No other card attaches one, so outspeed and kill cliffs are never solved under a stated state.
+    out.update(member.get("battle_state") or {})
+    return out
+
+
+def _state_assumption(state: dict[str, Any]) -> str:
+    parts = ([f"status {state['status']}"] if state.get("status") else []) + [
+        f"{k} {v:+d}" for k, v in (state.get("boosts") or {}).items()]
+    return ("our member is solved in the stated battle state (" + ", ".join(parts) + "); "
+            "the required SP holds only while that state does")
+
+
+def _member_state(b: dict[str, Any]) -> dict[str, Any]:
+    """The benchmark's explicit in-battle state for OUR member, in the calc's input vocabulary:
+    `status` (calc status name) and `boosts` (canonical stat keys, -6..6). Neutral values are dropped
+    so an all-default state and an absent one solve — and read back — identically."""
+    raw = b.get("member_state")
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, Any] = {}
+    status = raw.get("status")
+    if isinstance(status, str) and status and status != "Healthy":
+        out["status"] = status
+    boosts = raw.get("boosts") if isinstance(raw.get("boosts"), dict) else {}
+    stages = {k: int(v) for k, v in boosts.items()
+              if k in BOOST_KEYS and isinstance(v, int) and not isinstance(v, bool) and v}
+    if stages:
+        out["boosts"] = stages
+    return out
 
 
 def _attacker_ncp(species: str, category: str, attacker_set: dict[str, Any] | None,
@@ -725,12 +757,11 @@ def _survive_min_sp(member: dict[str, Any], nature: str, attacker: dict[str, Any
     nature re-batches; the incoming damage is monotonic in `dstat` SP, so one batch [0..cap] feeds the
     binary search. This is the per-nature kernel the baseline card and every §16.8 nature lane share.
 
-    `hits` is the DEFENSE mirror of the kill cliff's multi-hit band (§9): surviving h hits statically
-    (each hit repeats hit 1, entry-hazard chip applied ONCE) means `h*d < eff_hp` for a roll d, i.e.
-    `d < ceil(eff_hp/h)`, so the single-hit survival predicate is reused against the per-hit threshold —
-    exact for h=1 (byte-identical to survive-1). Ignores between-hit recovery, same boundary as the kill
-    side. The damage rolls do NOT depend on `hits`, so the survive-1 rolls_cache can be passed back in as
-    `precomputed` for the survive-2 solve — same (attacker, field, nature), no second batch call.
+    `hits` is the DEFENSE mirror of the kill cliff's multi-hit band (§9). Two-hit survival enumerates
+    the exact independent 16x16 damage-roll distribution, with entry-hazard chip applied ONCE. It
+    still ignores between-hit recovery and state changes; those are surfaced as assumptions. Damage
+    rolls do NOT depend on `hits`, so the survive-1 rolls_cache can be passed back in as `precomputed`
+    for the survive-2 solve — same (attacker, field, nature), no second batch call.
 
     `defender_types`/`hazard_abilities` feed ONLY the hazard chip and must describe the PRE-Mega
     (switch-in) form and ability. The damage side reads the effective Mega form from `member`."""
@@ -762,8 +793,7 @@ def _survive_min_sp(member: dict[str, Any], nature: str, attacker: dict[str, Any
         hazard_chip = (_sr_chip(defender_types, hp, abilities=hazard_abilities) if use_sr else 0) \
             + _spikes_chip(defender_types, hp, spikes, abilities=hazard_abilities, item=m.get("item"))
         eff_hp = hp - hazard_chip
-        thr = -(-eff_hp // hits)              # ceil(eff_hp/hits): the per-hit survival threshold
-        return meets_target(survival_prob(rolls, thr), target)
+        return meets_target(survival_prob_hits(rolls, eff_hp, hits), target)
 
     return solve_min_sp(predicate, cap=SP_CAP), rolls_cache
 
@@ -782,7 +812,11 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
     # Resolve the DEFENDER to its Mega form when it holds a stone (§9): Mega stats/typing/ability
     # (so Mega Delphox's Levitate makes Ground a 0, not an unreachable survival cliff).
     eff = effective or _effective_form(member, dex_fn, item_fn)
-    calc_member = _calc_member(member, eff)
+    # A stated battle state (a status, stat stages) is a condition of THIS benchmark, not part of the
+    # build: it rides on the calc member so every lane below — Def/SpD, HP, mixed, probability,
+    # nature, Intimidate — is solved under the same state, and it is echoed on the card.
+    state = _member_state(b)
+    calc_member = {**_calc_member(member, eff), **({"battle_state": state} if state else {})}
     member_label = eff["name"]
     if cat not in ("physical", "special"):
         return {"aspect": "defense", "kind": "survive", "member": member_label, "vs": b.get("vs"),
@@ -826,9 +860,9 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
     # Only `dstat` (Def or SpD, never HP) varies across the SP search, so the incoming damage is
     # monotonic in SP and one batch [0..cap] feeds the search (the kernel handles batch-vs-live).
     cur_nature = member.get("nature") or "Hardy"
-    # Solve both one- and two-hit survival lines, while keeping the requested `survive` benchmark's
-    # one-hit objective primary. Damage rolls don't depend on `hits`, so the one-hit cache feeds the
-    # contextual two-hit and HP lanes unchanged.
+    # Solve both one- and two-hit survival lines. The benchmark's optional `hits` selects the primary
+    # line; damage rolls don't depend on that count, so the one-hit cache feeds the two-hit and HP
+    # lanes unchanged.
     tiers: dict[int, dict[str, Any]] = {}
     rolls_cache: dict[int, tuple[list[int], int]] = {}
     for h in (1, 2):
@@ -844,17 +878,20 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
         if t["result"] == "already" and mt is not None:      # slack = pullable SP while still surviving
             t["slack_sp"] = cur - mt
         tiers[h] = t
-    # The benchmark's declared target is surviving the named hit ONCE. Survive-2 is useful context,
-    # never a replacement objective: a facts operator must not silently strengthen the user's request.
+    # The browser durability workbench may explicitly request one- or two-hit survival. Keep one hit
+    # as the compatibility default; when two is named, make that tier the headline instead of
+    # silently solving a different objective. The two-hit tier uses the documented independent-roll
+    # model and surfaces the effects it cannot carry across hits.
     survive_tiers = [tiers[1], tiers[2]]
-    headline = tiers[1]
+    requested_hits = b.get("hits", 1)
+    headline = tiers[requested_hits]
     head_hits = headline["hits"]
     probability_lanes: list[dict[str, Any]] = []
-    for lane_target in ("guaranteed", "likely", "any"):
+    for lane_target in ("guaranteed", "near_guaranteed", "likely", "three_quarters", "half", "any"):
         lane_min, _ = _survive_min_sp(
             calc_member, cur_nature, attacker, move, field, dstat, base_sps,
             lane_target, defender_types, use_sr, spikes,
-            damage_fn=damage_fn, damage_batch_fn=damage_batch_fn, hits=1,
+            damage_fn=damage_fn, damage_batch_fn=damage_batch_fn, hits=head_hits,
             precomputed=rolls_cache, hazard_abilities=hazard_abilities,
         )
         probability_lanes.append({
@@ -891,8 +928,7 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                            else 0) + _spikes_chip(defender_types, mhp, spikes,
                                                   abilities=hazard_abilities, item=calc_member.get("item"))
             eff_hp = mhp - hazard_chip
-            thr = -(-eff_hp // head_hits)            # ceil(eff_hp/hits): the headline tier's per-hit threshold
-            return meets_target(survival_prob(cur_rolls, thr), target)
+            return meets_target(survival_prob_hits(cur_rolls, eff_hp, head_hits), target)
 
         min_hp = solve_min_sp(_hp_pred, cap=SP_CAP)
         if min_hp is None:
@@ -925,7 +961,8 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                     defender_types, mhp, spikes, abilities=hazard_abilities,
                     item=calc_member.get("item"),
                 )
-                if meets_target(survival_prob(defense_rolls, mhp - hazard_chip), target):
+                if meets_target(
+                        survival_prob_hits(defense_rolls, mhp - hazard_chip, head_hits), target):
                     cand = ((defense_sp - cur) + (hp_sp - cur_hp_sp), hp_sp, defense_sp)
                     if best is None or cand < best:
                         best = cand
@@ -1017,10 +1054,12 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
         "allocation_lanes": allocation_lanes,
         "selected_lane": selected.get("lane"),
         "assumptions": [f"attacker = {prov.get('source')} set",
-                        "requested survive benchmark is the one-hit primary; two-hit survival is contextual"]
-        + (["STATIC 2-hit survival: repeats hit 1 and applies the entry-hazard chip once; ignores "
-            "between-hit recovery (Sitrus/Leftovers), ability shifts (Stamina/Multiscale) & field changes "
-            "— a heal can flip it. Only survive-1 is exact."])
+                        f"requested survive benchmark is the {requested_hits}-hit primary"]
+        + ([_state_assumption(state)] if state else [])
+        + (["2-hit survival enumerates the independent 16x16 damage rolls and applies entry-hazard "
+            "chip once; it ignores between-hit recovery (Sitrus/Leftovers), ability shifts "
+            "(Stamina/Multiscale), and field changes — those effects can flip the result."]
+           if head_hits == 2 else [])
         # The meta attacker stitches independent ability/item/nature marginals onto a real spread row;
         # surface that caveat in assumptions too (matchup already does), not only in evidence.note.
         + (["attacker fields are independent meta marginals — exact ability+item+nature combo may not co-occur"]
@@ -1042,6 +1081,8 @@ def _survive_card(member: dict[str, Any], b: dict[str, Any], fmt: str, *,
                                {"source": "meta", "ref": "attacker modal set"}],
                      "note": (prov.get("note") or "attacker set") + (f" | {mc_note}" if mc_note else "")},
     }
+    if state:
+        card["member_state"] = state
     if sr_ignored:
         card["stealth_rock_requested"] = True
         card["stealth_rock_ignored"] = "doubles_not_modelled"

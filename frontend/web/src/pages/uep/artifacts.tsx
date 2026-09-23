@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import type { TuneCardDto } from "@pokemon-champions/protocol";
 import { TypeBadge } from "../../components/TypeBadge.tsx";
 import { optionalKey, useLang, useT } from "../../i18n.ts";
-import { TuneCard } from "../calc/TuneTab.tsx";
+import { TuneCard } from "../calc/TuneCard.tsx";
 import { MonRow } from "./MonChip.tsx";
 import { readTeamMembers, useDexByName, type TeamMemberish } from "./TeamCard.tsx";
 

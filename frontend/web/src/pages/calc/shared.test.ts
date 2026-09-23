@@ -6,9 +6,8 @@ import {
   buildConfigSig, modalForEntry, observedBuildOptions, sideFromBuild, sideIsBare,
   withMega, type ModalSet,
 } from "./shared.tsx";
-import { applyBuildOption } from "./DamageTab.tsx";
 import { buildCardOptionForMon } from "./duel/MonEditor.tsx";
-import { makeMon, rollModifier } from "./duel/state.ts";
+import { applyBuildOption, makeMon, rollModifier } from "./duel/state.ts";
 
 const stats = { hp: 1, atk: 1, def: 1, spa: 1, spd: 1, spe: 1 };
 const entry = (name: string, slug: string, ability: string,

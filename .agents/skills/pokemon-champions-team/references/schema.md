@@ -351,11 +351,13 @@ It is **structured constraints, not natural language** — the skill never parse
     {"member": "Incineroar", "kind": "survive",  "vs": "Garchomp", "move": "Earthquake",
      "conditions": {"stealth_rock": false, "spikes": 0}, "probability": "guaranteed",
      "opponent_set": {"ability": "Rough Skin", "item": "Life Orb", "nature": "Jolly",
-                      "spread": {"atk": 32, "spe": 32}}},
+                      "spread": {"atk": 32, "spe": 32}},
+     "member_state": {"status": "Burned", "boosts": {"def": 1}}},
     {"member": "Garchomp",   "kind": "outspeed", "vs": "Dragapult", "conditions": {"tailwind": false},
      "opponent_set": {"nature": "Timid", "spread": {"spe": 20}}}
     // kind: survive | outspeed | ohko | 2hko ; vs = canonical species (or a raw Speed number for outspeed);
-    // conditions are applied when set explicitly here; probability: guaranteed | likely | any
+    // conditions are applied when set explicitly here; survive may set hits: 1 | 2 and member_state;
+    // probability: guaranteed | near_guaranteed | likely | three_quarters | half | any
   ],
   "frame_required": true,                 // build-flow backstop: slate refuses without --frame-output,
                                           //   answer-audit requires a frame fingerprint in the receipt chain
@@ -379,6 +381,18 @@ fallback. Survival cards compare HP, relevant Def/SpD, and bounded mixed allocat
 objective; `probability_lanes` are explicitly scoped to their single stat axis. Speed cards use the
 resolved set as the main target and keep the max-SP positive-nature target in `ceiling_lane`. Adjacent
 survival/KO tiers and probability lanes are context, not silent replacements for the requested target.
+For `survive`, `hits: 2` enumerates the independent 16×16 damage-roll pairs and applies entry-hazard
+chip once. Between-hit recovery, ability/stat changes, and field changes remain explicit assumptions
+rather than being silently approximated.
+
+`member_state` (survive only) states OUR member's battle state while it takes the hit: `status` in the
+calc's vocabulary (`Healthy | Burned | Paralyzed | Poisoned | Badly Poisoned | Asleep | Frozen`) and
+`boosts` as canonical stat keys (`atk/def/spa/spd/spe`, integers -6..6). It is a condition of that
+benchmark, not part of the build: every lane on the card (defense axis, HP, mixed, probability, nature,
+Intimidate) is solved under it, the card echoes the non-neutral part as `member_state`, and an
+assumption line says the required SP holds only while that state does. It is what status-sensitive
+defence needs — Marvel Scale, Hex / Venoshock / Wake-Up Slap into a statused target, Foul Play off our
+Attack stage, Gyro Ball off our Speed. Outspeed and kill benchmarks refuse it rather than drop it.
 
 `conditions` keys
 (stealth_rock / spikes / tailwind / opponent_tailwind /

@@ -2,7 +2,7 @@
   "season": "M-6",
   "rule": "M-C",
   "format": "single",
-  "generated_at": "2026-09-21T00:00:00+00:00",
+  "generated_at": "2026-09-23T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,23 +50,14 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-09-18T00:00:00+00:00",
-    "details_updated_at": "2026-09-18T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-09-21T00:00:00+00:00",
     "details_updated_at": "2026-09-21T00:00:00+00:00"
   },
-  "rank_moves": [
-    {
-      "slug": "corviknight",
-      "name": "钢铠鸦",
-      "old": 16,
-      "new": 21,
-      "delta": -5,
-      "tier": "A"
-    }
-  ],
+  "current": {
+    "ranking_updated_at": "2026-09-23T00:00:00+00:00",
+    "details_updated_at": "2026-09-23T00:00:00+00:00"
+  },
+  "rank_moves": [],
   "new_entries": [],
   "dropped": [],
   "config_changes": []

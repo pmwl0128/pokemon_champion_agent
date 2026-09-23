@@ -26,7 +26,8 @@ import { useRanking } from "../../hooks.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import {
-  BOOST_STAGES, FieldCheck, MonPicker, STATUSES, boostLabel, natureLabel, useModalFill, megaFor, withMega,
+  BOOST_STAGES, BuildPickerButton, FieldCheck, MonPicker, STATUSES, boostLabel, modalForEntry,
+  natureLabel, useModalFill, megaFor, withMega,
   type BuildOption,
 } from "./shared.tsx";
 
@@ -102,7 +103,7 @@ function modState(slug: string, mod: Mod, p: Preset): SpeedState {
   return mod === "tailwind" ? { ...base, tailwind: true } : { ...base, item: SCARF };
 }
 
-function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove }: {
+function SpeedRow({ label, side, setSide, dex, natures, items, presets, format, onRemove, add }: {
   label: string;
   side: SpeedState;
   setSide: Dispatch<SetStateAction<SpeedState>>;
@@ -110,7 +111,11 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
   natures: NatureDto[];
   items: ItemRef[];
   presets: Preset;
+  format: FormatId;
   onRemove?: () => void;
+  /** The column's append control rides on its LAST card: a heading row above the cards existed
+   * only to hold this one button. */
+  add?: { label: string; onAdd: () => void; full: boolean };
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -140,7 +145,33 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
         <span className="speed-heading-label">{label}
           {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
         </span>
-        {onRemove && <button className="mini-x" onClick={onRemove} aria-label={t("a11y.remove")}>✕</button>}
+        {/* A speed row holds only the Speed half of a build, so it claims no "current" card — it
+            reads one off the environment and never pretends the row still IS that card. */}
+        <span className="side-actions">
+          <BuildPickerButton slug={side.slug} format={format}
+            onPick={(option) => {
+              const modal = modalForEntry(option.modal, entry, requiredStone);
+              setSide((s) => ({
+                ...s,
+                ability: modal.ability,
+                nature: modal.nature,
+                item: modal.item,
+                speedSp: modal.sps.spe ?? 0,
+                pinned: true,
+              }));
+            }} />
+          {add && (
+            <button type="button" className="ghost-btn tiny speed-add" onClick={add.onAdd}
+              disabled={add.full} title={add.full ? t("calc.maxSix") : add.label}
+              aria-label={add.full ? t("calc.maxSix") : add.label}>
+              + {t("speed.addShort")}
+            </button>
+          )}
+          {/* Kept on the last row too, disabled: the cluster is the same three pixels wide on every
+              card, so the buttons beside it do not shift when a row is added or dropped. */}
+          <button type="button" className="mini-x" onClick={onRemove} disabled={!onRemove}
+            aria-label={t("a11y.remove")} title={t("a11y.remove")}>✕</button>
+        </span>
       </strong>
       <MonPicker idKey={`spd-${label}`} slug={side.slug} dex={dex}
         onSlug={(slug) => setSide((s) => s.slug === slug ? s : { ...EMPTY_SPEED, slug })} />
@@ -208,6 +239,7 @@ function SpeedRow({ label, side, setSide, dex, natures, items, presets, onRemove
 
 interface TierRow {
   rowKey?: string;
+  sideIndex?: number;
   state?: SpeedState;
   slug: string;
   name: string;
@@ -217,6 +249,15 @@ interface TierRow {
   tiers: Partial<Record<Tier, number>>;
   mods: Partial<Record<Mod, number>>;   // max investment under Tailwind / Choice Scarf
   actual?: number;   // custom opponents' real configured speed (Scarf/Tailwind folded)
+}
+
+/** Actual builds share the Max+ ordering axis without pretending to have a Max+ cell. */
+function rowOrderSpeed(row: TierRow): number {
+  return row.kind === "meta" ? (row.tiers.max ?? -1) : (row.actual ?? -1);
+}
+
+function compareSpeedRows(a: TierRow, b: TierRow): number {
+  return rowOrderSpeed(b) - rowOrderSpeed(a);
 }
 
 function speedBuildCard(side: SpeedState, entry: DexIndexEntry): BuildCardOption {
@@ -263,6 +304,9 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
   const [error, setError] = useState<string | null>(null);
   const [tableTarget, setTableTarget] = useState<CalcRailTarget>("primary");
   const [tableFeedback, setTableFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [markerRailHeight, setMarkerRailHeight] = useState(0);
+  const speedScrollRef = useRef<HTMLDivElement>(null);
+  const markerRailRef = useRef<HTMLDivElement>(null);
 
   const ranking = useRanking(format);
   const rankingRows = ranking.status === "ready" ? ranking.data.rows : [];
@@ -326,20 +370,18 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
     // Invalidate an older batch even when the new scope has no rows and exits before requesting.
     const token = ++tableToken.current;
     const custom = opponents.filter((o) => o.slug && entryOf(o.slug));
-    const customSlugs = new Set(custom.map((o) => o.slug));
     const base: Array<{ rowKey?: string; slug: string; name: string; rank: number | null; kind: TierRow["kind"];
-      state?: SpeedState }> = [];
+      sideIndex?: number; state?: SpeedState }> = [];
     custom.forEach((o, index) => base.push({ rowKey: `custom-${index}`,
       slug: o.slug, name: entryOf(o.slug)!.name,
-      rank: rankOf(o.slug), kind: "custom", state: o }));
+      rank: rankOf(o.slug), kind: "custom", sideIndex: index, state: o }));
     rankingRows.slice(0, topN).forEach((r) => {
       const e = entryOf(r.slug);
-      if (!e || customSlugs.has(r.slug)) return;
+      if (!e) return;
       base.push({ slug: r.slug, name: r.name, rank: r.rank, kind: "meta" });
       // Add this mon's mega form(s) as their own rungs — mega Speed differs from the base (e.g.
       // Garchomp 102 → Mega 92), and the ranking only lists the base species.
       dex.filter((m) => m.isMega && m.baseSpecies === e.name).forEach((mg) => {
-        if (customSlugs.has(mg.slug)) return;
         base.push({ slug: mg.slug, name: mg.name, rank: r.rank, kind: "meta" });
       });
     });
@@ -347,6 +389,14 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
     const inputs: SpeedInputDto[] = [];
     const desc: Array<{ row: number; col: Tier | Mod | "actual" }> = [];
     base.forEach((row, ri) => {
+      // A generated build is one factual point. Keep its species' generic reference row separate
+      // instead of filling this row with investment values the user did not configure.
+      if (row.kind === "custom" && row.state) {
+        const eff = withMega(row.state, dex, items);
+        inputs.push(cleanSpeed(eff.state, eff.entry?.name ?? row.name));
+        desc.push({ row: ri, col: "actual" });
+        return;
+      }
       TIER_KEYS.forEach((tier) => {
         inputs.push(cleanSpeed(tierState(row.slug, tier, presets), row.name));
         desc.push({ row: ri, col: tier });
@@ -358,13 +408,6 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
         inputs.push(cleanSpeed(modState(row.slug, mod, presets), row.name));
         desc.push({ row: ri, col: mod });
       });
-      if (row.kind === "custom" && row.state) {
-        {
-          const eff = withMega(row.state, dex, items);
-          inputs.push(cleanSpeed(eff.state, eff.entry?.name ?? row.name));
-        }
-        desc.push({ row: ri, col: "actual" });
-      }
     });
     // The table can exceed the 240-item batch cap (top-100 + mega rungs × 4 tiers), so fan out in
     // ≤240-item chunks and stitch the results back in order — res[i] still aligns with inputs[i]/desc[i].
@@ -373,18 +416,26 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
     Promise.all(chunks.map((c) => adapter.speedBatch(c))).then((arrs) => {
       if (token !== tableToken.current) return;
       const res = arrs.flat();
-      const out: TierRow[] = base.map((b) => ({ rowKey: b.rowKey, state: b.state,
+      const out: TierRow[] = base.map((b) => ({ rowKey: b.rowKey, sideIndex: b.sideIndex,
+        state: b.state,
         slug: b.slug, name: b.name, rank: b.rank,
         kind: b.kind, tiers: {}, mods: {} }));
       res.forEach((r, i) => {
         if (isErrorShape(r)) return;
         const d = desc[i]!;
-        out[d.row]!.base = r.baseSpeed;   // identical across a mon's tiers — last write wins, same value
-        if (d.col === "actual") out[d.row]!.actual = r.finalSpeed;
-        else if (d.col === "tailwind" || d.col === "scarf") out[d.row]!.mods[d.col] = r.finalSpeed;
-        else out[d.row]!.tiers[d.col] = r.finalSpeed;
+        if (d.col === "actual") {
+          out[d.row]!.actual = r.finalSpeed;
+        } else {
+          // Identical across a species' generic tiers — last write wins with the same value.
+          out[d.row]!.base = r.baseSpeed;
+          if (d.col === "tailwind" || d.col === "scarf") {
+            out[d.row]!.mods[d.col] = r.finalSpeed;
+          } else {
+            out[d.row]!.tiers[d.col] = r.finalSpeed;
+          }
+        }
       });
-      out.sort((a, b) => (b.tiers.max ?? -1) - (a.tiers.max ?? -1));
+      out.sort(compareSpeedRows);
       setRows(out);
       setError(null);
     }).catch((e) => {
@@ -446,26 +497,66 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
     if (diffs.every((diff) => diff === 0)) return "tie";
     return "";
   };
-  const mySlugs = useMemo(() => new Set(mySides.map((side) => side.slug).filter(Boolean)), [mySides]);
-  const opponentRows = useMemo(
-    () => mySlugs.size ? rows.filter((row) => row.kind === "custom" || !mySlugs.has(row.slug)) : rows,
-    [rows, mySlugs],
-  );
   const displayRows = useMemo(() => {
     if (!calculatedMine.length) return rows;
     const mine: TierRow[] = calculatedMine.map(({ entry, speed, index }) => ({
-      rowKey: `mine-${index}`,
+      rowKey: `mine-${index}`, sideIndex: index,
       slug: entry.slug, name: entry.name, rank: rankOf(entry.slug), kind: "mine",
-      state: mySides[index], base: entry.stats.spe, tiers: {}, mods: {}, actual: speed,
+      state: mySides[index], tiers: {}, mods: {}, actual: speed,
     }));
-    return [...opponentRows, ...mine].sort((a, b) => {
-      const av = a.kind === "mine" ? a.actual : a.tiers.max;
-      const bv = b.kind === "mine" ? b.actual : b.tiers.max;
-      return (bv ?? -1) - (av ?? -1);
-    });
+    return [...rows, ...mine].sort(compareSpeedRows);
     // rankOf is a cheap lookup over the already-loaded ranking rows.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, opponentRows, calculatedMine, rankingRows]);
+  }, [rows, calculatedMine, rankingRows]);
+
+  const actualMarkers = useMemo(() => displayRows.flatMap((row, index) => {
+    if (row.kind === "meta" || !row.rowKey) return [];
+    return [{ row, position: ((index + 0.5) / displayRows.length) * 100 }];
+  }), [displayRows]);
+
+  useEffect(() => {
+    const rail = markerRailRef.current;
+    if (!rail) return;
+    const measure = () => setMarkerRailHeight(rail.clientHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [rows.length]);
+
+  const markerTopByRowKey = useMemo(() => {
+    const tops = new Map<string, number>();
+    if (markerRailHeight <= 0) return tops;
+    // Keep hit targets distinct when several actual rows occupy neighboring speed tiers.
+    const halfHitbox = 11;
+    const minSpacing = halfHitbox * 2;
+    for (const kind of ["mine", "custom"] as const) {
+      const lane = actualMarkers.filter(({ row }) => row.kind === kind);
+      const centers = lane.map(({ position }) =>
+        Math.max(halfHitbox, position * markerRailHeight / 100));
+      for (let i = 1; i < centers.length; i += 1) {
+        centers[i] = Math.max(centers[i]!, centers[i - 1]! + minSpacing);
+      }
+      for (let i = centers.length - 1; i >= 0; i -= 1) {
+        centers[i] = Math.min(centers[i]!, i === centers.length - 1
+          ? markerRailHeight - halfHitbox : centers[i + 1]! - minSpacing);
+      }
+      lane.forEach(({ row }, index) => tops.set(row.rowKey!, centers[index]!));
+    }
+    return tops;
+  }, [actualMarkers, markerRailHeight]);
+
+  const locateRow = useCallback((rowKey: string) => {
+    const scroller = speedScrollRef.current;
+    const row = document.getElementById(`speed-row-${rowKey}`);
+    if (!scroller || !row) return;
+    const scrollerRect = scroller.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const rowTop = scroller.scrollTop + rowRect.top - scrollerRect.top;
+    const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const centeredTop = rowTop - (scroller.clientHeight - rowRect.height) / 2;
+    scroller.scrollTop = Math.min(maxTop, Math.max(0, centeredTop));
+  }, []);
 
   const addSide = useCallback((target: CalcRailTarget, picked: SpeedState) => {
     const list = target === "primary" ? mySides : opponents;
@@ -530,16 +621,7 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
   return (
     <>
       <div className="speed-side-grid">
-        <section className="speed-side-column">
-          <div className="defenders-head speed-side-head">
-            <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.ours")}</h2>
-            <button className="ghost-btn" disabled={mySides.length >= 6}
-              title={mySides.length >= 6 ? t("calc.maxSix") : undefined}
-              onClick={() => setMySides((sides) => sides.length >= 6
-                ? sides : [...sides, { ...EMPTY_SPEED }])}>
-              + {t("speed.addMine")}
-            </button>
-          </div>
+        <section className="speed-side-column" aria-label={t("speed.ours")}>
           <div className="speed-side-cards">
             {mySides.map((side, index) => (
               <SpeedRow key={index} label={`${t("speed.ours")} ${index + 1}`}
@@ -549,23 +631,19 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
                     ? (typeof update === "function"
                       ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
                     : candidate))}
-                dex={dex} natures={natures} items={items} presets={presets}
+                dex={dex} natures={natures} items={items} presets={presets} format={format}
                 onRemove={mySides.length > 1
                   ? () => setMySides((previous) => previous.filter((_, at) => at !== index))
-                  : undefined} />
+                  : undefined}
+                add={index === mySides.length - 1 ? {
+                  label: t("speed.addMine"), full: mySides.length >= 6,
+                  onAdd: () => setMySides((sides) => sides.length >= 6
+                    ? sides : [...sides, { ...EMPTY_SPEED }]),
+                } : undefined} />
             ))}
           </div>
         </section>
-        <section className="speed-side-column">
-          <div className="defenders-head speed-side-head">
-            <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.theirs")}</h2>
-            <button className="ghost-btn" disabled={opponents.length >= 6}
-              title={opponents.length >= 6 ? t("calc.maxSix") : undefined}
-              onClick={() => setOpponents((sides) => sides.length >= 6
-                ? sides : [...sides, { ...EMPTY_SPEED }])}>
-              + {t("speed.addOpponent")}
-            </button>
-          </div>
+        <section className="speed-side-column" aria-label={t("speed.theirs")}>
           <div className="speed-side-cards">
             {opponents.map((side, index) => (
               <SpeedRow key={index} label={`${t("speed.theirs")} ${index + 1}`} side={side}
@@ -574,9 +652,20 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
                     ? (typeof update === "function"
                       ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
                     : candidate))}
-                dex={dex} natures={natures} items={items} presets={presets}
-                onRemove={() => setOpponents((previous) => previous.filter((_, at) => at !== index))} />
+                dex={dex} natures={natures} items={items} presets={presets} format={format}
+                onRemove={() => setOpponents((previous) => previous.filter((_, at) => at !== index))}
+                add={index === opponents.length - 1 ? {
+                  label: t("speed.addOpponent"), full: opponents.length >= 6,
+                  onAdd: () => setOpponents((sides) => sides.length >= 6
+                    ? sides : [...sides, { ...EMPTY_SPEED }]),
+                } : undefined} />
             ))}
+            {opponents.length === 0 && (
+              <button type="button" className="speed-add-empty"
+                onClick={() => setOpponents([{ ...EMPTY_SPEED }])}>
+                + {t("speed.addOpponent")}
+              </button>
+            )}
           </div>
         </section>
       </div>
@@ -622,9 +711,10 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
           role="status">{tableFeedback.text}</div>
       )}
       {rows.length > 0 ? (
-        <div className="panel speed-tier-wrap">
-          <div className="speed-tier-scroll">
-            <table className="speed-tier">
+        <div className="speed-tier-shell">
+          <div className="panel speed-tier-wrap">
+            <div className="speed-tier-scroll" ref={speedScrollRef}>
+              <table className="speed-tier">
               <thead>
                 <tr>
                   <th className="corner">{t("ranking.pokemon")}</th>
@@ -642,25 +732,33 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
                 {displayRows.map((r) => {
                   const e = entryOf(r.slug);
                   const build = e && r.state ? speedBuildCard(r.state, e) : null;
+                  const sideNumber = (r.sideIndex ?? 0) + 1;
                   const identity = <>
                     {e && <GameImage assetKey={e.key} role="dense"
                       alt={displayName(e, lang)} className="mini" />}
                     <span className="nm">{e ? displayName(e, lang) : r.name}</span>
                     {r.rank != null && <span className="rk num">#{r.rank}</span>}
-                    {r.kind === "mine" && <span className="rung-you">{t("speed.you")}</span>}
-                    {r.kind === "custom" && <span className="rung-you custom">{t("speed.customTag")}</span>}
+                    {r.kind === "mine" && <span className="rung-you">
+                      {t("speed.you")} {sideNumber}
+                    </span>}
+                    {r.kind === "custom" && <span className="rung-you custom">
+                      {t("speed.customTag")} {sideNumber}
+                    </span>}
                   </>;
                   return (
-                    <tr key={r.rowKey ?? `${r.slug}-${r.kind}`} className={r.kind}>
-                      <th className="tier-mon" onClick={() => r.kind !== "mine" && loadTier(r.slug, "max")}
-                        role={r.kind === "mine" ? undefined : "button"}
-                        tabIndex={r.kind === "mine" ? undefined : 0}
+                    <tr key={r.rowKey ?? `${r.slug}-${r.kind}`}
+                      id={r.rowKey ? `speed-row-${r.rowKey}` : undefined}
+                      className={r.kind}>
+                      <th className="tier-mon"
+                        onClick={() => r.kind === "meta" && loadTier(r.slug, "max")}
+                        role={r.kind === "meta" ? "button" : undefined}
+                        tabIndex={r.kind === "meta" ? 0 : undefined}
                         onKeyDown={(event) => {
-                          if (r.kind !== "mine" && (event.key === "Enter" || event.key === " ")) {
+                          if (r.kind === "meta" && (event.key === "Enter" || event.key === " ")) {
                             event.preventDefault(); loadTier(r.slug, "max");
                           }
                         }}
-                        title={r.kind === "mine" ? undefined : t("speed.load")}>
+                        title={r.kind === "meta" ? t("speed.load") : undefined}>
                         {build ? (
                           <EntityHover kind="spread" name="" link={false} passive
                             previewAddon={<BuildSetSummary option={build} index={0} />}>
@@ -672,16 +770,18 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
                           </EntityHover>
                         ) : identity}
                       </th>
-                      <td className="base-col"><span className="speed-value">{r.base ?? "—"}</span></td>
+                      <td className="base-col">
+                        {r.kind === "meta" && <span className="speed-value">{r.base ?? "—"}</span>}
+                      </td>
                       <td className={`spd actual-col ${cellCls(r.actual)}`}
-                        role={r.kind === "mine" ? undefined : "button"}
-                        tabIndex={r.kind === "mine" ? undefined : 0}
+                        role={r.kind === "custom" ? "button" : undefined}
+                        tabIndex={r.kind === "custom" ? 0 : undefined}
                         onKeyDown={(event) => {
-                          if (r.kind !== "mine" && (event.key === "Enter" || event.key === " ")) {
+                          if (r.kind === "custom" && (event.key === "Enter" || event.key === " ")) {
                             event.preventDefault(); loadActual(r);
                           }
                         }}
-                        onClick={() => r.kind !== "mine" && loadActual(r)}>
+                        onClick={() => r.kind === "custom" && loadActual(r)}>
                         {r.actual != null && <span className="speed-value">{r.actual}</span>}
                       </td>
                       {MOD_KEYS.map((mod) => (
@@ -701,22 +801,41 @@ export function SpeedTab({ dex, natures, items, onRailApi }: {
                       ))}
                       {TIER_KEYS.map((tier) => (
                         <td key={tier} className={`spd ${cellCls(r.tiers[tier])}`}
-                          role={r.kind === "mine" ? undefined : "button"}
-                          tabIndex={r.kind === "mine" ? undefined : 0}
+                          role={r.kind === "meta" ? "button" : undefined}
+                          tabIndex={r.kind === "meta" ? 0 : undefined}
                           onKeyDown={(event) => {
-                            if (r.kind !== "mine" && (event.key === "Enter" || event.key === " ")) {
+                            if (r.kind === "meta" && (event.key === "Enter" || event.key === " ")) {
                               event.preventDefault(); loadTier(r.slug, tier);
                             }
                           }}
-                          onClick={() => r.kind !== "mine" && loadTier(r.slug, tier)}>
-                          <span className="speed-value">{r.tiers[tier] ?? "—"}</span>
+                          onClick={() => r.kind === "meta" && loadTier(r.slug, tier)}>
+                          {r.kind === "meta"
+                            && <span className="speed-value">{r.tiers[tier] ?? "—"}</span>}
                         </td>
                       ))}
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
+          </div>
+          <div className="speed-row-markers" ref={markerRailRef}
+            role="navigation" aria-label={t("speed.locators")}>
+            {actualMarkers.map(({ row, position }) => {
+              const entry = entryOf(row.slug);
+              const side = row.kind === "mine" ? t("speed.ours") : t("speed.theirs");
+              const index = (row.sideIndex ?? 0) + 1;
+              const name = entry ? displayName(entry, lang) : row.name;
+              const label = t("speed.locate").replace("{side}", side)
+                .replace("{index}", String(index)).replace("{name}", name);
+              return <button key={row.rowKey} type="button"
+                className={`speed-row-marker ${row.kind}`}
+                style={{ top: markerTopByRowKey.get(row.rowKey!) ?? `${position}%` }}
+                aria-label={label} title={label}
+                aria-controls={`speed-row-${row.rowKey}`}
+                onClick={() => locateRow(row.rowKey!)} />;
+            })}
           </div>
         </div>
       ) : (

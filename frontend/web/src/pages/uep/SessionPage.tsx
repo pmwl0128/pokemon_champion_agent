@@ -256,11 +256,10 @@ function ResultSection({ draft, intent, sessionId, provisional }: {
   const navigate = useNavigate();
   const loc = useProseRenderer();
   const recommended = Array.isArray(draft.recommended) ? draft.recommended : [];
-  // Hand the team to the calc tune page (one page, every tune shape). sessionId enables the
-  // write-back loop there: benchmarks + note come back as a `tune-request` artifact.
+  // Hand the team to the calc bulk-tune page, where it becomes our roster (format included).
   const sendToTune = (team: unknown) => {
     stashTuneFill({ team, label: intent, sessionId });
-    navigate("/calc?tab=tune&mode=team");
+    navigate("/calc?tab=tune");
   };
   const sendToMatchup = (team: unknown) => {
     const format = (team as { format?: string })?.format === "double" ? "double" : "single";
