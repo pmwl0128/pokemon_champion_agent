@@ -140,8 +140,9 @@ def make_context(form: BuilderForm) -> tuple[dict, list[str]]:
 # ships, its real-team origin is never labeled). `spread_origin="real-team"`,
 # `grounding_ref="repset:..."`, `confidence_reason="observed-sample"` and the
 # `observed_facts`/`observed_fillers` blocks all disclose the real-team sampling and are
-# stripped alongside the plain source/provenance fields (audit 2026-07-16).
-_PROVENANCE_KEYS = {"source", "confidence", "note", "notes", "sample_count",
+# stripped alongside the plain source/provenance fields (audit 2026-07-16). `fallback` names
+# where a skeleton came from when no current team carries the anchor — internal too.
+_PROVENANCE_KEYS = {"source", "confidence", "note", "notes", "sample_count", "fallback",
                     "real_team_backed", "set_source", "set_confidence", "provenance",
                     "evidence", "fetched_at", "spread_origin", "grounding_ref",
                     "confidence_reason", "observed_facts", "observed_fillers"}
@@ -398,6 +399,15 @@ def _ground(pool: Any, form: BuilderForm, skeletons: list[dict], deadline: float
 
 
 # -- the assemble step (the LLM's only creative act) ---------------------------------------
+
+def _model_skeleton(skeleton: dict) -> dict:
+    """A skeleton as the model sees it. A fallback skeleton (the anchor has no current team, team
+    skill §19.10) is assembled on exactly like any other, and where it came from is internal — it
+    must not surface in the rationale the user reads."""
+    if not skeleton.get("fallback"):
+        return skeleton
+    return {k: v for k, v in skeleton.items() if k not in ("fallback", "confidence_reason")}
+
 
 SYSTEM_PROMPT = """\
 You are the team-assembly engine of a Pokemon Champions team-building site.
@@ -1137,7 +1147,9 @@ def build(pool: Any, provider: LlmProvider, form: BuilderForm,
     ], deadline)[0])
     skeletons = [s for s in (frame_out.get("skeletons") or []) if isinstance(s, dict)]
     if not skeletons:
-        raise BuilderFailed("no_frame")     # constraints too tight for any grounded frame
+        # Only after frame's whole fallback ladder came up empty — an anchor no current team
+        # carries still gets skeletons from the fallback table (team skill design §19.10).
+        raise BuilderFailed("no_frame")
     core_names: list[str] = []
     for sk in skeletons:
         for cand in (sk.get("core_candidates") or []):
@@ -1168,7 +1180,7 @@ def build(pool: Any, provider: LlmProvider, form: BuilderForm,
     known_ids = {s.get("frame_id") for s in skeletons}
     payload = {
         "constraints": ctx,
-        "skeletons": [prune(s, **PRUNE_SKELETON) for s in skeletons[:3]],
+        "skeletons": [prune(_model_skeleton(s), **PRUNE_SKELETON) for s in skeletons[:3]],
         "usage_details": grounding["usage_details"],
         "mega_options": grounding["mega_options"],
         "instruction": "Assemble ONE team for these constraints.",

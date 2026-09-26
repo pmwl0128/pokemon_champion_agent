@@ -1,0 +1,636 @@
+{
+ "kind": "fallback_frames",
+ "schema_version": 1,
+ "built_for": {
+  "format": "double",
+  "rule": "M-C",
+  "season": "M-6",
+  "built_at": "2026-09-26T00:31:51Z"
+ },
+ "counts": {
+  "history": 54,
+  "partners": 12
+ },
+ "anchors": {
+  "Absol|Absolite": {
+   "source": "history",
+   "seasons": [
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 12
+  },
+  "Aegislash-Blade|": {
+   "source": "partners",
+   "partners": [
+    "Garchomp",
+    "Sylveon"
+   ],
+   "teams": 51
+  },
+  "Aegislash-Shield|": {
+   "source": "partners",
+   "partners": [
+    "Garchomp",
+    "Sylveon"
+   ],
+   "teams": 51
+  },
+  "Aromatisse|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 42
+  },
+  "Avalugg-Hisui|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 28
+  },
+  "Avalugg|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 4
+  },
+  "Banette|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 31
+  },
+  "Banette|Banettite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 30
+  },
+  "Castform|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 10
+  },
+  "Decidueye|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 16
+  },
+  "Dedenne|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 14
+  },
+  "Emboar|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 36
+  },
+  "Emboar|Emboarite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 29
+  },
+  "Emolga|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 11
+  },
+  "Excadrill|Excadrite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 51
+  },
+  "Falinks|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 55
+  },
+  "Falinks|Falinksite": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 50
+  },
+  "Flareon|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 4
+  },
+  "Floette|Floettite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5",
+    "M-A-events",
+    "M-B-events"
+   ],
+   "teams": 130
+  },
+  "Florges|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 22
+  },
+  "Furfrou|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 5
+  },
+  "Garbodor|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 6
+  },
+  "Glaceon|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 60
+  },
+  "Gliscor|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 103
+  },
+  "Gourgeist-Large|": {
+   "source": "partners",
+   "partners": [
+    "Garchomp",
+    "Sylveon"
+   ],
+   "teams": 51
+  },
+  "Gourgeist-Small|": {
+   "source": "partners",
+   "partners": [
+    "Talonflame",
+    "Tyranitar"
+   ],
+   "teams": 8
+  },
+  "Gourgeist-Super|": {
+   "source": "partners",
+   "partners": [
+    "Incineroar",
+    "Kingambit",
+    "Floette-Eternal"
+   ],
+   "teams": 54
+  },
+  "Leafeon|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 21
+  },
+  "Lycanroc-Midday|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 38
+  },
+  "Lycanroc-Midnight|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 10
+  },
+  "Medicham|Medichamite": {
+   "source": "history",
+   "seasons": [
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 48
+  },
+  "Meowstic|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 217
+  },
+  "Meowstic|Meowsticite": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 9
+  },
+  "Morpeko-Hangry|": {
+   "source": "partners",
+   "partners": [
+    "Raichu",
+    "Dragonite"
+   ],
+   "teams": 17
+  },
+  "Mr. Rime|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 80
+  },
+  "Palafin-Hero|": {
+   "source": "partners",
+   "partners": [
+    "Pelipper",
+    "Archaludon",
+    "Sinistcha"
+   ],
+   "teams": 16
+  },
+  "Pangoro|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 21
+  },
+  "Passimian|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 9
+  },
+  "Persian|": {
+   "source": "partners",
+   "partners": [
+    "Charizard",
+    "Farigiraf",
+    "Aerodactyl"
+   ],
+   "teams": 23
+  },
+  "Pinsir|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 30
+  },
+  "Pinsir|Pinsirite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 30
+  },
+  "Polteageist|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 8
+  },
+  "Qwilfish|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 15
+  },
+  "Rampardos|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 35
+  },
+  "Roserade|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 12
+  },
+  "Rotom-Frost|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 36
+  },
+  "Rotom-Mow|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 118
+  },
+  "Rotom|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-5"
+   ],
+   "teams": 7
+  },
+  "Sableye|Sablenite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 55
+  },
+  "Samurott|": {
+   "source": "partners",
+   "partners": [
+    "Incineroar",
+    "Golisopod"
+   ],
+   "teams": 81
+  },
+  "Sandaconda|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 8
+  },
+  "Sharpedo|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 36
+  },
+  "Sharpedo|Sharpedonite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 25
+  },
+  "Simipour|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 20
+  },
+  "Simisage|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 8
+  },
+  "Simisear|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 12
+  },
+  "Slowbro-Galar|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 26
+  },
+  "Slowking|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 32
+  },
+  "Slurpuff|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 6
+  },
+  "Squawkabilly-Yellow|": {
+   "source": "partners",
+   "partners": [
+    "Farigiraf",
+    "Camerupt",
+    "Hatterene"
+   ],
+   "teams": 13
+  },
+  "Swalot|": {
+   "source": "partners",
+   "partners": [
+    "Garchomp",
+    "Charizard",
+    "Pawmot"
+   ],
+   "teams": 3
+  },
+  "Tauros-Paldea-Combat|": {
+   "source": "partners",
+   "partners": [
+    "Farigiraf",
+    "Charizard",
+    "Sylveon"
+   ],
+   "teams": 41
+  },
+  "Tauros|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 6
+  },
+  "Vaporeon|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 47
+  },
+  "Victreebel|Victreebelite": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5",
+    "M-A-events"
+   ],
+   "teams": 40
+  },
+  "Watchog|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 7
+  }
+ }
+}

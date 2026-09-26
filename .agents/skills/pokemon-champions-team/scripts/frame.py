@@ -46,6 +46,18 @@ abilities) carries no signature in either format and is grouped as such — "we 
 structure" is a different fact from "it carries none", and grouping the two together is what makes a
 data gap look like an archetype.
 Tier 2 (profile-vector clustering) lands only if Tier-1 groups prove to blend distinct archetypes.
+
+Fallback ladder (an anchor NO current-rule real team carries — an empty anchor pool). Zero skeletons
+there left the online wizard nothing to assemble on. The anchor now gets skeletons computed over the
+evidence pool its fallback-table recipe names (`fallback_frames.py`, rebuilt every data refresh):
+  - history   — older-rule teams built around the anchor itself (rules only ever add species, moves
+                and items, so those teams stay valid evidence as they are);
+  - partners  — current teams carrying the anchor's specific usage partners together; those partners
+                become the backbone and the anchor joins them;
+  - stand_in  — the frames of a data-backed species doing the same job, the anchor in its place;
+and, only if the table has nothing, whole-library frames lent to the anchor. Every fallback skeleton
+is marked `fallback`, carries low confidence and binds softly — the slate reports a departure from it
+and never eliminates on one, because nothing in it was observed with the anchor under this rule.
 """
 from __future__ import annotations
 
@@ -79,6 +91,8 @@ MAX_CORE = 5
 # Display cap for the generic (no-anchor) case where the whole library partitions into many groups.
 # Anchor frames are never capped below constraint-relevant retention (see module docstring).
 MAX_FRAMES = 8
+# How many whole-library skeletons the last fallback rung lends an anchor with no data of its own.
+GENERIC_FALLBACK_FRAMES = 3
 
 
 def frame_fingerprint(audit_fp: str | None, skeletons: list[dict[str, Any]],
@@ -393,15 +407,129 @@ def _skeleton(sig: tuple[str, ...], group: list[tuple[dict, dict]], *, fmt: str,
     return {"frame_id": skeleton.pop("frame_id"), **skeleton}
 
 
+def _anchor_entry(member: dict[str, Any], fmt: str, all_teams: list[dict[str, Any]],
+                  meta_fn: Callable[[str], dict | None] | None) -> dict[str, Any]:
+    """A fallback skeleton's anchor slot. Nothing co-occurs with it (that is why we are here), so the
+    share fields are empty facts rather than invented ones; its own repset is still tried, since an
+    anchor form can be stored under a name the pool filter did not match."""
+    sp = member["species"]
+    grounding = _grounding_for(sp, fmt, [], all_teams, member.get("item"))
+    prim = (grounding or {}).get("primary") or {}
+    return {
+        "species": sp, "role": "anchor",
+        "within_group_share": None, "within_group_count": 0, "pool_share": None,
+        "grounding": grounding,
+        "set_guidance": ({"moves": prim.get("moves"), "nature": prim.get("nature"),
+                          "sps": prim.get("sps")} if grounding else None),
+        "confidence": prim.get("confidence") if grounding else "low",
+        "meta_auxiliary": (meta_fn(sp) if meta_fn else None),
+    }
+
+
+def _no_mega_reference() -> dict[str, Any]:
+    """Fallback skeletons never gate the Mega registration count: an older rule or another species'
+    registrations are not an observed norm for this anchor under this rule."""
+    empty = mega_slot_distribution([])
+    return {"basis": "none", "distribution": empty, "confidence": "low"}
+
+
+def _lend(skeletons: list[dict[str, Any]], anchor_members: list[dict[str, Any]], *, fmt: str, source: str,
+          all_teams: list[dict[str, Any]], meta_fn: Callable[[str], dict | None] | None,
+          drop: set[str] = frozenset(),
+          wider: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Turn skeletons computed over a fallback pool into the anchor's: the anchor takes the first core
+    slots, `drop` (a stand-in) leaves, a pool-defining partner becomes backbone, and the rest is
+    trimmed so a flex slot stays open. A member the (small) pool could not ground — species-only
+    rows publish no set — is grounded from `wider`, the whole current library."""
+    anchors = [_anchor_entry(m, fmt, all_teams, meta_fn) for m in anchor_members]
+    names = {a["species"] for a in anchors}
+    out = []
+    for sk in skeletons:
+        lent = []
+        for cc in sk.get("core_candidates") or []:
+            sp = cc.get("species")
+            if not sp or sp in names or sp in drop:
+                continue
+            cc = dict(cc)
+            if cc.get("role") == "anchor":            # a partner that defined the pool: its backbone
+                cc["role"] = "core-partner"
+            if not cc.get("grounding") and wider:
+                grounding = _grounding_for(sp, fmt, [], wider, None)
+                if grounding:
+                    prim = grounding.get("primary") or {}
+                    cc.update({"grounding": grounding,
+                               "set_guidance": {"moves": prim.get("moves"), "nature": prim.get("nature"),
+                                                "sps": prim.get("sps")},
+                               "confidence": prim.get("confidence")})
+            lent.append(cc)
+        lent = lent[:max(0, MAX_CORE - len(anchors))]
+        core_candidates = anchors + lent
+        tiers = Counter(c.get("role") for c in lent)
+        new = {k: v for k, v in sk.items() if k != "frame_id"}
+        facts = dict(new.get("observed_facts") or {})
+        facts["mega_registration_reference"] = _no_mega_reference()
+        new.update({
+            "fallback": source,
+            "core_candidates": core_candidates,
+            "core_tiers": {"anchor": len(anchors), "core": tiers.get("core-partner", 0),
+                           "recurring_partner": tiers.get("recurring-partner", 0)},
+            "flex_slots": {"open_count": max(0, 6 - len(core_candidates)),
+                           "substitutable_count": len(lent)},
+            "observed_facts": facts,
+            "confidence": "low",
+            "confidence_reason": f"{source.replace('_', '-')}-fallback",
+        })
+        frame_id = "f" + _content_hash(
+            {"sig": (sk.get("group_signature") or {}).get("key"), "fallback": source,
+             "core": sorted(c["species"] for c in core_candidates), "fmt": fmt}, 10)
+        out.append({"frame_id": frame_id, **new})
+    # Two pool frames can collapse onto the same lent roster once trimmed; keep the first of each.
+    seen: set[str] = set()
+    return [sk for sk in out if not (sk["frame_id"] in seen or seen.add(sk["frame_id"]))]
+
+
+def _fallback_skeletons(resolved: dict[str, Any], anchor_members: list[dict[str, Any]],
+                        filter_members: list[dict[str, Any]], *, fmt: str,
+                        teams: list[dict[str, Any]], dex_fn: Callable, move_fn: Callable,
+                        item_fn: Callable, order: str,
+                        meta_fn: Callable[[str], dict | None] | None) -> list[dict[str, Any]]:
+    """Materialize one resolved fallback recipe (`fallback_frames.resolve`) into skeletons."""
+    source, pool = resolved.get("source"), resolved.get("pool") or []
+    # A pool outside the current library brings its own prefetched fact tables (team.py).
+    dex_fn, move_fn, item_fn = resolved.get("fact_fns") or (dex_fn, move_fn, item_fn)
+    common = dict(fmt=fmt, dex_fn=dex_fn, move_fn=move_fn, item_fn=item_fn, order=order,
+                  meta_fn=meta_fn)
+    if source == "history":
+        sub = frame_from_teams(pool, filter_members=filter_members, **common)
+        return _lend(sub["skeletons"], anchor_members, fmt=fmt, source=source, all_teams=pool,
+                     meta_fn=meta_fn, wider=teams)
+    if source == "partners":
+        sub = frame_from_teams(pool, filter_members=[{"species": p, "item": None}
+                                                     for p in resolved.get("partners") or []],
+                               **common)
+        return _lend(sub["skeletons"], anchor_members, fmt=fmt, source=source, all_teams=teams,
+                     meta_fn=meta_fn, wider=teams)
+    if source == "stand_in":
+        stand = resolved.get("stand_in")
+        sub = frame_from_teams(pool, filter_members=[{"species": stand, "item": None}], **common)
+        return _lend(sub["skeletons"], anchor_members, fmt=fmt, source=source, all_teams=teams,
+                     meta_fn=meta_fn, drop={stand}, wider=teams)
+    return []
+
+
 def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
                      dex_fn: Callable, move_fn: Callable, item_fn: Callable,
                      filter_members: list[dict[str, Any]] | None = None,
                      order: str = "common_first", max_frames: int = MAX_FRAMES,
-                     meta_fn: Callable[[str], dict | None] | None = None) -> dict[str, Any]:
+                     meta_fn: Callable[[str], dict | None] | None = None,
+                     fallback_fn: Callable[[list[dict[str, Any]]], dict | None] | None = None,
+                     ) -> dict[str, Any]:
     """Build grounded skeletons over `teams` (one format's real library). Pure given the injected fact
     tables + optional `meta_fn` (auxiliary marginals only). `filter_members` ({species, item?} — item =
     the doubles-Mega stone isolation, landscape's rule) narrows to the anchor pool; empty = the generic
-    (whole-library) build. `order` = the meta_conformance knob (common_first | rare_first)."""
+    (whole-library) build. `order` = the meta_conformance knob (common_first | rare_first).
+    `fallback_fn(filter_members)` -> the resolved fallback-table recipe ({source, pool, ...}) or
+    None; read only when the anchor pool is empty (the fallback ladder, module docstring)."""
     filter_members = [f for f in (filter_members or []) if f.get("species")]
     anchor_labels = [_filter_label(f) for f in filter_members]
     anchor_species = {f["species"] for f in filter_members}
@@ -454,12 +582,31 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
                            anchor_members=anchor_members, all_teams=teams, meta_fn=meta_fn)
                  for sig, g in shown]
 
+    # Fallback ladder: an anchor no current-rule team carries still gets skeletons.
+    fallback: dict[str, Any] | None = None
+    if filter_members and not skeletons:
+        resolved = fallback_fn(filter_members) if fallback_fn else None
+        if resolved:
+            skeletons = _fallback_skeletons(resolved, anchor_members, filter_members, fmt=fmt,
+                                            teams=teams, dex_fn=dex_fn, move_fn=move_fn,
+                                            item_fn=item_fn, order=order, meta_fn=meta_fn)
+            if skeletons:
+                fallback = {"tier": resolved["source"], "reason": "anchor_pool_empty"}
+        if not skeletons:
+            generic = frame_from_teams(teams, fmt=fmt, dex_fn=dex_fn, move_fn=move_fn, item_fn=item_fn,
+                                       order=order, max_frames=GENERIC_FALLBACK_FRAMES,
+                                       meta_fn=meta_fn)
+            skeletons = _lend(generic["skeletons"], anchor_members, fmt=fmt,
+                              source="generic_library", all_teams=teams, meta_fn=meta_fn)
+            if skeletons:
+                fallback = {"tier": "generic_library", "reason": "anchor_pool_empty"}
+
     thin = pool_size < THIN_BAR
     meta_fallback = pool_size == 0 or not any(
         cc.get("grounding") for s in skeletons for cc in s["core_candidates"])
     # Every shown skeleton empty of a derived backbone is a frame-level fact, not a per-group quirk:
     # the pool does not carry a recurring structure this partition can see.
-    no_backbone = bool(skeletons) and all(
+    no_backbone = bool(skeletons) and not fallback and all(
         not (s["core_tiers"]["core"] or s["core_tiers"]["recurring_partner"]) for s in skeletons)
     notes = [
         "frame HANDS the AI a data-grounded starting skeleton so `[assemble]` is not built from the "
@@ -480,6 +627,14 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         notes.append("META_FALLBACK: no real joint grammar for this anchor (empty pool or no core "
                      "candidate cleared repset) — this is the data-gated boundary (design §19.8), "
                      "stated honestly; assemble from meta + dex facts and disclose the low confidence.")
+    if fallback:
+        notes.append(
+            f"FALLBACK LADDER ({fallback['tier']}): no current-rule team carries the anchor, so these "
+            "skeletons come from the fallback table — history = older-rule teams built around the "
+            "anchor, partners = current teams carrying its specific usage partners, stand_in = the "
+            "frames of a species doing the same job, generic_library = whole-library frames. None "
+            "was observed with the anchor under this rule: they bind softly (reported, never "
+            "eliminating).")
     if no_backbone:
         notes.append(f"NO BACKBONE in any shown frame: no species recurs in >= {PARTNER_SUPPORT:.2f} "
                      "of any structural group, so this run hands you structural facts and open slots "
@@ -507,6 +662,7 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
         "frames_total": frames_total,
         "frames_shown": len(skeletons),
         "skeletons": skeletons,
+        "fallback": fallback,
         "thin": thin,
         "meta_fallback": meta_fallback,
         "no_backbone": no_backbone,
@@ -519,7 +675,8 @@ def frame_from_teams(teams: list[dict[str, Any]], *, fmt: str,
                                              if t.get("expires_at")})}
                       if transitioned else None),
         "confidence": "low" if (thin or no_backbone) else "medium",
-        "confidence_reason": ("thin-observed-sample" if thin
+        "confidence_reason": ((fallback["tier"].replace("_", "-") + "-fallback") if fallback
+                              else "thin-observed-sample" if thin
                               else "no-recurring-backbone" if no_backbone else "observed-sample"),
         "notes": notes,
     }
@@ -537,6 +694,8 @@ def format_frame_md(d: dict[str, Any]) -> str:
         lines.append("> ⚠️ " + i18n.t('frame_thin', n=d["pool_size"], bar=THIN_BAR))
     if d.get("meta_fallback"):
         lines.append("> ⚠️ " + i18n.t('frame_meta_fallback'))
+    if d.get("fallback"):
+        lines.append("> ⚠️ " + i18n.t('frame_fallback_' + d["fallback"]["tier"]))
     if d.get("no_backbone"):
         lines.append("> ⚠️ " + i18n.t('frame_no_backbone', bar=f"{PARTNER_SUPPORT:.2f}"))
     for i, s in enumerate(d.get("skeletons") or [], 1):
@@ -559,7 +718,9 @@ def format_frame_md(d: dict[str, Any]) -> str:
                      f"{s['flex_slots']['open_count']}"
                      + (f"; {i18n.t('frame_substitutable')}: {tiers.get('recurring_partner')}"
                         if tiers.get("recurring_partner") else "") + ")")
-        if not (tiers.get("core") or tiers.get("recurring_partner")):
+        if s.get("fallback"):
+            lines.append("> ⚠️ " + i18n.t('frame_fallback_' + s["fallback"]))
+        elif not (tiers.get("core") or tiers.get("recurring_partner")):
             lines.append("> ⚠️ " + i18n.t('frame_empty_backbone', bar=f"{PARTNER_SUPPORT:.2f}"))
         for cc in s["core_candidates"]:
             g = cc.get("grounding")

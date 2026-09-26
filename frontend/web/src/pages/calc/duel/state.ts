@@ -170,21 +170,27 @@ export const TERRAIN_ABILITIES: Record<string, Terrain> = {
  * Deliberately short: the vendored engine carries a much longer list of side flags inherited from
  * older generations (Protect quartering, Leech Seed, Steelsurge, the Ruin abilities, Magic/Wonder
  * Room), and for gen-10 Champions those are never consulted. Offering them would put checkboxes on
- * the page that silently change nothing — worse than not offering them at all. */
+ * the page that silently change nothing — worse than not offering them at all.
+ *
+ * `cat` is what the flag DOES to the numbers (cuts damage taken, raises damage dealt, changes
+ * turn order, chips on entry); the team strip colours its chips by it so a row of five reads at a
+ * glance without spelling each one out. */
+export type SideFlagCategory = "wall" | "boost" | "speed" | "hazard";
+
 export const SIDE_FLAGS: Array<{
-  key: string; label: string; doublesOnly?: boolean; hint?: string;
+  key: string; label: string; cat: SideFlagCategory; doublesOnly?: boolean; hint?: string;
 }> = [
-  { key: "reflect", label: "calc.reflect" },
-  { key: "light_screen", label: "calc.lightScreen" },
-  { key: "aurora_veil", label: "calc.auroraVeil" },
-  { key: "friend_guard", label: "calc.friendGuard", doublesOnly: true },
-  { key: "helping_hand", label: "calc.helpingHand", doublesOnly: true },
-  { key: "battery", label: "calc.battery", doublesOnly: true },
-  { key: "power_spot", label: "calc.powerSpot", doublesOnly: true },
-  { key: "steely_spirit", label: "calc.steelySpirit", doublesOnly: true },
-  { key: "charge", label: "calc.charge", hint: "calc.chargeHint" },
-  { key: "tailwind", label: "calc.tailwind", hint: "calc.tailwindHint" },
-  { key: "stealth_rock", label: "calc.stealthRock", hint: "calc.stealthRockHint" },
+  { key: "reflect", label: "calc.reflect", cat: "wall" },
+  { key: "light_screen", label: "calc.lightScreen", cat: "wall" },
+  { key: "aurora_veil", label: "calc.auroraVeil", cat: "wall" },
+  { key: "friend_guard", label: "calc.friendGuard", cat: "wall", doublesOnly: true },
+  { key: "helping_hand", label: "calc.helpingHand", cat: "boost", doublesOnly: true },
+  { key: "battery", label: "calc.battery", cat: "boost", doublesOnly: true },
+  { key: "power_spot", label: "calc.powerSpot", cat: "boost", doublesOnly: true },
+  { key: "steely_spirit", label: "calc.steelySpirit", cat: "boost", doublesOnly: true },
+  { key: "charge", label: "calc.charge", cat: "boost", hint: "calc.chargeHint" },
+  { key: "tailwind", label: "calc.tailwind", cat: "speed", hint: "calc.tailwindHint" },
+  { key: "stealth_rock", label: "calc.stealthRock", cat: "hazard", hint: "calc.stealthRockHint" },
 ];
 
 export type SideFlags = Record<string, boolean>;
@@ -198,13 +204,18 @@ export interface FieldState {
   /** Resolve Intimidate / Supersweet Syrup between the two sides. On by default: a one-off damage
    * question is asked about a real switch-in. */
   switchInDrops: boolean;
+  /** Field-wide, read by the speed line only: it changes no speed, it reverses who moves first. */
+  trickRoom: boolean;
   sides: Record<SideId, SideFlags>;
 }
 
 export const EMPTY_FIELD: FieldState = {
   format: "single", weather: "", terrain: "", gravity: false, foresight: false,
-  switchInDrops: true, sides: { a: {}, b: {} },
+  switchInDrops: true, trickRoom: false, sides: { a: {}, b: {} },
 };
+
+/** The field-wide switches. Each tool's console offers only the ones its numbers read. */
+export type SharedFlagKey = "gravity" | "foresight" | "switchInDrops" | "trickRoom";
 
 function liveFlags(flags: SideFlags, format: FormatId): SideFlags {
   const out: SideFlags = {};

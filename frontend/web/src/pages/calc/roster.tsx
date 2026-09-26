@@ -19,11 +19,13 @@ import {
 import { markTuneFillApplied, readTeamMembers, takeCalcTeams, takeTuneFill,
   type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
+import { useRuntime } from "../../runtime/context.tsx";
 import { autofillSig, sideIsBare, useBuildOptions } from "./shared.tsx";
 import { TEAM_MAX } from "./duel/TeamBar.tsx";
 import { loadRoster, saveRoster, type RosterSnapshot } from "./duel/persist.ts";
 import {
-  EMPTY_FIELD, applyBuildOption, makeMon, withMoves, type FieldState, type MonState, type SideId,
+  EMPTY_FIELD, applyBuildOption, makeMon, newMonUid, withMoves, type FieldState, type MonState,
+  type SideId,
 } from "./duel/state.ts";
 
 type PerSide<T> = Record<SideId, T>;
@@ -43,6 +45,9 @@ export interface RosterApi {
   setField: Dispatch<SetStateAction<FieldState>>;
   /** Attack and defence change places: teams, who is up, selected moves and side conditions. */
   swapSides: () => void;
+  /** A fresh copy of this side's demo Pokemon (what a reset side starts from); blank until the
+   * demo pair has loaded. */
+  demoMon: (side: SideId) => MonState;
 }
 
 const RosterContext = createContext<RosterApi | null>(null);
@@ -65,13 +70,15 @@ function fromCalcMember(member: CalcMember, dex: DexIndexEntry[]): MonState {
 }
 
 /** Where the roster starts: an explicit hand-off outranks the saved workspace, which outranks the
- * demo pair. The calculator's hand-off names both teams; a build session's hand-off names ours. */
-function initialRoster(dex: DexIndexEntry[]): RosterSnapshot {
+ * demo pair. The calculator's hand-off names both teams; a build session's hand-off names ours.
+ * `demo` marks a start with nothing to restore: its blank slots take the demo pair once it loads. */
+function initialRoster(dex: DexIndexEntry[]): RosterSnapshot & { demo?: boolean } {
   const saved = loadRoster();
-  const base: RosterSnapshot = saved ?? {
-    teams: { a: [makeMon("garchomp")], b: [makeMon("mimikyu")] },
+  const base: RosterSnapshot & { demo?: boolean } = saved ?? {
+    teams: { a: [makeMon()], b: [makeMon()] },
     active: { a: 0, b: 0 }, slot: { a: 0, b: 0 },
     field: { ...EMPTY_FIELD, sides: { a: {}, b: {} } },
+    demo: true,
   };
   const calcFill = takeCalcTeams();
   if (calcFill) {
@@ -111,6 +118,50 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   const [field, setField] = useState(initial.field);
   const [swaps, setSwaps] = useState(0);
   const loadBuildOptions = useBuildOptions();
+  const { adapter } = useRuntime();
+
+  // The demo pair: the current doubles ranking's #1 and #2, each with its most common build. Read
+  // from the live ranking rather than written here, so the example follows the environment instead
+  // of freezing one period's builds into code. The builds are doubles builds whatever format the
+  // page opens in, and they are not auto-fills, so a format switch leaves them as they are.
+  const [demo, setDemo] = useState<PerSide<MonState | null>>({ a: null, b: null });
+  const demoSlots = useRef(initial.demo ? { a: initial.teams.a[0]!.uid, b: initial.teams.b[0]!.uid } : null);
+  const loadOptions = useRef(loadBuildOptions);
+  loadOptions.current = loadBuildOptions;
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const slugs = (await adapter.ranking("double", 2)).rows.slice(0, 2).map((row) => row.slug);
+      if (slugs.length < 2) return;
+      const [a, b] = await Promise.all(slugs.map(async (slug) => {
+        const option = (await loadOptions.current(slug, "double"))[0];
+        return option ? applyBuildOption(makeMon(slug), option, 0) : makeMon(slug);
+      }));
+      if (!live || !a || !b) return;
+      const pair = { a, b };
+      setDemo(pair);
+      const slots = demoSlots.current;
+      demoSlots.current = null;
+      if (!slots) return;
+      // Only a slot still exactly as it started takes the demo: anything picked meanwhile stays.
+      setTeams((previous) => {
+        let next = previous;
+        for (const side of SIDES) {
+          const team = next[side];
+          if (team.length === 1 && team[0]!.uid === slots[side] && !team[0]!.slug) {
+            next = { ...next, [side]: [{ ...pair[side], uid: newMonUid() }] };
+          }
+        }
+        return next;
+      });
+    })().catch((error) => console.error("demo roster failed:", error));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const demoMon = useCallback((side: SideId): MonState => {
+    const template = demo[side];
+    return template ? { ...template, uid: newMonUid() } : makeMon();
+  }, [demo]);
 
   useEffect(() => {
     saveRoster({ teams, active, slot, field });
@@ -165,7 +216,7 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   }, []);
 
   const value = useMemo<RosterApi>(() => ({
-    teams, active, slot, field, swaps, setTeams, setActive, setSlot, setField, swapSides,
-  }), [teams, active, slot, field, swaps, swapSides]);
+    teams, active, slot, field, swaps, setTeams, setActive, setSlot, setField, swapSides, demoMon,
+  }), [teams, active, slot, field, swaps, swapSides, demoMon]);
   return <RosterContext.Provider value={value}>{children}</RosterContext.Provider>;
 }

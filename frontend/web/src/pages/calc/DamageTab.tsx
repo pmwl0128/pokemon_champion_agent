@@ -15,27 +15,28 @@ import type {
   DamageRequestDto, DamageResultDto, LearnsetDto, NatureDto,
 } from "@pokemon-champions/protocol";
 import { isErrorShape } from "@pokemon-champions/protocol";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
 import { useAsync, useMovesByName } from "../../hooks.ts";
 import { useDamageText } from "../../lib/damageText.tsx";
-import { localName, useNameMaps } from "../../lib/names.ts";
-import { displayName, useLang, useT, type MsgKey } from "../../i18n.ts";
-import { parsePokepaste, formatPokepasteMon } from "../../lib/pokepaste.ts";
+import { displayName, useLang, useT } from "../../i18n.ts";
+import { formatPokepasteMon } from "../../lib/pokepaste.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
 import type { BuildOption } from "./shared.tsx";
 import { AllMatchups, type GridCol, type GridRow } from "./duel/AllMatchups.tsx";
 import { loadDuelView, saveDuelView } from "./duel/persist.ts";
-import { FieldPanel } from "./duel/FieldPanel.tsx";
+import { FieldPanel, useFieldOffers } from "./duel/FieldPanel.tsx";
 import { MonEditor, buildCardOptionForMon } from "./duel/MonEditor.tsx";
 import { ResultCard, type SlotResult } from "./duel/ResultCard.tsx";
-import { TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
+import { SwapSeam } from "./duel/SwapSeam.tsx";
+import { monsFromPaste } from "./duel/paste.ts";
+import { DuelBar, TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  MOVE_SLOTS, SIDE_FLAGS, TERRAIN_ABILITIES, WEATHER_ABILITIES,
+  MOVE_SLOTS,
   ROLL_TOP, applyBuildOption, curHPOf, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide,
-  rollValue, withMoves, type MonState, type SideId,
+  rollValue, type MonState, type SideId,
 } from "./duel/state.ts";
 import { useRoster } from "./roster.tsx";
 
@@ -176,81 +177,12 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
 
   // -- import / export --------------------------------------------------------------------
 
-  const matchLocal = <T extends { name: string; nameZh?: string; nameJa?: string },>(
-    pool: T[], raw: string | undefined): T | undefined => {
-    if (!raw) return undefined;
-    const q = raw.trim();
-    if (!q) return undefined;
-    const lower = q.toLowerCase();
-    return pool.find((x) => x.name.toLowerCase() === lower || x.nameZh === q || x.nameJa === q)
-      ?? pool.find((x) => x.name.toLowerCase().replace(/[\s'’.-]/g, "")
-        === lower.replace(/[\s'’.-]/g, ""));
-  };
-
   const importPaste = async (side: SideId, text: string): Promise<ImportOutcome> => {
-    const { mons: pasted, rescaledEvs } = parsePokepaste(text);
-    if (!pasted.length) return { added: 0, unresolved: [], rescaledEvs };
-
-    // Species: try the dex index we already hold, then ask the resolver ONCE for whatever is left
-    // (a fuzzy or alias spelling is exactly what `resolve` is for; per-name round trips are not).
-    const resolved = new Map<string, DexIndexEntry>();
-    const misses: string[] = [];
-    for (const p of pasted) {
-      const local = matchLocal(dex, p.species)
-        ?? dex.find((e) => e.slug === p.species.trim().toLowerCase());
-      if (local) resolved.set(p.species, local);
-      else misses.push(p.species);
-    }
-    if (misses.length) {
-      try {
-        const entries = await adapter.resolve(misses, "pokemon");
-        entries.forEach((entry, i) => {
-          const hit = entry.ok && entry.canonical
-            ? dex.find((e) => e.name === entry.canonical) : undefined;
-          if (hit) resolved.set(misses[i]!, hit);
-        });
-      } catch (e) {
-        console.error("pokepaste species resolution failed:", e);
-      }
-    }
-
-    const unresolved: string[] = [];
-    const built: MonState[] = [];
-    for (const p of pasted.slice(0, TEAM_MAX)) {
-      const entry = resolved.get(p.species);
-      if (!entry) { unresolved.push(p.species); continue; }
-      const next = makeMon(entry.slug);
-      next.sps = { ...p.sps };
-      const item = matchLocal(items, p.item);
-      if (item) next.item = item.name;
-      else if (p.item) unresolved.push(p.item);
-      const ability = matchLocal(entry.abilities, p.ability);
-      if (ability) next.ability = ability.name;
-      else if (p.ability) unresolved.push(p.ability);
-      const nature = matchLocal(natures, p.nature);
-      if (nature) next.nature = nature.name;
-      else if (p.nature) unresolved.push(p.nature);
-      if (p.moves.length) {
-        let pool: LearnsetDto["moves"] = [];
-        try {
-          pool = (await loadLearnset(entry.slug)).moves;
-        } catch (e) {
-          console.error(`learnset load failed for ${entry.slug}:`, e);
-        }
-        const names: string[] = [];
-        for (const raw of p.moves) {
-          const hit = matchLocal(pool, raw);
-          if (hit) names.push(hit.name);
-          else unresolved.push(raw);
-        }
-        next.moves = withMoves(next, names).moves;
-      }
-      built.push(next);
-    }
-    if (!built.length) return { added: 0, unresolved, rescaledEvs };
-    setTeams((prev) => ({ ...prev, [side]: built }));
+    const { mons, outcome } = await monsFromPaste(text, { dex, items, natures, adapter });
+    if (!mons.length) return outcome;
+    setTeams((prev) => ({ ...prev, [side]: mons }));
     setActive((prev) => ({ ...prev, [side]: 0 }));
-    return { added: built.length, unresolved, rescaledEvs };
+    return outcome;
   };
 
   const exportMon = (side: SideId) => {
@@ -473,39 +405,13 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const notesFor = (side: SideId): string[] =>
     (outgoing(side)?.koCaveats ?? []).map((cv) => damageText.caveat(cv));
 
-  // A field-setting ability on either active mon, offered next to the picker it would fill. Only
-  // when that field is still empty: an offer to set what is already set says nothing.
-  const abilityNames = useNameMaps().ability;
-  const fieldOffers = <V extends string,>(table: Record<string, V>, current: string) => {
-    if (current) return [];
-    const seen = new Set<string>();
-    return SIDES.flatMap((side) => {
-      const ability = mon[side].ability;
-      const value = ability ? table[ability] : undefined;
-      // Both sides can bring a setter, and which one actually landed is a battle fact the page
-      // cannot know — so it offers both rather than silently picking the attacker's.
-      if (!value || seen.has(ability)) return [];
-      seen.add(ability);
-      return [{ ability, label: localName(abilityNames, ability, lang), value }];
-    });
-  };
+  const offers = useFieldOffers([mon.a, mon.b], field);
 
   const resetSide = (side: SideId) => {
     setTeams((prev) => ({ ...prev, [side]: [makeMon()] }));
     setActive((prev) => ({ ...prev, [side]: 0 }));
     setSlot((prev) => ({ ...prev, [side]: 0 }));
   };
-
-  // The flyout lives here rather than inside FieldPanel: a team strip's overflow chip opens it too.
-  const [fieldOpen, setFieldOpen] = useState(false);
-  const activeFlagsFor = (side: SideId) => SIDE_FLAGS
-    .filter((flag) => (field.format === "double" || !flag.doublesOnly)
-      && field.sides[side][flag.key])
-    .map((flag) => ({ key: flag.key, label: t(flag.label as MsgKey) }));
-  const clearFlag = (side: SideId, key: string) => setField((current) => ({
-    ...current,
-    sides: { ...current.sides, [side]: { ...current.sides[side], [key]: false } },
-  }));
 
   const column = (side: SideId) => (
     <ResultCard
@@ -532,13 +438,22 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
       busy={duelBusy} />
   );
 
+  const flip = () => {
+    // Attack and defence change places for real: the two teams, who is up, their moves and side
+    // conditions all swap — on this tab and on every tool reading the same roster.
+    swapSides();
+    // The grid asks the same question the other way round; making the reader press compute again
+    // for an answer they already asked for is a step with no decision in it.
+    if (gridRun) setGridRerun((n) => n + 1);
+  };
+
   return (
     <div className="calc-duel">
       {duelError && <div className="notice mono">{duelError}</div>}
 
-      <div className={`duel-teams${field.weather ? ` weather-${field.weather.toLowerCase()}` : ""}${field.terrain ? ` terrain-${field.terrain.toLowerCase()}` : ""}`}>
-        <TeamBar label={t("calc.attackerTeam")} team={teams.a} index={active.a}
-          onIndex={(i) => setActive((p) => ({ ...p, a: i }))}
+      <DuelBar field={field}>
+        <TeamBar label={sideLabel.a} teamLabel={t("calc.attackerTeam")} team={teams.a}
+          index={active.a} onIndex={(i) => setActive((p) => ({ ...p, a: i }))}
           onAdd={() => {
             if (teams.a.length >= TEAM_MAX) return;
             setTeams((p) => p.a.length >= TEAM_MAX ? p : { ...p, a: [...p.a, makeMon()] });
@@ -549,18 +464,14 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setActive((p) => ({ ...p, a: Math.max(0, Math.min(p.a, teams.a.length - 2)) }));
           }}
           onReset={() => resetSide("a")}
-          activeFlags={activeFlagsFor("a")} onClearFlag={(key) => clearFlag("a", key)}
-          onShowFlags={() => setFieldOpen(true)}
+          field={field} setField={setField} side="a"
           dex={dex} items={items} onImport={(text) => importPaste("a", text)} />
 
-        <FieldPanel field={field} setField={setField} open={fieldOpen} setOpen={setFieldOpen}
-          sideALabel={t("calc.sideOf").replace("{side}", sideLabel.a)}
-          sideBLabel={t("calc.sideOf").replace("{side}", sideLabel.b)}
-          weatherSuggestions={fieldOffers(WEATHER_ABILITIES, field.weather)}
-          terrainSuggestions={fieldOffers(TERRAIN_ABILITIES, field.terrain)} />
+        <FieldPanel field={field} setField={setField}
+          weatherSuggestions={offers.weather} terrainSuggestions={offers.terrain} />
 
-        <TeamBar label={t("calc.defenderTeam")} team={teams.b} index={active.b}
-          onIndex={(i) => setActive((p) => ({ ...p, b: i }))}
+        <TeamBar label={sideLabel.b} teamLabel={t("calc.defenderTeam")} team={teams.b}
+          index={active.b} onIndex={(i) => setActive((p) => ({ ...p, b: i }))}
           onAdd={() => {
             if (teams.b.length >= TEAM_MAX) return;
             setTeams((p) => p.b.length >= TEAM_MAX ? p : { ...p, b: [...p.b, makeMon()] });
@@ -571,37 +482,31 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setActive((p) => ({ ...p, b: Math.max(0, Math.min(p.b, teams.b.length - 2)) }));
           }}
           onReset={() => resetSide("b")}
-          activeFlags={activeFlagsFor("b")} onClearFlag={(key) => clearFlag("b", key)}
-          onShowFlags={() => setFieldOpen(true)}
+          field={field} setField={setField} side="b"
           dex={dex} items={items} onImport={(text) => importPaste("b", text)} mirrored />
-      </div>
+      </DuelBar>
 
       {/* Each side is one panel: what it does on top, the build that does it underneath. */}
-      <div className="duel-sides">
+      <div className="duel-sides swap-seam-host">
         {SIDES.map((side) => (
-          <section key={side} className="panel duel-side">
-            {column(side)}
-            <MonEditor label={sideLabel[side]} mon={mon[side]}
-              setMon={setActiveMon[side]} dex={dex} natures={natures} items={items}
-              format={field.format}
-              onSetPick={(option, index) => setMonAt(
-                side, active[side], (current) => applyBuildOption(current, option, index))}
-              onExport={() => exportMon(side)} />
-          </section>
+          <Fragment key={side}>
+            {side === "b" && <SwapSeam onSwap={flip} />}
+            <section className="panel duel-side">
+              {column(side)}
+              <MonEditor label={sideLabel[side]} mon={mon[side]}
+                setMon={setActiveMon[side]} dex={dex} natures={natures} items={items}
+                format={field.format}
+                onSetPick={(option, index) => setMonAt(
+                  side, active[side], (current) => applyBuildOption(current, option, index))}
+                onExport={() => exportMon(side)} />
+            </section>
+          </Fragment>
         ))}
       </div>
 
       <AllMatchups
         rows={gridRun?.plan.rows ?? []} cols={gridRun?.plan.cols ?? []}
         results={gridRun?.results ?? []}
-        onFlip={() => {
-          // Attack and defence change places for real: the two teams, who is up, their moves and
-          // side conditions all swap — on this tab and on every tool reading the same roster.
-          swapSides();
-          // The grid asks the same question the other way round; making the reader press compute
-          // again for an answer they already asked for is a step with no decision in it.
-          if (gridRun) setGridRerun((n) => n + 1);
-        }}
         onRun={() => void runGrid()} runnable={gridRunnable} stale={gridStale}
         busy={gridBusy} error={gridError}
         fromLabel={sideLabel.a} toLabel={sideLabel.b} />

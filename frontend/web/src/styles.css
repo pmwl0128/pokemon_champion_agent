@@ -386,7 +386,6 @@ input[type="number"].num::-webkit-inner-spin-button { -webkit-appearance: none; 
    select-height box below, so the boxes bottom-align with the selects in the align-items:end row. */
 .field-row .fld-group { align-self: end; display: flex; gap: 12px; align-items: end; flex-wrap: wrap;
   padding-left: 12px; border-left: 1px solid var(--line); }
-/* also used inside .speed-fields — the tailwind / trick-room checkboxes align with those selects too. */
 .fld-chk { align-self: end; display: grid; gap: 4px; justify-items: center;
   font-size: 12px; color: var(--sub); cursor: pointer; }
 .fld-chk .cap { white-space: nowrap; }
@@ -617,11 +616,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
   opacity: 1; visibility: visible; transform: translate(-50%, 0);
 }
 
-/* ---- speed line: rows + presets + ladder --------------------------------------- */
-.speed-row { padding: 12px 14px; gap: 8px; }
-.speed-row .side-head { min-height: 24px; }
-.speed-heading-label { display: inline-flex; align-items: center; gap: 7px; }
-.speed-row .side-head .side-actions { margin-left: auto; }
+/* ---- speed line: presets + ladder --------------------------------------------- */
 .mon-config { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand) inset; }
 .speed-presets { display: flex; gap: 6px; flex-wrap: wrap; }
 .speed-presets button { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
@@ -630,19 +625,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .speed-presets button.on { border-color: var(--brand); background: var(--brand-soft);
   color: var(--brand-strong); font-weight: 700; box-shadow: inset 0 0 0 1px var(--brand); }
 .speed-presets button:disabled { opacity: .5; cursor: not-allowed; }
-.speed-fields { display: flex; gap: 8px 12px; flex-wrap: wrap; align-items: end; }
-.speed-row .speed-fields { display: grid;
-  grid-template-columns: minmax(90px, 1.2fr) minmax(120px, 1.55fr) minmax(50px, .55fr)
-    minmax(65px, .65fr) minmax(85px, 1fr); gap: 8px; }
-.speed-row .speed-fields label { min-width: 0; }
-.speed-fields label { font-size: 11.5px; color: var(--sub); display: grid; gap: 4px; }
-.speed-row .speed-fields .num { width: 100%; }
-@media (max-width: 720px) {
-  .speed-row .speed-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width: 400px) {
-  .speed-row .speed-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 /* ---- metagame speed-tier table: one quiet reading surface, state carried by value pills ---- */
 .speed-tier-head { display: flex; align-items: center; gap: 12px; margin: 20px 0 10px; flex-wrap: wrap; }
 /* The table's scope controls: what the rows are drawn from, beside the heading that names them. */
@@ -661,8 +643,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 }
 .speed-tier-scope .fld-chk .cap { order: 2; }
 .speed-tier-scope .fld-chk .box { order: 1; height: auto; padding: 0; }
-/* The hint belongs with the control it explains, so it takes the slack and the side switch follows. */
-.speed-tier-hint { margin-left: auto; font-size: 12px; }
 .tier-legend { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .tier-legend .lg { padding: 3px 9px; border-radius: 999px; font-weight: 650; }
 .tier-legend .lg.faster { background: color-mix(in srgb, var(--danger) 12%, var(--panel)); color: var(--danger); }
@@ -681,7 +661,7 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .speed-tier thead th.corner { width: 212px; text-align: left; left: 0; z-index: 3; padding-left: 12px; }
 .speed-tier th.tier-mon {
   position: sticky; left: 0; z-index: 1; display: flex; align-items: center; gap: 7px;
-  width: 212px; min-width: 148px; height: 46px; padding: 6px 8px 6px 12px; cursor: pointer;
+  width: 212px; min-width: 148px; height: 46px; padding: 6px 8px 6px 12px;
   font-weight: 550;
   background: var(--panel); border-bottom: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
@@ -694,15 +674,13 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
   font: 650 13.5px/1 var(--font-ui); white-space: nowrap;
 }
 .speed-tier tbody tr:last-child > * { border-bottom: 0; }
-.speed-tier td.spd { min-width: 58px; cursor: pointer; }
-.speed-tier td.spd:not([role]) { cursor: default; }
+.speed-tier td.spd { min-width: 58px; }
 .speed-tier .base-col { min-width: 62px; padding-right: 10px; color: var(--sub); }
 .speed-tier tbody .base-col { background: color-mix(in srgb, var(--panel-2) 38%, var(--panel)); font-weight: 600; }
 /* Modifier cells are distinct; their headers use the same style as the four investment tiers. */
 .speed-tier tbody .mod-col { background: color-mix(in srgb, var(--panel-2) 22%, var(--panel)); }
 .speed-tier .actual-col { min-width: 62px; padding-right: 14px; }
 .speed-tier td.actual-col { background: color-mix(in srgb, var(--brand) 3.5%, var(--panel)); }
-.speed-tier td.actual-col:empty { cursor: default; }
 .speed-value {
   display: inline-grid; place-items: center; min-width: 38px; min-height: 28px; padding: 0 6px;
   border-radius: 7px; transition: color 170ms ease, background-color 170ms ease, box-shadow 170ms ease;
@@ -710,9 +688,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .speed-tier td.spd.faster .speed-value { color: var(--danger); background: color-mix(in srgb, var(--danger) 11%, var(--panel)); }
 .speed-tier td.spd.slower .speed-value { color: var(--success); background: color-mix(in srgb, var(--success) 11%, var(--panel)); }
 .speed-tier td.spd.tie .speed-value { color: var(--ink); background: color-mix(in srgb, var(--warning) 15%, var(--panel)); }
-.speed-tier td.spd:hover .speed-value, .speed-tier td.spd:focus-visible .speed-value {
-  color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong), 0 3px 10px rgb(25 39 68 / 0.08);
-}
 .speed-tier tr.custom > * {
   background: color-mix(in srgb, var(--build-b) 11%, var(--panel));
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--build-b) 34%, var(--line)),
@@ -729,8 +704,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .speed-tier tr.custom > *:first-child { box-shadow: inset 4px 0 0 var(--build-b),
   inset 0 1px 0 color-mix(in srgb, var(--build-b) 34%, var(--line)),
   inset 0 -1px 0 color-mix(in srgb, var(--build-b) 34%, var(--line)); }
-.speed-tier tr.mine .actual-col .speed-value { color: var(--brand-strong); background: var(--panel);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 35%, var(--line)); }
 .rung-you { font-size: 10px; background: var(--brand); color: #fff; border-radius: 999px; padding: 1px 7px; font-weight: 700; }
 .rung-you.custom { background: var(--build-b); }
 /* Scroll minimap: green = mine, red = opponent. It lives just outside the table so the original
@@ -1934,7 +1907,6 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 900px) {
-  .speed-row .side-head { min-height: 36px; }
   .session-page { grid-template-columns: minmax(0, 1fr); }
   .session-page, .uep-card, .uep-result, .artifact-row { min-width: 0; max-width: 100%; }
   .uep-card, .uep-slate-cand, .uep-frame-row { grid-template-columns: minmax(0, 1fr); }
@@ -2007,6 +1979,9 @@ input:focus, select:focus, textarea:focus {
 .rail-handle.left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
 .rail-handle.right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
 .rail-handle:hover, .rail-handle[aria-expanded="true"] { color: var(--brand-strong); border-color: var(--brand); }
+@media (max-width: 950px) {
+  main.content > .rail-handle.left + .page-header { padding-inline-start: 34px; }
+}
 .rail-scrim { position: fixed; inset: var(--topbar-offset) 0 0; background: rgb(16 26 47 / 0.28); z-index: 11; }
 .rail-layer { position: fixed; inset: var(--topbar-offset) 0 0; z-index: 12; pointer-events: none; }
 .rail {
@@ -2298,48 +2273,11 @@ input:focus, select:focus, textarea:focus {
   color: var(--sub); white-space: pre-wrap; word-break: break-word;
 }
 
-/* -- team strips + centre actions --------------------------------------------------- */
-.duel-teams {
-  display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: start;
-}
-.team-bar { display: grid; gap: 8px; min-width: 0; }
-.team-bar-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.team-bar-head strong { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--sub); }
-.team-strip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  padding-bottom: 4px; border-bottom: 1px solid var(--line); min-height: 48px; }
-.team-chip { position: relative; display: inline-flex; }
-.team-chip-btn {
-  display: grid; place-items: center; width: 44px; height: 42px; padding: 0; cursor: pointer;
-  border: 1px solid transparent; border-bottom: 2px solid transparent; border-radius: 8px;
-  background: transparent;
-}
-.team-chip-btn:hover { background: var(--panel-2); }
-.team-chip.on .team-chip-btn { border-bottom-color: var(--brand); background: var(--brand-soft); }
-.team-chip-btn img.mini { width: 34px; height: 34px; object-fit: contain; }
-.team-chip-empty { display: block; width: 30px; height: 30px; border-radius: 6px;
-  background: var(--panel-3); }
-.team-chip-x {
-  position: absolute; top: -3px; right: -3px; width: 17px; height: 17px; padding: 0;
-  border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--sub);
-  font-size: 9px; line-height: 1; cursor: pointer; opacity: 0; transition: opacity 120ms ease;
-}
-.team-chip:hover .team-chip-x, .team-chip-x:focus-visible { opacity: 1; }
-.team-chip-x:hover { color: var(--danger); border-color: var(--danger); }
-.team-add {
-  width: 44px; height: 42px; border: 1px dashed var(--line-strong); border-radius: 8px;
-  background: transparent; color: var(--sub); font-size: 17px; cursor: pointer;
-}
-.team-add:hover { border-color: var(--brand); color: var(--brand); }
-.team-add:disabled, .team-add:disabled:hover, .ghost-btn:disabled, .ghost-btn:disabled:hover {
+/* Disabled ghost buttons, shared by every tool. */
+.ghost-btn:disabled, .ghost-btn:disabled:hover {
   opacity: .42; cursor: not-allowed; border-color: var(--line); color: var(--sub);
 }
 
-.duel-actions { display: grid; gap: 6px; align-content: start; padding-top: 22px; }
-.duel-actions .ghost-btn { white-space: nowrap; font-size: 12.5px; padding: 6px 12px; }
-
-.paste-panel { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line);
-  border-radius: 10px; background: var(--panel); }
 .paste-label { display: grid; gap: 6px; font-size: 12px; color: var(--sub); }
 .paste-label textarea {
   font: inherit; font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
@@ -2401,23 +2339,6 @@ input:focus, select:focus, textarea:focus {
   background: var(--panel-3); }
 .move-slot input { width: 100%; }
 
-/* -- field conditions ---------------------------------------------------------------- */
-.field-panel { padding: 16px; display: grid; gap: 12px; }
-.field-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  flex-wrap: wrap; }
-.field-panel-head h2 { margin: 0; font-size: 14px; }
-.field-global { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
-.field-global > label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
-.field-global select { min-height: 33px; padding: 5px 9px; border: 1px solid var(--line);
-  border-radius: 8px; background: var(--panel-2); color: var(--ink); }
-.field-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.field-side { display: grid; gap: 7px; padding: 11px 12px; border: 1px solid var(--line);
-  border-radius: 10px; background: var(--panel-2); }
-.field-side h4 { margin: 0; font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--sub); }
-.field-side-flags { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-.field-side .fld-chk .box { height: 26px; }
-
 /* -- all-pairs grid -------------------------------------------------------------------- */
 .all-matchups { padding: 16px; display: grid; gap: 12px; }
 .all-matchups-head { display: flex; align-items: flex-start; justify-content: space-between;
@@ -2437,15 +2358,6 @@ input:focus, select:focus, textarea:focus {
   white-space: nowrap; }
 
 /* -- narrow viewports ------------------------------------------------------------------ */
-@media (max-width: 1040px) {
-  .duel-teams { grid-template-columns: 1fr; }
-  .duel-actions { grid-auto-flow: column; justify-content: start; padding-top: 0; }
-}
-@media (max-width: 860px) {
-  .field-sides { grid-template-columns: 1fr; }
-  .duel-actions { grid-auto-flow: row; }
-  .duel-actions .ghost-btn { width: 100%; }
-}
 @media (max-width: 520px) {
   .stat-table-head, .stat-table-row { grid-template-columns: 36px 36px 1fr 1fr 46px; }
   .duel-rolls { gap: 5px; }
@@ -2453,24 +2365,16 @@ input:focus, select:focus, textarea:focus {
 
 /* The duel panels are not `.form-panel`s (they carry their own grids), so they opt into the same
    control shell explicitly rather than inheriting a layout meant for a different card. */
-.mon-editor label, .field-panel label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
+.mon-editor label { font-size: 12px; color: var(--sub); display: grid; gap: 4px; }
 .mon-editor .mini-fields select,
 .mon-editor .mini-fields input:not([type="checkbox"]):not([type="radio"]),
 .mon-editor-namerow select,
-.mon-editor-namerow input:not([type="checkbox"]):not([type="radio"]),
-.field-panel select {
+.mon-editor-namerow input:not([type="checkbox"]):not([type="radio"]) {
   width: 100%; min-height: 38px; padding: 7px 10px;
   border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--panel) 97%, var(--bg)); color: var(--ink);
 }
 .mon-editor .inline-check { display: inline-flex; grid-template-columns: none; }
-
-/* The global field row groups its switches the way the weather/terrain selects are grouped; without
-   it the bare `span` collapses and each label stacks on its own line. */
-.field-global .fld-group { display: flex; gap: 14px; align-items: end; flex-wrap: wrap; }
-.field-global .fld-chk { align-self: end; }
-.field-global .fld-chk .box { height: 38px; }
-.field-side .fld-chk { align-self: start; }
 
 /* The editor already shows the calculated form as full art, so the picker's own thumbnail would be
    a second, DIFFERENT sprite of the same mon (base vs. activated Mega) sitting next to it. */
@@ -2495,15 +2399,6 @@ input:focus, select:focus, textarea:focus {
 /* An empty slot is still a row: keeping the height constant stops the list from changing shape as
    moves are filled in, which is exactly when the percentages beside it are being compared. */
 
-/* The offer is a suggestion, not a state: it uses the warning hue the page reserves for "look at
-   this", and disappears the moment the field it fills is set. */
-.field-suggest {
-  font: inherit; font-size: 11px; font-weight: 650; white-space: nowrap; cursor: pointer;
-  padding: 4px 9px; border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--warning) 46%, var(--line));
-  background: color-mix(in srgb, var(--warning) 12%, var(--panel)); color: var(--warning);
-}
-.field-suggest:hover { background: color-mix(in srgb, var(--warning) 22%, var(--panel)); }
 .all-matchups-head p { max-width: 78ch; }
 
 /* ==== calc workspace, second pass ================================================= */
@@ -2519,20 +2414,6 @@ input:focus, select:focus, textarea:focus {
   display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 999px;
   font-size: 10.5px; font-weight: 700; color: var(--sub); background: var(--panel-2);
 }
-
-/* -- team strip: import sits beside its own label, and opens over the page ---------- */
-.team-bar-head { position: relative; justify-content: flex-start; }
-.paste-pop {
-  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
-  width: min(440px, 88vw); display: grid; gap: 8px; padding: 12px;
-  border: 1px solid var(--line-strong); border-radius: 10px;
-  background: var(--panel); box-shadow: var(--shadow-raised);
-}
-/* The second strip is near the right edge; anchor its popover to that edge instead. */
-.duel-teams > .team-bar:last-child .paste-pop { left: auto; right: 0; }
-
-/* -- reset buttons line up with the avatars they act on ----------------------------- */
-.duel-actions { padding-top: 26px; }
 
 /* -- species + forme on one row ----------------------------------------------------- */
 .mon-editor-namerow { display: grid; gap: 8px; }
@@ -2574,12 +2455,6 @@ input:focus, select:focus, textarea:focus {
 }
 .move-slot input::placeholder { color: var(--sub); opacity: 0.7; }
 
-/* -- field row: one line, format first, no heading ----------------------------------- */
-.field-panel { padding: 12px 16px; gap: 10px; }
-.field-global { gap: 12px 16px; align-items: end; }
-.field-global .seg { align-self: end; }
-.field-side { padding: 9px 11px; }
-
 /* -- all-pairs grid: narrower cells fit more of the answer on screen ------------------ */
 .all-matchups { padding: 14px 16px; }
 .all-grid { border-spacing: 3px; }
@@ -2591,9 +2466,6 @@ input:focus, select:focus, textarea:focus {
 .all-grid th.row-mon { min-width: 108px; }
 .all-matchups .matrix-detail .duel-band { margin-bottom: 2px; }
 .all-matchups .matrix-detail .duel-band strong { font-size: 17px; }
-
-/* The reset pair lines up with the avatar strips it acts on, not with the labels above them. */
-.duel-actions { padding-top: 30px; }
 
 /* ==== calc workspace, third pass ================================================== */
 
@@ -2608,19 +2480,6 @@ input:focus, select:focus, textarea:focus {
 .duel-rolls-cap { flex: none; }
 .duel-roll-group, .duel-rolls .roll-btn { flex: none; }
 .duel-rolls .roll-btn { font-size: 11px; padding: 3px 8px; }
-
-/* -- 2. field row: each label sits to the LEFT of the control it names --------------- */
-.field-global > label { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
-.field-global > label > select { width: auto; min-width: 84px; }
-.field-global .fld-chk {
-  display: flex; align-items: center; gap: 6px; justify-items: initial; align-self: center;
-}
-.field-global .fld-chk .box { height: auto; padding: 0; }
-.field-global .fld-group { align-items: center; }
-
-/* -- 3. the reset pair sits above the strip's divider -------------------------------- */
-.duel-actions { padding-top: 4px; gap: 5px; }
-.duel-actions .ghost-btn { padding: 5px 12px; }
 
 /* -- 5. a bipolar slider needs a bipolar track --------------------------------------- */
 .boost-slider { grid-template-columns: 1fr 26px; }
@@ -2706,17 +2565,6 @@ img.hp-bar-sprite[alt=""] { opacity: 0.5; }
 }
 
 /* ==== calc workspace, fourth pass ================================================= */
-
-/* -- 1. every cell in the field row is the same height and sits on the same line ----- */
-.field-global { align-items: center; }
-.field-global > label,
-.field-global .fld-chk {
-  min-height: 38px; font-size: 12px; color: var(--sub);
-  display: flex; align-items: center; gap: 7px; white-space: nowrap;
-}
-.field-global .fld-chk .cap { font-size: 12px; color: var(--sub); }
-.field-global .fld-chk .box { display: flex; align-items: center; height: auto; padding: 0; }
-.field-global .seg { align-self: center; }
 
 /* -- 3. HP's row carries its own current value: slider, percentage, editable number --- */
 .stat-table-head, .stat-table-row {
@@ -2848,11 +2696,6 @@ input.stat-cur.hp-cur {
 .duel-summary-row .duel-summary { flex: 1; min-width: 0; }
 .duel-summary-row .ghost-btn { flex: none; }
 .duel-line { min-height: 46px; }
-
-/* -- the defender strip faces the page edge ---------------------------------------- */
-.team-bar.mirrored .team-bar-head { flex-direction: row-reverse; justify-content: flex-start; }
-.team-bar.mirrored .team-strip { flex-direction: row-reverse; justify-content: flex-start; }
-.team-bar.mirrored .paste-pop { left: auto; right: 0; }
 
 /* The dex flyout holds one scrolling column of filter sections, not the metagame rail's
    facet-column + value-column split, so it overrides that grid rather than inheriting it. */
@@ -3167,22 +3010,141 @@ input.stat-cur.hp-cur { text-align: center; }
 .calc-rail-feedback.ok { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--panel)); }
 .calc-rail-feedback.error { color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, var(--panel)); }
 
-/* Speed query cards mirror custom opponents; both columns grow downward independently. */
-.speed-side-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.speed-side-column { min-width: 0; }
-/* The append control lives on each column's last card; an emptied opponent column keeps a slim
-   stand-in so the side can still be refilled. */
-.speed-heading-label .speed-add { margin-left: 2px; white-space: nowrap; font-weight: 650; }
-.speed-add-empty {
-  min-height: 42px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
-  background: transparent; color: var(--brand); font-weight: 600; cursor: pointer;
-}
-.speed-add-empty:hover { border-color: var(--brand); background: var(--brand-soft); }
-.speed-side-cards { display: grid; gap: 10px; }
-.speed-table-target { margin-left: 0; }
-.speed-table-feedback { margin: -4px 0 10px; border: 1px solid var(--line); border-radius: 8px; }
 .speed-tier-identity { width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px; }
 .speed-tier th.tier-mon > .ehover { width: 100%; min-width: 0; }
+
+/* ==== speed line: two cards like the calculator's, the metagame table below ============== */
+/* `.spd` alone is the table's speed-cell class; the page wrapper needs its own name. */
+.spd-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
+.spd-top {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;
+  align-items: stretch; min-width: 0;
+}
+@media (max-width: 860px) { .spd-top { grid-template-columns: minmax(0, 1fr); } }
+.spd-card { align-content: start; }
+.spd-tune { display: grid; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.spd-tune .speed-presets { align-items: center; }
+.spd-preset-sep { width: 1px; height: 18px; margin: 0 2px; background: var(--line-strong); }
+/* The budget reads with the presets that spend it, at the row's far end. */
+.spd-budget {
+  display: inline-flex; align-items: center; gap: 8px; margin-left: auto;
+  font-size: 12px; color: var(--sub);
+}
+.spd-budget .sp-sum { font-size: 12.5px; }
+.speed-presets button.spd-give-back {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--line));
+  background: color-mix(in srgb, var(--warning) 10%, var(--panel)); color: var(--warning); font-weight: 650;
+}
+.speed-presets button.spd-give-back:hover { border-color: var(--warning); color: var(--warning); }
+
+/* -- table: header tools, sortable columns, the real-build cell ---------------------------------- */
+/* Scope on the left with the heading it qualifies; how the table is read, on the right. */
+.speed-tier-tools {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 12px;
+  margin-left: auto;
+}
+.spd-compare-seg { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--sub); }
+.spd-compare-seg .seg button { padding: 4px 10px; font-size: 12.5px; }
+.tier-legend .lg.tr { background: color-mix(in srgb, var(--build-b) 12%, var(--panel)); color: var(--build-b); }
+.speed-tier thead th.sortable { padding: 0; }
+.th-sort {
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px;
+  width: 100%; min-height: 41px; padding: 7px 8px; border: 0; background: transparent;
+  color: inherit; font: inherit; white-space: nowrap; cursor: pointer;
+}
+.speed-tier thead th.base-col .th-sort { padding-right: 10px; }
+.speed-tier thead th.actual-col .th-sort { padding-right: 14px; }
+.th-sort:hover { color: var(--ink); }
+.speed-tier thead th.sorted { color: var(--brand-strong); }
+.th-sort-glyph { width: 8px; height: 11px; flex: none; }
+.th-sort-glyph path { fill: currentColor; opacity: .28; }
+.th-sort-glyph.desc .down, .th-sort-glyph.asc .up { opacity: 1; }
+.speed-real {
+  display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
+}
+.speed-real small { min-width: 26px; font-size: 10.5px; font-weight: 500; color: var(--sub); text-align: left; }
+.speed-real small.who { font-weight: 700; color: var(--brand-strong); }
+.speed-real small.who.b { color: var(--build-b); }
+/* Always rendered, empty when there is nothing more, so the values line up down the column. */
+.speed-real small.more {
+  min-width: 22px; padding: 0 3px; border: 1px solid var(--line); border-radius: 5px; line-height: 15px;
+  text-align: center;
+}
+.speed-real small.more:empty { border-color: transparent; }
+.speed-real:hover .speed-value, .speed-real.open .speed-value, .speed-real:focus-visible .speed-value {
+  color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong), 0 3px 10px rgb(25 39 68 / 0.08);
+}
+/* A cell showing one of our own builds is the reference, not a line to read against. */
+.speed-tier td.actual-col.self .speed-value {
+  color: var(--brand-strong); background: var(--panel);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 35%, var(--line));
+}
+.speed-tier tr.focus td.actual-col.self .speed-value { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* A roster build under its side's Tailwind: the cell reads the doubled Speed and says so — a wash
+   of the strip's Tailwind colour (--build-c, --cond-speed on the strip), a ring on the value and a
+   "x2" tab on its corner. Only the image is set, so a team row keeps its own tint underneath. */
+.speed-tier td.actual-col.on-tailwind {
+  background-image: linear-gradient(90deg, transparent 8%, color-mix(in srgb, var(--build-c) 15%, transparent));
+}
+.speed-tier td.actual-col.on-tailwind .speed-value {
+  position: relative;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--build-c) 75%, transparent);
+}
+.speed-tw-badge {
+  position: absolute; top: -7px; right: -10px; padding: 0 4px; border-radius: 5px;
+  background: var(--build-c); color: #fff; font-size: 9.5px; font-weight: 800; line-height: 14px;
+  box-shadow: 0 0 0 1.5px var(--panel);
+}
+.speed-tier tr.mine.focus > *:first-child {
+  box-shadow: inset 4px 0 0 var(--brand), inset 0 0 0 1px color-mix(in srgb, var(--brand) 40%, transparent);
+}
+/* The roster Pokemon in this row: the tag selects it on the strip and in its card. */
+button.rung-you {
+  flex: none; border: 0; cursor: pointer; font: inherit; font-size: 10px; font-weight: 700; line-height: 16px;
+  background: color-mix(in srgb, var(--brand) 15%, var(--panel)); color: var(--brand-strong);
+}
+button.rung-you.custom { background: color-mix(in srgb, var(--build-b) 15%, var(--panel)); color: var(--build-b); }
+button.rung-you.on { background: var(--brand); color: #fff; }
+button.rung-you.custom.on { background: var(--build-b); color: #fff; }
+
+/* -- the swap control, in the seam between the two cards (calculator, bulk tool, speed line) ----- */
+/* It floats over the gap without taking space, so the cards keep the layout they had. Side by side
+   it spans both columns and centres on the gap; stacked, it gets a zero-height row between them. */
+.swap-seam-host { position: relative; grid-template-areas: "a b"; }
+.swap-seam-host > :first-child { grid-area: a; }
+.swap-seam-host > :last-child { grid-area: b; }
+.swap-seam {
+  --seam: 30px;
+  grid-row: 1; grid-column: 1 / -1; justify-self: center; align-self: start;
+  position: relative; z-index: 4; margin-top: var(--seam-top, 20px);
+  display: grid; place-items: center; width: var(--seam); height: var(--seam); padding: 0;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: var(--panel); color: var(--sub); cursor: pointer;
+  box-shadow: 0 0 0 3px var(--bg), 0 2px 8px rgb(16 26 47 / .10);
+  transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+.swap-seam svg {
+  width: 16px; height: 16px;
+  transform: rotate(calc(var(--turns, 0) * 180deg)); transition: transform 320ms var(--ease-out);
+}
+.swap-seam:hover { color: var(--brand); border-color: var(--brand); background: var(--brand-soft); }
+.swap-seam:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 50%; }
+/* The global button:active nudge would knock it off the seam. */
+button.swap-seam:active:not(:disabled) { transform: none; }
+.swap-seam-label {
+  position: absolute; top: calc(100% + 8px); left: 50%; translate: -50% 0;
+  padding: 3px 8px; border-radius: 6px; background: var(--ink); color: var(--panel);
+  font-size: 11px; font-weight: 650; line-height: 1.4; white-space: nowrap; pointer-events: none;
+  opacity: 0; transition: opacity 140ms ease;
+}
+.swap-seam:hover .swap-seam-label, .swap-seam:focus-visible .swap-seam-label { opacity: 1; }
+@media (max-width: 860px) {
+  .swap-seam-host { grid-template-areas: "a" "seam" "b"; row-gap: 7px; }
+  .swap-seam { grid-area: seam; margin: calc(var(--seam) / -2) 0; }
+  .swap-seam svg { rotate: 90deg; }
+  .swap-seam-label { top: 50%; left: calc(100% + 8px); translate: 0 -50%; }
+}
 
 /* One frame, not a form panel around another framed command row. The labels sit beside their
    controls, so format, fields and the calculate buttons share one compact horizontal baseline. */
@@ -3204,7 +3166,6 @@ input.stat-cur.hp-cur { text-align: center; }
 }
 .tune-command > .tune-note, .tune-command > .tune-proposal { margin-top: 10px; }
 @media (max-width: 800px) {
-  .speed-side-grid { grid-template-columns: minmax(0, 1fr); }
 }
 .build-card.on {
   border-color: var(--brand); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 24%, transparent);
@@ -3323,196 +3284,423 @@ input.stat-cur.hp-cur { text-align: center; }
   padding-top: 7px; padding-bottom: 7px;
 }
 
+/* ==== duel strip: two wings and a centre console ====================================
+   The roster bar opens every calc tool. It is framed by a hairline and left unfilled: the weather
+   art is the only thing painted on it, and a terrain adds its colour as the bottom edge.
+
+   Each wing is the side's name (a menu button), six roster slots and, under them, the conditions
+   standing on that side; the console between them holds weather, format and terrain, with the
+   field-wide conditions underneath. Rows line up across all three columns (46px controls, 24px
+   conditions) so the strip reads as one instrument, not three widgets.
+
+   The layout tiers are CONTAINER queries: the calc rail pushes the page by several hundred pixels
+   without the viewport changing, and a media query would keep the three-column layout long after
+   it stopped fitting. */
+.duel-bar {
+  --slot: 44px;
+  --slot-gap: 5px;
+  --cond-wall: var(--build-a);
+  --cond-boost: var(--build-b);
+  --cond-speed: var(--build-c);
+  --cond-hazard: var(--warning);
+  --cond-shared: var(--sub);
+  --terrain-electric: #d7bd30;
+  --terrain-grassy: #55af70;
+  --terrain-psychic: #a779d7;
+  --terrain-misty: #d58cbb;
+  position: relative; min-width: 0;
+  container: duelbar / inline-size;
+}
+/* An open popover has to sit over the panels that follow the strip. */
+.duel-bar:has(.duel-pop) { z-index: 20; }
+
 .duel-teams {
   --terrain-edge: var(--line);
   position: relative; isolation: isolate;
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(425px, 1.23fr) minmax(0, 1fr);
-  gap: 10px; align-items: end; min-width: 0; margin-top: 0; padding: 7px 0 8px;
-  border: 0; border-bottom: 3px solid var(--terrain-edge);
-  border-radius: 14px; background: transparent; box-shadow: none;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  column-gap: 14px; row-gap: 10px; align-items: start; min-width: 0;
+  padding: 8px 12px 9px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: transparent;
 }
-/* The weather art is the field state made visible, so it is allowed to read as an image rather than
-   as a smudge. It is clipped to the plate's own corners and strongest in the MIDDLE, under the
-   console that names it; it fades out under the two rosters, where the labels are bare text. */
+.duel-teams[class*="terrain-"] { box-shadow: inset 0 -3px 0 var(--terrain-edge); }
+/* The weather art is the field state made visible, so it may read as an image rather than a
+   smudge — strongest under the console that names it, gone by the time it reaches the rosters. */
 .duel-teams::before {
-  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   border-radius: inherit;
-  background-image: var(--weather-art, none); background-size: cover; background-position: center;
-  opacity: .5;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 76%, transparent 100%),
-                      linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 76%, transparent 100%),
-              linear-gradient(to right, transparent 0%, #000 20%, #000 80%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
+  background: var(--weather-art, none) center / cover no-repeat;
+  opacity: .42;
+  -webkit-mask-image: radial-gradient(ellipse 36% 135% at 50% 38%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 36% 135% at 50% 38%, #000 30%, transparent 100%);
 }
-:root[data-theme="dark"] .duel-teams::before { opacity: .58; }
-.duel-teams > * { position: relative; z-index: 1; }
+:root[data-theme="dark"] .duel-teams::before { opacity: .52; }
 .duel-teams.weather-sun { --weather-art: url("./assets/weather/sun.webp"); }
 .duel-teams.weather-rain { --weather-art: url("./assets/weather/rain.webp"); }
 .duel-teams.weather-sand { --weather-art: url("./assets/weather/sand.webp"); }
 .duel-teams.weather-snow { --weather-art: url("./assets/weather/snow.webp"); }
-.duel-teams.terrain-electric { --terrain-edge: #d7bd30; }
-.duel-teams.terrain-grassy { --terrain-edge: #55af70; }
-.duel-teams.terrain-psychic { --terrain-edge: #a779d7; }
-.duel-teams.terrain-misty { --terrain-edge: #d58cbb; }
+.duel-teams.terrain-electric { --terrain-edge: var(--terrain-electric); }
+.duel-teams.terrain-grassy { --terrain-edge: var(--terrain-grassy); }
+.duel-teams.terrain-psychic { --terrain-edge: var(--terrain-psychic); }
+.duel-teams.terrain-misty { --terrain-edge: var(--terrain-misty); }
 
-.duel-teams .team-bar {
-  grid-template-rows: 24px 46px; gap: 0; align-self: end; min-width: 0;
+/* -- wings ------------------------------------------------------------------------------ */
+.team-bar {
+  position: relative; display: grid; min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 46px 24px;
+  column-gap: 8px; row-gap: 6px;
 }
-.duel-teams > .team-bar:first-child { margin-left: 12px; }
-.duel-teams > .team-bar:last-child { margin-right: 12px; }
-.duel-teams .team-bar-head {
-  display: grid; grid-template-columns: auto auto minmax(0, 1fr);
-  grid-template-areas: "label actions flags"; align-items: center; gap: 5px; min-width: 0; height: 24px;
+.team-bar.mirrored { grid-template-columns: minmax(0, 1fr) auto; }
+.team-who { position: relative; grid-column: 1; grid-row: 1; min-width: 0; }
+.team-bar.mirrored .team-who { grid-column: 2; }
+.team-who-btn {
+  display: grid; justify-items: start; align-content: center; gap: 1px;
+  height: 46px; max-width: 92px; padding: 3px 8px 3px 6px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--ink);
+  text-align: left; cursor: pointer; transition: background-color 140ms ease;
 }
-.duel-teams .team-bar-head strong { flex: none; white-space: nowrap; font-size: 11.5px; }
-.duel-teams .team-bar-head > strong { grid-area: label; }
-.team-bar-actions { grid-area: actions; display: inline-flex; gap: 4px; flex: none; }
-.duel-teams .team-bar-actions .ghost-btn {
-  min-height: 22px; padding: 1px 6px; border: 1px dashed var(--line); border-radius: 6px;
-  background: transparent; color: var(--brand-strong); font-weight: 650;
+.team-who-btn:hover, .team-who-btn.open {
+  background: color-mix(in srgb, var(--panel-2) 88%, transparent);
 }
-.duel-teams .team-bar-actions .ghost-btn:hover { border-color: var(--brand); background: transparent; }
-.duel-teams .team-bar.mirrored .team-bar-head {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: "flags actions label";
+.team-who-btn b {
+  display: inline-flex; align-items: center; gap: 3px; max-width: 100%; min-width: 0;
+  font-size: 13.5px; font-weight: 800; line-height: 1.3; white-space: nowrap;
 }
-.team-active-flags {
-  grid-area: flags; display: flex; justify-content: flex-start;
-  align-items: center; gap: 4px; height: 24px; min-width: 0; overflow: hidden;
-  /* Active chips begin beside the action buttons and extend toward the centre. */
-  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 18px), transparent 100%);
+.team-who-btn .num { font-size: 11px; line-height: 1.25; color: var(--sub); }
+.team-bar.mirrored .team-who-btn { justify-items: end; padding: 3px 6px 3px 8px; text-align: right; }
+.duel-caret {
+  width: 10px; height: 10px; flex: none; color: var(--sub);
+  transition: transform 160ms var(--ease-out);
 }
-.team-bar.mirrored .team-active-flags {
-  flex-direction: row-reverse;
-  -webkit-mask-image: linear-gradient(to left, #000 0, #000 calc(100% - 18px), transparent 100%);
-  mask-image: linear-gradient(to left, #000 0, #000 calc(100% - 18px), transparent 100%);
+.open > .duel-caret, .open > b > .duel-caret { transform: rotate(180deg); }
+.duel-plus { display: block; width: 10px; height: 10px; flex: none; }
+
+/* Six slots, always: filled, then the next free one, then placeholders. A slot may shrink when the
+   strip is tight, never below a size its sprite still reads at. */
+.team-strip {
+  grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: var(--slot-gap);
+  min-width: 0;
 }
-.team-active-flags .team-flag-chip { flex: 0 0 auto; }
-.team-flag-chip {
+.team-bar.mirrored .team-strip { grid-column: 1; flex-direction: row-reverse; }
+.team-strip > * { flex: 0 1 var(--slot); min-width: 32px; aspect-ratio: 1; border-radius: 11px; }
+.team-chip {
+  position: relative; display: block;
+  background: color-mix(in srgb, var(--panel-2) 82%, transparent);
+  transition: background-color 140ms ease, box-shadow 160ms ease;
+}
+.team-chip:hover { background: var(--panel-3); }
+.team-chip.on {
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 2px var(--brand), 0 4px 12px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+.team-chip-btn {
+  display: grid; place-items: center; width: 100%; height: 100%; padding: 0;
+  border: 0; border-radius: inherit; background: transparent; cursor: pointer;
+}
+.team-chip-btn .ehover { display: grid; place-items: center; width: 100%; height: 100%; }
+.team-chip-btn img.mini {
+  width: 90%; height: 90%; object-fit: contain;
+  transition: transform 160ms var(--ease-out);
+}
+.team-chip:hover .team-chip-btn img.mini { transform: translateY(-1px) scale(1.05); }
+.team-chip-btn img.team-chip-empty { width: 62%; height: 62%; opacity: .45; }
+.team-chip-x {
+  position: absolute; top: -5px; right: -5px; z-index: 1;
+  display: grid; place-items: center; width: 17px; height: 17px; padding: 0;
+  border: 1px solid var(--line-strong); border-radius: 50%;
+  background: var(--panel); color: var(--sub); font-size: 9px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity 120ms ease;
+}
+.team-chip:hover .team-chip-x, .team-chip-x:focus-visible { opacity: 1; }
+.team-chip-x:hover { color: var(--danger); border-color: var(--danger); }
+.team-slot-add {
+  display: grid; place-items: center; padding: 0; cursor: pointer;
+  border: 1px dashed var(--line-strong); background: transparent; color: var(--sub);
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease;
+}
+.team-slot-add:hover {
+  border-color: var(--brand); color: var(--brand);
+  background: color-mix(in srgb, var(--brand-soft) 65%, transparent);
+}
+.team-slot-add .duel-plus { width: 14px; height: 14px; }
+.team-slot-rest { border: 1px dotted var(--line-strong); opacity: .5; }
+.team-chip .img-fallback-note { display: none; }
+
+/* -- conditions ------------------------------------------------------------------------- */
+.team-conds-zone { display: contents; }
+.team-conds {
+  position: relative; grid-column: 2; grid-row: 2; display: flex; align-items: center; gap: 5px;
+  height: 24px; min-width: 0; overflow: hidden;
+}
+/* Chips past the fitted count stay rendered so the next fit can measure them: out of flow,
+   invisible, and clipped by the row so they never add scroll width. */
+.team-conds .spill { position: absolute; top: 0; left: 0; visibility: hidden; pointer-events: none; }
+.team-bar.mirrored .team-conds { grid-column: 1; flex-direction: row-reverse; }
+.duel-bar [data-cat="wall"] { --cat: var(--cond-wall); }
+.duel-bar [data-cat="boost"] { --cat: var(--cond-boost); }
+.duel-bar [data-cat="speed"] { --cat: var(--cond-speed); }
+.duel-bar [data-cat="hazard"] { --cat: var(--cond-hazard); }
+.duel-bar [data-cat="shared"] { --cat: var(--cond-shared); }
+.duel-cond {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  height: 22px; padding: 0 7px 0 7px;
+  border: 1px solid transparent; border-radius: 999px;
+  background: color-mix(in srgb, var(--cat) 12%, transparent);
+  color: color-mix(in srgb, var(--cat) 78%, var(--ink));
+  font: inherit; font-size: 11.5px; font-weight: 650; line-height: 1; white-space: nowrap;
+  cursor: pointer; transition: border-color 120ms ease, background-color 120ms ease;
+}
+.duel-cond:hover {
+  border-color: color-mix(in srgb, var(--cat) 45%, transparent);
+  background: color-mix(in srgb, var(--cat) 17%, transparent);
+}
+.duel-cond > i { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--cat); }
+.duel-cond-x { font-size: 12px; line-height: 1; opacity: .45; transition: opacity 120ms ease; }
+.duel-cond:hover .duel-cond-x, .duel-cond:focus-visible .duel-cond-x { opacity: .9; }
+/* Set, but not counted by this format: kept visible so switching back holds no surprise. */
+.duel-cond.muted {
+  border: 1px dashed var(--line-strong); background: transparent;
+  color: var(--sub); font-weight: 500;
+}
+.duel-cond.muted > i { background: var(--line-strong); }
+.duel-cond.muted .duel-cond-label {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--sub) 55%, transparent);
+}
+.duel-cond-add {
   flex: none; display: inline-flex; align-items: center; gap: 3px;
-  min-height: 20px; padding: 1px 6px; border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line));
-  background: var(--brand-soft); color: var(--brand-strong);
-  font: inherit; font-size: 10.5px; cursor: pointer;
+  height: 22px; padding: 0 8px 0 6px;
+  border: 1px dashed var(--line-strong); border-radius: 999px; background: transparent;
+  color: var(--sub); font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  cursor: pointer; transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
 }
-.team-flag-chip:hover { border-color: var(--brand); }
-.team-flag-chip.more {
-  gap: 1px; border-style: dashed; background: color-mix(in srgb, var(--panel) 80%, transparent);
-  color: var(--sub); font-variant-numeric: tabular-nums; font-weight: 700;
+.duel-cond-add:hover { border-color: var(--brand); color: var(--brand); }
+.duel-cond-add.open {
+  border-style: solid; border-color: var(--brand); background: var(--brand-soft);
+  color: var(--brand-strong);
 }
-.team-flag-chip.more > span { font-size: 11px; line-height: 1; opacity: .8; }
-.team-flag-chip.more:hover { color: var(--brand-strong); border-color: var(--brand); }
-.team-flag-chip span { font-size: 13px; line-height: 1; }
-.duel-teams .team-strip {
-  min-height: 46px; height: 46px; padding-bottom: 2px; border-bottom: 0; align-items: flex-end;
+/* "+N" is a count, not an invitation: solid, and in ink, so it reads as "there are more". */
+.duel-cond-add.more {
+  padding: 0 8px; border-style: solid; border-color: var(--line);
+  background: color-mix(in srgb, var(--panel-2) 85%, transparent); color: var(--ink); font-weight: 700;
 }
+.duel-cond-lock {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--sub);
+}
+/* A tool that reads only one or two conditions shows them as switches on the strip itself: off is an
+   outline with a hollow dot, on takes the chip's tint — same pill, so both rows keep one rhythm. */
+.duel-toggle {
+  --cat: var(--cond-shared);
+  flex: none; display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 9px 0 8px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: var(--sub); font: inherit; font-size: 11.5px; font-weight: 600; line-height: 1;
+  white-space: nowrap; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.duel-toggle > i {
+  width: 7px; height: 7px; flex: none; border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--cat) 55%, var(--line-strong));
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.duel-toggle:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--cat) 45%, var(--line)); color: var(--ink);
+}
+.duel-toggle.on {
+  border-color: color-mix(in srgb, var(--cat) 40%, transparent);
+  background: color-mix(in srgb, var(--cat) 14%, var(--panel));
+  color: color-mix(in srgb, var(--cat) 78%, var(--ink)); font-weight: 700;
+}
+.duel-toggle.on > i { background: var(--cat); box-shadow: none; }
+.duel-toggle:disabled { opacity: .42; cursor: not-allowed; }
+.team-conds.inline { overflow: visible; }
 
-.duel-teams .field-panel {
-  position: relative; display: grid; justify-items: stretch; align-content: end; gap: 0;
-  min-width: 0; padding: 0; border: 0; background: transparent; box-shadow: none;
+/* -- centre console ------------------------------------------------------------------------ */
+.field-console {
+  position: relative; display: grid; grid-template-rows: 46px auto; row-gap: 6px;
+  justify-items: center; min-width: 0;
 }
-.duel-teams:has(.field-flyout) { z-index: 11; }
-.duel-teams:has(.field-flyout) .field-panel { z-index: 30; }
-/* The import popover lives inside a roster that is its own layer (z 1, like the field console after
-   it), and the bar is an isolated layer under the result panels — so an open popover lifts both. */
-.duel-teams:has(.paste-pop) { z-index: 11; }
-.duel-teams > .team-bar:has(.paste-pop) { z-index: 30; }
-/* The visible controls sit directly on the shared strip. The popover carries the dense flags. */
-.duel-teams .field-global {
-  display: grid; gap: 4px; justify-items: center; width: 100%;
-  padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none;
-  -webkit-backdrop-filter: none; backdrop-filter: none;
+.field-console-main { display: flex; align-items: center; gap: 8px; height: 46px; min-width: 0; }
+/* The conditions row takes the console's width without adding to it: an extra offer chip wraps to
+   a second line instead of widening the console and squeezing both rosters. */
+.field-console-conds {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 5px;
+  width: 100%; min-height: 24px; contain: inline-size;
 }
-.field-line {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center; gap: 8px; width: 100%; min-height: 32px; min-width: 0;
+.field-pick { position: relative; min-width: 0; }
+.field-pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 34px; max-width: 200px;
+  padding: 0 10px 0 8px; border: 1px solid var(--line); border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 86%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap;
+  cursor: pointer; transition: border-color 140ms ease, box-shadow 140ms ease;
 }
-.field-weather, .field-terrain { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.field-weather { justify-self: end; }
-.field-terrain { justify-self: start; }
-.field-flyout {
-  position: absolute; left: 50%; bottom: 34px; z-index: 40;
-  transform: translateX(-50%); width: max-content; max-width: calc(100vw - 16px);
-  max-height: min(240px, 75vh); padding: 6px;
-  border: 1px solid var(--line-strong); border-radius: 12px;
+.field-pill:hover { border-color: var(--line-strong); }
+.field-pill.open { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.field-pill-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.field-pill:not(.set) .field-pill-value { color: var(--sub); font-weight: 600; }
+.wx-swatch {
+  display: block; flex: none; width: 18px; height: 18px; border-radius: 6px;
+  border: 1px dashed var(--line-strong); background: center / cover no-repeat;
+}
+.wx-swatch[data-weather] { border: 0; box-shadow: inset 0 0 0 1px rgb(16 26 47 / .1); }
+.wx-swatch[data-weather="Sun"] {
+  background-image: url("./assets/weather/sun.webp"); background-position: 8% 50%;
+}
+.wx-swatch[data-weather="Rain"] { background-image: url("./assets/weather/rain.webp"); }
+.wx-swatch[data-weather="Sand"] { background-image: url("./assets/weather/sand.webp"); }
+.wx-swatch[data-weather="Snow"] { background-image: url("./assets/weather/snow.webp"); }
+.terrain-dot {
+  display: block; flex: none; width: 12px; height: 12px; margin: 0 3px; border-radius: 50%;
+  border: 1px dashed var(--line-strong);
+}
+.terrain-dot[data-terrain] {
+  border: 0; background: var(--dot);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot) 24%, transparent);
+}
+.terrain-dot[data-terrain="Electric"] { --dot: var(--terrain-electric); }
+.terrain-dot[data-terrain="Grassy"] { --dot: var(--terrain-grassy); }
+.terrain-dot[data-terrain="Psychic"] { --dot: var(--terrain-psychic); }
+.terrain-dot[data-terrain="Misty"] { --dot: var(--terrain-misty); }
+.field-format.seg {
+  flex: none; height: 34px; padding: 3px; border-radius: 10px;
+  background: color-mix(in srgb, var(--panel-2) 86%, transparent);
+}
+.field-format.seg button {
+  height: 26px; padding: 0 13px; font-size: 13px; font-weight: 600; line-height: 26px;
+  white-space: nowrap;
+}
+.field-format.seg button.on { font-weight: 750; }
+/* An offer is a suggestion, not a state: the warning hue the page keeps for "look at this", and
+   gone the moment the field it would fill is set. */
+.field-offer {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px;
+  border: 1px dashed color-mix(in srgb, var(--warning) 55%, var(--line)); border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  color: color-mix(in srgb, var(--warning) 78%, var(--ink));
+  font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.field-offer:hover { border-style: solid; background: color-mix(in srgb, var(--warning) 17%, transparent); }
+.field-offer b { font-weight: 750; }
+.field-offer-arrow { opacity: .65; }
+
+/* -- popovers ------------------------------------------------------------------------------ */
+.duel-pop {
+  position: absolute; top: calc(100% + 6px); z-index: 40;
+  padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px;
   background: var(--panel); box-shadow: var(--shadow-raised);
+  animation: duel-pop-in 150ms var(--ease-out);
 }
-.field-flyout::after { content: ""; position: absolute; left: 40%; right: 40%;
-  top: 100%; height: 7px; }
-.field-flyout-row {
-  display: grid; grid-template-columns: max-content max-content;
-  grid-template-areas: "shared shared" "side-a side-b";
-  align-items: start; gap: 5px 6px;
+@keyframes duel-pop-in { from { opacity: 0; transform: translateY(-4px); } }
+.duel-pop :focus-visible { outline-offset: -2px; }
+.duel-menu { left: 0; width: max-content; min-width: 164px; }
+.team-bar.mirrored .duel-menu { left: auto; right: 0; }
+.duel-menu-row {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 32px; padding: 0 10px;
+  border: 0; border-radius: 8px; background: transparent; color: var(--ink);
+  font: inherit; font-size: 13px; text-align: left; white-space: nowrap; cursor: pointer;
 }
-.field-flyout .field-side {
-  min-width: 0; padding: 4px; border: 1px solid var(--line); border-radius: 9px;
-  background: color-mix(in srgb, var(--panel-2) 78%, var(--panel)); overflow: hidden;
+.duel-menu-row:hover { background: var(--panel-2); }
+.duel-menu-row.on { background: var(--brand-soft); color: var(--brand-strong); font-weight: 700; }
+.duel-menu-row.danger { color: var(--danger); }
+.duel-menu-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+.field-pick-pop { left: 50%; translate: -50% 0; min-width: 100%; width: max-content; }
+.team-cond-pop, .field-shared-pop { max-width: calc(100cqw - 24px); padding: 10px; }
+.team-cond-pop { width: 400px; }
+.field-shared-pop { width: max-content; }
+.field-shared-pop .duel-opt-grid { grid-template-columns: repeat(3, max-content); }
+.team-cond-pop { left: 0; }
+.team-bar.mirrored .team-cond-pop { left: auto; right: 0; }
+.field-shared-pop { left: 50%; translate: -50% 0; }
+.duel-pop-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 0 2px 8px; font-size: 12px; font-weight: 700; color: var(--ink);
 }
-.field-flyout .field-side:first-child { grid-area: side-a; }
-.field-flyout .field-side:last-child { grid-area: side-b; }
-.field-flyout .field-side-flags {
-  display: grid; grid-auto-flow: column; grid-template-rows: repeat(6, 24px);
-  grid-auto-columns: minmax(108px, max-content); gap: 2px 5px; min-width: 0;
+.duel-pop-title small { font-size: 11px; font-weight: 500; color: var(--sub); text-align: right; }
+.duel-opt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.duel-opt {
+  --cat: var(--cond-shared);
+  display: flex; align-items: center; gap: 6px; min-width: 0; height: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink);
+  font: inherit; font-size: 12.5px; white-space: nowrap; text-align: left; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
 }
-.field-shared-flags { grid-area: shared; display: flex; align-items: center; justify-content: center;
-  gap: 5px; padding: 4px 6px;
-  border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--line));
-  border-radius: 10px; background: color-mix(in srgb, var(--brand-soft) 76%, var(--panel)); }
-.field-flyout .fld-chk {
-  min-width: 0; height: 24px; padding: 2px 4px;
-  display: inline-flex; flex-direction: row; align-items: center; justify-content: space-between;
-  gap: 7px; border-radius: 6px; color: var(--ink); cursor: pointer;
-  font-size: 10px; transition: background-color 130ms ease, color 130ms ease;
+.duel-opt > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.duel-opt > i {
+  width: 6px; height: 6px; flex: none; border-radius: 50%;
+  background: color-mix(in srgb, var(--cat) 40%, var(--line-strong));
 }
-.field-flyout .field-side .fld-chk { width: 100%; }
-.field-flyout .fld-chk:hover { background: color-mix(in srgb, var(--brand-soft) 58%, transparent); }
-.field-flyout .fld-chk .cap {
-  order: 1; max-width: none; overflow: visible; font-size: 10px; white-space: nowrap;
+.duel-opt:hover:not(:disabled) { border-color: color-mix(in srgb, var(--cat) 45%, var(--line)); }
+.duel-opt.on {
+  border-color: color-mix(in srgb, var(--cat) 60%, var(--line));
+  background: color-mix(in srgb, var(--cat) 11%, var(--panel)); font-weight: 700;
 }
-.field-flyout .fld-chk .box { order: 2; display: grid; place-items: center; height: 16px; padding: 0; }
-.field-flyout .fld-chk input {
-  appearance: none; position: relative; width: 28px; height: 16px; margin: 0;
-  border: 1px solid var(--line-strong); border-radius: 999px;
-  background: var(--panel-3); cursor: pointer;
-  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+.duel-opt.on > i { background: var(--cat); }
+.duel-opt small { flex: none; margin-left: auto; font-size: 10px; font-weight: 500; color: var(--sub); }
+.duel-opt:disabled { opacity: .42; cursor: not-allowed; }
+.paste-pop {
+  left: 0; width: 440px; max-width: calc(100cqw - 24px);
+  display: grid; gap: 8px; padding: 12px;
 }
-.field-flyout .fld-chk input::before {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px;
-  border-radius: 50%; background: var(--panel); box-shadow: 0 1px 3px rgb(16 26 47 / .24);
-  transition: transform 150ms var(--ease-out);
+.team-bar.mirrored .paste-pop { left: auto; right: 0; }
+
+/* -- tiers ----------------------------------------------------------------------------------
+   Below ~1080px the console takes its own row above the two rosters; below 780px everything
+   stacks, the right wing stops mirroring, and popovers span the strip. */
+@container duelbar (max-width: 1079px) {
+  .duel-teams { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .field-console {
+    grid-column: 1 / -1; grid-row: 1; grid-template-rows: 40px auto; row-gap: 2px;
+    padding-bottom: 6px; border-bottom: 1px dashed color-mix(in srgb, var(--line-strong) 70%, transparent);
+  }
+  .field-console-main { height: 40px; }
+  .team-bar { grid-row: 2; }
+  .duel-teams::before {
+    -webkit-mask-image: radial-gradient(ellipse 48% 70% at 50% 18%, #000 25%, transparent 100%);
+    mask-image: radial-gradient(ellipse 48% 70% at 50% 18%, #000 25%, transparent 100%);
+  }
 }
-.field-flyout .fld-chk input:checked {
-  border-color: var(--brand); background: var(--brand);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 15%, transparent);
+@container duelbar (max-width: 779px) {
+  .duel-bar { --slot: 42px; --slot-gap: 4px; }
+  .duel-teams { grid-template-columns: minmax(0, 1fr); padding: 10px 10px 8px; }
+  .field-console, .team-bar { grid-column: auto; grid-row: auto; }
+  .field-console {
+    padding: 8px 0; border-block: 1px solid var(--line);
+    grid-template-rows: auto auto; row-gap: 6px;
+  }
+  .field-console-main {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    width: min(100%, 520px); height: auto; gap: 5px;
+  }
+  .field-format.seg button { padding: 0 10px; }
+  .terrain-dot { margin: 0 2px; }
+  .field-pick > .field-pill { width: 100%; max-width: none; justify-content: center; }
+  .team-bar.mirrored { grid-template-columns: auto minmax(0, 1fr); }
+  .team-bar.mirrored .team-who { grid-column: 1; }
+  .team-bar.mirrored .team-strip, .team-bar.mirrored .team-conds {
+    grid-column: 2; flex-direction: row;
+  }
+  .team-bar.mirrored .team-who-btn { justify-items: start; padding: 3px 8px 3px 6px; text-align: left; }
+  .team-bar.mirrored .duel-menu, .team-bar.mirrored .team-cond-pop,
+  .team-bar.mirrored .paste-pop { left: 0; right: auto; }
+  .team-cond-pop, .paste-pop { width: calc(100cqw - 22px); max-width: none; }
+  .field-shared-pop { width: calc(100cqw - 22px); max-width: none; }
+  .field-shared-pop .duel-opt-grid { grid-template-columns: minmax(0, 1fr); }
+  .duel-opt-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .duel-teams::before {
+    -webkit-mask-image: radial-gradient(ellipse 90% 26% at 50% 50%, #000 30%, transparent 100%);
+    mask-image: radial-gradient(ellipse 90% 26% at 50% 50%, #000 30%, transparent 100%);
+  }
 }
-.field-flyout .fld-chk input:checked::before { transform: translateX(12px); }
-.duel-teams .field-global .field-format { flex: none; padding: 2px; border-radius: 9px; }
-.duel-teams .field-global .field-format button {
-  min-width: 0; width: auto; height: 26px; padding: 0 7px; border-radius: 7px;
-  font-size: 12px; font-weight: 650; letter-spacing: .02em;
+@container duelbar (max-width: 380px) {
+  .duel-bar { --slot-gap: 3px; }
+  .team-who-btn { max-width: 72px; padding-inline: 4px; }
+  .team-bar { column-gap: 5px; }
 }
-.duel-teams .field-global .field-format button.on { font-weight: 750; }
-.duel-teams .field-global .field-format .field-expand { min-width: 0;
-  color: var(--brand-strong); white-space: nowrap; background: transparent; box-shadow: none; }
-.duel-teams .field-global .field-format .field-expand:hover { color: var(--brand); }
-.duel-teams .field-global .field-control-label {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 30px;
-  font-size: 11.5px; white-space: nowrap;
-}
-.duel-teams .field-global .field-cap { flex: none; color: var(--sub); }
-.duel-teams .field-global select {
-  min-height: 30px; height: 30px; min-width: 96px; padding: 2px 27px 2px 9px;
-  font-weight: 600; color: var(--ink);
-}
-.field-active-common {
-  position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%);
-  display: flex; align-items: center; justify-content: center; flex-wrap: nowrap;
-  width: max-content; max-width: 100%; min-height: 24px; gap: 4px;
-}
-.field-active-common .team-flag-chip { min-height: 20px; padding: 0 5px; }
 
 /* The form portrait is a cue, not a second hero image. Its former width belongs to the two
    identity controls; type badges sit with the Pokémon label and Mega sits beside the form label. */
@@ -3524,28 +3712,7 @@ input.stat-cur.hp-cur { text-align: center; }
 .mon-editor-label-line .type-badge { gap: 3px; font-size: 10.5px; color: var(--ink); }
 .mon-editor-label-line .type-badge img { width: 15px; height: 15px; }
 
-@media (max-width: 1000px) {
-  .duel-teams { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
-  .duel-teams .field-panel { order: -1; }
-  .duel-teams .team-bar { min-width: 0; margin-inline: 0; }
-  .field-active-common {
-    position: static; transform: none; width: auto; min-height: 20px; flex-wrap: wrap;
-  }
-}
 @media (max-width: 520px) {
-  .field-flyout { bottom: 68px; width: calc(100vw - 16px);
-    max-height: min(460px, 55vh); overflow-y: auto; }
-  .field-flyout-row {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "shared" "side-a" "side-b";
-  }
-  .field-shared-flags { min-width: 0; justify-content: center; }
-  .field-flyout .field-side-flags { grid-auto-columns: minmax(112px, 1fr); }
-  .field-line { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; }
-  .field-format { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
-  .field-weather { grid-column: 1; grid-row: 2; flex-wrap: wrap; justify-content: flex-end; }
-  .field-terrain { grid-column: 2; grid-row: 2; flex-wrap: wrap; justify-content: flex-start; }
-  .duel-teams .field-global select { min-width: 84px; }
   .hp-warning::after { max-width: min(260px, 70vw); }
   .duel-summary-row {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 6px;
@@ -3556,19 +3723,6 @@ input.stat-cur.hp-cur { text-align: center; }
 }
 
 /* ==== calc workspace: rosters → results → builds ======================================= */
-/* The roster bar opens the page. It is framed by a hairline and left unfilled: the weather art is
-   the only thing painted on it, and a terrain adds its colour as the bottom edge. */
-.duel-teams {
-  padding: 8px 12px 9px; border: 1px solid var(--line); border-radius: var(--radius);
-  background: transparent;
-}
-.duel-teams[class*="terrain-"] { box-shadow: inset 0 -3px 0 var(--terrain-edge); }
-.duel-teams > .team-bar:first-child { margin-left: 0; }
-.duel-teams > .team-bar:last-child { margin-right: 0; }
-/* With the bar at the top of the page, the condition flyout opens downward, over the results. */
-.field-flyout { top: calc(100% + 6px); bottom: auto; }
-.field-flyout::after { top: auto; bottom: 100%; }
-
 /* Each side is one panel: its result on top, the build that produced it underneath. The two halves
    are told apart by a hairline and a faint wash on the build, not by two separate cards. */
 .duel-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
@@ -3729,9 +3883,6 @@ input.stat-cur.hp-cur { text-align: center; }
   .duel-dmg-pct { font-size: 18px; }
   .duel-move-grid { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 520px) {
-  .field-flyout { top: calc(100% + 6px); bottom: auto; }
-}
 
 /* ==== durability workbench (耐久调整) ============================================== */
 /* Rosters → results → builds, the same order as the damage calculator. The two builds reuse the
@@ -3739,23 +3890,6 @@ input.stat-cur.hp-cur { text-align: center; }
    everything else is specific to this tool and namespaced `tw-`. */
 .tw { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 
-/* -- roster bar ------------------------------------------------------------------------ */
-/* The calculator's own bar (`.duel-teams` + TeamBar + the console line), so the two tabs line up
-   pixel for pixel. Only the line above the console differs: our three screens as toggles, where the
-   calculator lists its active conditions. */
-.tw-teams .tw-walls { gap: 5px; }
-/* Two formats and no condition button: widened to the calculator's three-button segment, so the
-   weather and terrain selects stay where they were when the tab changes. */
-.tw-teams .field-global .field-format button { min-width: 71px; }
-.tw-walls-cap { margin-right: 1px; font-size: 11px; color: var(--sub); white-space: nowrap; }
-.tw-teams .tw-wall {
-  border-style: dashed; border-color: var(--line-strong); background: transparent; color: var(--sub);
-}
-.tw-teams .tw-wall:hover { border-color: var(--brand); color: var(--brand-strong); }
-.tw-teams .tw-wall.on {
-  border-style: solid; border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
-  background: var(--brand-soft); color: var(--brand-strong); font-weight: 700;
-}
 .tw-text-btn {
   border: 1px dashed var(--line); border-radius: 6px; padding: 1px 7px; background: transparent;
   cursor: pointer; color: var(--brand-strong); font: inherit; font-size: 11.5px; font-weight: 650;
@@ -3772,7 +3906,6 @@ input.stat-cur.hp-cur { text-align: center; }
   font-size: 12px; font-weight: 650; white-space: nowrap;
 }
 .tw-arrow { color: var(--sub); }
-.tw-matchup .tw-swap { margin-left: 4px; padding: 3px 9px; font-size: 12px; white-space: nowrap; }
 .tw-state {
   display: inline-flex; align-items: center; justify-content: center; padding: 2px 10px;
   border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap;

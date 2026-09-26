@@ -1,849 +1,888 @@
-/** Speed line: MY mon (the query slot, with 最速/準速/無振/最慢 presets) plotted against a live
- * metagame speed-tier TABLE — every top-N usage mon shown at all four investment tiers at once, plus
- * the two lines that decide most Speed reads in practice: max investment under Tailwind and under
- * Choice Scarf (design ref: the gamewith / nerd-of-now speed tools). Each speed cell is coloured
- * against my mon: red = that line outspeeds me, green = I outspeed it. Click any cell to load that
- * mon at that line into the query slot. Custom opponents get their own rows with a real "actual"
- * speed (Scarf/Tailwind folded).
+/** Speed line: where OUR selected Pokémon stands in the metagame, and the tools to move it.
  *
- * Nothing here is behind a Calculate button. The table and my own speeds both recompute from a
- * SIGNATURE of the inputs they read, so editing a nature re-runs them and clicking a cell, switching
- * the add-to side or re-rendering does not: an explicit button on a derived number is a button that
- * exists only to make the reader wonder whether the number on screen is still the current one. */
+ * The page reads the calc page's shared roster. Two cards, like the calculator's: ours on the left is
+ * the reference the whole table is coloured against; the other side's is whatever the user chose to
+ * compare — a specific build worth checking. Both edit the shared builds. The table is not a matchup
+ * between the two teams: it lists the metagame, and a roster Pokémon appears in its own species' row.
+ *
+ * Only conditions that move a Speed number are offered, and since each is a single switch they sit
+ * on the strip itself: each side's Tailwind, and Trick Room, which reverses who moves first. Weather
+ * and terrain stay (Swift Swim, Surge Surfer…). Everything else on the shared field is the
+ * calculator's and is not shown.
+ *
+ * The metagame table lists every top-N species at the four investment tiers plus the two modified
+ * lines (Tailwind, Scarf at max investment) and, from the observed-build catalog the calculator
+ * already loads, the real builds, with the Meta stitch last as the environment picker shows it. The
+ * 实配 cell shows one build at a time and opens the build cards to switch it; a roster Pokémon's own
+ * build joins that list — selected where it equals a real build, added on top where it does not.
+ * Under its side's Tailwind a roster build's cell reads the doubled Speed (the cards keep the build's
+ * own), and sorting and colouring follow the doubled number. The table only reads: nothing in it
+ * writes to the roster.
+ * Nothing here is behind a Calculate button either: each batch re-runs from a signature of exactly
+ * the inputs it reads, and a hidden tab defers its work until it is shown again. */
 import type {
-  FormatId, NatureDto, SpeedInputDto, Status,
+  FormatId, NatureDto, OppSetCatalogDto, SpeedInputDto, SpeedlineDto,
 } from "@pokemon-champions/protocol";
 import { isErrorShape } from "@pokemon-champions/protocol";
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { BuildSetSummary, type BuildCardOption } from "../../components/BuildPicker.tsx";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BuildPicker, type BuildCardOption } from "../../components/BuildPicker.tsx";
 import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
 import { EntityHover } from "../../components/EntityHover.tsx";
-import { FormatTabs } from "../../components/FormatTabs.tsx";
 import { GameImage } from "../../components/GameImage.tsx";
+import { loadOppSetsCached, useMovesByName, useRanking } from "../../hooks.ts";
 import { displayName, useLang, useT } from "../../i18n.ts";
-import { type ItemRef } from "../../runtime/projection.ts";
-import { useRanking } from "../../hooks.ts";
+import type { DexIndexEntry, RuntimeAdapter } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
-import type { DexIndexEntry } from "../../runtime/adapter.ts";
+import type { ItemRef } from "../../runtime/projection.ts";
+import { useRoster } from "./roster.tsx";
 import {
-  BOOST_STAGES, BuildPickerButton, FieldCheck, MonPicker, STATUSES, boostLabel, modalForEntry,
-  natureLabel, useModalFill, megaFor, withMega,
-  type BuildOption,
+  buildConfigSig, observedBuildOptions, useBuildOptions, withMega, type BuildOption,
 } from "./shared.tsx";
+import { FieldPanel, useFieldOffers } from "./duel/FieldPanel.tsx";
+import { buildCardOptionForMon } from "./duel/MonEditor.tsx";
+import { monsFromPaste } from "./duel/paste.ts";
+import { SwapSeam } from "./duel/SwapSeam.tsx";
+import { DuelBar, TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
+import {
+  applyBuildOption, effectiveEntry, makeMon, type MonState, type SharedFlagKey, type SideId,
+} from "./duel/state.ts";
+import {
+  SCARF, SPEED_SIDE_FLAGS, SP_MAX, TIER_KEYS, TIER_SPEC, movesFirst, natureDir, neutralNature,
+  offenseOf, speedInputOf, speedNature, spToBeat, type Tier,
+} from "./speed/lens.ts";
+import { SpeedCard } from "./speed/SpeedCard.tsx";
 
-interface SpeedState {
-  slug: string;
-  ability: string;
-  nature: string;
-  item: string;
-  speedSp: number;   // 0..32
-  boost: number;     // -6..6
-  status: string;
-  tailwind: boolean;
-  /** A drawer card is authoritative even when it is the deliberately blank Custom card. */
-  pinned?: boolean;
-}
-const EMPTY_SPEED: SpeedState = {
-  slug: "", ability: "", nature: "", item: "", speedSp: 32, boost: 0, status: "", tailwind: false,
-  pinned: false,
-};
-
-function cleanSpeed(s: SpeedState, name: string): SpeedInputDto {
-  return {
-    name,
-    ...(s.nature ? { nature: s.nature } : {}),
-    ...(s.ability ? { ability: s.ability } : {}),
-    sps: { spe: s.speedSp },
-    ...(s.boost ? { boosts: { spe: s.boost } } : {}),
-    ...(s.item ? { item: s.item } : {}),
-    ...(s.status ? { status: s.status as Status } : {}),
-    ...(s.tailwind ? { field: { tailwind: true } } : {}),
-  };
-}
-
-type Preset = { plus: string; minus: string; neutral: string };
-const TIER_KEYS = ["max", "fast", "none", "min"] as const;
-type Tier = (typeof TIER_KEYS)[number];
 const TIER_LABEL: Record<Tier, "speed.preset.max" | "speed.preset.fast" | "speed.preset.none" | "speed.preset.min"> = {
   max: "speed.preset.max", fast: "speed.preset.fast", none: "speed.preset.none", min: "speed.preset.min",
 };
-
-/** The three speed-relevant natures (found by their spe modifier — the dex is the authority). */
-function useSpeedNatures(natures: NatureDto[]): Preset {
-  return useMemo(() => ({
-    plus: natures.find((n) => n.upStat === "spe" && n.downStat !== "spe")?.name ?? "",
-    minus: natures.find((n) => n.downStat === "spe" && n.upStat !== "spe")?.name ?? "",
-    neutral: natures.find((n) => !n.upStat || n.upStat === n.downStat)?.name ?? "",
-  }), [natures]);
-}
-
-/** Every Pokémon Champions individual value is fixed at 31. The four tiers therefore differ only
- * by nature and SP: 最速 (+spe, 32), 準速 (neutral, 32), 無振 (neutral, 0), 最慢 (−spe, 0). */
-function tierState(slug: string, tier: Tier, p: Preset): SpeedState {
-  const c = tier === "max" ? { n: p.plus, sp: 32 }
-    : tier === "fast" ? { n: p.neutral, sp: 32 }
-    : tier === "none" ? { n: p.neutral, sp: 0 }
-    : { n: p.minus, sp: 0 };
-  return { ...EMPTY_SPEED, slug, nature: c.n, speedSp: c.sp };
-}
-
-/** The two modified lines, both read off MAX investment: the question they answer is "what does the
- * fastest build of this mon reach once the obvious multiplier lands", so a lower tier would not be
- * the line anyone checks. Both go through the engine rather than being multiplied here — the
- * rounding of a Speed modifier is the calculator's fact, not the table's. */
-const SCARF = "Choice Scarf";
 const MOD_KEYS = ["tailwind", "scarf"] as const;
 type Mod = (typeof MOD_KEYS)[number];
-const MOD_LABEL: Record<Mod, "speed.tailwind" | "speed.scarf"> = {
-  tailwind: "speed.tailwind", scarf: "speed.scarf",
-};
+const MOD_LABEL: Record<Mod, "speed.tailwind" | "speed.scarf"> = { tailwind: "speed.tailwind", scarf: "speed.scarf" };
+const SPEED_SHARED: SharedFlagKey[] = ["trickRoom"];
+const SIDES: SideId[] = ["a", "b"];
+const BATCH = 240;
+const CURVE = Array.from({ length: SP_MAX + 1 }, (_, sp) => sp);
 
-function modState(slug: string, mod: Mod, p: Preset): SpeedState {
-  const base = tierState(slug, "max", p);
-  return mod === "tailwind" ? { ...base, tailwind: true } : { ...base, item: SCARF };
-}
-
-function SpeedRow({ label, side, setSide, dex, natures, items, presets, format, onRemove, add }: {
-  label: string;
-  side: SpeedState;
-  setSide: Dispatch<SetStateAction<SpeedState>>;
-  dex: DexIndexEntry[];
-  natures: NatureDto[];
-  items: ItemRef[];
-  presets: Preset;
-  format: FormatId;
-  onRemove?: () => void;
-  /** The column's append control rides on its LAST card: a heading row above the cards existed
-   * only to hold this one button. */
-  add?: { label: string; onAdd: () => void; full: boolean };
-}) {
-  const { lang } = useLang();
-  const t = useT();
-  const entry = dex.find((e) => e.slug === side.slug);
-  const mega = entry?.isMega ? entry : megaFor(side.slug, side.item, dex, items);
-  const requiredStone = entry?.isMega
-    ? items.find((i) => i.requiredBy?.includes(entry.name)) : undefined;
-  useEffect(() => {
-    if (requiredStone && side.item !== requiredStone.name) {
-      setSide((s) => ({ ...s, item: requiredStone.name }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requiredStone?.name, side.slug]);
-
-  const preset = (nature: string, speedSp: number) =>
-    setSide((s) => ({ ...s, nature, speedSp }));
-  const activePreset = TIER_KEYS.find((tier) => {
-    const selected = tierState(side.slug, tier, presets);
-    return side.nature && side.nature === selected.nature
-      && side.speedSp === selected.speedSp;
-  });
-  const scarfOn = side.item === SCARF;
-
-  return (
-    <div className="panel form-panel speed-row mon-config">
-      <strong className="side-head">
-        <span className="speed-heading-label">{label}
-          {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
-          {/* Adding extends the list this card ends, so it reads as part of the card's own label. */}
-          {add && (
-            <button type="button" className="ghost-btn tiny speed-add" onClick={add.onAdd}
-              disabled={add.full} title={add.full ? t("calc.maxSix") : add.label}
-              aria-label={add.full ? t("calc.maxSix") : add.label}>
-              + {t("speed.addShort")}
-            </button>
-          )}
-        </span>
-        {/* A speed row holds only the Speed half of a build, so it claims no "current" card — it
-            reads one off the environment and never pretends the row still IS that card. */}
-        <span className="side-actions">
-          <BuildPickerButton slug={side.slug} format={format}
-            onPick={(option) => {
-              const modal = modalForEntry(option.modal, entry, requiredStone);
-              setSide((s) => ({
-                ...s,
-                ability: modal.ability,
-                nature: modal.nature,
-                item: modal.item,
-                speedSp: modal.sps.spe ?? 0,
-                pinned: true,
-              }));
-            }} />
-          {/* Kept on the last row too, disabled: the cluster is the same three pixels wide on every
-              card, so the buttons beside it do not shift when a row is added or dropped. */}
-          <button type="button" className="mini-x" onClick={onRemove} disabled={!onRemove}
-            aria-label={t("a11y.remove")} title={t("a11y.remove")}>✕</button>
-        </span>
-      </strong>
-      <MonPicker idKey={`spd-${label}`} slug={side.slug} dex={dex}
-        onSlug={(slug) => setSide((s) => s.slug === slug ? s : { ...EMPTY_SPEED, slug })} />
-      <div className="speed-presets">
-        <button type="button" className={side.tailwind ? "on" : ""}
-          aria-pressed={side.tailwind}
-          onClick={() => setSide((s) => ({ ...s, tailwind: !s.tailwind }))}>
-          {t("speed.tailwind")}
-        </button>
-        <button type="button" className={scarfOn ? "on" : ""}
-          aria-pressed={scarfOn} disabled={!!entry?.isMega}
-          title={entry?.isMega ? t("speed.megaNoScarf") : undefined}
-          onClick={() => setSide((s) => ({ ...s, item: s.item === SCARF ? "" : SCARF }))}>
-          {t("speed.scarf")}
-        </button>
-        {TIER_KEYS.map((tier) => {
-          const selected = tierState(side.slug, tier, presets);
-          return <button key={tier} type="button" className={activePreset === tier ? "on" : ""}
-            aria-pressed={activePreset === tier}
-            onClick={() => preset(selected.nature, selected.speedSp)}>
-            {t(TIER_LABEL[tier])}
-          </button>;
-        })}
-      </div>
-      <div className="speed-fields">
-        <label>{t("calc.ability")}
-          <select value={side.ability}
-            onChange={(e) => setSide((s) => ({ ...s, ability: e.target.value }))}>
-            <option value="">—</option>
-            {entry?.abilities.map((ability) => (
-              <option key={ability.name} value={ability.name}>{displayName(ability, lang)}</option>
-            ))}
-          </select>
-        </label>
-        <label>{t("calc.nature")}
-          <select value={side.nature}
-            onChange={(e) => setSide((s) => ({ ...s, nature: e.target.value }))}>
-            <option value="">—</option>
-            {natures.map((n) => <option key={n.name} value={n.name}>{natureLabel(n, lang)}</option>)}
-          </select>
-        </label>
-        <label>{t("speed.sp")}
-          <input type="number" min={0} max={32} className="num" value={side.speedSp}
-            onChange={(e) => setSide((s) => ({
-              ...s, speedSp: Math.max(0, Math.min(32, Number(e.target.value))) }))} />
-        </label>
-        <label>{t("speed.boost")}
-          <select className="boost-sel" value={side.boost}
-            onChange={(e) => setSide((s) => ({ ...s, boost: Number(e.target.value) }))}>
-            {BOOST_STAGES.map((n) => <option key={n} value={n}>{boostLabel(n)}</option>)}
-          </select>
-        </label>
-        <label>{t("calc.status")}
-          <select value={side.status}
-            onChange={(e) => setSide((s) => ({ ...s, status: e.target.value }))}>
-            {STATUSES.map((st) => (
-              <option key={st} value={st === "Healthy" ? "" : st}>{t(`status.${st}`)}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-    </div>
-  );
+interface RealBuild {
+  option: BuildOption;
+  /** The build's own signature, to recognise a roster Pokémon that carries exactly this build. */
+  sig: string;
+  speed: number | null;
+  lo: number | null;
+  hi: number | null;
 }
 
 interface TierRow {
-  rowKey?: string;
-  sideIndex?: number;
-  state?: SpeedState;
+  rowKey: string;
   slug: string;
   name: string;
   rank: number | null;
-  kind: "meta" | "custom" | "mine";
-  base?: number;     // base Speed stat (same across every tier of a mon)
+  base?: number;
   tiers: Partial<Record<Tier, number>>;
-  mods: Partial<Record<Mod, number>>;   // max investment under Tailwind / Choice Scarf
-  actual?: number;   // custom opponents' real configured speed (Scarf/Tailwind folded)
+  mods: Partial<Record<Mod, number>>;
+  real: RealBuild[];
 }
 
-/** Actual builds share the Max+ ordering axis without pretending to have a Max+ cell. */
-function rowOrderSpeed(row: TierRow): number {
-  return row.kind === "meta" ? (row.tiers.max ?? -1) : (row.actual ?? -1);
+/** A roster Pokémon, placed in its species' row. */
+interface Member {
+  side: SideId;
+  index: number;
+  mon: MonState;
+  /** Its build's Speed under the shared weather and terrain — the same terms as a real build's. */
+  speed: number | null;
+  /** The same build under its side's Tailwind, or null while that side has none. */
+  tailwind: number | null;
+  /** The real build it equals, if any. */
+  matchKey: string | null;
+  /** A slot with nothing set yet is on the team, but has no build to compare. */
+  built: boolean;
 }
 
-function compareSpeedRows(a: TierRow, b: TierRow): number {
-  return rowOrderSpeed(b) - rowOrderSpeed(a);
+/** One card in a 实配 picker, with the Speed the cell would show for it. */
+interface RealCard {
+  key: string;
+  option: BuildCardOption;
+  speed: number | null;
+  coverage: number | null;
+  /** The roster Pokémon carrying this build, if any. */
+  member: Member | null;
 }
 
-function speedBuildCard(side: SpeedState, entry: DexIndexEntry): BuildCardOption {
-  return {
-    key: `speed:${entry.slug}:${side.item}:${side.ability}:${side.nature}:${side.speedSp}`,
-    source: "custom",
-    coverage: null,
-    isModal: false,
-    set: {
-      species: entry.name,
-      runForm: entry.isMega ? entry.name : null,
-      ability: side.ability || null,
-      item: side.item || null,
-      nature: side.nature || null,
-      moves: null,
-      sps: { spe: side.speedSp },
-    },
-  };
+type SortKey = "actual" | "base";
+interface SpeedView {
+  topN: number;
+  compare: "active" | "team";
+  sort: { key: SortKey; dir: "desc" | "asc" };
+  /** The item a Pokémon held before the Scarf button swapped one in, by roster uid. */
+  scarfRestore: Record<string, string>;
+}
+const VIEW_KEY = "pc-calc-speed-view-v1";
+const DEFAULT_VIEW: SpeedView = {
+  topN: 60, compare: "active", sort: { key: "actual", dir: "desc" }, scarfRestore: {},
+};
+
+function loadView(): SpeedView {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(VIEW_KEY) ?? "null") as Partial<SpeedView> | null;
+    if (!raw || typeof raw !== "object") return DEFAULT_VIEW;
+    const restore = raw.scarfRestore && typeof raw.scarfRestore === "object"
+      ? Object.fromEntries(Object.entries(raw.scarfRestore).filter(([, v]) => typeof v === "string"))
+      : {};
+    const sort = raw.sort && (raw.sort.key === "actual" || raw.sort.key === "base")
+      ? { key: raw.sort.key, dir: raw.sort.dir === "asc" ? "asc" as const : "desc" as const }
+      : DEFAULT_VIEW.sort;
+    return {
+      topN: [30, 60, 100].includes(raw.topN as number) ? raw.topN as number : DEFAULT_VIEW.topN,
+      compare: raw.compare === "team" ? "team" : "active",
+      sort,
+      scarfRestore: restore as Record<string, string>,
+    };
+  } catch {
+    return DEFAULT_VIEW;
+  }
 }
 
-export function SpeedTab({ dex, natures, items, onRailApi }: {
+/** Catalog nature names are not always capitalised ("relaxed"); the engine only knows the canonical. */
+const canonicalNature = (name: string) => (name ? name[0]!.toUpperCase() + name.slice(1).toLowerCase() : name);
+
+async function speedBatch(adapter: RuntimeAdapter, inputs: SpeedInputDto[]): Promise<Array<SpeedlineDto | null>> {
+  const chunks: SpeedInputDto[][] = [];
+  for (let i = 0; i < inputs.length; i += BATCH) chunks.push(inputs.slice(i, i + BATCH));
+  const parts = await Promise.all(chunks.map((chunk) => adapter.speedBatch(chunk)));
+  return parts.flat().map((row) => (row && !isErrorShape(row) ? row as SpeedlineDto : null));
+}
+
+function SortGlyph({ dir }: { dir: "desc" | "asc" | null }) {
+  return (
+    <svg className={`th-sort-glyph${dir ? ` ${dir}` : ""}`} viewBox="0 0 10 12" aria-hidden>
+      <path d="M5 1.5 8 5H2z" className="up" />
+      <path d="M5 10.5 2 7h6z" className="down" />
+    </svg>
+  );
+}
+
+export function SpeedTab({ dex, natures, items, onRailApi, active: visible = true }: {
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
   onRailApi?: (api: CalcRailApi) => void;
+  /** False while another calc tab is showing: batches wait until the tab is back. */
+  active?: boolean;
 }) {
-  const { adapter } = useRuntime();
+  const { adapter, capabilities } = useRuntime();
   const t = useT();
   const { lang } = useLang();
-  const loadModal = useModalFill();
-  const presets = useSpeedNatures(natures);
+  const moveVocab = useMovesByName();
+  const { teams, active, field, setTeams, setActive, setField, swapSides } = useRoster();
+  const format: FormatId = field.format;
+  const neutral = useMemo(() => neutralNature(natures), [natures]);
+  const natureNames = useMemo(() => ({
+    plus: natures.find((n) => n.upStat === "spe" && n.downStat !== "spe")?.name ?? "Timid",
+    minus: natures.find((n) => n.downStat === "spe" && n.upStat !== "spe")?.name ?? "Brave",
+  }), [natures]);
 
-  const [format, setFormat] = useState<FormatId>("single");
-  const [trickRoom, setTrickRoom] = useState(false);
-  const [topN, setTopN] = useState(60);
-  const [mySides, setMySides] = useState<SpeedState[]>([
-    { ...EMPTY_SPEED, slug: "garchomp" },
-  ]);
-  const [opponents, setOpponents] = useState<SpeedState[]>([
-    { ...EMPTY_SPEED, slug: "mimikyu" },
-  ]);
-  const [rows, setRows] = useState<TierRow[]>([]);
-  const [mySpeeds, setMySpeeds] = useState<Array<number | null>>([]);
+  const [view, setView] = useState<SpeedView>(loadView);
+  useEffect(() => {
+    try { sessionStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch { /* storage blocked */ }
+  }, [view]);
   const [error, setError] = useState<string | null>(null);
-  const [tableTarget, setTableTarget] = useState<CalcRailTarget>("primary");
-  const [tableFeedback, setTableFeedback] = useState<{ ok: boolean; text: string } | null>(null);
-  const [markerRailHeight, setMarkerRailHeight] = useState(0);
-  const speedScrollRef = useRef<HTMLDivElement>(null);
-  const markerRailRef = useRef<HTMLDivElement>(null);
+
+  const entryOf = useCallback((slug: string) => dex.find((e) => e.slug === slug), [dex]);
+  const category = useCallback((move: string) => moveVocab.get(move)?.category, [moveVocab]);
+  const nameOf = useCallback((slug: string) => {
+    const entry = entryOf(slug);
+    return entry ? displayName(entry, lang) : slug;
+  }, [entryOf, lang]);
+  const sideName = (side: SideId) => (side === "a" ? t("speed.ours") : t("speed.theirs"));
+
+  const mineIndex = Math.min(active.a, teams.a.length - 1);
+  const mine = teams.a[mineIndex]!;
+  const foeIndex = Math.min(active.b, teams.b.length - 1);
+  const foe = teams.b[foeIndex]!;
+
+  const setMonByUid = useCallback((uid: string, update: (mon: MonState) => MonState) => {
+    setTeams((previous) => {
+      for (const side of SIDES) {
+        const at = previous[side].findIndex((mon) => mon.uid === uid);
+        const current = previous[side][at];
+        if (!current) continue;
+        const next = update(current);
+        if (next === current) return previous;
+        const team = [...previous[side]];
+        team[at] = next;
+        return { ...previous, [side]: team };
+      }
+      return previous;
+    });
+  }, [setTeams]);
+  const setMine = useCallback((update: (mon: MonState) => MonState) => setMonByUid(mine.uid, update),
+    [setMonByUid, mine.uid]);
+  const setFoe = useCallback((update: (mon: MonState) => MonState) => setMonByUid(foe.uid, update),
+    [setMonByUid, foe.uid]);
+
+  // -- the roster: live Speeds, build Speeds, and our SP curves --------------------------------
+
+  // Real builds are on nobody's side: the shared weather and terrain apply, no Tailwind does. A
+  // roster build is read on the same terms when it sits in the table beside them.
+  const plainField = useMemo(() => ({ ...field, sides: { a: {}, b: {} } }), [field]);
+  // The same, keeping only each side's Tailwind: a roster build's cell reads it (see Member.tailwind).
+  const tailwindField = useMemo(() => ({ ...field, sides: {
+    a: { tailwind: !!field.sides.a.tailwind }, b: { tailwind: !!field.sides.b.tailwind } } }), [field]);
+  const offenseMine = offenseOf(mine, effectiveEntry(mine, dex, items), category);
+  const mineInput = speedInputOf(mine, field, "a", dex, items, neutral);
+  const altNature = speedNature(natures, mine.nature, field.trickRoom ? "-" : "+", offenseMine);
+
+  const teamPlan = useMemo(() => {
+    const members = SIDES.flatMap((side) => teams[side].map((mon) => {
+      const bare = { ...mon, boosts: {}, status: "", abilityOn: null };
+      return {
+        mon,
+        live: speedInputOf(mon, field, side, dex, items, neutral),
+        build: speedInputOf(bare, plainField, null, dex, items, neutral),
+        tailwind: tailwindField.sides[side].tailwind
+          ? speedInputOf(bare, tailwindField, side, dex, items, neutral) : null,
+      };
+    }));
+    const inputs: SpeedInputDto[] = members.flatMap(({ live, build, tailwind }) =>
+      (live && build ? [live, build, ...(tailwind ? [tailwind] : [])] : []));
+    const curve = mineInput ? CURVE.map((sp) => ({ ...mineInput, sps: { spe: sp } })) : [];
+    const alt = mineInput && altNature !== mineInput.nature
+      ? CURVE.map((sp) => ({ ...mineInput, nature: altNature, sps: { spe: sp } })) : [];
+    const all = [...inputs, ...curve, ...alt];
+    return { members, curve, alt, all, sig: JSON.stringify(all) };
+  }, [teams, field, plainField, tailwindField, dex, items, neutral, mineInput, altNature]);
+
+  const [teamRun, setTeamRun] = useState<{
+    sig: string; byUid: Record<string, SpeedlineDto>; buildByUid: Record<string, number>;
+    tailwindByUid: Record<string, number>; curve: Array<number | null>; alt: Array<number | null>;
+  } | null>(null);
+  const teamToken = useRef(0);
+  useEffect(() => {
+    if (!visible || teamRun?.sig === teamPlan.sig) return;
+    const token = ++teamToken.current;
+    const plan = teamPlan;
+    if (!plan.all.length) {
+      setTeamRun({ sig: plan.sig, byUid: {}, buildByUid: {}, tailwindByUid: {}, curve: [], alt: [] });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      speedBatch(adapter, plan.all).then((out) => {
+        if (token !== teamToken.current) return;
+        const byUid: Record<string, SpeedlineDto> = {};
+        const buildByUid: Record<string, number> = {};
+        const tailwindByUid: Record<string, number> = {};
+        let at = 0;
+        for (const member of plan.members) {
+          if (!member.live || !member.build) continue;
+          const live = out[at++];
+          const build = out[at++];
+          const tailwind = member.tailwind ? out[at++] : null;
+          if (live) byUid[member.mon.uid] = live;
+          if (build) buildByUid[member.mon.uid] = build.finalSpeed;
+          if (tailwind) tailwindByUid[member.mon.uid] = tailwind.finalSpeed;
+        }
+        const read = (n: number) => out.slice(at, at + n).map((row) => row?.finalSpeed ?? null);
+        const curve = read(plan.curve.length); at += plan.curve.length;
+        const alt = read(plan.alt.length);
+        setTeamRun({ sig: plan.sig, byUid, buildByUid, tailwindByUid, curve, alt });
+        setError(null);
+      }).catch((e) => {
+        console.error("Speed calculation failed:", e);
+        if (token === teamToken.current) setError(t("calc.error"));
+      });
+    }, 160);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamPlan.sig, visible]);
+
+  const speedOf = useCallback((mon: MonState) => teamRun?.byUid[mon.uid]?.finalSpeed ?? null, [teamRun]);
+  const mineSpeed = speedOf(mine);
+
+  // -- the metagame table ---------------------------------------------------------------------
 
   const ranking = useRanking(format);
-  const rankingRows = ranking.status === "ready" ? ranking.data.rows : [];
-  const entryOf = (slug: string) => dex.find((e) => e.slug === slug);
-  const rankOf = (slug: string) => rankingRows.find((r) => r.slug === slug)?.rank ?? null;
-
-  // Seed new hand-added MY rows at 最速 once the +spe nature is known. Drawer Custom cards are
-  // pinned, so deliberately blank cards do not acquire an environment/default nature behind the user.
+  const rankingRows = useMemo(() => (ranking.status === "ready" ? ranking.data.rows : []), [ranking]);
+  const [catalog, setCatalog] = useState<{ format: FormatId; data: OppSetCatalogDto | null } | null>(null);
   useEffect(() => {
-    if (presets.plus) setMySides((previous) => {
-      let changed = false;
-      const next = previous.map((side) => {
-        if (side.nature || side.pinned) return side;
-        changed = true;
-        return { ...side, nature: presets.plus, speedSp: 32 };
+    let live = true;
+    loadOppSetsCached(adapter, capabilities.deploymentId, format)
+      .then((data) => { if (live) setCatalog({ format, data }); })
+      .catch((e) => {
+        console.error(`observed build catalog failed for ${format}:`, e);
+        if (live) setCatalog({ format, data: null });
       });
-      return changed ? next : previous;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presets.plus, mySides.length]);
+    return () => { live = false; };
+  }, [adapter, capabilities.deploymentId, format]);
+  const catalogData = catalog?.format === format ? catalog.data : null;
 
-  // Custom opponents auto-fill their highest-share observed build on a fresh pick (Meta fallback
-  // only when no aggregate exists). Re-fill on a
-  // FORMAT switch ONLY when the row is still bare or still holds its last (unedited) auto-fill — a
-  // user-edited opponent (custom nature/item/speedSp) keeps its build instead of being clobbered back
-  // to the environment default (parity with DamageTab/TuneTab's autofillSig guard — audit 2026-07-14).
-  const speedFillSig = (ability: string, nature: string, item: string, speedSp: number) =>
-    JSON.stringify([ability, nature, item, speedSp]);
-  const oppFill = useRef<Array<{ key: string; sig: string }>>([]);
-  useEffect(() => {
-    opponents.forEach((o, i) => {
-      if (!o.slug || o.pinned) return;
-      const key = `${format}:${o.slug}`;
-      const prev = oppFill.current[i];
-      if (prev && prev.key === key) return;
-      const bare = o.ability === "" && o.nature === "" && o.item === "" && o.speedSp === EMPTY_SPEED.speedSp;
-      const refill = bare || (prev !== undefined
-        && speedFillSig(o.ability, o.nature, o.item, o.speedSp) === prev.sig);
-      oppFill.current[i] = { key, sig: prev?.sig ?? "" };
-      if (!refill) return;
-      void loadModal(o.slug, format).then((m) => {
-        if (!m || oppFill.current[i]?.key !== key) return;
-        const sp = m.sps.spe ?? 0;
-        setOpponents((prevOpp) => prevOpp.map((x, j) =>
-          j === i && x.slug === o.slug && !x.pinned
-            ? { ...x, ability: m.ability, nature: m.nature, item: m.item, speedSp: sp } : x));
-        oppFill.current[i] = { key, sig: speedFillSig(m.ability, m.nature, m.item, sp) };
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, opponents.map((o) => o.slug).join(",")]);
+  // A roster species outside the top N still gets its row: the table is where its build is compared.
+  const rosterSlugs = useMemo(() => [...new Set(SIDES.flatMap((side) => teams[side].flatMap((mon) => {
+    const entry = effectiveEntry(mon, dex, items);
+    return entry ? [entry.slug] : [];
+  })))].sort(), [teams, dex, items]);
+  const rosterKey = rosterSlugs.join("|");
 
-  // The environment table is reference data, so keep it populated as its scope changes. The
-  // explicit Calculate action below adds only the user's speed, position, and comparison colours.
-  const tableToken = useRef(0);
-  // Blank editor rows do not participate in the reference table. Adding several of them should
-  // not dispatch the same large speed batch repeatedly before the user picks a species.
-  const tableSig = JSON.stringify([format, topN, opponents.filter((side) => side.slug),
-    rankingRows.length, presets, dex.length]);
-  useEffect(() => {
-    // Invalidate an older batch even when the new scope has no rows and exits before requesting.
-    const token = ++tableToken.current;
-    const custom = opponents.filter((o) => o.slug && entryOf(o.slug));
-    const base: Array<{ rowKey?: string; slug: string; name: string; rank: number | null; kind: TierRow["kind"];
-      sideIndex?: number; state?: SpeedState }> = [];
-    custom.forEach((o, index) => base.push({ rowKey: `custom-${index}`,
-      slug: o.slug, name: entryOf(o.slug)!.name,
-      rank: rankOf(o.slug), kind: "custom", sideIndex: index, state: o }));
-    rankingRows.slice(0, topN).forEach((r) => {
-      const e = entryOf(r.slug);
-      if (!e) return;
-      base.push({ slug: r.slug, name: r.name, rank: r.rank, kind: "meta" });
-      // Add this mon's mega form(s) as their own rungs — mega Speed differs from the base (e.g.
-      // Garchomp 102 → Mega 92), and the ranking only lists the base species.
-      dex.filter((m) => m.isMega && m.baseSpecies === e.name).forEach((mg) => {
-        base.push({ slug: mg.slug, name: mg.name, rank: r.rank, kind: "meta" });
-      });
+  const tablePlan = useMemo(() => {
+    const base: Array<{ row: TierRow; entry: DexIndexEntry }> = [];
+    const seen = new Set<string>();
+    const push = (entry: DexIndexEntry, rank: number | null) => {
+      if (seen.has(entry.slug)) return;
+      seen.add(entry.slug);
+      base.push({ entry, row: { rowKey: `meta-${entry.slug}`, slug: entry.slug, name: entry.name,
+        rank, tiers: {}, mods: {}, real: [] } });
+    };
+    rankingRows.slice(0, view.topN).forEach((ranked) => {
+      const entry = entryOf(ranked.slug);
+      if (!entry) return;
+      push(entry, ranked.rank);
+      // A Mega's Speed differs from its base (Garchomp 102 → Mega 92), and the ranking lists only
+      // the base species, so each Mega gets its own rung.
+      dex.filter((m) => m.isMega && m.baseSpecies === entry.name).forEach((mega) => push(mega, ranked.rank));
     });
-    if (!base.length) { setRows([]); return; }
+    for (const slug of rosterSlugs) {
+      const entry = entryOf(slug);
+      if (!entry) continue;
+      const baseSlug = entry.isMega ? dex.find((e) => e.name === entry.baseSpecies)?.slug : entry.slug;
+      push(entry, rankingRows.find((r) => r.slug === baseSlug)?.rank ?? null);
+    }
     const inputs: SpeedInputDto[] = [];
-    const desc: Array<{ row: number; col: Tier | Mod | "actual" }> = [];
-    base.forEach((row, ri) => {
-      // A generated build is one factual point. Keep its species' generic reference row separate
-      // instead of filling this row with investment values the user did not configure.
-      if (row.kind === "custom" && row.state) {
-        const eff = withMega(row.state, dex, items);
-        inputs.push(cleanSpeed(eff.state, eff.entry?.name ?? row.name));
-        desc.push({ row: ri, col: "actual" });
-        return;
-      }
+    const desc: Array<{ row: number; col: Tier | Mod | "real" | "lo" | "hi"; real?: number }> = [];
+    const tierNature = (tier: Tier) => (TIER_SPEC[tier].dir === "+" ? natureNames.plus
+      : TIER_SPEC[tier].dir === "-" ? natureNames.minus : neutral);
+    base.forEach(({ row, entry }, ri) => {
       TIER_KEYS.forEach((tier) => {
-        inputs.push(cleanSpeed(tierState(row.slug, tier, presets), row.name));
+        inputs.push({ name: entry.name, nature: tierNature(tier), sps: { spe: TIER_SPEC[tier].sp } });
         desc.push({ row: ri, col: tier });
       });
-      MOD_KEYS.forEach((mod) => {
-        // A Mega form battles holding its stone, so there is no Scarf line to report for it. The
-        // cell stays empty rather than showing a speed the form cannot reach.
-        if (mod === "scarf" && entryOf(row.slug)?.isMega) return;
-        inputs.push(cleanSpeed(modState(row.slug, mod, presets), row.name));
-        desc.push({ row: ri, col: mod });
-      });
-    });
-    // The table can exceed the 240-item batch cap (top-100 + mega rungs × 4 tiers), so fan out in
-    // ≤240-item chunks and stitch the results back in order — res[i] still aligns with inputs[i]/desc[i].
-    const chunks: SpeedInputDto[][] = [];
-    for (let i = 0; i < inputs.length; i += 240) chunks.push(inputs.slice(i, i + 240));
-    Promise.all(chunks.map((c) => adapter.speedBatch(c))).then((arrs) => {
-      if (token !== tableToken.current) return;
-      const res = arrs.flat();
-      const out: TierRow[] = base.map((b) => ({ rowKey: b.rowKey, sideIndex: b.sideIndex,
-        state: b.state,
-        slug: b.slug, name: b.name, rank: b.rank,
-        kind: b.kind, tiers: {}, mods: {} }));
-      res.forEach((r, i) => {
-        if (isErrorShape(r)) return;
-        const d = desc[i]!;
-        if (d.col === "actual") {
-          out[d.row]!.actual = r.finalSpeed;
-        } else {
-          // Identical across a species' generic tiers — last write wins with the same value.
-          out[d.row]!.base = r.baseSpeed;
-          if (d.col === "tailwind" || d.col === "scarf") {
-            out[d.row]!.mods[d.col] = r.finalSpeed;
-          } else {
-            out[d.row]!.tiers[d.col] = r.finalSpeed;
-          }
+      inputs.push({ name: entry.name, nature: natureNames.plus, sps: { spe: SP_MAX }, field: { tailwind: true } });
+      desc.push({ row: ri, col: "tailwind" });
+      // A Mega battles holding its stone, so it has no Scarf line.
+      if (!entry.isMega) {
+        inputs.push({ name: entry.name, nature: natureNames.plus, sps: { spe: SP_MAX }, item: SCARF });
+        desc.push({ row: ri, col: "scarf" });
+      }
+      const options = observedBuildOptions(catalogData, entry.slug, dex, items)
+        .filter((option) => entry.isMega || !option.set.runForm || option.set.runForm === entry.name);
+      row.real = options.map((option) => ({
+        option, sig: buildConfigSig(applyBuildOption(makeMon(entry.slug), option)), speed: null, lo: null, hi: null,
+      }));
+      options.forEach((option, oi) => {
+        const probe = (nature: string, spe: number) => speedInputOf(
+          { ...makeMon(entry.slug), ability: option.modal.ability, item: option.modal.item, nature,
+            sps: { spe } }, plainField, null, dex, items, neutral);
+        const own = probe(option.modal.nature, option.modal.sps.spe ?? 0);
+        if (own) { inputs.push(own); desc.push({ row: ri, col: "real", real: oi }); }
+        // The cluster behind one representative build spans a Speed range; its ends are the
+        // slowest nature seen at the lowest SP and the fastest at the highest.
+        const profile = option.set.speedProfile;
+        if (profile && profile.minSpeSp != null && profile.maxSpeSp != null) {
+          const dirs = new Set(profile.natures.map((name) => natureDir(natures, canonicalNature(name))));
+          const lo = probe(dirs.has("-") ? natureNames.minus : neutral, profile.minSpeSp);
+          const hi = probe(dirs.has("+") ? natureNames.plus : neutral, profile.maxSpeSp);
+          if (lo) { inputs.push(lo); desc.push({ row: ri, col: "lo", real: oi }); }
+          if (hi) { inputs.push(hi); desc.push({ row: ri, col: "hi", real: oi }); }
         }
       });
-      out.sort(compareSpeedRows);
-      setRows(out);
+    });
+    return { base, inputs, desc, sig: `${JSON.stringify(inputs)}#${base.length}` };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rankingRows, view.topN, rosterKey, dex, items, catalogData, field.weather, field.terrain, neutral, natureNames]);
+
+  const [metaRows, setMetaRows] = useState<{ sig: string; rows: TierRow[] } | null>(null);
+  const tableToken = useRef(0);
+  useEffect(() => {
+    if (!visible || metaRows?.sig === tablePlan.sig) return;
+    const token = ++tableToken.current;
+    const plan = tablePlan;
+    if (!plan.inputs.length) { setMetaRows({ sig: plan.sig, rows: [] }); return; }
+    speedBatch(adapter, plan.inputs).then((out) => {
+      if (token !== tableToken.current) return;
+      const rows: TierRow[] = plan.base.map(({ row }) => ({
+        ...row, tiers: {}, mods: {}, real: row.real.map((real) => ({ ...real })),
+      }));
+      out.forEach((result, i) => {
+        if (!result) return;
+        const d = plan.desc[i]!;
+        const row = rows[d.row]!;
+        if (d.col === "real" || d.col === "lo" || d.col === "hi") {
+          const real = row.real[d.real ?? 0];
+          if (!real) return;
+          if (d.col === "real") real.speed = result.finalSpeed;
+          else real[d.col] = result.finalSpeed;
+          return;
+        }
+        row.base = result.baseSpeed;
+        if (d.col === "tailwind" || d.col === "scarf") row.mods[d.col] = result.finalSpeed;
+        else row.tiers[d.col] = result.finalSpeed;
+      });
+      setMetaRows({ sig: plan.sig, rows });
       setError(null);
     }).catch((e) => {
       console.error("Speed table calculation failed:", e);
-      if (token === tableToken.current) { setRows([]); setError(t("calc.error")); }
+      if (token === tableToken.current) setError(t("calc.error"));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableSig]);
+  }, [tablePlan.sig, visible]);
 
-  // Only the fields the calculation READS are in the signature. Format, the row count, the trick-room
-  // view and the add-to side all leave it alone, so browsing the table never dispatches a batch; the
-  // short debounce then coalesces the keystrokes inside the SP box into one run.
-  const mineSig = useMemo(() => JSON.stringify(mySides.map((s) => [
-    s.slug, s.ability, s.nature, s.item, s.speedSp, s.boost, s.status, s.tailwind,
-  ])), [mySides]);
-  const runToken = useRef(0);
+  // -- the Meta stitch: the environment picker's last card, loaded per species on demand ---------
+  // A detail file per species is too much to fetch for the whole table up front. It is loaded for
+  // the rows that need it to show anything (no real build, or a roster Pokémon that may carry it),
+  // and for a row the moment its picker is about to open.
+  const loadBuildOptions = useBuildOptions();
+  const [metaSets, setMetaSets] = useState<Record<string, BuildOption | null>>({});
+  const metaAsked = useRef(new Set<string>());
+  const metaKey = (slug: string) => `${format}:${slug}`;
+  const requestMeta = (slug: string) => {
+    const key = metaKey(slug);
+    if (metaAsked.current.has(key)) return;
+    metaAsked.current.add(key);
+    loadBuildOptions(slug, format)
+      .then((options) => options.find((option) => option.source === "meta") ?? null)
+      .catch(() => null)
+      .then((meta) => setMetaSets((previous) => ({ ...previous, [key]: meta })));
+  };
+  const metaOf = (slug: string) => metaSets[metaKey(slug)];
   useEffect(() => {
-    const token = ++runToken.current;
-    const valid = mySides.flatMap((side, index) => {
-      const entry = entryOf(side.slug);
-      return entry ? [{ side, index, entry }] : [];
-    });
-    if (!valid.length) { setMySpeeds([]); return; }
-    const timer = setTimeout(() => {
-      adapter.speedBatch(valid.map(({ side, entry }) => {
-        const effective = withMega(side, dex, items);
-        return cleanSpeed(effective.state, effective.entry?.name ?? entry.name);
-      })).then((result) => {
-        if (token !== runToken.current) return;
-        const speeds: Array<number | null> = Array.from({ length: mySides.length }, () => null);
-        valid.forEach(({ index }, resultIndex) => {
-          const row = result[resultIndex];
-          speeds[index] = row && !isErrorShape(row) ? row.finalSpeed : null;
-        });
-        setMySpeeds(speeds);
-        setError(null);
-      }).catch((e) => {
-        console.error("My speed calculations failed:", e);
-        if (token === runToken.current) { setMySpeeds([]); setError(t("calc.error")); }
-      });
-    }, 160);
-    return () => clearTimeout(timer);
+    // Only once the table reflects the loaded catalog: before that every row looks build-less.
+    if (catalog?.format !== format || metaRows?.sig !== tablePlan.sig) return;
+    for (const row of metaRows.rows) {
+      const onRoster = rosterSlugs.includes(row.slug);
+      if (!row.real.length || onRoster) requestMeta(row.slug);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mineSig, dex.length, items.length]);
+  }, [metaRows, tablePlan.sig, rosterKey, format]);
 
-  // Cell tone vs every configured MY mon. A definitive colour means all of mine agree. A split
-  // verdict deliberately falls back to the neutral cell: it is not one actionable speed relation.
-  const hasResult = mySpeeds.some((speed) => speed != null);
-  const calculatedMine = useMemo(() => !hasResult ? [] : mySides.flatMap((side, index) => {
-    const entry = entryOf(side.slug);
-    const speed = mySpeeds[index];
-    return entry && speed != null ? [{ side, index, entry, speed }] : [];
-  }), [hasResult, mySides, mySpeeds, dex]);
-  const cellCls = (v: number | undefined): string => {
-    if (v == null || !calculatedMine.length) return "";
-    const diffs = calculatedMine.map(({ speed }) => trickRoom ? speed - v : v - speed);
-    if (diffs.every((diff) => diff > 0)) return "faster";
-    if (diffs.every((diff) => diff < 0)) return "slower";
-    if (diffs.every((diff) => diff === 0)) return "tie";
+  const metaPlan = useMemo(() => {
+    const entries = Object.entries(metaSets).flatMap(([key, option]) => {
+      if (!option || !key.startsWith(`${format}:`)) return [];
+      const slug = key.slice(format.length + 1);
+      const input = speedInputOf({ ...makeMon(slug), ability: option.modal.ability, item: option.modal.item,
+        nature: option.modal.nature, sps: option.modal.sps }, plainField, null, dex, items, neutral);
+      return input ? [{ key: option.key, input }] : [];
+    });
+    return { entries, sig: JSON.stringify(entries) };
+  }, [metaSets, format, plainField, dex, items, neutral]);
+  const [metaSpeeds, setMetaSpeeds] = useState<{ sig: string; byKey: Record<string, number> } | null>(null);
+  useEffect(() => {
+    if (!visible || metaSpeeds?.sig === metaPlan.sig) return;
+    const plan = metaPlan;
+    if (!plan.entries.length) { setMetaSpeeds({ sig: plan.sig, byKey: {} }); return; }
+    let live = true;
+    speedBatch(adapter, plan.entries.map((entry) => entry.input)).then((out) => {
+      if (!live) return;
+      const byKey: Record<string, number> = {};
+      out.forEach((row, i) => { if (row) byKey[plan.entries[i]!.key] = row.finalSpeed; });
+      setMetaSpeeds({ sig: plan.sig, byKey });
+    }).catch((e) => console.error("Meta speed calculation failed:", e));
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metaPlan.sig, visible]);
+
+  // -- roster Pokémon in their species' rows, and what each 实配 cell shows -----------------------
+
+  const [picks, setPicks] = useState<Record<string, string>>({});
+  const pct = (share: number | null | undefined) => (share == null ? "" : `${Math.round(share * 100)}%`);
+  const memberTag = (member: Member) => `${sideName(member.side)} ${member.index + 1}`;
+  const rowsView = useMemo(() => (metaRows?.rows ?? []).map((row) => {
+    const entry = entryOf(row.slug);
+    const meta = metaOf(row.slug);
+    const metaSig = meta ? buildConfigSig(applyBuildOption(makeMon(row.slug), meta)) : null;
+    const members: Member[] = SIDES.flatMap((side) => teams[side].flatMap((mon, index) => {
+      if (effectiveEntry(mon, dex, items)?.slug !== row.slug) return [];
+      const sig = buildConfigSig(mon);
+      const built = !!(mon.ability || mon.item || mon.nature
+        || Object.values(mon.sps).some((value) => (value ?? 0) > 0));
+      const match = row.real.find((real) => real.sig === sig)?.option.key
+        ?? (meta && metaSig === sig ? meta.key : null);
+      return [{ side, index, mon, built, speed: teamRun?.buildByUid[mon.uid] ?? null,
+        tailwind: field.sides[side].tailwind ? teamRun?.tailwindByUid[mon.uid] ?? null : null,
+        matchKey: built ? match : null }];
+    }));
+    const own: RealCard[] = entry ? members.filter((member) => member.built && !member.matchKey).map((member) => ({
+      key: `team:${member.mon.uid}`,
+      option: { ...buildCardOptionForMon(member.mon, entry, dex), key: `team:${member.mon.uid}` },
+      speed: member.speed, coverage: null, member,
+    })) : [];
+    const real: RealCard[] = row.real.map((build, i) => ({
+      key: build.option.key,
+      option: { key: build.option.key, source: build.option.source, coverage: build.option.coverage,
+        isModal: build.option.isModal, set: build.option.set, labelIndex: i },
+      speed: build.speed, coverage: build.option.coverage,
+      member: members.find((member) => member.matchKey === build.option.key) ?? null,
+    }));
+    const metaCard: RealCard[] = meta ? [{
+      key: meta.key,
+      option: { key: meta.key, source: "meta", coverage: null, isModal: row.real.length === 0, set: meta.set },
+      speed: metaSpeeds?.byKey[meta.key] ?? null, coverage: null,
+      member: members.find((member) => member.matchKey === meta.key) ?? null,
+    }] : [];
+    const cards = [...own, ...real, ...metaCard];
+    // What the roster carries comes first: ours, then theirs, then the most common real build.
+    const built = members.filter((member) => member.built);
+    const preferred = built.find((m) => m.side === "a") ?? built[0];
+    const fallback = preferred ? (preferred.matchKey ?? `team:${preferred.mon.uid}`) : cards[0]?.key;
+    const shown = cards.find((card) => card.key === picks[row.rowKey])
+      ?? cards.find((card) => card.key === fallback) ?? null;
+    // What the cell reads: a roster build under its side's Tailwind is that Pokémon moving at double.
+    const tailwind = shown?.member?.tailwind ?? null;
+    const speed = tailwind ?? shown?.speed ?? null;
+    return { row, entry, members, cards, shown, speed, tailwind: tailwind != null };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [metaRows, teams, teamRun, picks, metaSets, metaSpeeds, field.sides, dex, items, lang]);
+
+  const sorted = useMemo(() => {
+    const { key, dir } = view.sort;
+    const value = (v: (typeof rowsView)[number]) => (key === "actual" ? v.speed : v.row.base ?? null);
+    return [...rowsView].sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      // Rows without a value sit at the bottom whichever way the column is sorted.
+      if (va != null && vb != null && va !== vb) return dir === "desc" ? vb - va : va - vb;
+      if (va == null && vb != null) return 1;
+      if (vb == null && va != null) return -1;
+      return (b.row.tiers.max ?? -1) - (a.row.tiers.max ?? -1) || (a.row.rank ?? 999) - (b.row.rank ?? 999);
+    });
+  }, [rowsView, view.sort]);
+  const sortBy = (key: SortKey) => setView((v) => ({
+    ...v, sort: v.sort.key === key ? { key, dir: v.sort.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" },
+  }));
+
+  // -- colour and hints against our selected Pokémon ----------------------------------------------
+
+  const tr = field.trickRoom;
+  const mineSpeeds = teams.a.flatMap((mon) => { const s = speedOf(mon); return s == null ? [] : [s]; });
+  const cellCls = (v: number | null | undefined): string => {
+    if (v == null) return "";
+    const refs = view.compare === "active" ? (mineSpeed == null ? [] : [mineSpeed]) : mineSpeeds;
+    if (!refs.length) return "";
+    // "faster" = that line moves before ours (under Trick Room, by being slower).
+    const diffs = refs.map((speed) => (tr ? speed - v : v - speed));
+    if (diffs.every((d) => d > 0)) return "faster";
+    if (diffs.every((d) => d < 0)) return "slower";
+    if (diffs.every((d) => d === 0)) return "tie";
     return "";
   };
-  const displayRows = useMemo(() => {
-    if (!calculatedMine.length) return rows;
-    const mine: TierRow[] = calculatedMine.map(({ entry, speed, index }) => ({
-      rowKey: `mine-${index}`, sideIndex: index,
-      slug: entry.slug, name: entry.name, rank: rankOf(entry.slug), kind: "mine",
-      state: mySides[index], tiers: {}, mods: {}, actual: speed,
-    }));
-    return [...rows, ...mine].sort(compareSpeedRows);
-    // rankOf is a cheap lookup over the already-loaded ranking rows.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, calculatedMine, rankingRows]);
-
-  const actualMarkers = useMemo(() => displayRows.flatMap((row, index) => {
-    if (row.kind === "meta" || !row.rowKey) return [];
-    return [{ row, position: ((index + 0.5) / displayRows.length) * 100 }];
-  }), [displayRows]);
-
-  useEffect(() => {
-    const rail = markerRailRef.current;
-    if (!rail) return;
-    const measure = () => setMarkerRailHeight(rail.clientHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(rail);
-    return () => observer.disconnect();
-  }, [rows.length]);
-
-  const markerTopByRowKey = useMemo(() => {
-    const tops = new Map<string, number>();
-    if (markerRailHeight <= 0) return tops;
-    // Keep hit targets distinct when several actual rows occupy neighboring speed tiers.
-    const halfHitbox = 11;
-    const minSpacing = halfHitbox * 2;
-    for (const kind of ["mine", "custom"] as const) {
-      const lane = actualMarkers.filter(({ row }) => row.kind === kind);
-      const centers = lane.map(({ position }) =>
-        Math.max(halfHitbox, position * markerRailHeight / 100));
-      for (let i = 1; i < centers.length; i += 1) {
-        centers[i] = Math.max(centers[i]!, centers[i - 1]! + minSpacing);
-      }
-      for (let i = centers.length - 1; i >= 0; i -= 1) {
-        centers[i] = Math.min(centers[i]!, i === centers.length - 1
-          ? markerRailHeight - halfHitbox : centers[i + 1]! - minSpacing);
-      }
-      lane.forEach(({ row }, index) => tops.set(row.rowKey!, centers[index]!));
+  const mineEntry = effectiveEntry(mine, dex, items);
+  const mineName = mineEntry ? displayName(mineEntry, lang) : t("calc.emptySlot");
+  const altRef = natures.find((n) => n.name === altNature);
+  const altLabel = altRef ? displayName(altRef, lang) : altNature;
+  const hintFor = (v: number | null | undefined): string | undefined => {
+    if (v == null || mineSpeed == null || !teamRun) return undefined;
+    const curSp = mine.sps.spe ?? 0;
+    if (v === mineSpeed) return t("speed.cellTie").replace("{mine}", mineName);
+    if (movesFirst(mineSpeed, v, tr)) {
+      const edge = spToBeat(teamRun.curve, v, tr);
+      return t("speed.cellAhead").replace("{mine}", mineName)
+        .replace("{n}", String(edge == null ? 0 : Math.abs(curSp - edge)));
     }
-    return tops;
-  }, [actualMarkers, markerRailHeight]);
-
-  const locateRow = useCallback((rowKey: string) => {
-    const scroller = speedScrollRef.current;
-    const row = document.getElementById(`speed-row-${rowKey}`);
-    if (!scroller || !row) return;
-    const scrollerRect = scroller.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    const rowTop = scroller.scrollTop + rowRect.top - scrollerRect.top;
-    const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-    const centeredTop = rowTop - (scroller.clientHeight - rowRect.height) / 2;
-    scroller.scrollTop = Math.min(maxTop, Math.max(0, centeredTop));
-  }, []);
-
-  const addSide = useCallback((target: CalcRailTarget, picked: SpeedState) => {
-    const list = target === "primary" ? mySides : opponents;
-    const emptyIndex = list.findIndex((candidate) => !candidate.slug);
-    if (emptyIndex < 0 && list.length >= 6) {
-      return { ok: false as const, reason: "full" as const };
+    const need = spToBeat(teamRun.curve, v, tr);
+    if (need != null) {
+      return t("speed.cellNeed").replace("{mine}", mineName).replace("{sp}", String(need))
+        .replace("{cur}", String(curSp));
     }
-    const next = emptyIndex >= 0
-      ? list.map((candidate, index) => index === emptyIndex ? picked : candidate)
-      : [...list, picked];
-    if (target === "primary") setMySides(next); else setOpponents(next);
+    const other = teamRun.alt.length ? spToBeat(teamRun.alt, v, tr) : null;
+    if (other != null) {
+      return t("speed.cellNeedNature").replace("{mine}", mineName).replace("{sp}", String(other))
+        .replace("{nature}", altLabel);
+    }
+    return t("speed.cellOut").replace("{mine}", mineName);
+  };
+
+  // -- the rail adds to the roster --------------------------------------------------------------
+
+  const place = useCallback((target: CalcRailTarget, mon: MonState) => {
+    const side: SideId = target === "primary" ? "a" : "b";
+    const team = teams[side];
+    const activeEmpty = team[active[side]] && !team[active[side]]!.slug ? active[side] : -1;
+    const emptyIndex = activeEmpty >= 0 ? activeEmpty : team.findIndex((candidate) => !candidate.slug);
+    if (emptyIndex < 0 && team.length >= TEAM_MAX) return { ok: false as const, reason: "full" as const };
+    const index = emptyIndex >= 0 ? emptyIndex : team.length;
+    setTeams((previous) => ({ ...previous, [side]: emptyIndex >= 0
+      ? previous[side].map((candidate, at) => at === emptyIndex ? mon : candidate)
+      : [...previous[side], mon] }));
+    setActive((previous) => ({ ...previous, [side]: index }));
     return { ok: true as const };
-  }, [mySides, opponents]);
-
-  const addFromTable = (entry: DexIndexEntry, picked: SpeedState) => {
-    const result = addSide(tableTarget, picked);
-    const side = tableTarget === "primary" ? t("speed.ours") : t("speed.theirs");
-    setTableFeedback(result.ok
-      ? { ok: true, text: t("calc.rail.added")
-        .replace("{name}", displayName(entry, lang)).replace("{side}", side) }
-      : { ok: false, text: t("calc.rail.full").replace("{side}", side).replace("{count}", "6") });
-  };
-
-  const loadTier = (slug: string, tier: Tier) => {
-    const entry = entryOf(slug);
-    if (entry) addFromTable(entry, tierState(slug, tier, presets));
-  };
-  const loadMod = (slug: string, mod: Mod) => {
-    const entry = entryOf(slug);
-    if (entry) addFromTable(entry, modState(slug, mod, presets));
-  };
-  const loadActual = (r: TierRow) => {
-    const entry = entryOf(r.slug);
-    if (r.state && entry) addFromTable(entry, { ...r.state });
-  };
-
+  }, [teams, active, setTeams, setActive]);
   const pickFromRail = useCallback((target: CalcRailTarget, entry: DexIndexEntry,
-                                    option: BuildOption | null) => {
-    const picked: SpeedState = {
-      ...EMPTY_SPEED,
-      slug: entry.slug,
-      ability: option?.modal.ability ?? "",
-      nature: option?.modal.nature ?? "",
-      item: option?.modal.item ?? "",
-      speedSp: option ? option.modal.sps.spe ?? 0 : EMPTY_SPEED.speedSp,
-      pinned: true,
-    };
-    return addSide(target, picked);
-  }, [addSide]);
-
+                                    option: BuildOption | null, optionIndex: number) => {
+    const seed = { ...makeMon(entry.slug), pinned: true };
+    const mon = option ? { ...applyBuildOption(seed, option, optionIndex), pinned: true } : seed;
+    return place(target, mon);
+  }, [place]);
   const railApi = useMemo<CalcRailApi>(() => ({
     format,
-    targets: [
-      { id: "primary", label: t("speed.ours") },
-      { id: "secondary", label: t("speed.theirs") },
-    ],
+    targets: [{ id: "primary", label: t("speed.ours") }, { id: "secondary", label: t("speed.theirs") }],
     pick: pickFromRail,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [format, pickFromRail, lang]);
   useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
+  // -- roster bar ---------------------------------------------------------------------------------
+
+  const offers = useFieldOffers([mine, foe], field);
+  const importPaste = async (side: SideId, text: string): Promise<ImportOutcome> => {
+    const { mons, outcome } = await monsFromPaste(text, { dex, items, natures, adapter });
+    if (!mons.length) return outcome;
+    setTeams((previous) => ({ ...previous, [side]: mons }));
+    setActive((previous) => ({ ...previous, [side]: 0 }));
+    return outcome;
+  };
+  const wing = (side: SideId) => ({
+    team: teams[side], index: active[side], dex, items, field, setField, side,
+    allowedFlags: SPEED_SIDE_FLAGS, inlineFlags: true,
+    onIndex: (i: number) => setActive((p) => (p[side] === i ? p : { ...p, [side]: i })),
+    onAdd: () => {
+      if (teams[side].length >= TEAM_MAX) return;
+      setTeams((p) => (p[side].length >= TEAM_MAX ? p : { ...p, [side]: [...p[side], makeMon()] }));
+      setActive((p) => ({ ...p, [side]: teams[side].length }));
+    },
+    onRemove: (i: number) => {
+      setTeams((p) => ({ ...p, [side]: p[side].filter((_, j) => j !== i) }));
+      setActive((p) => ({ ...p, [side]: Math.max(0, Math.min(p[side], teams[side].length - 2)) }));
+    },
+    onReset: () => {
+      setTeams((p) => ({ ...p, [side]: [makeMon()] }));
+      setActive((p) => ({ ...p, [side]: 0 }));
+    },
+    onImport: (text: string) => importPaste(side, text),
+  });
+
+  /** Scarf is an item: on remembers what it replaced, off gives that back. A Mega must hold its
+   * stone, and Item Clause allows one Scarf per team. */
+  const scarfFor = (mon: MonState, side: SideId) => {
+    const on = mon.item === SCARF;
+    const blocked = withMega(mon, dex, items).mega ? t("speed.megaNoScarf")
+      : teams[side].some((other) => other.uid !== mon.uid && other.item === SCARF) ? t("speed.scarfClause") : null;
+    return {
+      on, blocked,
+      toggle: () => {
+        if (on) {
+          const back = view.scarfRestore[mon.uid] ?? "";
+          setMonByUid(mon.uid, (m) => ({ ...m, item: back }));
+          setView((v) => {
+            const rest = { ...v.scarfRestore };
+            delete rest[mon.uid];
+            return { ...v, scarfRestore: rest };
+          });
+        } else {
+          setView((v) => ({ ...v, scarfRestore: { ...v.scarfRestore, [mon.uid]: mon.item } }));
+          setMonByUid(mon.uid, (m) => ({ ...m, item: SCARF }));
+        }
+      },
+    };
+  };
+  const foeEntry = effectiveEntry(foe, dex, items);
+
+  // -- the 实配 picker ------------------------------------------------------------------------------
+
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const pickAnchor = useRef<HTMLElement | null>(null);
+  const closePicker = useCallback(() => setOpenRow(null), []);
+  const openView = openRow ? rowsView.find((v) => v.row.rowKey === openRow) ?? null : null;
+  const cardNote = (card: RealCard, row: TierRow) => {
+    const real = row.real.find((build) => build.option.key === card.key);
+    const parts = [
+      card.member ? memberTag(card.member) : "",
+      t("speed.cardSpeed").replace("{n}", String(card.speed ?? "—")),
+      real?.lo != null && real.hi != null
+        ? t("speed.clusterRange").replace("{lo}", String(real.lo)).replace("{hi}", String(real.hi)) : "",
+    ];
+    return parts.filter(Boolean).join(" · ");
+  };
+
+  const markers = sorted.flatMap((v, index) => (v.members.length
+    ? [{ v, position: ((index + 0.5) / Math.max(1, sorted.length)) * 100 }] : []));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const locateRow = (rowKey: string) => {
+    const scroller = scrollRef.current;
+    const target = document.getElementById(`speed-row-${rowKey}`);
+    if (!scroller || !target) return;
+    const rect = target.getBoundingClientRect();
+    const top = scroller.scrollTop + rect.top - scroller.getBoundingClientRect().top;
+    scroller.scrollTop = Math.max(0, top - (scroller.clientHeight - rect.height) / 2);
+  };
+  const sortHead = (key: SortKey, label: string, className: string, title?: string) => {
+    const on = view.sort.key === key;
+    return (
+      <th className={`${className} sortable${on ? " sorted" : ""}`} title={title}
+        aria-sort={on ? (view.sort.dir === "desc" ? "descending" : "ascending") : "none"}>
+        <button type="button" className="th-sort" onClick={() => sortBy(key)} title={t("speed.sortBy")}>
+          {label}<SortGlyph dir={on ? view.sort.dir : null} />
+        </button>
+      </th>
+    );
+  };
+
   return (
-    <>
-      <div className="speed-side-grid">
-        <section className="speed-side-column" aria-label={t("speed.ours")}>
-          <div className="speed-side-cards">
-            {mySides.map((side, index) => (
-              <SpeedRow key={index} label={`${t("speed.ours")} ${index + 1}`}
-                side={side}
-                setSide={(update) => setMySides((previous) => previous.map((candidate, at) =>
-                  at === index
-                    ? (typeof update === "function"
-                      ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
-                    : candidate))}
-                dex={dex} natures={natures} items={items} presets={presets} format={format}
-                onRemove={mySides.length > 1
-                  ? () => setMySides((previous) => previous.filter((_, at) => at !== index))
-                  : undefined}
-                add={index === mySides.length - 1 ? {
-                  label: t("speed.addMine"), full: mySides.length >= 6,
-                  onAdd: () => setMySides((sides) => sides.length >= 6
-                    ? sides : [...sides, { ...EMPTY_SPEED }]),
-                } : undefined} />
-            ))}
-          </div>
-        </section>
-        <section className="speed-side-column" aria-label={t("speed.theirs")}>
-          <div className="speed-side-cards">
-            {opponents.map((side, index) => (
-              <SpeedRow key={index} label={`${t("speed.theirs")} ${index + 1}`} side={side}
-                setSide={(update) => setOpponents((previous) => previous.map((candidate, at) =>
-                  at === index
-                    ? (typeof update === "function"
-                      ? (update as (value: SpeedState) => SpeedState)(candidate) : update)
-                    : candidate))}
-                dex={dex} natures={natures} items={items} presets={presets} format={format}
-                onRemove={() => setOpponents((previous) => previous.filter((_, at) => at !== index))}
-                add={index === opponents.length - 1 ? {
-                  label: t("speed.addOpponent"), full: opponents.length >= 6,
-                  onAdd: () => setOpponents((sides) => sides.length >= 6
-                    ? sides : [...sides, { ...EMPTY_SPEED }]),
-                } : undefined} />
-            ))}
-            {opponents.length === 0 && (
-              <button type="button" className="speed-add-empty"
-                onClick={() => setOpponents([{ ...EMPTY_SPEED }])}>
-                + {t("speed.addOpponent")}
-              </button>
-            )}
-          </div>
-        </section>
+    <div className="spd-page">
+      <DuelBar field={field}>
+        <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...wing("a")} />
+        <FieldPanel field={field} setField={setField} sharedFlags={SPEED_SHARED} inlineShared
+          weatherSuggestions={offers.weather} terrainSuggestions={offers.terrain} />
+        <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...wing("b")} mirrored />
+      </DuelBar>
+
+      <div className="spd-top swap-seam-host">
+        <SpeedCard label={t("speed.ours")} mon={mine} setMon={setMine} pickerKey="spd-a" dex={dex}
+          natures={natures} items={items} format={format} offense={offenseMine} input={mineInput}
+          result={teamRun?.byUid[mine.uid] ?? null} scarf={scarfFor(mine, "a")} />
+        <SwapSeam onSwap={swapSides} />
+        <SpeedCard label={t("speed.theirs")} mon={foe} setMon={setFoe} pickerKey="spd-b" dex={dex}
+          natures={natures} items={items} format={format} offense={offenseOf(foe, foeEntry, category)}
+          input={speedInputOf(foe, field, "b", dex, items, neutral)}
+          result={teamRun?.byUid[foe.uid] ?? null} scarf={scarfFor(foe, "b")} />
       </div>
 
-      {error && <div className="notice mono" style={{ marginTop: 14 }}>{error}</div>}
+      {error && <div className="notice mono">{error}</div>}
 
-      {/* Format, depth and the Trick Room view scope THIS table and nothing else, so they sit on its
-          heading rather than in a command bar above it that also implied a Calculate step. */}
       <div className="speed-tier-head">
         <h2 className="page-title" style={{ fontSize: 15, margin: 0 }}>{t("speed.env")}</h2>
         <span className="speed-tier-scope">
-          <FormatTabs format={format} onChange={setFormat} />
           <label><span>{t("speed.topN")}</span>
-            <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}>
+            <select value={view.topN} onChange={(e) => setView((v) => ({ ...v, topN: Number(e.target.value) }))}>
               {[30, 60, 100].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
-          <FieldCheck label={t("speed.trickRoom")} checked={trickRoom} onChange={setTrickRoom} />
         </span>
-        {hasResult && (
+        <span className="speed-tier-tools">
           <span className="tier-legend">
-            <span className="lg faster">{t("speed.legendFaster")}</span>
-            <span className="lg slower">{t("speed.legendSlower")}</span>
+            <span className="lg faster">{t(view.compare === "active" ? "speed.legendBefore" : "speed.legendBeforeAll")}</span>
+            <span className="lg slower">{t(view.compare === "active" ? "speed.legendAfter" : "speed.legendAfterAll")}</span>
+            {tr && <span className="lg tr">{t("speed.trNote")}</span>}
           </span>
-        )}
-        <span className="muted speed-tier-hint">{t("speed.load")}</span>
-        <span className="calc-rail-target speed-table-target" role="group"
-          aria-label={t("calc.rail.target")}>
-          <button type="button" className={tableTarget === "primary" ? "on" : ""}
-            aria-pressed={tableTarget === "primary"}
-            onClick={() => { setTableTarget("primary"); setTableFeedback(null); }}>
-            {t("speed.ours")}
-          </button>
-          <button type="button" className={tableTarget === "secondary" ? "on" : ""}
-            aria-pressed={tableTarget === "secondary"}
-            onClick={() => { setTableTarget("secondary"); setTableFeedback(null); }}>
-            {t("speed.theirs")}
-          </button>
+          <span className="spd-compare-seg" role="group" aria-label={t("speed.compareLabel")}>
+            <span className="cap">{t("speed.compareLabel")}</span>
+            <span className="seg">
+              <button type="button" className={view.compare === "active" ? "on" : ""} aria-pressed={view.compare === "active"}
+                onClick={() => setView((v) => ({ ...v, compare: "active" }))}>
+                {t("speed.compareActive").replace("{name}", mineName).replace("{speed}", String(mineSpeed ?? "—"))}
+              </button>
+              <button type="button" className={view.compare === "team" ? "on" : ""} aria-pressed={view.compare === "team"}
+                onClick={() => setView((v) => ({ ...v, compare: "team" }))}>
+                {t("speed.compareTeam")}
+              </button>
+            </span>
+          </span>
         </span>
       </div>
-      {tableFeedback && (
-        <div className={`calc-rail-feedback speed-table-feedback ${tableFeedback.ok ? "ok" : "error"}`}
-          role="status">{tableFeedback.text}</div>
-      )}
-      {rows.length > 0 ? (
+
+      {sorted.length > 0 ? (
         <div className="speed-tier-shell">
           <div className="panel speed-tier-wrap">
-            <div className="speed-tier-scroll" ref={speedScrollRef}>
+            <div className="speed-tier-scroll" ref={scrollRef}>
               <table className="speed-tier">
-              <thead>
-                <tr>
-                  <th className="corner">{t("ranking.pokemon")}</th>
-                  <th className="base-col">{t("speed.baseSpe")}</th>
-                  <th className="actual-col">{t("speed.actual")}</th>
-                  {MOD_KEYS.map((mod) => (
-                    <th key={mod} className="mod-col" title={t("speed.modifiedMaxHint")}>
-                      {t(MOD_LABEL[mod])}
-                    </th>
-                  ))}
-                  {TIER_KEYS.map((tier) => <th key={tier}>{t(TIER_LABEL[tier])}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {displayRows.map((r) => {
-                  const e = entryOf(r.slug);
-                  const build = e && r.state ? speedBuildCard(r.state, e) : null;
-                  const sideNumber = (r.sideIndex ?? 0) + 1;
-                  const identity = <>
-                    {e && <GameImage assetKey={e.key} role="dense"
-                      alt={displayName(e, lang)} className="mini" />}
-                    <span className="nm">{e ? displayName(e, lang) : r.name}</span>
-                    {r.rank != null && <span className="rk num">#{r.rank}</span>}
-                    {r.kind === "mine" && <span className="rung-you">
-                      {t("speed.you")} {sideNumber}
-                    </span>}
-                    {r.kind === "custom" && <span className="rung-you custom">
-                      {t("speed.customTag")} {sideNumber}
-                    </span>}
-                  </>;
-                  return (
-                    <tr key={r.rowKey ?? `${r.slug}-${r.kind}`}
-                      id={r.rowKey ? `speed-row-${r.rowKey}` : undefined}
-                      className={r.kind}>
-                      <th className="tier-mon"
-                        onClick={() => r.kind === "meta" && loadTier(r.slug, "max")}
-                        role={r.kind === "meta" ? "button" : undefined}
-                        tabIndex={r.kind === "meta" ? 0 : undefined}
-                        onKeyDown={(event) => {
-                          if (r.kind === "meta" && (event.key === "Enter" || event.key === " ")) {
-                            event.preventDefault(); loadTier(r.slug, "max");
-                          }
-                        }}
-                        title={r.kind === "meta" ? t("speed.load") : undefined}>
-                        {build ? (
-                          <EntityHover kind="spread" name="" link={false} passive
-                            previewAddon={<BuildSetSummary option={build} index={0} />}>
-                            <span className="speed-tier-identity">{identity}</span>
-                          </EntityHover>
-                        ) : e ? (
-                          <EntityHover kind="pokemon" name={e.name} link={false} passive>
-                            <span className="speed-tier-identity">{identity}</span>
-                          </EntityHover>
-                        ) : identity}
-                      </th>
-                      <td className="base-col">
-                        {r.kind === "meta" && <span className="speed-value">{r.base ?? "—"}</span>}
-                      </td>
-                      <td className={`spd actual-col ${cellCls(r.actual)}`}
-                        role={r.kind === "custom" ? "button" : undefined}
-                        tabIndex={r.kind === "custom" ? 0 : undefined}
-                        onKeyDown={(event) => {
-                          if (r.kind === "custom" && (event.key === "Enter" || event.key === " ")) {
-                            event.preventDefault(); loadActual(r);
-                          }
-                        }}
-                        onClick={() => r.kind === "custom" && loadActual(r)}>
-                        {r.actual != null && <span className="speed-value">{r.actual}</span>}
-                      </td>
-                      {MOD_KEYS.map((mod) => (
-                        <td key={mod} className={`spd mod-col ${cellCls(r.mods[mod])}`}
-                          role={r.kind === "mine" || r.mods[mod] == null ? undefined : "button"}
-                          tabIndex={r.kind === "mine" || r.mods[mod] == null ? undefined : 0}
-                          onKeyDown={(event) => {
-                            if (r.kind !== "mine" && r.mods[mod] != null
-                              && (event.key === "Enter" || event.key === " ")) {
-                              event.preventDefault(); loadMod(r.slug, mod);
-                            }
-                          }}
-                          onClick={() => r.kind !== "mine" && r.mods[mod] != null
-                            && loadMod(r.slug, mod)}>
-                          {r.mods[mod] != null && <span className="speed-value">{r.mods[mod]}</span>}
+                <thead>
+                  <tr>
+                    <th className="corner">{t("ranking.pokemon")}</th>
+                    {sortHead("base", t("speed.baseSpe"), "base-col")}
+                    {sortHead("actual", t("speed.actual"), "actual-col", t("speed.realHint"))}
+                    {MOD_KEYS.map((mod) => (
+                      <th key={mod} className="mod-col" title={t("speed.modifiedMaxHint")}>{t(MOD_LABEL[mod])}</th>
+                    ))}
+                    {TIER_KEYS.map((tier) => <th key={tier}>{t(TIER_LABEL[tier])}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(({ row, entry, members, cards, shown, speed, tailwind }) => {
+                    const ours = members.some((m) => m.side === "a");
+                    const focus = members.some((m) => m.side === "a" && m.index === mineIndex);
+                    // A cell showing one of OUR builds is a reference, not a line to read against.
+                    const self = shown?.member?.side === "a";
+                    const identity = <>
+                      {entry && <GameImage assetKey={entry.key} role="dense" alt={displayName(entry, lang)} className="mini" />}
+                      <span className="nm">{entry ? displayName(entry, lang) : row.name}</span>
+                      {row.rank != null && <span className="rk num">#{row.rank}</span>}
+                    </>;
+                    const others = cards.filter((card) => card.option.source !== "meta").length - 1;
+                    const shownTag = shown?.member ? sideName(shown.member.side)
+                      : shown ? pct(shown.coverage) : "";
+                    return (
+                      <tr key={row.rowKey} id={`speed-row-${row.rowKey}`}
+                        className={`${ours ? "mine" : members.length ? "custom" : "meta"}${focus ? " focus" : ""}`}>
+                        <th className="tier-mon">
+                          {entry ? (
+                            <EntityHover kind="pokemon" name={entry.name} link={false} passive>
+                              <span className="speed-tier-identity">{identity}</span>
+                            </EntityHover>
+                          ) : <span className="speed-tier-identity">{identity}</span>}
+                          {members.map((member) => {
+                            const on = active[member.side] === member.index;
+                            return (
+                              <button key={member.mon.uid} type="button"
+                                className={`rung-you${member.side === "b" ? " custom" : ""}${on ? " on" : ""}`}
+                                aria-pressed={on} title={t("speed.selectRow")}
+                                onClick={() => setActive((p) => (p[member.side] === member.index ? p
+                                  : { ...p, [member.side]: member.index }))}>
+                                {memberTag(member)}
+                              </button>
+                            );
+                          })}
+                        </th>
+                        <td className="base-col"><span className="speed-value">{row.base ?? "—"}</span></td>
+                        <td className={`spd actual-col${self ? " self" : ` ${cellCls(speed)}`}${tailwind ? " on-tailwind" : ""}`}>
+                          {shown && (
+                            <button type="button" className={`speed-real${openRow === row.rowKey ? " open" : ""}`}
+                              aria-haspopup="dialog" aria-expanded={openRow === row.rowKey}
+                              title={[cardNote(shown, row),
+                                tailwind ? `${t("speed.tailwind")} ×2 → ${speed}` : "",
+                                self ? "" : hintFor(speed), t("speed.pickReal")].filter(Boolean).join("\n")}
+                              onPointerEnter={() => requestMeta(row.slug)} onFocus={() => requestMeta(row.slug)}
+                              onClick={(event) => {
+                                if (openRow === row.rowKey) { setOpenRow(null); return; }
+                                requestMeta(row.slug);
+                                pickAnchor.current = event.currentTarget;
+                                setOpenRow(row.rowKey);
+                              }}>
+                              <span className="speed-value">
+                                {speed ?? "—"}
+                                {tailwind && <span className="speed-tw-badge" aria-label={t("speed.tailwind")}>×2</span>}
+                              </span>
+                              <small className={shown.member ? `who ${shown.member.side}` : ""}>{shownTag}</small>
+                              {/* The Meta card loads on hover; counting it would make the number jump. */}
+                              <small className="more num">{others > 0 ? `+${others}` : ""}</small>
+                            </button>
+                          )}
                         </td>
-                      ))}
-                      {TIER_KEYS.map((tier) => (
-                        <td key={tier} className={`spd ${cellCls(r.tiers[tier])}`}
-                          role={r.kind === "meta" ? "button" : undefined}
-                          tabIndex={r.kind === "meta" ? 0 : undefined}
-                          onKeyDown={(event) => {
-                            if (r.kind === "meta" && (event.key === "Enter" || event.key === " ")) {
-                              event.preventDefault(); loadTier(r.slug, tier);
-                            }
-                          }}
-                          onClick={() => r.kind === "meta" && loadTier(r.slug, tier)}>
-                          {r.kind === "meta"
-                            && <span className="speed-value">{r.tiers[tier] ?? "—"}</span>}
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
+                        {MOD_KEYS.map((mod) => (
+                          <td key={mod} className={`spd mod-col ${cellCls(row.mods[mod])}`} title={hintFor(row.mods[mod])}>
+                            {row.mods[mod] != null && <span className="speed-value">{row.mods[mod]}</span>}
+                          </td>
+                        ))}
+                        {TIER_KEYS.map((tier) => (
+                          <td key={tier} className={`spd ${cellCls(row.tiers[tier])}`} title={hintFor(row.tiers[tier])}>
+                            <span className="speed-value">{row.tiers[tier] ?? "—"}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </div>
-          <div className="speed-row-markers" ref={markerRailRef}
-            role="navigation" aria-label={t("speed.locators")}>
-            {actualMarkers.map(({ row, position }) => {
-              const entry = entryOf(row.slug);
-              const side = row.kind === "mine" ? t("speed.ours") : t("speed.theirs");
-              const index = (row.sideIndex ?? 0) + 1;
-              const name = entry ? displayName(entry, lang) : row.name;
-              const label = t("speed.locate").replace("{side}", side)
-                .replace("{index}", String(index)).replace("{name}", name);
-              return <button key={row.rowKey} type="button"
-                className={`speed-row-marker ${row.kind}`}
-                style={{ top: markerTopByRowKey.get(row.rowKey!) ?? `${position}%` }}
-                aria-label={label} title={label}
-                aria-controls={`speed-row-${row.rowKey}`}
-                onClick={() => locateRow(row.rowKey!)} />;
+          <div className="speed-row-markers" role="navigation" aria-label={t("speed.locators")}>
+            {markers.map(({ v, position }) => {
+              const lead = v.members.find((m) => m.side === "a") ?? v.members[0]!;
+              const label = t("speed.locate").replace("{side}", sideName(lead.side))
+                .replace("{index}", String(lead.index + 1)).replace("{name}", nameOf(v.row.slug));
+              return <button key={v.row.rowKey} type="button"
+                className={`speed-row-marker ${lead.side === "a" ? "mine" : "custom"}`}
+                style={{ top: `${position}%` }} aria-label={label} title={label}
+                aria-controls={`speed-row-${v.row.rowKey}`} onClick={() => locateRow(v.row.rowKey)} />;
             })}
           </div>
+          {openView && (
+            <BuildPicker anchorRef={pickAnchor} onClose={closePicker} hint={t("speed.pickReal")}
+              currentKey={openView.shown?.key}
+              options={openView.cards.map((card) => ({ ...card.option, note: cardNote(card, openView.row) }))}
+              onPick={(option) => setPicks((p) => ({ ...p, [openView.row.rowKey]: option.key }))} />
+          )}
         </div>
       ) : (
         !error && (ranking.status === "loading"
           ? <div className="spinner">{t("state.loading")}</div>
           : <div className="notice">{t("speed.empty")}</div>)
       )}
-    </>
+    </div>
   );
 }

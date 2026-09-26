@@ -2,7 +2,7 @@
   "season": "M-6",
   "rule": "M-C",
   "format": "double",
-  "generated_at": "2026-09-23T00:00:00+00:00",
+  "generated_at": "2026-09-25T00:00:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,55 +50,15 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-09-21T00:00:00+00:00",
-    "details_updated_at": "2026-09-21T00:00:00+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-09-23T00:00:00+00:00",
     "details_updated_at": "2026-09-23T00:00:00+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-09-25T00:00:00+00:00",
+    "details_updated_at": "2026-09-25T00:00:00+00:00"
   },
   "rank_moves": [],
   "new_entries": [],
   "dropped": [],
-  "config_changes": [
-    {
-      "slug": "corviknight",
-      "name": "钢铠鸦",
-      "rank": 53,
-      "tier": "B",
-      "panel": "items",
-      "item": "精神种子",
-      "old_pct": 10.3,
-      "new_pct": 36.8,
-      "delta": 26.5,
-      "kind": "上升",
-      "rank_triggered": false
-    },
-    {
-      "slug": "corviknight",
-      "name": "钢铠鸦",
-      "rank": 53,
-      "tier": "B",
-      "panel": "moves",
-      "item": "嚣张",
-      "old_pct": 9.2,
-      "new_pct": 36.7,
-      "delta": 27.5,
-      "kind": "上升",
-      "rank_triggered": false
-    },
-    {
-      "slug": "corviknight",
-      "name": "钢铠鸦",
-      "rank": 53,
-      "tier": "B",
-      "panel": "moves",
-      "item": "健美",
-      "old_pct": 31.5,
-      "new_pct": 53.1,
-      "delta": 21.6,
-      "kind": "上升",
-      "rank_triggered": false
-    }
-  ]
+  "config_changes": []
 }

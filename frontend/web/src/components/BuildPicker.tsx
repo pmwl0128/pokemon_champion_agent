@@ -18,6 +18,8 @@ export interface BuildCardOption {
   set: OppSetDto;
   /** Original A/B/C position when this option is rendered outside its picker list. */
   labelIndex?: number;
+  /** One line the picker's caller adds above the card body (whose build it is, what it computes). */
+  note?: string;
 }
 
 const pct = (n: number | null | undefined) => n == null ? null : `${Math.round(n * 100)}%`;
@@ -202,7 +204,7 @@ export function BuildPicker({
                   aria-pressed={option.key === currentKey}
                   onClick={() => { onPick(option); onClose(); }}>
                   <BuildSetSummary option={option} index={index}
-                    selected={option.key === currentKey} />
+                    selected={option.key === currentKey} title={option.note} />
                 </button>
               </li>
             ))}

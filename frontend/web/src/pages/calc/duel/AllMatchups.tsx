@@ -33,7 +33,7 @@ export interface GridRow {
 }
 
 export function AllMatchups({
-  rows, cols, results, onFlip, onRun, runnable, stale, busy, error, fromLabel, toLabel,
+  rows, cols, results, onRun, runnable, stale, busy, error, fromLabel, toLabel,
 }: {
   /** The axes the CURRENT results were computed against — never the live plan, or a stale grid
    * would be painted onto axes its cells do not belong to. */
@@ -41,7 +41,6 @@ export function AllMatchups({
   cols: GridCol[];
   /** Row-major, aligned to rows × cols; a cell is a result, an engine error, or null (not run). */
   results: Array<DamageResultDto | { error?: unknown } | null>;
-  onFlip: () => void;
   onRun: () => void;
   /** There is something to compute right now (both sides populated, within the batch bound). */
   runnable: boolean;
@@ -70,15 +69,13 @@ export function AllMatchups({
 
   return (
     <section className="panel all-matchups">
-      {/* The rule belongs to the whole header, not to the title alone: the hint and the flip control
-          are part of the same band, so they sit above the line rather than beside a short one. */}
+      {/* The rule belongs to the whole header, not to the title alone: the hint and the compute
+          control are part of the same band, so they sit above the line rather than beside a short one. */}
       <header className="all-matchups-head">
         <h2>{t("calc.allMatchups")}</h2>
         <p className="muted">{t("calc.allMatchupsHint")}</p>
         <span className="all-matchups-actions">
           {stale && <span className="grid-stale">{t("calc.gridStale")}</span>}
-          <button type="button" className="ghost-btn" onClick={onFlip}
-            title={t("calc.flipAxisHint")}>⇄ {t("calc.flipAxis")}</button>
           <button type="button" className={stale || !results.length ? "primary-btn" : "ghost-btn"}
             onClick={onRun} disabled={busy || !runnable}>
             {busy ? t("state.loading")

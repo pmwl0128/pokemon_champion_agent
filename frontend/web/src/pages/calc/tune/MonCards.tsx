@@ -134,7 +134,7 @@ type StageKey = "atk" | "def" | "spa" | "spd" | "spe";
 
 /** A stat stage, as narrow as -6..+6 allows. Coloured by direction so a raised or lowered stat is
  * visible without reading the number. */
-function StageSelect({ value, label, onChange }: {
+export function StageSelect({ value, label, onChange }: {
   value: number;
   label: string;
   onChange: (stage: number) => void;
@@ -147,7 +147,7 @@ function StageSelect({ value, label, onChange }: {
   );
 }
 
-function SpSlider({ label, value, baseline, mini = false, onChange }: {
+export function SpSlider({ label, value, baseline, mini = false, onChange }: {
   label: string;
   value: number;
   /** Where the loaded spread sat; drawn as a tick once the slider has left it. */

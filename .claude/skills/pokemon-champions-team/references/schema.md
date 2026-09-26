@@ -457,6 +457,7 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
   "pool_size": 223, "partitioned": true, "frames_total": 11, "frames_shown": 11,
   "thin": false, "meta_fallback": false, "no_backbone": false,
   "handover": null,
+  "fallback": null,     // {tier, reason} only when NO current-rule team carries the anchor (below)
   "skeletons": [{
     "frame_id": "fa1a799e1ab",                 // MECHANICAL hash, never a team-name/type label
     "group_signature": {"axis": "speed_control", "key": ["tailwind"]},  // the Tier-1 key ACTUALLY used
@@ -515,6 +516,17 @@ come from `team.py schema` (`commands.frame`, `commands.slate-evaluate`, and
 - During the entire active week, `handover` reports evidence rules, contributing row count and expiry
   for validated prior-rule structural rows, regardless of the native team count. At expiry structure
   becomes target-rule-only and `handover` is `null`.
+- An anchor that NO current-rule team carries still gets skeletons. `data/fallback_frames/<rule>_<format>.json`
+  (rebuilt with the opponent cache) stores one RECIPE per such anchor — `{"source": "history",
+  "seasons": [...]}` (older-rule teams built around it), `{"source": "partners", "partners": [...]}`
+  (current teams carrying its specific usage partners together) or `{"source": "stand_in",
+  "species": "...", "hits": {...}}` (a data-backed species doing the same job, matched on explicit
+  predicate counts) — and `frame` computes the skeletons over that pool with its ordinary machinery.
+  With no recipe it lends whole-library frames (`generic_library`). Every such skeleton carries
+  `fallback: <source>`, `confidence: low`, `confidence_reason: <source>-fallback`, a Mega reference
+  with `basis: "none"` (never gates), and binds SOFTLY: departing from any of its members' clusters
+  is reported, never eliminated. The top-level `fallback` names the source; `meta_fallback` stays
+  `true` (the anchor still has no current joint grammar of its own).
 
 **The two fields the AI PRODUCES for the binding:**
 - `slate.frame_bindings[i]` (aligned with `teams[i]`): `{frame_id, off_meta?:[species], deviations?:

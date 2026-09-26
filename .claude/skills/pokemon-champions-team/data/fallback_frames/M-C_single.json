@@ -1,0 +1,487 @@
+{
+ "kind": "fallback_frames",
+ "schema_version": 1,
+ "built_for": {
+  "format": "single",
+  "rule": "M-C",
+  "season": "M-6",
+  "built_at": "2026-09-26T00:31:44Z"
+ },
+ "counts": {
+  "history": 10,
+  "partners": 26,
+  "stand_in": 14
+ },
+ "anchors": {
+  "Aegislash-Blade|": {
+   "source": "stand_in",
+   "species": "Aegislash",
+   "hits": {
+    "types": 2,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 90
+  },
+  "Aegislash-Shield|": {
+   "source": "stand_in",
+   "species": "Aegislash",
+   "hits": {
+    "types": 2,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 90
+  },
+  "Ampharos|": {
+   "source": "partners",
+   "partners": [
+    "Mimikyu",
+    "Corviknight"
+   ],
+   "teams": 11
+  },
+  "Arbok|": {
+   "source": "stand_in",
+   "species": "Sneasler",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 0,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 68
+  },
+  "Ariados|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4"
+   ],
+   "teams": 4
+  },
+  "Beartic|": {
+   "source": "partners",
+   "partners": [
+    "Pelipper",
+    "Swampert"
+   ],
+   "teams": 8
+  },
+  "Castform|": {
+   "source": "partners",
+   "partners": [
+    "Kingambit",
+    "Basculegion"
+   ],
+   "teams": 12
+  },
+  "Decidueye-Hisui|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5",
+    "M-A-events"
+   ],
+   "teams": 8
+  },
+  "Dedenne|": {
+   "source": "partners",
+   "partners": [
+    "Charizard",
+    "Vanilluxe"
+   ],
+   "teams": 6
+  },
+  "Farfetch'd|": {
+   "source": "stand_in",
+   "species": "Staraptor",
+   "hits": {
+    "types": 2,
+    "lean": 1,
+    "speed_band": 0,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 10
+  },
+  "Flareon|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4"
+   ],
+   "teams": 3
+  },
+  "Forretress|": {
+   "source": "partners",
+   "partners": [
+    "Volcarona",
+    "Kingambit"
+   ],
+   "teams": 5
+  },
+  "Garbodor|": {
+   "source": "partners",
+   "partners": [
+    "Basculegion",
+    "Mimikyu"
+   ],
+   "teams": 7
+  },
+  "Gogoat|": {
+   "source": "stand_in",
+   "species": "Meganium",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 11
+  },
+  "Gourgeist-Large|": {
+   "source": "stand_in",
+   "species": "Sinistcha",
+   "hits": {
+    "types": 2,
+    "lean": 0,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 11
+  },
+  "Gourgeist-Small|": {
+   "source": "partners",
+   "partners": [
+    "Clefable",
+    "Snorlax"
+   ],
+   "teams": 4
+  },
+  "Houndoom|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Gyarados"
+   ],
+   "teams": 7
+  },
+  "Hydrapple|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Basculegion"
+   ],
+   "teams": 7
+  },
+  "Klefki|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4"
+   ],
+   "teams": 6
+  },
+  "Lycanroc-Dusk|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 4
+  },
+  "Lycanroc-Midday|": {
+   "source": "partners",
+   "partners": [
+    "Lucario",
+    "Ninetales-Alola"
+   ],
+   "teams": 7
+  },
+  "Manectric|": {
+   "source": "stand_in",
+   "species": "Rotom",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 15
+  },
+  "Maushold-Four|": {
+   "source": "stand_in",
+   "species": "Mega Lopunny",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 2,
+    "field": 0
+   },
+   "teams": 11
+  },
+  "Mega Ampharos|": {
+   "source": "history",
+   "seasons": [
+    "M-4",
+    "M-5"
+   ],
+   "teams": 3
+  },
+  "Mega Houndoom|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Gyarados"
+   ],
+   "teams": 7
+  },
+  "Mega Manectric|": {
+   "source": "stand_in",
+   "species": "Raichu",
+   "hits": {
+    "types": 1,
+    "lean": 0,
+    "speed_band": 1,
+    "roles": 4,
+    "field": 0
+   },
+   "teams": 21
+  },
+  "Mega Sharpedo|": {
+   "source": "history",
+   "seasons": [
+    "M-1",
+    "M-2",
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 7
+  },
+  "Meowstic-F|": {
+   "source": "partners",
+   "partners": [
+    "Indeedee",
+    "Sneasler",
+    "Kingambit"
+   ],
+   "teams": 5
+  },
+  "Morpeko-Hangry|": {
+   "source": "stand_in",
+   "species": "Pawmot",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 2,
+    "field": 0
+   },
+   "teams": 48
+  },
+  "Mr. Rime|": {
+   "source": "partners",
+   "partners": [
+    "Cinderace",
+    "Rillaboom"
+   ],
+   "teams": 8
+  },
+  "Oranguru|": {
+   "source": "stand_in",
+   "species": "Indeedee",
+   "hits": {
+    "types": 2,
+    "lean": 1,
+    "speed_band": 0,
+    "roles": 1,
+    "field": 0
+   },
+   "teams": 57
+  },
+  "Pangoro|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4",
+    "M-5"
+   ],
+   "teams": 3
+  },
+  "Passimian|": {
+   "source": "partners",
+   "partners": [
+    "Indeedee",
+    "Basculegion"
+   ],
+   "teams": 6
+  },
+  "Perrserker|": {
+   "source": "stand_in",
+   "species": "Mega Golisopod",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 109
+  },
+  "Raichu-Alola|": {
+   "source": "partners",
+   "partners": [
+    "Blastoise",
+    "Sneasler",
+    "Indeedee"
+   ],
+   "teams": 11
+  },
+  "Rampardos|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Basculegion"
+   ],
+   "teams": 7
+  },
+  "Reuniclus|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-5"
+   ],
+   "teams": 3
+  },
+  "Rotom-Fan|": {
+   "source": "partners",
+   "partners": [
+    "Gyarados",
+    "Tyranitar"
+   ],
+   "teams": 5
+  },
+  "Runerigus|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Gyarados"
+   ],
+   "teams": 7
+  },
+  "Sharpedo|": {
+   "source": "history",
+   "seasons": [
+    "M-3",
+    "M-4"
+   ],
+   "teams": 4
+  },
+  "Slowbro-Galar|": {
+   "source": "stand_in",
+   "species": "Toxapex",
+   "hits": {
+    "types": 1,
+    "lean": 0,
+    "speed_band": 1,
+    "roles": 4,
+    "field": 0
+   },
+   "teams": 22
+  },
+  "Squawkabilly-Yellow|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Basculegion",
+    "Pawmot"
+   ],
+   "teams": 3
+  },
+  "Stunfisk-Galar|": {
+   "source": "partners",
+   "partners": [
+    "Baxcalibur",
+    "Cinderace"
+   ],
+   "teams": 11
+  },
+  "Tauros-Paldea-Aqua|": {
+   "source": "stand_in",
+   "species": "Pawmot",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 2,
+    "field": 0
+   },
+   "teams": 48
+  },
+  "Tauros-Paldea-Combat|": {
+   "source": "partners",
+   "partners": [
+    "Empoleon",
+    "Ceruledge"
+   ],
+   "teams": 3
+  },
+  "Thievul|": {
+   "source": "partners",
+   "partners": [
+    "Indeedee",
+    "Cinderace"
+   ],
+   "teams": 6
+  },
+  "Toxtricity-Low Key|": {
+   "source": "partners",
+   "partners": [
+    "Cinderace",
+    "Gyarados"
+   ],
+   "teams": 7
+  },
+  "Typhlosion-Hisui|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Basculegion"
+   ],
+   "teams": 7
+  },
+  "Tyrantrum|": {
+   "source": "partners",
+   "partners": [
+    "Charizard",
+    "Greninja"
+   ],
+   "teams": 7
+  },
+  "Wyrdeer|": {
+   "source": "partners",
+   "partners": [
+    "Golisopod",
+    "Dragonite"
+   ],
+   "teams": 4
+  }
+ }
+}

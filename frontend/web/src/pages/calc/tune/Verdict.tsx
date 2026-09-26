@@ -58,7 +58,7 @@ function TargetSelect({ target, onTarget }: {
 export type VerdictState = "ready" | "noMove" | "statusMove" | "noMon";
 
 export const Verdict = memo(function Verdict({ foe, mine, moveLabel, rolls, pending, state, hits, onHits,
-  target, onTarget, pinned, onTogglePin, onSwap }: {
+  target, onTarget, pinned, onTogglePin }: {
   foe: DexIndexEntry | undefined;
   mine: DexIndexEntry | undefined;
   moveLabel: string;
@@ -71,8 +71,6 @@ export const Verdict = memo(function Verdict({ foe, mine, moveLabel, rolls, pend
   onTarget: (target: GoalTarget) => void;
   pinned: boolean;
   onTogglePin: () => void;
-  /** Attack and defence change places — the shared roster's swap, so the calculator follows. */
-  onSwap: () => void;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -99,8 +97,6 @@ export const Verdict = memo(function Verdict({ foe, mine, moveLabel, rolls, pend
           {moveLabel && <span className="tw-matchup-move">{moveLabel}</span>}
           <span className="tw-arrow" aria-hidden>→</span>
           {who(mine)}
-          <button type="button" className="ghost-btn tw-swap" onClick={onSwap}
-            title={t("calc.flipAxisHint")}>⇄ {t("calc.swap")}</button>
         </span>
         <span className="tw-verdict-controls">
           <label className="tw-target-field">

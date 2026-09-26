@@ -106,7 +106,7 @@ export function CalcPage() {
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "speed")}
           aria-labelledby={segmentedTabId("calc-tool", "speed")} hidden={tab !== "speed"}>
           <Suspense fallback={<div className="spinner">{t("state.loading")}</div>}>
-            <SpeedTab dex={dex.data} natures={natures.data} items={items.data}
+            <SpeedTab dex={dex.data} natures={natures.data} items={items.data} active={tab === "speed"}
               onRailApi={registerSpeed} />
           </Suspense>
         </div>

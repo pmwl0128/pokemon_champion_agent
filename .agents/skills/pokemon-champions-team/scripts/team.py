@@ -1066,6 +1066,35 @@ def cmd_landscape(fmt: str, game_format: str | None, season: str | None, context
     return 0
 
 
+def _fallback_fn(game_format: str, rule: str | None, current_teams: list[dict]):
+    """frame's fallback-ladder input: the fallback table's recipe for an anchor no current-rule team
+    carries, resolved into the evidence pool frame computes over. Older-rule partitions load through
+    the same process cache as the rule pool. No table for this rule (not built yet, or a historical
+    scope) -> None, and frame falls to its generic rung."""
+    import fallback_frames
+
+    def resolve(filter_members: list[dict]) -> dict | None:
+        table = fallback_frames.load_table(game_format, rule) if rule else None
+        if not table or len(filter_members) != 1:
+            return None
+        f = filter_members[0]
+        recipe = (table.get("anchors") or {}).get(fallback_frames.anchor_key(f["species"], f.get("item")))
+        if not recipe:
+            return None
+        resolved = fallback_frames.resolve(
+            recipe, fmt=game_format, rule=rule, current_teams=current_teams,
+            load_season=lambda season: repset.cached_teams(game_format, season))
+        if resolved and resolved["source"] == "history":
+            # frame's fact tables are prefetched over the species/moves/items the current library
+            # uses; an older pool can carry ones it does not, which would otherwise profile blind.
+            try:
+                resolved["fact_fns"] = _dex_fact_fns(resolved["pool"], {f["species"]})
+            except DexUnavailable:
+                return None
+        return resolved
+    return resolve
+
+
 def cmd_frame(fmt: str, game_format: str | None, season: str | None, context_path: str | None,
               audit_receipt_path: str | None) -> int:
     """UEP P4.5 assembly front-door: emit DATA-GROUNDED skeletons (repset-backed core candidates +
@@ -1134,7 +1163,8 @@ def cmd_frame(fmt: str, game_format: str | None, season: str | None, context_pat
         print(i18n.t('team_sibling_dex_unavailable', e=e), file=sys.stderr)
         return 2
     out = frame.frame_from_teams(teams, fmt=game_format, dex_fn=dex_fn, move_fn=move_fn,
-                                 item_fn=item_fn, filter_members=filter_members, order=order)
+                                 item_fn=item_fn, filter_members=filter_members, order=order,
+                                 fallback_fn=_fallback_fn(game_format, scope.get("rule"), teams))
     out["frame_receipt"] = frame.make_receipt(provided, out["skeletons"], out.get("anchor"), game_format)
     # Historical-provenance stamp mirrors landscape/repset: the library partition IS the data's season.
     stamp2, env_warn = _scope_stamp(scope, teams, context)

@@ -349,7 +349,9 @@ def frame_binding(team_c: dict[str, Any], binding: Any, skeletons_by_id: dict[st
             # disclosed at answer-audit) and never eliminates — taxing that band at the core rate
             # would price a substitution above going with the crowd, which is the behaviour frame
             # exists to counteract.
-            soft = tier == "recurring-partner"
+            # A fallback skeleton (frame's ladder for an anchor no real team carries) was never
+            # observed WITH the anchor, so none of its lent members is a commitment either.
+            soft = tier == "recurring-partner" or (tier != "anchor" and bool(skel.get("fallback")))
             info["recurring_partners" if soft else "core_bearers"].append(sp)
             clusters = ((core[core_key].get("grounding") or {}).get("clusters")) or []
             if clusters and not _pair_in_clusters(item, ability, clusters):

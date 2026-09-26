@@ -18,15 +18,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx";
 import { useAsync, useMovesByName } from "../../hooks.ts";
 import { displayName, useLang, useT } from "../../i18n.ts";
-import { parsePokepaste } from "../../lib/pokepaste.ts";
 import { takeTuneFill } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
 import { BOOST_KEYS, buildConfigSig, type BuildOption } from "./shared.tsx";
+import { monsFromPaste } from "./duel/paste.ts";
+import { SwapSeam } from "./duel/SwapSeam.tsx";
 import { TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  EMPTY_FIELD, applyBuildOption, damageRequest, effectiveEntry, makeMon, withMoves,
+  EMPTY_FIELD, applyBuildOption, damageRequest, effectiveEntry, makeMon,
   type FieldState, type MonState, type SideId,
 } from "./duel/state.ts";
 import { useRoster } from "./roster.tsx";
@@ -41,24 +42,12 @@ import { TargetsPanel, type SolveEntry, type SolveRun, type TargetRow } from "./
 
 /** Our defender is the roster's side "a", the attackers side "b". */
 const SIDE: Record<TuneSide, SideId> = { mine: "a", foe: "b" };
-const DEFAULT_SLUG: Record<TuneSide, string> = { mine: "garchomp", foe: "mimikyu" };
 const SWEEP_STATS: BulkStat[] = ["hp", "def", "spd"];
 const SWEEP_CAP = 960;
 const SOLVE_CAP = 12;
 
 type MonUpdate = (update: (mon: MonState) => MonState) => void;
 type Teams = Record<SideId, MonState[]>;
-
-function matchLocal<T extends { name: string; nameZh?: string; nameJa?: string }>(
-  pool: T[], raw: string | undefined): T | undefined {
-  if (!raw) return undefined;
-  const query = raw.trim();
-  const lower = query.toLowerCase();
-  const loose = (value: string) => value.toLowerCase().replace(/[\s'’.-]/g, "");
-  return pool.find((candidate) => candidate.name.toLowerCase() === lower
-    || candidate.nameZh === query || candidate.nameJa === query)
-    ?? pool.find((candidate) => loose(candidate.name) === loose(query));
-}
 
 /** Everything a solve depends on except our members' SP and nature, which an applied lane changes. */
 function contextSignature(teams: Teams, field: FieldState, plan: Array<Omit<SolveEntry, "base">>): string {
@@ -85,7 +74,7 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   const moveVocab = useMovesByName();
   const store = useDamageStore(adapter);
   const roster = useRoster();
-  const { teams, setTeams, active, setActive, slot, setSlot, setField, swaps, swapSides } = roster;
+  const { teams, setTeams, active, setActive, slot, setSlot, setField, swaps, swapSides, demoMon } = roster;
   // The build session a team was handed over from, if any: its team-level fields ride along with
   // every solve. (The roster itself was filled from it once, by the provider.)
   const fill = useRef(takeTuneFill()).current;
@@ -215,58 +204,13 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   // -- roster ------------------------------------------------------------------------------
 
   const importPaste = useCallback(async (side: TuneSide, text: string): Promise<ImportOutcome> => {
-    const { mons: pasted, rescaledEvs } = parsePokepaste(text);
-    if (!pasted.length) return { added: 0, unresolved: [], rescaledEvs };
-    const resolved = new Map<string, DexIndexEntry>();
-    const misses: string[] = [];
-    for (const pastedMon of pasted) {
-      const local = matchLocal(dex, pastedMon.species)
-        ?? dex.find((entry) => entry.slug === pastedMon.species.trim().toLowerCase());
-      if (local) resolved.set(pastedMon.species, local); else misses.push(pastedMon.species);
-    }
-    if (misses.length) {
-      try {
-        const entries = await adapter.resolve(misses, "pokemon");
-        entries.forEach((entry, index) => {
-          const hit = entry.ok && entry.canonical
-            ? dex.find((candidate) => candidate.name === entry.canonical) : undefined;
-          if (hit) resolved.set(misses[index]!, hit);
-        });
-      } catch (error) { console.error("tune import resolution failed:", error); }
-    }
-    const unresolved: string[] = [];
-    const built: MonState[] = [];
-    for (const pastedMon of pasted.slice(0, TEAM_MAX)) {
-      const entry = resolved.get(pastedMon.species);
-      if (!entry) { unresolved.push(pastedMon.species); continue; }
-      const mon = makeMon(entry.slug);
-      mon.sps = { ...pastedMon.sps };
-      mon.pinned = true;
-      const item = matchLocal(items, pastedMon.item);
-      if (item) mon.item = item.name; else if (pastedMon.item) unresolved.push(pastedMon.item);
-      const ability = matchLocal(entry.abilities, pastedMon.ability);
-      if (ability) mon.ability = ability.name; else if (pastedMon.ability) unresolved.push(pastedMon.ability);
-      const nature = matchLocal(natures, pastedMon.nature);
-      if (nature) mon.nature = nature.name; else if (pastedMon.nature) unresolved.push(pastedMon.nature);
-      if (pastedMon.moves.length) {
-        let pool: LearnsetDto["moves"] = [];
-        try { pool = (await loadLearnset(entry.slug)).moves; }
-        catch (error) { console.error("tune learnset import failed:", error); }
-        const names = pastedMon.moves.flatMap((raw) => {
-          const hit = matchLocal(pool, raw);
-          if (hit) return [hit.name];
-          unresolved.push(raw);
-          return [];
-        });
-        mon.moves = withMoves(mon, names).moves;
-      }
-      built.push(mon);
-    }
-    if (!built.length) return { added: 0, unresolved, rescaledEvs };
-    setTeams((previous: Teams) => ({ ...previous, [SIDE[side]]: built }));
+    // Imported builds are pinned here: the bulk tool is tuning exactly what was pasted.
+    const { mons, outcome } = await monsFromPaste(text, { dex, items, natures, adapter, pin: true });
+    if (!mons.length) return outcome;
+    setTeams((previous: Teams) => ({ ...previous, [SIDE[side]]: mons }));
     setActive((previous) => ({ ...previous, [SIDE[side]]: 0 }));
     setRun(null);
-    return { added: built.length, unresolved, rescaledEvs };
+    return outcome;
   }, [adapter, dex, items, natures, setTeams, setActive]);
 
   const pickActive = useCallback((side: TuneSide, index: number) =>
@@ -294,10 +238,10 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   }, [teams, setTeams, setActive]);
 
   const resetSide = useCallback((side: TuneSide) => {
-    setTeams((previous: Teams) => ({ ...previous, [SIDE[side]]: [makeMon(DEFAULT_SLUG[side])] }));
+    setTeams((previous: Teams) => ({ ...previous, [SIDE[side]]: [demoMon(SIDE[side])] }));
     setActive((previous) => ({ ...previous, [SIDE[side]]: 0 }));
     setRun(null);
-  }, [setTeams, setActive]);
+  }, [setTeams, setActive, demoMon]);
 
   // The side rail drops a picked mon into the first blank slot of that side, else appends.
   const pickFromRail = useCallback((targetId: CalcRailTarget, entry: DexIndexEntry,
@@ -590,12 +534,13 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
       <Verdict foe={foeEntry} mine={mineEntry} moveLabel={selectedMove ? moveLabel(selectedMove) : ""}
         rolls={selectedCell?.rolls ?? null} pending={!!selectedCell?.pending} state={verdictState}
         hits={hits} onHits={changeHits} target={target} onTarget={changeTarget}
-        pinned={!!currentGoal} onTogglePin={togglePin} onSwap={swapSides} />
+        pinned={!!currentGoal} onTogglePin={togglePin} />
 
-      <div className="tw-stage">
+      <div className="tw-stage swap-seam-host">
         <DefenderCard mon={mine} baseline={mineBaseline} dex={dex} natures={natures} items={items}
           format={field.format} pressed={pressedStat(selectedMove, moveVocab.get(selectedMove)?.category)}
           onSpecies={mineSpecies} onChange={changeMine} onPickBuild={minePick} onRestore={restoreMine} />
+        <SwapSeam onSwap={swapSides} />
         <AttackerCard mon={foe} dex={dex} natures={natures} items={items} format={field.format}
           learnset={foeLearnset.status === "ready" ? foeLearnset.data : null}
           cells={cells} selectedSlot={selectedSlot} onSelectSlot={selectSlot}

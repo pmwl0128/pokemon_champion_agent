@@ -1,26 +1,68 @@
-/** One side's roster strip: the mons on that side, which one the editor below is showing, and the
- * pokepaste import that fills the whole strip at once.
+/** One wing of the duel strip: a side's roster, the conditions standing on that side's field, and
+ * the pokepaste import that fills the whole roster at once.
  *
- * Import opens as a popover rather than an inline block: it has to stay open while you read back
- * what was and was not recognised, and a panel that pushes the page down moves everything the
- * reader was comparing. */
-import { useEffect, useRef, useState } from "react";
-import { useT } from "../../../i18n.ts";
+ * The roster is always six slots wide — filled, the next free one, then placeholders — so adding a
+ * Pokémon never moves the conditions row, the centre console or the other wing. The side's name is
+ * the menu button for the two whole-team actions, which keeps the condition row free for what is
+ * actually switched on.
+ *
+ * Conditions live with the side they belong to rather than in one shared flyout: each chip clears
+ * itself, and the wing's own button opens that side's toggles right under the roster it affects. */
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
-import { FIELD_FLAGS_TOGGLE } from "./FieldPanel.tsx";
 import { MonAvatar } from "./MonEditor.tsx";
-import type { MonState } from "./state.ts";
+import { roveFocus, useFocusOnOpen, usePopover } from "./popover.ts";
+import { SIDE_FLAGS, type FieldState, type MonState, type SideId } from "./state.ts";
 
-/** How many active-condition chips the head row previews inline. The row is a fixed height beside
- * the roster, so a long list can neither wrap nor scroll — it used to scroll with a hidden
- * scrollbar, which simply made the extra conditions invisible.
+/** Gap between condition chips; mirrors `.team-conds { gap }`. */
+const COND_GAP = 5;
+
+/** How many chips of a one-line row fit beside its trailing button, measured rather than guessed:
+ * label length varies threefold across languages, and a fixed cap either wastes the row or pushes
+ * the "+N" button — the only way to the rest — past the clipped edge.
  *
- * The badge beside the preview carries the TOTAL, not the leftover: at an awkward width one more
- * chip can still be squeezed off the outer end, and a number that meant "hidden" would then be
- * wrong by one while a total stays true however the row lays out. It opens the flyout that owns the
- * full list. */
-const MAX_FLAG_CHIPS = 3;
+ * Every chip stays rendered (the overflow ones out of flow and invisible) so each can be measured,
+ * and both faces of the button are measured from hidden twins. The answer depends only on those
+ * widths, never on the face currently shown, so it cannot oscillate: when everything does not fit
+ * beside "+ 状态", at least one chip folds and the narrower "+N" face is the one reserved for. */
+function useChipFit(row: { current: HTMLElement | null }, signature: string) {
+  const [fit, setFit] = useState(Number.POSITIVE_INFINITY);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const node = row.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setWidth(node.clientWidth));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [row]);
+  useLayoutEffect(() => {
+    const node = row.current;
+    if (!node) return;
+    const chips = Array.from(node.querySelectorAll<HTMLElement>("[data-chip]"))
+      .map((chip) => chip.offsetWidth);
+    const face = (kind: string) => node.querySelector<HTMLElement>(`[data-measure="${kind}"]`)
+      ?.offsetWidth ?? 0;
+    const room = node.clientWidth;
+    const all = chips.reduce((sum, w) => sum + w + COND_GAP, 0);
+    let next = chips.length;
+    if (all + face("full") > room) {
+      const count = face("count");
+      next = 0;
+      let used = 0;
+      for (const w of chips) {
+        if (used + w + COND_GAP + count > room) break;
+        used += w + COND_GAP;
+        next += 1;
+      }
+      next = Math.max(0, Math.min(next, chips.length - 1));
+    }
+    setFit(next);
+  }, [row, signature, width]);
+  return fit;
+}
 
 export interface ImportOutcome {
   added: number;
@@ -30,118 +72,84 @@ export interface ImportOutcome {
 
 export const TEAM_MAX = 6;
 
+export function Caret() {
+  return (
+    <svg className="duel-caret" viewBox="0 0 10 10" aria-hidden>
+      <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function PlusGlyph() {
+  return (
+    <svg className="duel-plus" viewBox="0 0 12 12" aria-hidden>
+      <path d="M6 2v8M2 6h8" fill="none" stroke="currentColor" strokeWidth="1.5"
+        strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** The strip's frame: weather art behind the console, terrain colour along the bottom edge. The
+ * outer box is the size container the layout tiers query, because the calc rail can take several
+ * hundred pixels from the page without the viewport changing at all. */
+export function DuelBar({ field, children }: { field: FieldState; children: ReactNode }) {
+  const weather = field.weather ? ` weather-${field.weather.toLowerCase()}` : "";
+  const terrain = field.terrain ? ` terrain-${field.terrain.toLowerCase()}` : "";
+  return (
+    <div className="duel-bar">
+      <div className={`duel-teams${weather}${terrain}`}>{children}</div>
+    </div>
+  );
+}
+
 export function TeamBar({
-  label, team, index, onIndex, onAdd, onRemove, onReset, activeFlags, onClearFlag, onShowFlags,
+  label, teamLabel, team, index, onIndex, onAdd, onRemove, onReset,
+  field, setField, side, allowedFlags, flagNote, lockedNote, inlineFlags = false,
   dex, items, onImport, mirrored = false,
 }: {
+  /** Short side name shown on the strip (我方 / 对方). */
   label: string;
+  /** Full name for menus and screen readers (我方队伍). */
+  teamLabel: string;
   team: MonState[];
   index: number;
   onIndex: (i: number) => void;
   onAdd: () => void;
   onRemove: (i: number) => void;
   onReset: () => void;
-  activeFlags: Array<{ key: string; label: string }>;
-  onClearFlag: (key: string) => void;
-  /** Opens the side-condition flyout, so the chips that do not fit stay reachable. */
-  onShowFlags: () => void;
+  field: FieldState;
+  setField: Dispatch<SetStateAction<FieldState>>;
+  /** The FIELD side this roster's conditions are stored on. The damage tab keeps the left roster on
+   * side a; the durability workspace defends on the left, which is field side b. */
+  side: SideId;
+  /** Conditions this tool can actually use; omitted means the calculator's full list. An empty set
+   * leaves the side without a toggle and shows `lockedNote` instead. */
+  allowedFlags?: ReadonlySet<string>;
+  flagNote?: string;
+  lockedNote?: string;
+  /** Show the offered conditions as toggles right on the strip instead of chips plus a popover —
+   * for a tool that offers only one or two (the speed line's Tailwind). */
+  inlineFlags?: boolean;
   dex: DexIndexEntry[];
   items: ItemRef[];
   onImport: (text: string) => Promise<ImportOutcome>;
-  /** Right-hand strip: the label, its import control and the roster all pack toward the page edge,
-   * so the two sides read as facing each other rather than as one list repeated twice. */
+  /** Right-hand wing: the name, the roster and the conditions all pack toward the page edge, so the
+   * two sides read as facing each other rather than as one list repeated twice. */
   mirrored?: boolean;
 }) {
   const t = useT();
+  const menu = usePopover();
+  const paste = usePopover(menu.trigger);
+  const conds = usePopover();
+  const menuList = useRef<HTMLDivElement>(null);
+  const condList = useRef<HTMLDivElement>(null);
+  useFocusOnOpen(menu.open, menuList, "[role=menuitem]");
+  useFocusOnOpen(conds.open, condList, ".duel-opt");
 
-  return (
-    <div className={`team-bar${mirrored ? " mirrored" : ""}`}>
-      <div className="team-bar-head">
-        <strong>{label}</strong>
-        <span className="team-bar-actions">
-          <PasteImport onImport={onImport} />
-          <button type="button" className="ghost-btn tiny" onClick={onReset}
-            title={t("calc.resetSide").replace("{side}", label)}>
-            {t("calc.resetTeam")}
-          </button>
-        </span>
-        <div className="team-active-flags" aria-label={t("calc.activeSideFlags")}>
-          {(() => {
-            const hidden = Math.max(0, activeFlags.length - MAX_FLAG_CHIPS);
-            const shown = hidden ? activeFlags.slice(activeFlags.length - MAX_FLAG_CHIPS) : activeFlags;
-            const label = t("calc.moreSideFlags")
-              .replace("{n}", String(activeFlags.length))
-              .replace("{flags}", activeFlags.map((f) => f.label).join("、"));
-            const more = hidden > 0 && (
-              <button key="more" type="button" className="team-flag-chip more"
-                {...{ [FIELD_FLAGS_TOGGLE]: "" }}
-                title={label} aria-label={label} onClick={onShowFlags}>
-                <span aria-hidden>⋯</span>{activeFlags.length}
-              </button>
-            );
-            const chips = shown.map((flag) => (
-              <button key={flag.key} type="button" className="team-flag-chip"
-                title={t("calc.clearSideFlag").replace("{flag}", flag.label)}
-                aria-label={t("calc.clearSideFlag").replace("{flag}", flag.label)}
-                onClick={() => onClearFlag(flag.key)}>
-                {flag.label}<span aria-hidden>×</span>
-              </button>
-            ));
-            // The count stays beside Import/Reset when space is tight; conditions extend from
-            // those actions toward the centre on either side of the field.
-            return [more, ...chips];
-          })()}
-        </div>
-      </div>
-      <div className="team-strip">
-        {team.map((mon, i) => (
-          <MonAvatar key={mon.uid || i} mon={mon} dex={dex} items={items} active={i === index}
-            onClick={() => onIndex(i)}
-            onRemove={team.length > 1 ? () => onRemove(i) : undefined} />
-        ))}
-        <button type="button" className="team-add" onClick={onAdd}
-          disabled={team.length >= TEAM_MAX}
-          aria-label={team.length >= TEAM_MAX ? t("calc.maxSix") : t("calc.addMon")}
-          title={team.length >= TEAM_MAX ? t("calc.maxSix") : t("calc.addMon")}>+</button>
-      </div>
-    </div>
-  );
-}
-
-/** Pokepaste import: a trigger button plus the popover that reads the paste back.
- *
- * The popover positions against the caller's nearest positioned ancestor, so each surface decides
- * where it opens (the calculator's strip head, the bulk tool's roster column) without this control
- * wrapping itself in a box that would change the surrounding layout. */
-export function PasteImport({ onImport, className = "ghost-btn tiny", label }: {
-  onImport: (text: string) => Promise<ImportOutcome>;
-  className?: string;
-  label?: string;
-}) {
-  const t = useT();
-  const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
-
-  // A popover that only closes on its own button strands itself the moment you click past it.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (!trigger.current?.contains(target) && !pop.current?.contains(target)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const run = async () => {
     setBusy(true);
     try {
@@ -151,15 +159,159 @@ export function PasteImport({ onImport, className = "ghost-btn tiny", label }: {
     }
   };
 
+  const singles = field.format === "single";
+  const flags = field.sides[side];
+  const setFlag = (key: string, on: boolean) => setField((current) => ({
+    ...current,
+    sides: { ...current.sides, [side]: { ...current.sides[side], [key]: on } },
+  }));
+  const offered = SIDE_FLAGS.filter((flag) => !allowedFlags || allowedFlags.has(flag.key));
+  const flagName = (flag: (typeof SIDE_FLAGS)[number]) => t(flag.label as MsgKey);
+  // Live conditions take the visible places first; a muted one only says "set, but ignored here".
+  const active = offered.filter((flag) => flags[flag.key])
+    .map((flag) => ({ flag, muted: !!flag.doublesOnly && singles }))
+    .sort((a, b) => Number(a.muted) - Number(b.muted));
+  const condRow = useRef<HTMLDivElement>(null);
+  const fit = useChipFit(condRow,
+    `${active.map(({ flag, muted }) => `${flagName(flag)}${muted ? "~" : ""}`).join("|")}:${t("calc.condAdd")}`);
+  const hidden = Math.max(0, active.length - fit);
+  const condsTitle = t("calc.sideOf").replace("{side}", label);
+  const moreLabel = t("calc.moreSideFlags")
+    .replace("{n}", String(active.length))
+    .replace("{flags}", active.map(({ flag }) => flagName(flag)).join("、"));
+
+  const slots = Array.from({ length: TEAM_MAX }, (_, i) => {
+    const mon = team[i];
+    if (mon) {
+      return <MonAvatar key={mon.uid || i} mon={mon} dex={dex} items={items} active={i === index}
+        onClick={() => onIndex(i)} onRemove={team.length > 1 ? () => onRemove(i) : undefined} />;
+    }
+    if (i === team.length) {
+      return (
+        <button key={i} type="button" className="team-slot-add" onClick={onAdd}
+          aria-label={t("calc.addMon")} title={t("calc.addMon")}>
+          <PlusGlyph />
+        </button>
+      );
+    }
+    return <span key={i} className="team-slot-rest" aria-hidden />;
+  });
+
   return (
-    <>
-      <button ref={trigger} type="button" className={className}
-        aria-label={t("calc.importPaste")} aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}>
-        {label ?? t("calc.importShort")}
-      </button>
-      {open && (
-        <div ref={pop} className="paste-pop" role="dialog" aria-label={t("calc.importPaste")}>
+    <div className={`team-bar${mirrored ? " mirrored" : ""}`}>
+      <div className="team-who" ref={menu.wrap} onBlur={menu.onBlur}>
+        <button ref={menu.trigger} type="button"
+          className={`team-who-btn${menu.open ? " open" : ""}`}
+          aria-haspopup="menu" aria-expanded={menu.open}
+          aria-label={`${teamLabel} ${team.length}/${TEAM_MAX}`}
+          title={t("calc.teamMenuHint")} onClick={menu.toggle}>
+          <b>{label}<Caret /></b>
+          <span className="num">{team.length}/{TEAM_MAX}</span>
+        </button>
+        {menu.open && (
+          <div ref={menuList} className="duel-pop duel-menu" role="menu" aria-label={teamLabel}
+            onKeyDown={(event) => roveFocus(event, "[role=menuitem]")}>
+            <button type="button" role="menuitem" className="duel-menu-row"
+              onClick={() => { menu.setOpen(false); setOutcome(null); paste.setOpen(true); }}>
+              {t("calc.importPaste")}…
+            </button>
+            <div className="duel-menu-sep" role="separator" />
+            <button type="button" role="menuitem" className="duel-menu-row danger"
+              onClick={() => { menu.setOpen(false); onReset(); menu.trigger.current?.focus(); }}>
+              {t("calc.resetTeamFull")}
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="team-strip" role="group" aria-label={teamLabel}>{slots}</div>
+
+      {inlineFlags ? (
+        <div className="team-conds inline" role="group" aria-label={condsTitle}>
+          {offered.map((flag) => {
+            const on = !!flags[flag.key];
+            const ignored = !!flag.doublesOnly && singles;
+            return (
+              <button key={flag.key} type="button" className={`duel-toggle${on ? " on" : ""}`}
+                data-cat={flag.cat} aria-pressed={on} disabled={ignored && !on}
+                title={ignored ? t("calc.doublesOnlyHint") : flag.hint ? t(flag.hint as MsgKey) : undefined}
+                onClick={() => setFlag(flag.key, !on)}>
+                <i aria-hidden />{flagName(flag)}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="team-conds-zone" ref={conds.wrap} onBlur={conds.onBlur}>
+          <div ref={condRow} className="team-conds" aria-label={condsTitle}>
+            {active.map(({ flag, muted }, at) => {
+              const name = flagName(flag);
+              const title = (muted ? t("calc.condSinglesOff") : t("calc.clearSideFlag"))
+                .replace("{flag}", name);
+              return (
+                <button key={flag.key} type="button" data-chip
+                  className={`duel-cond${muted ? " muted" : ""}${at >= fit ? " spill" : ""}`}
+                  data-cat={flag.cat} title={title} aria-label={title} aria-hidden={at >= fit || undefined}
+                  tabIndex={at >= fit ? -1 : undefined}
+                  onClick={() => setFlag(flag.key, false)}>
+                  <i aria-hidden /><span className="duel-cond-label">{name}</span>
+                  <span className="duel-cond-x" aria-hidden>×</span>
+                </button>
+              );
+            })}
+            {offered.length > 0 ? (
+              <button ref={conds.trigger} type="button"
+                className={`duel-cond-add${conds.open ? " open" : ""}${hidden ? " more" : ""}`}
+                aria-expanded={conds.open} title={hidden ? moreLabel : condsTitle}
+                aria-label={hidden ? moreLabel : condsTitle} onClick={conds.toggle}>
+                {hidden ? <span className="num">+{hidden}</span>
+                  : <><PlusGlyph />{t("calc.condAdd")}</>}
+              </button>
+            ) : lockedNote ? (
+              <span className="duel-cond-lock" title={lockedNote}>{lockedNote}</span>
+            ) : null}
+            {offered.length > 0 && (
+              // Both faces of the button, measured by useChipFit; never seen, never focused.
+              <>
+                <span className="duel-cond-add spill" data-measure="full" aria-hidden>
+                  <PlusGlyph />{t("calc.condAdd")}
+                </span>
+                <span className="duel-cond-add more spill" data-measure="count" aria-hidden>
+                  <span className="num">+{Math.max(9, active.length)}</span>
+                </span>
+              </>
+            )}
+          </div>
+          {conds.open && (
+            <div ref={condList} className="duel-pop team-cond-pop" role="group" aria-label={condsTitle}
+              onKeyDown={(event) => roveFocus(event, ".duel-opt")}>
+              <div className="duel-pop-title">{condsTitle}{flagNote && <small>{flagNote}</small>}</div>
+              <div className="duel-opt-grid">
+                {offered.map((flag) => {
+                  const on = !!flags[flag.key];
+                  const ignored = !!flag.doublesOnly && singles;
+                  return (
+                    <button key={flag.key} type="button" className={`duel-opt${on ? " on" : ""}`}
+                      data-cat={flag.cat} aria-pressed={on}
+                      // A doubles-only flag that is already on stays clickable in singles, so it can
+                      // still be switched off from here.
+                      disabled={ignored && !on}
+                      title={ignored ? t("calc.doublesOnlyHint")
+                        : flag.hint ? t(flag.hint as MsgKey) : undefined}
+                      onClick={() => setFlag(flag.key, !on)}>
+                      <i aria-hidden /><span>{flagName(flag)}</span>
+                      {flag.doublesOnly && <small>{t("format.double")}</small>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {paste.open && (
+        <div className="duel-pop paste-pop" ref={paste.wrap} onBlur={paste.onBlur}
+          role="dialog" aria-label={`${teamLabel} · ${t("calc.importPaste")}`}>
           <label className="paste-label">{t("calc.pasteHint")}
             <textarea rows={8} value={text} spellCheck={false} autoFocus
               placeholder={"Garchomp @ Life Orb\nAbility: Rough Skin\nJolly Nature\nSPs: 32 Atk / 32 Spe\n- Earthquake"}
@@ -171,7 +323,7 @@ export function PasteImport({ onImport, className = "ghost-btn tiny", label }: {
               {busy ? t("state.loading") : t("calc.pasteApply")}
             </button>
             <button type="button" className="ghost-btn"
-              onClick={() => { setOpen(false); setOutcome(null); }}>
+              onClick={() => { paste.setOpen(false); setOutcome(null); menu.trigger.current?.focus(); }}>
               {t("calc.pasteClose")}
             </button>
           </div>
@@ -188,6 +340,6 @@ export function PasteImport({ onImport, className = "ghost-btn tiny", label }: {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }
