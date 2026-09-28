@@ -179,9 +179,12 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
     update();
     return () => { observer.disconnect(); document.documentElement.style.removeProperty("--topbar-offset"); };
   }, []);
-  const { capabilities, can } = useRuntime();
+  const { adapter, capabilities, can } = useRuntime();
   const t = useT();
   const { lang, setLang } = useLang();
+  const showAssistant = (can("team.validate") && !!adapter.diagnose)
+    || (can("llm.qa") && !!adapter.qa)
+    || (can("llm.builder") && !!adapter.builder);
   return (
     <div className="shell">
       <EscapeLayers />
@@ -203,7 +206,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           {can("team.matchup") && (
             <NavItem to="/matchup" label={t("nav.matchup")} preload={loadMatchupPage} />
           )}
-          {(can("team.validate") || can("llm.qa") || can("llm.builder")) && (
+          {showAssistant && (
             <NavItem to="/assist" label={t("nav.assistant")} preload={loadAssistantPage} />
           )}
           {/* The library is the browser's own, so both runtimes have this page. */}
@@ -239,7 +242,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           <Route path="/matchup" element={<MatchupPage />} />
           <Route path="/calc" element={<CalcPage />} />
           <Route path="/teams" element={<TeamsPage />} />
-          {(can("team.validate") || can("llm.qa") || can("llm.builder")) && (
+          {showAssistant && (
             <Route path="/assist" element={<AssistantPage />} />
           )}
           {can("llm.qa") && <Route path="/qa" element={<Navigate to="/assist" replace />} />}
