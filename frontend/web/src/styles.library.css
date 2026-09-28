@@ -1,0 +1,556 @@
+/* Teams page: team slots, Pokémon boxes, and their shared dialogs (components/library/). */
+
+.lib-shelf { display: grid; gap: 14px; }
+.lib-loading { margin: 0; padding: 24px 0; }
+
+/* ---- toolbar ------------------------------------------------------------------ */
+.lib-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.lib-count { font-size: 12.5px; }
+.lib-first-run { margin: 0; font-size: 12.5px; }
+.lib-toolbar-end { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-btn { display: inline-flex; align-items: center; gap: 6px; }
+.lib-btn svg, .lib-icon-btn svg, .lib-link-btn svg, .lib-store svg, .lib-slot-free-action svg,
+.lib-box-moving svg { width: 16px; height: 16px; stroke-width: 1.8; flex: none; }
+.lib-seg-count { margin-left: 6px; font-size: 11.5px; color: var(--sub); font-weight: 500; }
+.primary-btn.lib-danger { background: var(--danger); }
+.primary-btn.lib-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, #000); }
+
+.notice.lib-warn { background: color-mix(in srgb, var(--warning) 12%, var(--panel)); color: var(--ink); }
+
+/* ---- team slots ------------------------------------------------------------------ */
+.lib-teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lib-slot-no {
+  width: 26px; height: 26px; display: inline-grid; place-items: center; flex: none;
+  border-radius: 7px; background: var(--panel-2); color: var(--sub); font-size: 12.5px; font-weight: 700;
+}
+.lib-team {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.lib-team.open { border-color: var(--line-strong); }
+.lib-team.open .lib-slot-no { background: var(--brand-soft); color: var(--brand-strong); }
+.lib-team-head {
+  width: 100%; min-height: 64px; display: grid; align-items: center; gap: 8px 16px;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "no sprites main tags chevron";
+  padding: 8px 16px 8px 12px; border: 0; background: transparent; color: inherit; text-align: left;
+  font: inherit; cursor: pointer;
+}
+.lib-team-head:hover { background: color-mix(in srgb, var(--panel-2) 55%, transparent); }
+.lib-team-head:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.lib-sprites { display: flex; gap: 2px; min-width: 0; }
+.lib-team-head > .lib-slot-no { grid-area: no; }
+.lib-team-head > .lib-sprites { grid-area: sprites; }
+.lib-sprites img { width: 44px; height: 44px; object-fit: contain; }
+.lib-sprites.mini img { width: 28px; height: 28px; }
+.lib-team-main { grid-area: main; display: grid; gap: 3px; min-width: 0; }
+.lib-team-name {
+  font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lib-team-name.auto { color: var(--sub); font-weight: 600; }
+.lib-team-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lib-current {
+  flex: none; padding: 0 7px; border-radius: 999px; line-height: 19px; font-size: 11px; font-weight: 700;
+  background: var(--brand); color: #fff;
+}
+.lib-icon-btn.on { color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); background: var(--brand-soft); }
+.lib-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; font-size: 12px; color: var(--sub); }
+.lib-rule-changed { color: var(--warning); font-weight: 600; cursor: help; }
+.lib-rule-changed::before { content: "●"; margin-right: 4px; font-size: 9px; vertical-align: 1px; }
+.lib-tags { grid-area: tags; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; max-width: 260px; }
+.lib-tag {
+  padding: 0 8px; border-radius: 999px; line-height: 20px; font-size: 11.5px;
+  background: var(--brand-soft); color: var(--brand-strong);
+}
+.lib-chevron {
+  grid-area: chevron; width: 9px; height: 9px; margin: 0 4px 4px;
+  border-right: 2px solid var(--sub); border-bottom: 2px solid var(--sub);
+  transform: rotate(45deg); transition: transform 160ms var(--ease-out);
+}
+.lib-team.open .lib-chevron { transform: rotate(225deg); margin: 4px 4px 0; }
+.lib-team-body { display: grid; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.lib-team-empty { display: grid; gap: 10px; justify-items: start; }
+.lib-team-empty p { margin: 0; font-size: 13px; line-height: 1.6; }
+.lib-notes {
+  margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--panel-2);
+  font-size: 13px; line-height: 1.6; white-space: pre-wrap;
+}
+.lib-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lib-icon-btn {
+  width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--sub);
+  cursor: pointer;
+}
+.lib-icon-btn:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); }
+.lib-icon-btn.danger:hover:not(:disabled) { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.lib-icon-btn:disabled { opacity: 0.4; cursor: default; }
+.lib-icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* The dashed box is the whole row, so the slot's delete sits inside it, level with a taken row's. */
+.lib-slot-free {
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 45%, transparent);
+}
+.lib-slot-free > button {
+  width: 100%; min-height: 52px; display: flex; align-items: center; gap: 14px;
+  padding: 8px 16px 8px 12px; border: 0; border-radius: var(--radius);
+  background: transparent; color: var(--sub);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.lib-slot-free-action { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; color: var(--brand); opacity: 0; transition: opacity 120ms; }
+.lib-slot-free:has(> button:hover) { border-color: var(--brand); background: color-mix(in srgb, var(--brand-soft) 60%, transparent); }
+.lib-slot-free > button:hover .lib-slot-free-action, .lib-slot-free > button:focus-visible .lib-slot-free-action { opacity: 1; }
+.lib-slot-free > button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* A slot's own delete, at the row's right end (outside the row's button, never inside it). */
+.lib-slot-free { display: flex; align-items: center; gap: 8px; }
+.lib-slot-free > button { flex: 1; min-width: 0; }
+.lib-team-row { display: flex; align-items: stretch; }
+.lib-team-row > .lib-team-head { flex: 1; min-width: 0; }
+.lib-team-row > .lib-slot-delete { display: flex; align-items: center; padding: 0 14px 0 4px; }
+.lib-slot-free > .lib-slot-delete { padding: 0 14px 0 4px; }
+.lib-danger-btn { background: var(--danger); border-color: var(--danger); box-shadow: none; }
+.lib-danger-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 86%, #000); }
+@media (hover: none) { .lib-slot-free-action { opacity: 1; } }
+.lib-more { justify-self: start; }
+
+@media (max-width: 720px) {
+  .lib-team-head {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "no sprites chevron" "main main main" "tags tags tags";
+    padding: 10px 12px;
+  }
+  .lib-sprites img { width: 36px; height: 36px; }
+  .lib-tags { justify-content: flex-start; max-width: none; }
+  .lib-team-body { padding: 10px 12px 14px; }
+  .lib-toolbar-end { margin-left: 0; }
+}
+
+/* ---- Pokémon boxes ------------------------------------------------------------------ */
+/* Box and detail share the row half and half. The detail keeps one height whatever it shows (an
+   editor, an empty cell's form), so switching boxes or cells never moves the page. */
+.lib-boxes {
+  display: grid; gap: 18px; align-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lib-box-panel {
+  position: relative; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--box-tint, var(--brand)) 24%, var(--line));
+  background:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--box-tint, var(--brand)) 16%, transparent) 1px, transparent 0) 0 0 / 14px 14px,
+    color-mix(in srgb, var(--box-tint, var(--brand)) 7%, var(--panel));
+  box-shadow: var(--shadow);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.lib-box-panel .lib-box-dots { margin-top: auto; }
+.lib-box-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.lib-box-title { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; }
+.lib-box-title h2 { margin: 0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-box-rename {
+  flex: none; width: 26px; height: 26px; display: inline-grid; place-items: center; padding: 0;
+  border: 0; border-radius: 7px; background: transparent; color: var(--sub); cursor: pointer;
+}
+.lib-box-rename svg { width: 15px; height: 15px; }
+.lib-box-rename:hover { background: var(--panel); color: var(--ink); }
+.lib-box-rename.on { background: var(--brand-soft); color: var(--brand-strong); }
+.lib-box-rename.danger:hover:not(:disabled) { color: var(--danger); }
+.lib-box-rename:disabled { opacity: 0.35; cursor: default; background: transparent; }
+.lib-box-tip { display: inline-flex; }
+.lib-box-used { font-size: 12px; color: var(--sub); }
+
+.lib-box-grid {
+  position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;
+  padding: 8px; border-radius: 12px; background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+.lib-box-grid.moving { touch-action: none; user-select: none; }
+.lib-box-frame {
+  position: absolute; z-index: 2; pointer-events: none; border-radius: 6px;
+  border: 1.5px dashed var(--brand); background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+.lib-cell {
+  position: relative; aspect-ratio: 1; display: grid; place-items: center; padding: 0;
+  border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--panel-2) 80%, transparent);
+  cursor: pointer; transition: transform 120ms var(--ease-out), box-shadow 120ms;
+}
+.lib-cell.filled { background: var(--panel); border-color: var(--line); cursor: grab; }
+.lib-cell img { width: 88%; height: 88%; object-fit: contain; pointer-events: none; }
+.lib-cell:hover { border-color: var(--line-strong); }
+.lib-cell.on { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 35%, transparent); }
+.lib-cell:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lib-cell.lifted { opacity: 0.45; }
+.lib-cell.drop { border-color: var(--brand); border-style: dashed; background: var(--brand-soft); }
+.lib-box-grid.moving .lib-cell { cursor: crosshair; }
+/* Picked to move: lifted and ringed, not faded — they are what the next click puts down. */
+.lib-box-grid.moving .lib-cell.lifted {
+  opacity: 1; transform: translateY(-2px); border-color: var(--brand); background: var(--brand-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 45%, transparent), 0 6px 14px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.lib-cell-team {
+  position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--brand); box-shadow: 0 0 0 2px var(--panel);
+}
+
+.lib-box-moving {
+  position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 3;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); border-radius: 10px;
+  background: color-mix(in srgb, var(--brand) 10%, var(--panel)); color: var(--brand-strong); font-size: 12.5px;
+  box-shadow: var(--shadow-raised);
+}
+.lib-box-send { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lib-box-send-chip {
+  padding: 3px 10px; border: 1px solid color-mix(in srgb, var(--box-tint) 45%, var(--line)); border-radius: 999px;
+  background: color-mix(in srgb, var(--box-tint) 12%, var(--panel)); color: var(--ink);
+  font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+}
+.lib-box-send-chip:hover { background: color-mix(in srgb, var(--box-tint) 24%, var(--panel)); }
+.lib-box-moving span { flex: 1 1 200px; }
+.lib-box-moving .second-btn { padding: 4px 10px; font-size: 12.5px; }
+
+.lib-box-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.lib-box-dot {
+  min-width: 28px; height: 24px; padding: 0 6px; display: inline-grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub);
+  font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.lib-box-dot.on { border-color: var(--brand); background: var(--brand); color: #fff; }
+.lib-box-dot.add { border-style: dashed; color: var(--brand); }
+.lib-box-dot.add svg { width: 14px; height: 14px; }
+
+.lib-box-detail {
+  display: grid; gap: 12px; align-content: start; padding: 14px 16px 16px; min-height: 730px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.lib-detail-where { font-size: 12px; }
+.lib-detail { display: grid; gap: 12px; }
+.lib-detail-teams, .lib-detail-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.lib-detail-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px;
+}
+.lib-detail-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lib-detail-actions .second-btn { padding: 5px 10px; font-size: 12.5px; }
+
+/* The picked Pokémon, edited in place: a head row (where it is, save state, join / delete), the
+   build editor, then nickname, tags and notes, then its teams and provenance. */
+.lib-box-editor { gap: 14px; }
+.lib-editor-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.lib-editor-head .lib-detail-where { font-size: 12.5px; }
+.lib-editor-status { font-size: 12px; }
+.lib-editor-head .lib-detail-actions { margin-left: auto; }
+.lib-editor-notes {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px;
+  padding-top: 12px; border-top: 1px solid var(--line);
+}
+.lib-editor-notes label { display: grid; gap: 4px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--sub); }
+.lib-editor-notes label.wide { grid-column: 1 / -1; }
+.lib-editor-notes.side { grid-template-columns: minmax(0, 1fr); gap: 8px; padding-top: 8px; margin-top: 4px; border-top: 1px dashed var(--line); }
+.lib-editor-notes input, .lib-editor-notes textarea {
+  width: 100%; min-width: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; font-weight: 400;
+}
+.lib-editor-notes input { height: 36px; }
+.lib-editor-notes textarea { resize: vertical; line-height: 1.55; }
+@media (max-width: 560px) { .lib-editor-notes { grid-template-columns: minmax(0, 1fr); } }
+
+.lib-add { display: grid; gap: 10px; }
+.lib-add-title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; }
+.lib-add-title svg { width: 18px; height: 18px; }
+.lib-add-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.lib-add-row input {
+  width: 100%; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 13.5px;
+}
+.lib-add-row input:focus { outline: 2px solid color-mix(in srgb, var(--focus) 40%, transparent); outline-offset: 1px; }
+.lib-add-row input[aria-invalid] { border-color: var(--danger); }
+.lib-add-row .primary-btn { min-height: 38px; padding: 0 16px; }
+.lib-add-error { color: var(--danger); font-size: 12px; }
+.lib-add-hint { margin: 0; font-size: 12px; line-height: 1.55; }
+.lib-link-btn {
+  justify-self: start; display: inline-flex; align-items: center; gap: 5px; padding: 0;
+  border: 0; background: transparent; color: var(--brand); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.lib-link-btn:hover:not(:disabled) { text-decoration: underline; }
+.lib-link-btn:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 900px) {
+  .lib-boxes { grid-template-columns: minmax(0, 1fr); }
+  .lib-box-panel .lib-box-dots { margin-top: 0; }
+  .lib-box-panel { padding: 10px; }
+  .lib-box-grid { gap: 4px; padding: 6px; }
+  .lib-box-detail { min-height: 0; }
+}
+
+/* ---- dialogs ----------------------------------------------------------------------- */
+.lib-dialog .lib-form { display: grid; gap: 12px; }
+.lib-form label { display: grid; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--sub); }
+.lib-form input, .lib-form textarea {
+  padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 400;
+}
+.lib-form textarea { resize: vertical; line-height: 1.55; }
+.lib-form-row { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.lib-form-row .grow { flex: 1 1 200px; }
+.lib-paste-text { min-height: 220px; font-family: var(--font-mono); font-size: 12.5px !important; }
+.lib-dialog-hint { margin: 0; font-size: 12.5px; line-height: 1.6; }
+.lib-reading { display: grid; gap: 10px; }
+.lib-preview {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+}
+.lib-preview li {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 8px; align-items: center;
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+}
+.lib-preview img { grid-row: span 2; width: 40px; height: 40px; object-fit: contain; }
+.lib-preview-name { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+.lib-preview-name > span:first-child, .lib-preview-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-preview-sub { font-size: 11.5px; }
+.lib-reuse {
+  flex: none; padding: 0 6px; font-weight: 500; border-radius: 999px; line-height: 17px; font-size: 10.5px;
+  background: var(--brand-soft); color: var(--brand-strong);
+}
+
+.lib-slot-pick {
+  margin: 0; padding: 0; border: 0; display: grid; gap: 6px; min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+}
+.lib-slot-pick legend { margin-bottom: 6px; padding: 0; font-size: 12.5px; font-weight: 600; color: var(--sub); }
+.lib-slot-option {
+  position: relative;
+  display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 4px 10px;
+  border: 1px solid var(--line); border-radius: 9px; font-size: 13px; cursor: pointer;
+}
+.lib-slot-option input { position: absolute; opacity: 0; pointer-events: none; }
+.lib-slot-option.free { border-style: dashed; }
+.lib-slot-option:hover { border-color: var(--line-strong); }
+.lib-slot-option.on { border-color: var(--brand); border-style: solid; background: var(--brand-soft); }
+.lib-slot-option.on .lib-slot-no { background: var(--brand); color: #fff; }
+.lib-slot-option:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.lib-slot-option-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lib-file-pick { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lib-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--sub); }
+.lib-plan {
+  list-style: none; margin: 0; padding: 10px 12px; display: grid; gap: 4px;
+  border-radius: 8px; background: var(--panel-2); font-size: 13px;
+}
+.lib-plan li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.lib-plan-bad { color: var(--warning); }
+.lib-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+/* ---- storage and backup ------------------------------------------------------------ */
+.lib-store {
+  display: grid; gap: 8px; margin-top: 22px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel-2) 55%, transparent);
+  font-size: 12.5px; color: var(--sub);
+}
+.lib-store-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.lib-store-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--ink); font-weight: 600; }
+.lib-store-status .muted { font-weight: 400; }
+.lib-store-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.lib-store-actions .second-btn { padding: 5px 12px; font-size: 12.5px; }
+.lib-store p { margin: 0; line-height: 1.65; }
+
+/* ---- library dock (components/library/LibraryDock.tsx) --------------------------------------
+   Docked: flush with the right edge under the top bar, full height, a hairline divider, no shadow —
+   it is part of the layout. Floating (not enough gutter): an inset card with a shadow, no scrim, so
+   the page stays live. Phone: a sheet from the bottom with two heights. */
+.dock {
+  position: fixed; top: var(--topbar-offset); right: 0; bottom: 0; z-index: 12; width: 360px;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--panel); border-left: 1px solid var(--line);
+}
+.dock.overlay {
+  top: calc(var(--topbar-offset) + 10px); right: 10px; bottom: 10px; width: min(360px, calc(100vw - 20px));
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-raised); overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dock { animation: dock-in 180ms var(--ease-out); }
+  @keyframes dock-in { from { transform: translateX(24px); opacity: 0; } }
+}
+.dock-grab { display: none; }
+@media (max-width: 720px) {
+  .dock.overlay {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 58vh;
+    border-radius: 16px 16px 0 0; border-bottom: 0;
+  }
+  .dock.overlay.tall { height: calc(100vh - var(--topbar-offset) - 8px); }
+  .dock-grab {
+    display: block; flex: none; width: 44px; height: 5px; margin: 8px auto 0; padding: 0;
+    border: 0; border-radius: 999px; background: var(--line-strong); cursor: pointer;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .dock.overlay { animation-name: dock-up; }
+    @keyframes dock-up { from { transform: translateY(32px); opacity: 0; } }
+  }
+}
+.dock-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.dock-head-end { margin-left: auto; display: flex; gap: 2px; }
+.dock-icon {
+  width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0;
+  border: 0; border-radius: 8px; background: transparent; color: var(--sub); cursor: pointer;
+}
+.dock-icon svg { width: 17px; height: 17px; stroke-width: 1.8; }
+.dock-icon:hover:not(:disabled) { background: var(--panel-2); color: var(--ink); }
+.dock-icon:disabled { opacity: 0.35; cursor: default; }
+.dock-icon.small { width: 24px; height: 24px; }
+.dock-icon.small svg { width: 14px; height: 14px; }
+/* A column of parts that never shrink: the body scrolls instead of squeezing a part (a grid track
+   would collapse a clipped control like the format switch to nothing). */
+.dock-body { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.dock-body > * { flex: none; }
+.dock-note { margin: 0; font-size: 12.5px; line-height: 1.6; }
+.dock-format { align-self: flex-start; }
+
+.dock-teams { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dock-team { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.dock-team.on { border-color: var(--brand); box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); }
+.dock-team-head {
+  width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 6px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.dock-team-head:hover { background: color-mix(in srgb, var(--panel-2) 60%, transparent); }
+.dock-team-head:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.dock-team-head[draggable="true"] { cursor: grab; }
+.dock-team.on .lib-slot-no { background: var(--brand); color: #fff; }
+.dock-team-main { display: grid; gap: 2px; min-width: 0; }
+.dock-team-name { font-size: 13px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-team-name.auto { color: var(--sub); font-weight: 600; }
+.lib-sprites.dock-mini img { width: 28px; height: 28px; }
+.dock-badge {
+  white-space: nowrap; padding: 0 7px; border-radius: 999px; line-height: 19px; font-size: 11px; font-weight: 700;
+  background: var(--brand); color: #fff;
+}
+.dock-team-free {
+  display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 3px 10px;
+  border: 1px dashed var(--line); border-radius: 10px; font-size: 12px;
+}
+.dock-team-free .lib-slot-no { width: 22px; height: 22px; font-size: 11.5px; }
+.dock-members {
+  list-style: none; margin: 0; padding: 2px 8px 8px; display: grid; gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.dock-member {
+  width: 100%; display: grid; justify-items: center; gap: 1px; padding: 6px 4px;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: inherit;
+  font: inherit; cursor: grab;
+}
+.dock-member img { width: 42px; height: 42px; object-fit: contain; pointer-events: none; }
+.dock-member:hover { border-color: var(--line-strong); }
+.dock-member.on { border-color: var(--brand); background: var(--brand-soft); }
+.dock-member:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.dock-member-name, .dock-member-sub { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-member-name { font-size: 12px; font-weight: 600; }
+.dock-member-sub { font-size: 10.5px; }
+.dock-members > li { position: relative; }
+.dock-member-act {
+  position: absolute; top: -6px; width: 22px; height: 22px; display: grid; place-items: center; padding: 0;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--sub);
+  box-shadow: var(--shadow); cursor: pointer;
+}
+.dock-member-act svg { width: 13px; height: 13px; stroke-width: 2; }
+.dock-member-act.edit { left: -4px; }
+.dock-member-act.remove { right: -4px; }
+.dock-member-act.edit:hover { color: var(--brand-strong); border-color: var(--brand); }
+.dock-member-act.remove:hover { color: var(--danger); border-color: var(--danger); }
+/* Level with the grid above it: same edges, no margins of its own; long text ends in an ellipsis. */
+.dock-card { display: block; width: 100%; margin: 0; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel); cursor: default; overflow: hidden; }
+.dock-card:hover { transform: none; }
+.dock-card .build-card-move, .dock-card .build-card-stat { min-width: 0; }
+.dock-card .build-card-move > span:last-child, .dock-card .build-card-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dock-icon.danger:hover:not(:disabled) { color: var(--danger); }
+
+.dock-box-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 6px; }
+.dock-box-name { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; font-size: 14px; }
+.dock-box-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dock-grid {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; padding: 6px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--box-tint, var(--brand)) 20%, var(--line));
+  background: color-mix(in srgb, var(--box-tint, var(--brand)) 8%, var(--panel));
+}
+.dock-grid .lib-cell { border-radius: 8px; }
+
+.dock-actions {
+  flex: none; display: grid; gap: 10px; padding: 10px 12px 12px; border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel-2) 50%, var(--panel));
+}
+.dock-action-group { display: grid; gap: 6px; }
+.dock-action-title { font-size: 11.5px; font-weight: 700; color: var(--sub); letter-spacing: 0.04em; }
+.dock-action-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.dock-btn.primary-btn, .dock-btn.second-btn {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 5px 12px;
+  font-size: 12.5px; border-radius: 8px;
+}
+.dock-btn svg { width: 15px; height: 15px; stroke-width: 1.9; flex: none; }
+/* Two families that must never be confused: into the page (outlined), and keeping from it (solid). */
+.dock-btn.fill { color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); background: var(--panel); }
+.dock-btn.fill:hover:not(:disabled) { background: var(--brand-soft); }
+.dock-btn.save { color: #fff; border-color: var(--success); background: var(--success);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--success) 26%, transparent); font-weight: 700; }
+.dock-btn.save:hover:not(:disabled) { background: color-mix(in srgb, var(--success) 86%, #000); border-color: color-mix(in srgb, var(--success) 86%, #000); }
+.dock-hint { font-size: 11.5px; }
+@media (hover: none) { .dock-hint { display: none; } }
+
+/* Short windows need room to choose a team before reaching the action area. Both sections scroll
+   together here; the header remains visible. */
+@media (max-height: 520px) {
+  .dock, .dock.overlay { overflow-y: auto; }
+  .dock-head { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+  .dock-body { flex: none; overflow: visible; }
+}
+/* ---- building a team from the boxes (TeamShelf's party card, BoxPicker, JoinTeamDialog) ---- */
+.party-corner-actions { display: inline-flex; gap: 4px; }
+.party-edit, .party-remove {
+  width: 22px; height: 22px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--panel); color: var(--sub); cursor: pointer;
+}
+.party-edit svg, .party-remove svg { width: 13px; height: 13px; stroke-width: 2.2; }
+.party-edit:hover { color: #fff; background: var(--brand); border-color: var(--brand); }
+.party-remove:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
+.party-remove:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+.lib-pick { display: grid; gap: 10px; }
+.lib-pick-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; text-align: center; }
+.lib-pick-grid {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; padding: 6px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--brand) 16%, var(--line));
+  background: color-mix(in srgb, var(--brand) 6%, var(--panel));
+}
+.lib-pick-grid .lib-cell:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.lib-join-format { justify-self: start; }
+.lib-join-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.lib-join-row {
+  width: 100%; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 8px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: inherit;
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.lib-join-row.free { border-style: dashed; }
+.lib-join-row:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-soft); }
+.lib-join-row:disabled { opacity: 0.55; cursor: not-allowed; }
+.lib-join-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-join-reason { flex: none; font-size: 12px; }
+
+@media (max-width: 900px) { .lib-box-detail { min-height: 0; } }
+/* ---- dock: builds on hover, actions under a selection -------------------------------------- */
+.set-hover { display: block; min-width: 0; }
+.dock-grid .set-hover > .lib-cell { width: 100%; }
+.dock-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 8px 8px; }
+.dock-row-actions-end { margin-left: auto; display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.ghost-btn.dock-btn, .second-btn.dock-btn { min-height: 28px; padding: 3px 10px; font-size: 12px; border-radius: 8px; }
+@media (pointer: coarse) {
+  .lib-icon-btn, .dock-icon, .dock-icon.small, .party-edit, .party-remove,
+  .lib-link-btn, .dock-btn.primary-btn, .dock-btn.second-btn, .dock-btn.ghost-btn, .dock-member-act {
+    min-width: 44px; min-height: 44px;
+  }
+  .lib-actions, .party-corner-actions { flex-wrap: wrap; }
+  .party-corner { position: static; opacity: 1; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+  .dock-members { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dock-member-act { position: static; display: inline-grid; margin-top: 4px; }
+}

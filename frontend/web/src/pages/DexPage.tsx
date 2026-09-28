@@ -22,7 +22,7 @@ import {
 import { useAbilities, useDexIndex, useItems, useLearners, useMoves } from "../hooks.ts";
 import { displayName, effectText, optionalKey, useLang, useT } from "../i18n.ts";
 import type { ItemRef, MoveRef } from "../runtime/projection.ts";
-import { ITEM_CATEGORY_ORDER, itemOrder } from "./calc/shared.tsx";
+import { ITEM_CATEGORY_ORDER, itemOrder } from "../components/build/inputs.tsx";
 
 type DexTab = "pokemon" | "moves" | "items" | "abilities";
 const TABS: readonly DexTab[] = ["pokemon", "moves", "items", "abilities"];
@@ -169,7 +169,7 @@ export function DexPage() {
   const items = useItems(tab === "items");
   // Wider than the metagame rail (it holds a type grid and stat rows), and it pushes further down
   // before covering: a card grid keeps reflowing where a panel layout would stop being readable.
-  const rail = useSideRail(360, 620);
+  const rail = useSideRail(360, "dex");
   // The learnset index is one lazy document: fetched when a move filter is in play, and eagerly
   // once the rail is open so its per-move learner counts are there to read.
   const learners = useLearners(filters.pokemon.moves.length > 0 || rail.open);

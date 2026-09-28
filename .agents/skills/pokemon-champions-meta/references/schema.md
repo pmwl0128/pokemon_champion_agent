@@ -108,6 +108,10 @@ is its own and must be quoted separately.
   `coverage.move_share` is `absent` they are `null`; an empty list would mean the source reported
   none. When the tier ships, `move_share` becomes `ranked_pct` and the panels hold move entries in
   the same shape as `details`' `moves` panel (with `percentage`).
+- **Move-share capture provenance.** `move_share_captured_at` timestamps that tier.
+  `move_share_capture: independent_bulk` also carries `move_share_agreement`; the explicit singles
+  page walk uses `same_snapshot_detail_pages` plus `move_share_snapshot_id`, which must equal the
+  file's verified snapshot. Automatic refresh does not enable the singles page walk.
 - **Objects are species-level.** `key` is the national dex number and there is no form: the source
   drops it. The names come from the dex at whatever precision that number allows: the base-form row
   when there is one, the single form when the dex ships the species as exactly one (#670 can only

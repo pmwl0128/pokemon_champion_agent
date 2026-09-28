@@ -12,6 +12,7 @@
  *
  * A future tool (the speed line) joins by reading `useRoster()` and mapping `MonState` onto its own
  * row shape; `swaps` tells any tool when the two sides changed places. */
+import { STAT_KEYS } from "@pokemon-champions/protocol";
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type Dispatch, type ReactNode, type SetStateAction,
@@ -19,8 +20,8 @@ import {
 import { markTuneFillApplied, readTeamMembers, takeCalcTeams, takeTuneFill,
   type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
-import { useRuntime } from "../../runtime/context.tsx";
-import { autofillSig, sideIsBare, useBuildOptions } from "./shared.tsx";
+import { autofillSig, buildConfigSig, sideIsBare, useBuildOptions } from "../../components/build/inputs.tsx";
+import { cloneSps, type Baseline } from "./tune/model.ts";
 import { TEAM_MAX } from "./duel/TeamBar.tsx";
 import { loadRoster, saveRoster, type RosterSnapshot } from "./duel/persist.ts";
 import {
@@ -30,6 +31,8 @@ import {
 
 type PerSide<T> = Record<SideId, T>;
 const SIDES: SideId[] = ["a", "b"];
+/** Our side's demo Pokémon and the opponent's (dex slugs). */
+const DEMO_PAIR: PerSide<string> = { a: "garchomp", b: "mimikyu" };
 
 export interface RosterApi {
   teams: PerSide<MonState[]>;
@@ -48,6 +51,9 @@ export interface RosterApi {
   /** A fresh copy of this side's demo Pokemon (what a reset side starts from); blank until the
    * demo pair has loaded. */
   demoMon: (side: SideId) => MonState;
+  /** The spread a Pokémon arrived with — an import, an environment build, or first sight — which
+   * 还原 on the durability and Speed tools puts back. Kept here so both tools restore to one point. */
+  baselineOf: (mon: MonState) => Baseline;
 }
 
 const RosterContext = createContext<RosterApi | null>(null);
@@ -58,7 +64,7 @@ export function useRoster(): RosterApi {
   return roster;
 }
 
-function fromCalcMember(member: CalcMember, dex: DexIndexEntry[]): MonState {
+export function fromCalcMember(member: CalcMember, dex: DexIndexEntry[]): MonState {
   // A member may name its species instead of a slug (a team-json carries canonical names); the dex
   // the page already holds is the resolver, so the hand-off never has to slugify by hand.
   const slug = member.slug ?? (member.species ? dex.find((e) => e.name === member.species)?.slug ?? "" : "");
@@ -118,12 +124,12 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   const [field, setField] = useState(initial.field);
   const [swaps, setSwaps] = useState(0);
   const loadBuildOptions = useBuildOptions();
-  const { adapter } = useRuntime();
 
-  // The demo pair: the current doubles ranking's #1 and #2, each with its most common build. Read
-  // from the live ranking rather than written here, so the example follows the environment instead
-  // of freezing one period's builds into code. The builds are doubles builds whatever format the
-  // page opens in, and they are not auto-fills, so a format switch leaves them as they are.
+  // The demo pair: Garchomp against Mimikyu, each with its first singles build (the highest-share
+  // real joint configuration). The species are fixed because the pair demonstrates the tools well;
+  // the builds are read from the live data, so they follow the environment instead of freezing one
+  // period's sets into code. They are singles builds whatever format the page opens in, and they
+  // are not auto-fills, so a format switch leaves them as they are.
   const [demo, setDemo] = useState<PerSide<MonState | null>>({ a: null, b: null });
   const demoSlots = useRef(initial.demo ? { a: initial.teams.a[0]!.uid, b: initial.teams.b[0]!.uid } : null);
   const loadOptions = useRef(loadBuildOptions);
@@ -131,10 +137,9 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   useEffect(() => {
     let live = true;
     (async () => {
-      const slugs = (await adapter.ranking("double", 2)).rows.slice(0, 2).map((row) => row.slug);
-      if (slugs.length < 2) return;
-      const [a, b] = await Promise.all(slugs.map(async (slug) => {
-        const option = (await loadOptions.current(slug, "double"))[0];
+      const [a, b] = await Promise.all(SIDES.map(async (side) => {
+        const slug = DEMO_PAIR[side];
+        const option = (await loadOptions.current(slug, "single"))[0];
         return option ? applyBuildOption(makeMon(slug), option, 0) : makeMon(slug);
       }));
       if (!live || !a || !b) return;
@@ -156,7 +161,6 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
       });
     })().catch((error) => console.error("demo roster failed:", error));
     return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const demoMon = useCallback((side: SideId): MonState => {
     const template = demo[side];
@@ -172,8 +176,12 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   // only mons still carrying an untouched auto-fill; hand-edited and handed-over (pinned) builds
   // are never overwritten.
   const fillTokens = useRef(new Set<string>());
+  // A Mega picked by name holds its stone and its one ability from the first render (the cards pin
+  // them); those are the form, not a build, so such a mon still counts as bare and takes the fill.
+  const bare = (mon: MonState) => sideIsBare(dex.find((entry) => entry.slug === mon.slug)?.isMega
+    ? { ...mon, item: "", ability: "" } : mon);
   const seedable = (mon: MonState) =>
-    sideIsBare(mon) || (mon.autoSig != null && autofillSig(mon, mon.moves) === mon.autoSig);
+    bare(mon) || (mon.autoSig != null && autofillSig(mon, mon.moves) === mon.autoSig);
   useEffect(() => {
     for (const side of SIDES) {
       for (const mon of teams[side]) {
@@ -203,7 +211,6 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
         });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [field.format, teams]);
 
   const swapSides = useCallback(() => {
@@ -215,8 +222,23 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
     setSwaps((count) => count + 1);
   }, []);
 
+  // A mon that is exactly an environment card right now (picked or auto-filled, on any tab) takes
+  // that card as its point; hand edits after that do not move it.
+  const baselines = useRef(new Map<string, Baseline>());
+  const baselineOf = useCallback((mon: MonState): Baseline => {
+    const exact = !!mon.buildRef && mon.buildRef.signature === buildConfigSig(mon);
+    let baseline = baselines.current.get(mon.uid);
+    if (!baseline || (exact && (baseline.nature !== mon.nature
+      || STAT_KEYS.some((key) => (baseline!.sps[key] ?? 0) !== (mon.sps[key] ?? 0))))) {
+      baseline = { sps: cloneSps(mon.sps), nature: mon.nature };
+      baselines.current.set(mon.uid, baseline);
+    }
+    return baseline;
+  }, []);
+
   const value = useMemo<RosterApi>(() => ({
     teams, active, slot, field, swaps, setTeams, setActive, setSlot, setField, swapSides, demoMon,
-  }), [teams, active, slot, field, swaps, swapSides, demoMon]);
+    baselineOf,
+  }), [teams, active, slot, field, swaps, swapSides, demoMon, baselineOf]);
   return <RosterContext.Provider value={value}>{children}</RosterContext.Provider>;
 }

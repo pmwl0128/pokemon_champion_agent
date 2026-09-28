@@ -1,52 +1,50 @@
 import type {
   ActualDamageFactDto, ActualMatchupCellDto, ActualMatchupResponseDto, FormatId, OppSetDto,
-  SpeciesRowDto,
+  SpeciesRowDto, TeamDoc, TeamMemberDoc,
 } from "@pokemon-champions/protocol";
 import { ActualMatchupResponseDtoSchema } from "@pokemon-champions/protocol";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconFileImport } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { EntityHover } from "../components/EntityHover.tsx";
-import { AdaptiveCombobox } from "../components/AdaptiveCombobox.tsx";
 import { CalcRail, type CalcRailApi, type CalcRailTarget } from "../components/CalcRail.tsx";
 import { GameImage } from "../components/GameImage.tsx";
 import { RailHandle, useSideRail } from "../components/SideRail.tsx";
 import { SegmentedControl } from "../components/SegmentedControl.tsx";
-import {
-  useAbilities, useDexByName, useDexIndex, useItems, useMoves, useNatures, useOppSets,
-} from "../hooks.ts";
-import { displayName, useLang, useT, type Lang } from "../i18n.ts";
+import { useAsync, useDexByName, useDexIndex, useOppSets } from "../hooks.ts";
+import { parseTeamInput } from "../lib/parseTeamInput.ts";
+import { displayName, useLang, useT } from "../i18n.ts";
 import { koTone } from "../lib/ko.ts";
 import {
-  readMatchupSources, readTeamMembers, stashDamageFill, takeMatchupFill,
-  type MatchupTeamSource, type TeamMemberish,
+  readTeamMembers, stashDamageFill, takeMatchupFill, type TeamMemberish,
 } from "../lib/team.ts";
 import {
   CellInspector, type InspectorBuild, type InspectorDamage,
 } from "../components/CellInspector.tsx";
 import { activeKey, ColHead } from "../components/MatchupHeads.tsx";
 import { useRuntime } from "../runtime/context.tsx";
+import { useTransferT } from "../lib/library/transferMessages.ts";
+import { useLibraryDrop, useLibraryReceiver, useLibrarySource } from "../lib/library/workspace.tsx";
+import { toTeamDoc } from "../lib/teamDoc.ts";
 import type { DexIndexEntry } from "../runtime/adapter.ts";
-import type { ItemRef } from "../runtime/projection.ts";
-import {
-  BuildPickerButton, buildConfigSig, megaFor, type BuildOption,
-} from "./calc/shared.tsx";
-import { slugify } from "./uep/MonChip.tsx";
+import type { BuildOption } from "../components/build/inputs.tsx";
+import { roveFocus, useFocusOnOpen, usePopover } from "../lib/popover.ts";
+import { MonBuildEditor } from "../components/library/MonBuildEditor.tsx";
+
+// The library store loads with the list, not with the page.
+const TeamImportList = lazy(() => import("../components/library/TeamImportList.tsx"));
+import { slugify } from "../components/team/MonChip.tsx";
 
 
 /** The skill emits the lossless canonical key and the bridge deliberately preserves it. */
 const variantKey = (cell: { opponent_variant?: string }, fallback: string): string =>
   cell.opponent_variant ?? fallback;
 
-type InputMode = "manual" | "text" | "recent";
+type InputMode = "manual" | "text";
 type ResultView = "check" | "ko";
 type Spread = Record<"hp" | "atk" | "def" | "spa" | "spd" | "spe", number>;
 interface DraftMember extends TeamMemberish { id: string; spread: Spread; moves: string[] }
-interface NamedOption { name: string; nameZh?: string; nameJa?: string }
-interface ActualVocab {
-  species: DexIndexEntry[]; moves: NamedOption[]; items: ItemRef[];
-  abilities: NamedOption[]; natures: NamedOption[];
-}
 
 /** Browser-session continuity, mirroring the wizard and the diagnose tab: a matchup battery is a
  * minute-scale server round trip, and the parent unmounts this whole workspace whenever the user
@@ -87,8 +85,9 @@ interface ActiveBatteryTask {
 let activeBatteryTask: ActiveBatteryTask | null = null;
 
 const EMPTY_SPREAD: Spread = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-const STATS = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
 const TOP_K_PRESETS = [8, 20, 30, 50, 60] as const;
+/** One team's worth of builds per battery (the bridge's MATCHUP_SOURCE_MAX). */
+const MAX_BUILDS = 6;
 
 function newMember(seed?: TeamMemberish, index = 0): DraftMember {
   return {
@@ -103,7 +102,7 @@ function newMember(seed?: TeamMemberish, index = 0): DraftMember {
 }
 
 function membersFromTeam(team: unknown): DraftMember[] {
-  return readTeamMembers(team).map((member, index) => newMember(member, index));
+  return readTeamMembers(team).slice(0, MAX_BUILDS).map((member, index) => newMember(member, index));
 }
 
 function teamFromMembers(format: FormatId, members: DraftMember[]) {
@@ -119,173 +118,61 @@ function teamFromMembers(format: FormatId, members: DraftMember[]) {
   };
 }
 
-function localizedOption(row: { name: string; nameZh?: string; nameJa?: string }, lang: string) {
-  return lang === "zh" ? row.nameZh ?? row.name : lang === "ja" ? row.nameJa ?? row.name : row.name;
-}
-
-function useActualVocab(): ActualVocab {
-  const dex = useDexIndex();
-  const moves = useMoves();
-  const items = useItems();
-  const abilities = useAbilities();
-  const natures = useNatures();
-  return useMemo(() => ({
-    species: dex.status === "ready" ? dex.data : [],
-    moves: moves.status === "ready" ? moves.data : [],
-    items: items.status === "ready" ? items.data : [],
-    abilities: abilities.status === "ready" ? abilities.data : [],
-    natures: natures.status === "ready" ? natures.data : [],
-  }), [dex, moves, items, abilities, natures]);
-}
-
-function displayInputValue(rows: NamedOption[], value: string, lang: Lang): string {
-  const row = rows.find((entry) => entry.name === value
-    || entry.nameZh === value || entry.nameJa === value);
-  return row ? localizedOption(row, lang) : value;
-}
-
-function canonicalInputValue(rows: NamedOption[], value: string): string {
-  return rows.find((entry) => entry.name === value
-    || entry.nameZh === value || entry.nameJa === value)?.name ?? value;
-}
-
-function LocalizedInput({ list, rows, value, onChange, placeholder }: {
-  list: string; rows: NamedOption[]; value: string;
-  onChange: (value: string) => void; placeholder?: string;
-}) {
-  const { lang } = useLang();
-  const options = useMemo(() => rows.map((row) => ({
-    key: row.name,
-    value: localizedOption(row, lang),
-    secondary: row.name,
-    searchText: `${row.nameZh ?? ""} ${row.nameJa ?? ""}`,
-  })), [rows, lang]);
-  return <AdaptiveCombobox nativeListId={list}
-    value={displayInputValue(rows, value, lang)} options={options}
-    onValueChange={(next) => onChange(canonicalInputValue(rows, next))}
-    placeholder={placeholder} />;
-}
-
-function VocabLists({ vocab }: { vocab: ActualVocab }) {
-  const { lang } = useLang();
-  const options = (id: string, rows: NamedOption[]) => (
-    <datalist id={id}>{rows.map((row) => {
-      const display = localizedOption(row, lang);
-      return <option key={row.name} value={display}>{display === row.name ? "" : row.name}</option>;
-    })}</datalist>
+/** 导入队伍: one of the reader's kept teams of this format replaces the builds. A page that works on
+ * one whole team takes it straight from here; the dock stays the way for a single Pokémon. */
+function TeamImport({ format, onPick }: { format: FormatId; onPick: (doc: TeamDoc) => void }) {
+  const t = useT();
+  const pop = usePopover();
+  const list = useRef<HTMLDivElement>(null);
+  useFocusOnOpen(pop.open, list, "[role=menuitem]");
+  return (
+    <div className="team-import" ref={pop.wrap} onBlur={pop.onBlur}>
+      <button ref={pop.trigger} type="button" className={`ghost-btn team-import-btn${pop.open ? " open" : ""}`}
+        aria-haspopup="menu" aria-expanded={pop.open} title={t("actual.importTeamHint")} onClick={pop.toggle}>
+        <IconFileImport size={16} aria-hidden />{t("actual.importTeam")}
+      </button>
+      {pop.open && (
+        <div ref={list} className="duel-pop team-import-pop" role="menu" aria-label={t("actual.importTeam")}
+          onKeyDown={(event) => roveFocus(event, "[role=menuitem]")}>
+          <Suspense fallback={null}>
+            <TeamImportList format={format} onPick={(doc) => { pop.setOpen(false); onPick(doc); }} />
+          </Suspense>
+        </div>
+      )}
+    </div>
   );
-  return <>
-    {options("actual-species-options", vocab.species)}
-    {options("actual-move-options", vocab.moves)}
-    {options("actual-item-options", vocab.items)}
-    {options("actual-ability-options", vocab.abilities)}
-    {options("actual-nature-options", vocab.natures)}
-  </>;
 }
 
-function MemberEditor({ member, index, count, vocab, format, onChange, onRemove }: {
-  member: DraftMember; index: number; count: number;
-  vocab: ActualVocab; format: FormatId;
+/** A draft member as the build editor's document, and back. */
+const docOf = (member: DraftMember): TeamMemberDoc => ({
+  species: member.species, item: member.item || null, ability: member.ability || null,
+  nature: member.nature || null, moves: member.moves.filter(Boolean), spread: member.spread,
+});
+const fromDoc = (doc: TeamMemberDoc, id: string): DraftMember => ({
+  id, species: doc.species, item: doc.item ?? "", ability: doc.ability ?? "", nature: doc.nature ?? "",
+  moves: [...doc.moves, "", "", "", ""].slice(0, 4), spread: { ...EMPTY_SPREAD, ...(doc.spread ?? {}) },
+});
+
+/** One of our builds, edited with the same editor as a box Pokémon (the calculator's inputs), its
+ * environment builds taken from this page's format. */
+function MemberEditor({ member, index, count, format, onChange, onRemove }: {
+  member: DraftMember; index: number; count: number; format: FormatId;
   onChange: (next: DraftMember) => void; onRemove: () => void;
 }) {
   const t = useT();
-  const dex = useDexByName();
-  const { lang } = useLang();
-  const entry = dex.get(member.species);
-  const name = entry ? displayName(entry, lang) : member.species || t("actual.member.empty");
-  // Same badge the calculator and speed rows wear: a held stone IS the Mega for every number the
-  // battery computes, so the card says so rather than leaving it to the item field.
-  const mega = entry?.isMega ? entry
-    : entry ? megaFor(entry.slug, member.item ?? "", vocab.species, vocab.items) : null;
-  // The cards the environment picker last loaded, kept only to mark which one this member IS.
-  const [setOptions, setSetOptions] = useState<BuildOption[]>([]);
-  const buildSig = buildConfigSig({
-    ability: member.ability ?? "", item: member.item ?? "", nature: member.nature ?? "",
-    sps: member.spread, moves: member.moves,
-  });
-  const currentSetKey = setOptions.find(
-    (option) => buildConfigSig(option.modal) === buildSig)?.key;
   return (
     <article className="actual-member-card">
       <header className="actual-member-head">
         <span className="actual-member-index num">{String(index + 1).padStart(2, "0")}</span>
-        {entry && <GameImage assetKey={`pokemon:${entry.slug}`} role="dense" alt="" className="mini" />}
-        <strong>{name}</strong>
-        {mega && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
-        <span className="actual-member-actions">
-          <BuildPickerButton slug={entry?.slug ?? ""} format={format} currentKey={currentSetKey}
-            onOptions={setSetOptions}
-            onPick={(option) => onChange({
-              ...member,
-              item: option.modal.item,
-              ability: option.modal.ability,
-              nature: option.modal.nature,
-              moves: [...option.modal.moves, "", "", "", ""].slice(0, 4),
-              spread: { ...EMPTY_SPREAD, ...option.modal.sps },
-            })} />
-          <button type="button" className="mini-x" onClick={onRemove} disabled={count === 1}
-            aria-label={t("actual.remove")} title={t("actual.remove")}>✕</button>
-        </span>
+        <button type="button" className="mini-x" onClick={onRemove} disabled={count === 1}
+          aria-label={t("actual.remove")} title={t("actual.remove")}>✕</button>
       </header>
-      <div className="actual-member-fields">
-        <label className="actual-species-field"><span>{t("actual.species")}</span>
-          <LocalizedInput list="actual-species-options" rows={vocab.species} value={member.species}
-            onChange={(value) => onChange({ ...member, species: value })}
-            placeholder={t("actual.speciesHint")} /></label>
-        <label><span>{t("actual.item")}</span><LocalizedInput list="actual-item-options"
-          rows={vocab.items} value={member.item ?? ""}
-          onChange={(value) => onChange({ ...member, item: value })} /></label>
-        <label><span>{t("actual.ability")}</span><LocalizedInput list="actual-ability-options"
-          rows={vocab.abilities} value={member.ability ?? ""}
-          onChange={(value) => onChange({ ...member, ability: value })} /></label>
-        <label><span>{t("actual.nature")}</span><LocalizedInput list="actual-nature-options"
-          rows={vocab.natures} value={member.nature ?? ""}
-          onChange={(value) => onChange({ ...member, nature: value })} /></label>
+      <div className="actual-member-body">
+        <MonBuildEditor value={docOf(member)} onChange={(doc) => onChange(fromDoc(doc, member.id))}
+          formats={[format]} />
       </div>
-      <div className="actual-moves">
-        {member.moves.map((move, moveIndex) => <label key={moveIndex}>
-          <span>{t("actual.move").replace("{n}", String(moveIndex + 1))}</span>
-          <LocalizedInput list="actual-move-options" rows={vocab.moves} value={move} onChange={(value) => {
-            const moves = [...member.moves]; moves[moveIndex] = value;
-            onChange({ ...member, moves });
-          }} /></label>)}
-      </div>
-      <fieldset className="actual-spread"><legend>{t("actual.spread")}</legend>
-        {STATS.map((stat) => <label key={stat}><span>{t(`stat.${stat}`)}</span>
-          <input className="num" type="number" min={0} max={32} value={member.spread[stat]}
-            onChange={(e) => onChange({ ...member, spread: {
-              ...member.spread, [stat]: Math.max(0, Math.min(32, Number(e.target.value) || 0)),
-            } })} /></label>)}
-        <span className={`actual-sp-total num${Object.values(member.spread).reduce((a, b) => a + b, 0) > 66 ? " over" : ""}`}>
-          {t("actual.spTotal").replace("{n}", String(Object.values(member.spread).reduce((a, b) => a + b, 0)))}</span>
-      </fieldset>
     </article>
   );
-}
-
-function RecentSources({ sources, onUse }: {
-  sources: MatchupTeamSource[]; onUse: (source: MatchupTeamSource) => void;
-}) {
-  const t = useT();
-  const dex = useDexByName();
-  const { lang } = useLang();
-  if (!sources.length) return <div className="actual-empty-state">
-    <span className="actual-empty-mark" aria-hidden>↗</span>
-    <strong>{t("actual.recentEmpty")}</strong><p>{t("actual.recentEmptyHint")}</p>
-  </div>;
-  return <div className="actual-source-grid">{sources.map((source) => {
-    const members = readTeamMembers(source.team);
-    return <button type="button" className="actual-source-card" key={source.id} onClick={() => onUse(source)}>
-      <span className="actual-source-meta"><b>{source.label}</b><span>{t(`format.${source.format}`)} · {members.length}</span></span>
-      <span className="actual-source-party">{members.map((member, index) => {
-        const row = dex.get(member.species);
-        return <span key={`${member.species}-${index}`} title={row ? displayName(row, lang) : member.species}>
-          <GameImage assetKey={`pokemon:${row?.slug ?? slugify(member.species)}`} role="dense" alt="" className="mini" />
-        </span>;
-      })}</span>
-      <span className="actual-source-use">{t("actual.useSource")} →</span>
-    </button>;
-  })}</div>;
 }
 
 /** Same markup as the reference grids' DetailMon (sprite + localized name in one hover chip), so a
@@ -617,14 +504,16 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
 }) {
   const t = useT();
   const { adapter } = useRuntime();
-  const vocab = useActualVocab();
+  const dexIndex = useDexIndex();
+  const species = dexIndex.status === "ready" ? dexIndex.data : [];
   const stash = useMemo(readStash, []);
-  const [mode, setMode] = useState<InputMode>(stash.mode ?? "manual");
+  // An older stash may name the retired "from other tools" mode: those teams arrive through the
+  // library dock now.
+  const [mode, setMode] = useState<InputMode>(stash.mode === "text" ? "text" : "manual");
   const [members, setMembers] = useState<DraftMember[]>(
-    () => (stash.members?.length ? stash.members : [newMember()]));
+    () => (stash.members?.length ? stash.members.slice(0, MAX_BUILDS) : [newMember()]));
   const [text, setText] = useState(stash.text ?? "");
   const [topK, setTopK] = useState(stash.topK ?? 30);
-  const [sources, setSources] = useState<MatchupTeamSource[]>(readMatchupSources);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quota, setQuota] = useState<{ used: number; limit: number } | null>(null);
@@ -637,12 +526,12 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     return parsed.success ? parsed.data : null;
   });
   const resultRef = useRef<HTMLDivElement>(null);
-  const rail = useSideRail(380, 760);
+  const rail = useSideRail(380, "calc");
 
   const pickFromRail = useCallback((_target: CalcRailTarget, entry: DexIndexEntry,
                                     option: BuildOption | null) => {
     const emptyIndex = members.findIndex((member) => !member.species.trim());
-    if (emptyIndex < 0 && members.length >= 12) {
+    if (emptyIndex < 0 && members.length >= MAX_BUILDS) {
       return { ok: false as const, reason: "full" as const };
     }
     const picked = newMember({
@@ -665,7 +554,7 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
   const railApi = useMemo<CalcRailApi>(() => ({
     format,
     targets: [{ id: "primary", label: t("actual.inputTitle") }],
-    maxItems: 12,
+    maxItems: MAX_BUILDS,
     pick: pickFromRail,
   }), [format, pickFromRail, t]);
 
@@ -678,13 +567,39 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
   useEffect(() => {
     const fill = takeMatchupFill();
     if (fill) loadTeam(fill.team, fill.format);
-    setSources(readMatchupSources());
   }, []);
   useEffect(() => {
     writeStash({ mode, members, text, topK, ...(response ? { response } : {}) });
   }, [mode, members, text, topK, response]);
 
   const sourceTeam = useMemo(() => teamFromMembers(format, members), [format, members]);
+  const parsedText = useAsync(() => mode === "text" ? parseTeamInput(text, format, adapter)
+    : Promise.resolve({ doc: null, error: null }), [mode, text, format, adapter]);
+  const textError = mode === "text" && parsedText.status === "ready" ? parsedText.data.error : null;
+
+  // The library workspace (design §2.4): a saved team becomes ours, a saved Pokémon joins our
+  // builds, and our team on screen can be kept. The input panel is the drop zone.
+  const bt = useTransferT();
+  useLibraryReceiver({ id: "matchup-team", kind: "team", label: bt("transfer.matchup.team"),
+    receive: ({ doc }) => {
+      if (!membersFromTeam(doc).length) return { ok: false, message: bt("transfer.unreadable") };
+      loadTeam(doc, doc.format);
+      return { ok: true };
+    } });
+  useLibraryReceiver({ id: "matchup-mon", kind: "pokemon", label: bt("transfer.matchup.mon"),
+    receive: ({ member }) => {
+      const emptyIndex = members.findIndex((row) => !row.species.trim());
+      if (emptyIndex < 0 && members.length >= MAX_BUILDS) return { ok: false, message: bt("transfer.matchup.full") };
+      const added = newMember(member, emptyIndex >= 0 ? emptyIndex : members.length);
+      setMembers(emptyIndex >= 0
+        ? members.map((row, index) => index === emptyIndex ? added : row) : [...members, added]);
+      setMode("manual"); setResponse(null); setError(null);
+      return { ok: true };
+    } });
+  useLibrarySource({ id: "matchup-keep", origin: "matchup", kind: "team", label: bt("transfer.matchup.save"),
+    read: () => mode === "text" ? (parsedText.status === "ready" ? parsedText.data.doc : null)
+      : toTeamDoc(sourceTeam, format) });
+  const drop = useLibraryDrop(["matchup-team", "matchup-mon"]);
   const sourceCount = mode === "text" ? null : readTeamMembers(sourceTeam).length;
   const estimatedUnits = sourceCount ? Math.ceil(sourceCount * topK / 30) : null;
   const refreshQuota = () => adapter.quota?.().then(
@@ -716,7 +631,7 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
 
   const run = async () => {
     const hasInput = mode === "text" ? !!text.trim() : readTeamMembers(sourceTeam).length > 0;
-    if (!hasInput || hasIllegalSpread || running || activeBatteryTask) return;
+    if (!hasInput || hasIllegalSpread || textError || running || activeBatteryTask) return;
     setRunning(true); setError(null); setResponse(null);
     const promise = adapter.actualMatchup({ format, topK,
       ...(mode === "text" ? { text: text.trim() } : { team: sourceTeam }) });
@@ -740,21 +655,10 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     }
   };
 
-  // The variant hint only applies once a run produced a species with more than one real build.
-  // Counting opponents here rather than reading the results section's column model keeps the guide
-  // at the top of the tab without lifting that section's state up.
-  const hasBuilds = useMemo(() => {
-    const cells = response?.result.members[0]?.cells ?? [];
-    const seen = new Set<string>();
-    // `Set.add` returns the SET, never a "was it new?" boolean — so ask before adding.
-    return cells.some((c) => (seen.has(c.opponent) ? true : (seen.add(c.opponent), false)));
-  }, [response]);
-
   return <>
     <RailHandle state={rail} label={t("calc.rail.title")} />
-    <CalcRail state={rail} dex={vocab.species} tab="actual" api={railApi} />
+    <CalcRail state={rail} dex={species} tab="actual" api={railApi} />
     <div className="actual-workspace">
-    <VocabLists vocab={vocab} />
     {/* Both guides sit at the TOP of the tab, exactly where the two reference grids put theirs —
       * they describe how to read the whole tab, not just the results section, and having them
       * appear halfway down once a run finished made the three matchup views look unrelated. This
@@ -763,29 +667,33 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
     <div className="matrix-guide" aria-live="polite">
       <span className="matrix-guide-mark" aria-hidden>↘</span>{t("actual.cellHint")}
     </div>
-    <section className="panel actual-input-panel">
+    <section className="panel actual-input-panel" {...drop}>
       <div className="actual-input-head">
-        <div><h3>{t("actual.inputTitle")}</h3></div>
+        <div className="actual-input-title">
+          <h3>{t("actual.inputTitle")}</h3>
+          {mode === "manual" && <span className="actual-input-count num">{members.filter((member) => member.species).length}/{MAX_BUILDS}</span>}
+        </div>
+        <TeamImport format={format} onPick={(doc) => loadTeam(doc)} />
         <SegmentedControl kind="tabs" idBase="actual-input" value={mode} onChange={setMode}
           ariaLabel={t("actual.inputMode")} className="seg" items={[
             { id: "manual", label: t("actual.manual") }, { id: "text", label: t("actual.text") },
-            { id: "recent", label: t("actual.recent") },
           ]} />
       </div>
       {mode === "manual" && <div className="actual-members">
         {members.map((member, index) => <MemberEditor key={member.id} member={member} index={index} count={members.length}
-          vocab={vocab} format={format}
+          format={format}
           onChange={(next) => setMembers((rows) => rows.map((row) => row.id === member.id ? next : row))}
           onRemove={() => setMembers((rows) => rows.filter((row) => row.id !== member.id))} />)}
-        <button type="button" className="actual-add-member" disabled={members.length >= 12}
+        {members.length < MAX_BUILDS && <button type="button" className="actual-add-member"
           onClick={() => setMembers((rows) => [...rows, newMember(undefined, rows.length)])}>
-          <span>＋</span><b>{t("actual.addMember")}</b><small>{t("actual.addMemberHint")}</small></button>
+          <span>＋</span><b>{t("actual.addMember")}</b><small>{t("actual.addMemberHint")}</small></button>}
       </div>}
       {mode === "text" && <div className="actual-text-import"><label htmlFor="actual-text">{t("actual.textLabel")}</label>
         <textarea id="actual-text" rows={12} maxLength={16000} value={text} onChange={(e) => setText(e.target.value)}
           placeholder={t("actual.textPlaceholder")} />
-        <p>{t("actual.textSupport")}</p></div>}
-      {mode === "recent" && <RecentSources sources={sources} onUse={(source) => loadTeam(source.team, source.format)} />}
+        <p>{t("actual.textSupport")}</p>
+        {textError && <p className="notice" role="alert">{t(textError === "too-many" ? "actual.textTooMany" : "actual.textInvalid")}</p>}
+        </div>}
     </section>
     <section className="panel actual-runbar">
       <div className="actual-topk"><div><b>{t("actual.topK")}</b><span>{t("actual.topKHint")}</span></div>
@@ -806,7 +714,7 @@ export function ActualMatchupWorkspace({ format, onFormatChange }: {
                     .replace("{remaining}", quota
                       ? String(Math.max(0, quota.limit - quota.used)) : "—")}
         </span>
-        <button type="button" className="primary-btn" disabled={running || hasIllegalSpread || (mode === "text" ? !text.trim() : readTeamMembers(sourceTeam).length === 0)}
+        <button type="button" className="primary-btn" disabled={running || hasIllegalSpread || !!textError || (mode === "text" ? !text.trim() || parsedText.status === "loading" : readTeamMembers(sourceTeam).length === 0)}
           onClick={run}>{running ? t("actual.running") : t("actual.run")}</button></div>
     </section>
     {running && <section className="panel actual-progress" aria-live="polite"><span className="actual-progress-orbit" aria-hidden />

@@ -24,14 +24,17 @@ import { useDexByName, useDexIndex, useOppCache } from "../hooks.ts";
 import { displayName, optionalKey, useLang, useT } from "../i18n.ts";
 import { useProseRenderer } from "../lib/prose.tsx";
 import {
-  readTeamMembers, rememberMatchupSource, stashCalcTeams, stashDamageFill,
+  readTeamMembers, stashCalcTeams, stashDamageFill, stashDiagnoseFill,
   stashMatchupFill, teamToCalcMembers,
 } from "../lib/team.ts";
 import { HttpError, type DexIndexEntry } from "../runtime/adapter.ts";
 import { useRuntime } from "../runtime/context.tsx";
-import { DiagnoseTab } from "./DiagnoseTab.tsx";
-import { slugify } from "./uep/MonChip.tsx";
-import { TeamCard } from "./uep/TeamCard.tsx";
+import { MemberHover, slugify, useMemberProse, useMemberSets } from "../components/team/MonChip.tsx";
+import { TeamCard } from "../components/team/TeamCard.tsx";
+import { HintButton } from "../components/HintButton.tsx";
+import { useTransferT } from "../lib/library/transferMessages.ts";
+import { useLibraryDrop, useLibraryReceiver, useLibrarySource } from "../lib/library/workspace.tsx";
+import { toTeamDoc } from "../lib/teamDoc.ts";
 
 type StartError =
   | { kind: "limit" | "busy" | "unavailable" | "generic" }
@@ -68,6 +71,9 @@ type View =
   /** `job` kept when we have it: the gate timeline (with its fact summaries) stays
    * reviewable after a failure too — only an expired/unknown job leaves it null. */
   | { phase: "failed"; code: string; job: BuilderJobDto | null };
+
+/** The server takes at most this many owned species (and says so if sent more). */
+const OWNED_MAX = 30;
 
 function splitNames(raw: string, cap: number): string[] {
   return raw.split(/[,，、;；\n]/).map((s) => s.trim()).filter(Boolean).slice(0, cap);
@@ -244,6 +250,8 @@ function ThreatAssessmentPanel({ assessment, team, format, dexByName }: {
   }, [oppCacheState.status, pendingCalc]);
 
   const worst = assessment.worst;
+  // Routes land on OUR members, whose generated builds are known; opponents keep the dex hover.
+  const memberOf = useMemberSets(team);
   return (
     <div className="builder-threat-assessment">
       <p className="muted builder-threat-method">
@@ -296,16 +304,19 @@ function ThreatAssessmentPanel({ assessment, team, format, dexByName }: {
                 const set = oppSets?.[route.opponentVariant ?? slugify(threat.opponent)];
                 const summary = set ?? variantFacts(route.opponentVariant);
                 const memberEntry = dexByName.get(route.member);
+                const memberSet = memberOf(route.member);
+                const memberChip = (
+                  <span className="gate-chip">
+                    {memberEntry ? displayName(memberEntry, lang) : route.member}
+                  </span>
+                );
                 return (
                   <div className="builder-threat-route"
                        key={`${route.evidenceId}:${route.opponentVariant ?? "base"}:${routeIndex}`}>
                     <span>{prose(route.move)}</span>
                     <span aria-hidden="true">→</span>
-                    <EntityHover kind="pokemon" name={route.member}>
-                      <span className="gate-chip">
-                        {memberEntry ? displayName(memberEntry, lang) : route.member}
-                      </span>
-                    </EntityHover>
+                    {memberSet ? <MemberHover mon={memberSet}>{memberChip}</MemberHover>
+                      : <EntityHover kind="pokemon" name={route.member}>{memberChip}</EntityHover>}
                     {(summary.item || summary.ability) && (
                       <span className="muted">
                         {prose([summary.item, summary.ability].filter(Boolean).map(String).join(" · "))}
@@ -331,10 +342,10 @@ function ThreatAssessmentPanel({ assessment, team, format, dexByName }: {
   );
 }
 
-export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
+export function BuilderPage({ embedded = false, active = true }: {
   embedded?: boolean;
-  activeTab?: "wizard" | "diagnose";
-  onTabChange?: (tab: "wizard" | "diagnose") => void;
+  /** False while another assist tab is on screen: the library then sees none of this page. */
+  active?: boolean;
 } = {}) {
   const { adapter, can } = useRuntime();
   const t = useT();
@@ -344,14 +355,9 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
   const prose = useProseRenderer();
   const navigate = useNavigate();
 
-  // Diagnose lives here as a sibling tab (same "teams" domain, shares TeamCard) and takes
-  // a hand-off from the wizard result; it is capability-gated on its own (team.validate).
-  const showDiagnose = can("team.validate") && !!adapter.diagnose;
-  const [localTab, setLocalTab] = useState<"wizard" | "diagnose">("wizard");
-  const tab = activeTab ?? localTab;
-  const setTab = onTabChange ?? setLocalTab;
-  const tabIdBase = embedded ? "assistant-mode" : "builder-mode";
-  const [diagFill, setDiagFill] = useState<unknown | null>(null);
+  // Diagnose is its own entry on the teams page (roadmap §1.2: a deterministic report must not
+  // sit behind an "AI" label); the wizard result hands its team over through a navigation.
+  const canDiagnose = can("team.validate") && !!adapter.diagnose;
 
   // Rehydrate from sessionStorage once: the form fields always, and — when a job id was
   // stashed — jump straight back into watching (the effect below re-fetches; a finished
@@ -380,15 +386,10 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
   const oppCacheState = useOppCache(format, needsLegacyOppSets);
   const oppSets = oppCacheState.status === "ready" ? oppCacheState.data?.sets : undefined;
 
-  useEffect(() => {
-    if (view.phase !== "done" || !view.job.result?.team) return;
-    rememberMatchupSource({ source: "builder", label: t("actual.source.builder"), format,
-      team: view.job.result.team });
-  }, [view, format, t]);
-
   const stashJobId = view.phase === "watching" ? view.jobId
     : view.phase === "done" ? view.job.id : undefined;
   const completedResult = view.phase === "done" ? view.job.result : null;
+  const memberProse = useMemberProse(completedResult?.team);
   useEffect(() => {
     writeStash({
       form: { format, posture, anchor, owned, avoid, wants: [...wants], thinking },
@@ -443,6 +444,35 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
     };
   }, [jobId, adapter]);
 
+  // The library workspace (design §2.4): the boxes become the owned list, one boxed Pokémon joins
+  // it, and a finished result can be kept. Names go in the reader's language; the server resolves
+  // any of the three.
+  const bt = useTransferT();
+  const ownedNames = () => splitNames(owned, OWNED_MAX);
+  const localSpecies = (species: string) => {
+    const entry = dexByName.get(species);
+    return entry ? displayName(entry, lang) : species;
+  };
+  useLibraryReceiver(active ? { id: "builder-box", kind: "box", label: bt("transfer.builder.box"),
+    receive: ({ species }) => {
+      const names = species.map(localSpecies);
+      setOwned(names.slice(0, OWNED_MAX).join("、"));
+      return names.length > OWNED_MAX
+        ? { ok: true, message: bt("transfer.builder.capped").replace(/\{n\}/g, String(OWNED_MAX)) }
+        : { ok: true };
+    } } : null);
+  useLibraryReceiver(active ? { id: "builder-mon", kind: "pokemon", label: bt("transfer.builder.mon"),
+    receive: ({ member }) => {
+      const current = ownedNames();
+      const name = localSpecies(member.species);
+      if (!current.includes(name) && current.length < OWNED_MAX) setOwned([...current, name].join("、"));
+      return { ok: true };
+    } } : null);
+  const builtTeam = view.phase === "done" ? view.job.result?.team ?? null : null;
+  useLibrarySource(active && builtTeam ? { id: "builder-keep", origin: "builder", kind: "team", label: bt("transfer.builder.save"),
+    read: () => toTeamDoc(builtTeam, format) } : null);
+  const ownedDrop = useLibraryDrop(["builder-box", "builder-mon"]);
+
   const submit = async () => {
     if (!adapter.builder || submitting) return;
     setError(null);
@@ -452,7 +482,7 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
       posture,
       lang,
       ...(anchor.trim() ? { anchor: anchor.trim().slice(0, 100) } : {}),
-      ...(owned.trim() ? { owned: splitNames(owned, 30) } : {}),
+      ...(owned.trim() ? { owned: splitNames(owned, OWNED_MAX) } : {}),
       ...(avoid.trim() ? { avoid: splitNames(avoid, 10) } : {}),
       ...(wants.size ? { wants: [...wants] as BuilderRequestDto["wants"] } : {}),
       ...(thinking ? { thinking: true } : {}),
@@ -473,22 +503,10 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
 
   return (
     <div>
-      {!embedded && (
-        <PageHeader title={t("builder.title")} description={t("online.aiNote")}>
-          {showDiagnose && (
-            <SegmentedControl kind="tabs" idBase={tabIdBase} value={tab} onChange={setTab}
-              ariaLabel={t("a11y.builderMode")} className="seg builder-tabs page-tabs"
-              items={(["wizard", "diagnose"] as const).map((id) => ({
-                id,
-                label: t(`builder.tab.${id}`),
-              }))} />
-          )}
-        </PageHeader>
-      )}
-      <div role={embedded || showDiagnose ? "tabpanel" : undefined}
-        id={embedded || showDiagnose ? segmentedPanelId(tabIdBase, "wizard") : undefined}
-        aria-labelledby={embedded || showDiagnose ? segmentedTabId(tabIdBase, "wizard") : undefined}
-        hidden={(embedded || showDiagnose) && tab !== "wizard"}>
+      {!embedded && <PageHeader title={t("builder.title")} description={t("online.aiNote")} />}
+      <div role={embedded ? "tabpanel" : undefined}
+        id={embedded ? segmentedPanelId("assistant-mode", "wizard") : undefined}
+        aria-labelledby={embedded ? segmentedTabId("assistant-mode", "wizard") : undefined}>
       <>
       <p className="notice page-disclosure">{t("builder.disclosure")}</p>
 
@@ -519,7 +537,7 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
                 searchText: `${entry.nameZh ?? ""} ${entry.nameJa ?? ""} ${entry.slug}`,
               })) : []} />
           </div>
-          <div className="builder-field">
+          <div className="builder-field" {...ownedDrop}>
             <label htmlFor="builder-owned">{t("builder.owned")}</label>
             <textarea id="builder-owned" rows={2} value={owned}
                       onChange={(e) => setOwned(e.target.value)}
@@ -547,48 +565,26 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
               ))}
             </div>
           </div>
-          <div className="diag-mode-options builder-thinking-options">
+          {/* The submit cluster — thinking mode over the quota and the start button — is built and
+              placed exactly as the diagnose tab's, so switching tabs moves none of it. */}
+          <div className="assist-submit">
             <ThinkingToggle checked={thinking} onChange={setThinking}
               disabled={submitting || thinkingUnavailable} label={t("thinking.label")}
               tip={`${t("builder.thinkingTip")}${thinkingUnavailable && quota !== null
                 ? ` ${t("thinking.insufficient")}` : ""}`} />
-          </div>
-          <div className="builder-actions">
-            {quota && (
-              <span className="muted num">
-                {t("builder.quota")} {quota.limit === 0
-                  ? t("quota.unlimited") : `${quota.used}/${quota.limit}`}
-              </span>
-            )}
-            {completedResult && showDiagnose && (
-              <button type="button" className="second-btn"
-                      onClick={() => {
-                        setDiagFill(completedResult.team);
-                        setTab("diagnose");
-                      }}>
-                {t("builder.sendDiagnose")}
+            <div className="builder-actions">
+              {quota && (
+                <span className="muted num qa-quota">
+                  {t("builder.quota")} {quota.limit === 0
+                    ? t("quota.unlimited") : `${quota.used}/${quota.limit}`}
+                </span>
+              )}
+              <button type="button" className="primary-btn"
+                      disabled={submitting || !!(quota && quota.limit > 0 && quota.used >= quota.limit)}
+                      onClick={() => void submit()}>
+                {submitting ? t("builder.starting") : t("builder.start")}
               </button>
-            )}
-            {completedResult && (
-              <button type="button" className="second-btn" title={t("team.sendCalcHint")}
-                onClick={() => {
-                  stashCalcTeams({ format, attackers: teamToCalcMembers(completedResult.team),
-                    defenders: [] });
-                  navigate("/calc?tab=damage");
-                }}>{t("team.sendCalc")}</button>
-            )}
-            {completedResult && (
-              <button type="button" className="second-btn" onClick={() => {
-                stashMatchupFill({ source: "builder", label: t("actual.source.builder"), format,
-                  team: completedResult.team });
-                navigate("/matchup?mode=actual");
-              }}>{t("actual.sendMatchup")}</button>
-            )}
-            <button type="button" className="primary-btn"
-                    disabled={submitting || !!(quota && quota.limit > 0 && quota.used >= quota.limit)}
-                    onClick={() => void submit()}>
-              {submitting ? t("builder.starting") : t("builder.start")}
-            </button>
+            </div>
           </div>
         </div>
       )}
@@ -617,7 +613,7 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
 
       {view.phase === "done" && view.job.result && (
         <div className="panel result-panel builder-result">
-          <TeamCard team={view.job.result.team} badges={
+          <TeamCard team={view.job.result.team} keepOrigin="builder" saveSource="builder-keep" badges={
             <div className="builder-badges">
               <span className="badge-ok">✓ {t("builder.badge.valid")}</span>
               <span className="badge-ok">✓ {t("builder.badge.audit")}</span>
@@ -625,12 +621,34 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
                 <span className="badge-note">{t("builder.badge.repaired")}</span>
               )}
             </div>
-          } />
+          } actions={(() => {
+            const team = view.job.result.team;
+            return (
+              <>
+                {/* Diagnosis lives on the teams page; the team crosses over with the navigation. */}
+                {canDiagnose && (
+                  <button type="button" className="second-btn"
+                          onClick={() => { stashDiagnoseFill(team); navigate("/assist?tab=diagnose"); }}>
+                    {t("builder.sendDiagnose")}
+                  </button>
+                )}
+                <HintButton hint={t("team.sendCalcHint")}
+                  onClick={() => {
+                    stashCalcTeams({ format, attackers: teamToCalcMembers(team), defenders: [] });
+                    navigate("/calc?tab=damage");
+                  }}>{t("team.sendCalc")}</HintButton>
+                <HintButton hint={t("actual.sendMatchupHint")} onClick={() => {
+                  stashMatchupFill({ source: "builder", label: t("actual.source.builder"), format, team });
+                  navigate("/matchup?mode=actual");
+                }}>{t("actual.sendMatchup")}</HintButton>
+              </>
+            );
+          })()} />
           {view.job.result.rationale && (
             <div className="builder-rationale">
               <span className="gate-detail-label">{t("builder.rationale")}</span>
               {view.job.result.rationale.split(/\n+/).map((paragraph, index) => (
-                <p key={index}>{prose(paragraph)}</p>
+                <p key={index} className="qa-answer-text">{memberProse(paragraph)}</p>
               ))}
             </div>
           )}
@@ -709,11 +727,15 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
                     {oppName ? displayName(oppName, lang) : wm.opponent}
                   </span>
                   {wm.move && <span className="muted">{prose(wm.move)}</span>}
-                  {wm.member && (
-                    <span className="gate-chip" title={memberName ? displayName(memberName, lang) : wm.member}>
-                      → {memberName ? displayName(memberName, lang) : wm.member}
-                    </span>
-                  )}
+                  {wm.member && (() => {
+                    const chip = (
+                      <span className="gate-chip" title={memberName ? displayName(memberName, lang) : wm.member}>
+                        → {memberName ? displayName(memberName, lang) : wm.member}
+                      </span>
+                    );
+                    const set = readTeamMembers(team).find((m) => m.species === wm.member);
+                    return set ? <MemberHover mon={set}>{chip}</MemberHover> : chip;
+                  })()}
                 </span>
                 <button type="button" className="second-btn builder-verify"
                         onClick={() => {
@@ -766,15 +788,6 @@ export function BuilderPage({ embedded = false, activeTab, onTabChange }: {
       )}
       </>
       </div>
-      {showDiagnose && (
-        <div role="tabpanel" id={segmentedPanelId(tabIdBase, "diagnose")}
-          aria-labelledby={segmentedTabId(tabIdBase, "diagnose")}
-          hidden={tab !== "diagnose"}>
-          {/* Keep the tab mounted: an in-flight reading must survive sibling-tab switches. */}
-          <DiagnoseTab active={tab === "diagnose"} fill={diagFill}
-            onConsumeFill={() => setDiagFill(null)} />
-        </div>
-      )}
     </div>
   );
 }

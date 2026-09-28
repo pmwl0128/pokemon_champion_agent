@@ -14,16 +14,20 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^7.0.2",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "echarts": "^6.1.0",
+    "@pokemon-champions/protocol": "*",
+    "@tabler/icons-react": "^3.48.0",
+    "dexie": "^4.4.6",
+    "dexie-react-hooks": "^1.1.7",
+    "modern-screenshot": "^4.7.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
-    "zod": "^4.4.3",
-    "@pokemon-champions/protocol": "*"
+    "zod": "^4.4.3"
   }
 }

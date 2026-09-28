@@ -35,7 +35,7 @@ export interface DuelViewSnapshot {
   single: Record<SideId, boolean>;
 }
 
-function readMon(raw: unknown): MonState | null {
+export function readMon(raw: unknown): MonState | null {
   if (raw === null || typeof raw !== "object") return null;
   const m = raw as Partial<MonState>;
   if (typeof m.slug !== "string") return null;

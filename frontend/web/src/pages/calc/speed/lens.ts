@@ -6,12 +6,13 @@
 import type { NatureDto, SpeedInputDto, Status } from "@pokemon-champions/protocol";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
-import { withMega } from "../shared.tsx";
+import { withMega } from "../../../components/build/inputs.tsx";
 import type { FieldState, MonState, SideId } from "../duel/state.ts";
 
 export const SCARF = "Choice Scarf";
-export const SP_MAX = 32;
-export const SP_BUDGET = 66;
+import { SP_MAX } from "../../../lib/battle.ts";
+export { SP_MAX } from "../../../lib/battle.ts";
+export { SP_BUDGET } from "../../../lib/battle.ts";
 
 /** The only side condition that moves a Speed number. Screens, Helping Hand, Stealth Rock and the
  * rest change damage, never turn order, so the speed line does not show them at all. */

@@ -19,10 +19,10 @@
  * that point there is no gutter left to borrow.
  */
 import type { FormatId, MetaFacetsDto, RankingDto } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { GameImage } from "./GameImage.tsx";
-import { RailLayer, useRailEscape, useSideRail, type RailState } from "./SideRail.tsx";
+import { FALLBACK_KIND, RailLayer, useRailEscape, useSideRail, type RailState } from "./SideRail.tsx";
 import {
   useAbilitiesByName, useDexByName, useItemsByName, useMetaFacets, useMovesByName,
   useNatures, type Async,
@@ -30,7 +30,7 @@ import {
 import { displayName, useLang, useT, type MsgKey } from "../i18n.ts";
 
 /** The metagame rail is a list of names; 320px is the width that reads well for one. */
-export const useMetaRails = () => useSideRail(320);
+export const useMetaRails = () => useSideRail(320, FALLBACK_KIND);
 
 type FacetKey = "items" | "moves" | "abilities" | "natures" | "partners" | "koTargets" | "koedBy";
 
@@ -183,7 +183,7 @@ function ActiveChips({ picks, label, onToggle, onClear }: {
 }
 
 /** Search + ranking list in the rail, filter in the flyout beside it. */
-export function MetaRail({ state, format, ranking, activeSlug = "", onAllowed }: {
+export function MetaRail({ state, format, ranking, activeSlug = "", onAllowed, headActions }: {
   state: RailState;
   format: FormatId;
   ranking: Async<RankingDto>;
@@ -192,6 +192,8 @@ export function MetaRail({ state, format, ranking, activeSlug = "", onAllowed }:
   /** The filter scopes THIS LIST only — the page behind the rail keeps showing its own rows.
    * Pages that do not consume the result pass a no-op. */
   onAllowed: (slugs: Set<string> | null) => void;
+  /** Extra controls in the panel head (the site-wide search's format switch). */
+  headActions?: ReactNode;
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -259,6 +261,7 @@ export function MetaRail({ state, format, ranking, activeSlug = "", onAllowed }:
   return (
     <RailLayer state={state} label={t("rail.search")} onClose={() => setFilterOpen(false)}
       count={t("rail.total").replace("{n}", String(shown.length))}
+      headActions={headActions}
       after={filterOpen ? (
         <FilterFlyout facets={table} picks={picks} matching={shown.length} onToggle={toggle}
                       onClear={() => setPicks({})} onClose={() => setFilterOpen(false)} />

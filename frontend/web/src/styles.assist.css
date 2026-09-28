@@ -1,0 +1,148 @@
+/* The assist page — fact Q&A, the team builder, team diagnosis — on one quieter visual system over
+   the shared styles: notes that inform rather than shout, forms laid out for the width they get,
+   and report sections with a clear heading rhythm. Scoped to `.assist-surface`, so nothing here
+   reaches another page. */
+
+/* -- notes ------------------------------------------------------------------------------------ */
+.assist-surface .page-disclosure {
+  display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; padding: 10px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  color: var(--sub); font-size: 12.5px; line-height: 1.7;
+}
+.assist-surface .page-disclosure::before {
+  content: "i"; flex: none; display: grid; place-items: center; width: 18px; height: 18px; margin-top: 1px;
+  border-radius: 50%; background: var(--brand-soft); color: var(--brand-strong);
+  font: 800 11px/1 var(--font-ui);
+}
+
+/* -- panels and fields ------------------------------------------------------------------------ */
+.assist-surface .form-panel, .assist-surface .qa-form { padding: 18px 20px; border-radius: 14px; }
+.assist-surface .builder-field { gap: 7px; }
+.assist-surface .builder-field > label {
+  color: var(--ink); font-size: 12.5px; font-weight: 650; letter-spacing: .01em;
+}
+.assist-surface .builder-field > .seg { justify-self: start; }
+.assist-surface .builder-field > input, .assist-surface .builder-field > textarea,
+.assist-surface .builder-field .adaptive-combobox input, .assist-surface .qa-form textarea {
+  border-radius: 10px; padding: 9px 12px; background: var(--panel);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.assist-surface .builder-field > input:focus, .assist-surface .builder-field > textarea:focus,
+.assist-surface .qa-form textarea:focus {
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); outline: none;
+}
+#diag-text { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; min-height: 180px; }
+
+/* Tactics are toggles: the pill itself carries the state, the checkbox stays for keyboards. */
+.assist-surface .builder-tactics { gap: 6px; }
+.assist-surface .builder-tactics label {
+  position: relative; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--sub); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.assist-surface .builder-tactics label input {
+  position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer;
+}
+.assist-surface .builder-tactics label:hover { color: var(--ink); border-color: var(--line-strong); }
+.assist-surface .builder-tactics label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--brand) 42%, var(--line)); background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+.assist-surface .builder-tactics label:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* The builder's and the diagnose tab's forms are one frame — the same panel height, the format switch
+   top-left, and the submit cluster (thinking mode over the quota and the primary button) pinned to the
+   bottom-right — so the two model-backed forms read as one tool although they sit on two pages. The builder spreads its
+   fields over two columns — format and posture, the anchor and excluded list beside the taller owned
+   list, tactics beside the cluster; the diagnose tab gives its team text the stretching middle row.
+   The notes above both reserve two lines, so a one-line note does not shift the panel either. */
+.assist-surface .assist-submit { display: grid; justify-items: end; align-content: end; gap: 12px; }
+.assist-surface .assist-submit .builder-actions { margin: 0; }
+.assist-surface .assist-submit .primary-btn { min-width: 120px; }
+@media (min-width: 900px) {
+  #assistant-mode-panel-wizard .page-disclosure,
+  .assist-surface:has(> .builder-form #diag-text) > .page-disclosure { min-height: 64px; align-items: center; }
+  .assist-surface .builder-form:has(#builder-anchor),
+  .assist-surface .builder-form:has(#diag-text) {
+    min-height: 432px; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 16px;
+  }
+  /* The builder's spare height goes to its two list boxes, never to a gap above the tactics. */
+  .builder-form:has(#builder-anchor) { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+  .builder-form:has(#builder-anchor) > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .builder-form:has(#builder-anchor) > :nth-child(2) { grid-column: 2; grid-row: 1; }
+  .builder-form:has(#builder-anchor) > :nth-child(3) { grid-column: 1; grid-row: 2; }
+  .builder-form:has(#builder-anchor) > :nth-child(4) { grid-column: 2; grid-row: 2 / span 2; }
+  .builder-form:has(#builder-anchor) > :nth-child(4),
+  .builder-form:has(#builder-anchor) > :nth-child(5) { grid-template-rows: auto minmax(0, 1fr); }
+  .builder-form:has(#builder-anchor) > :nth-child(4) textarea,
+  .builder-form:has(#builder-anchor) > :nth-child(5) textarea { height: 100%; min-height: 44px; resize: none; }
+  .builder-form:has(#builder-anchor) > :nth-child(5) { grid-column: 1; grid-row: 3; }
+  .builder-form:has(#builder-anchor) > :nth-child(6) { grid-column: 1; grid-row: 4; align-self: end; }
+  .builder-form:has(#builder-anchor) > .assist-submit { grid-column: 2; grid-row: 4; align-self: end; }
+  .builder-form:has(#diag-text) { grid-template-rows: auto 1fr auto; }
+  .builder-form:has(#diag-text) > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .builder-form:has(#diag-text) > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; grid-template-rows: auto 1fr; }
+  .builder-form:has(#diag-text) #diag-text { height: 100%; min-height: 150px; }
+  .builder-form:has(#diag-text) > .diag-mode-options { grid-column: 1; grid-row: 3; align-self: end; }
+  .builder-form:has(#diag-text) > .assist-submit { grid-column: 2; grid-row: 3; align-self: end; }
+}
+.assist-surface .builder-actions { gap: 12px; }
+.assist-surface .builder-actions .primary-btn { padding: 9px 18px; border-radius: 10px; }
+
+/* -- Q&A -------------------------------------------------------------------------------------- */
+.assist-surface .qa-form textarea { min-height: 96px; font-size: 15px; line-height: 1.65; }
+.assist-surface .qa-actions { margin-top: 12px; align-items: flex-end; gap: 14px; }
+.assist-surface .qa-example {
+  min-height: 30px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px;
+  background: var(--panel-2); color: var(--sub); font-size: 12.5px;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.assist-surface .qa-example:hover {
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent); background: var(--brand-soft);
+  color: var(--brand-strong);
+}
+.assist-surface .qa-answer { gap: 12px; padding: 18px 22px; border-radius: 14px; }
+.assist-surface .qa-asked {
+  display: flex; align-items: baseline; gap: 10px; margin: 0; padding-bottom: 12px;
+  border-bottom: 1px dashed var(--line); color: var(--ink); font-size: 14px; font-weight: 650;
+}
+.assist-surface .qa-asked::before {
+  content: "Q"; flex: none; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 6px; background: var(--brand-soft); color: var(--brand-strong);
+  font: 800 11px/1 var(--font-ui); transform: translateY(3px);
+}
+.assist-surface .qa-answer-text { font-size: 14.5px; line-height: 1.95; }
+.assist-surface .qa-sources { gap: 6px 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.assist-surface .qa-source { padding: 2px 10px; border-radius: 999px; background: var(--panel-2); }
+
+/* -- results and reports ---------------------------------------------------------------------- */
+.assist-surface .builder-result { border-radius: 14px; }
+.assist-surface .result-panel { padding: 18px 20px; gap: 14px; }
+/* AI-written prose — the builder's rationale, the diagnosis reading — sets exactly like a Q&A answer:
+   same size, line height and chip alignment, so every generated paragraph on the page reads alike. */
+.assist-surface .builder-rationale {
+  display: grid; gap: 6px; padding: 12px 16px; border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+}
+.assist-surface .builder-rationale .qa-answer-text,
+.assist-surface .diag-explain .qa-answer-text { margin: 0; font-size: 14.5px; line-height: 1.95; }
+.assist-surface .diag-section { padding: 18px 20px; border-radius: 14px; }
+.assist-surface .diag-section > h2 {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 12px;
+  font-size: 15px; font-weight: 750; letter-spacing: -.005em;
+}
+.assist-surface .diag-section > h2::before {
+  content: ""; flex: none; width: 4px; height: 15px; border-radius: 2px;
+  background: color-mix(in srgb, var(--brand) 70%, transparent);
+}
+.assist-surface .diag-table { width: 100%; border-collapse: collapse; }
+.assist-surface .diag-table td, .assist-surface .diag-table th { padding: 7px 14px 7px 0; }
+.assist-surface .diag-table tbody tr + tr td {
+  border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+}
+.assist-surface .diag-note { font-size: 12.5px; line-height: 1.6; }
+.assist-surface .gate-chip { padding: 2px 8px; border-radius: 7px; }

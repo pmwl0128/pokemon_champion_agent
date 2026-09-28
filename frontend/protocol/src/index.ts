@@ -16,3 +16,4 @@ export * from "./session.ts";
 export * from "./llm.ts";
 export * from "./diagnose.ts";
 export * from "./assets.ts";
+export * from "./team.ts";

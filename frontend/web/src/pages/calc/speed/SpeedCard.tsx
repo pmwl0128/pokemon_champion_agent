@@ -13,12 +13,14 @@ import { localName, useNameMaps } from "../../../lib/names.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import {
-  BuildPickerButton, ItemCombo, STATUSES, boostLabel, buildConfigSig, clampNum, megaFor, natureLabel,
+  BuildPickerButton, ItemCombo, NatureOptions, STATUSES, boostLabel, buildConfigSig, clampNum, megaFor,
   spSumClass,
-} from "../shared.tsx";
+} from "../../../components/build/inputs.tsx";
+import { useMetaUsage } from "../../../lib/metaUsage.ts";
 import { MonNameRow, MonPortrait } from "../duel/MonEditor.tsx";
-import { applyBuildOption, effectiveEntry, makeMon, type MonState } from "../duel/state.ts";
-import { SpSlider, StageSelect } from "../tune/MonCards.tsx";
+import { applyBuildOption, effectiveEntry, makeMon, monToMember, type MonState } from "../duel/state.ts";
+import { SpSlider, StageSelect, spreadChanged } from "../tune/MonCards.tsx";
+import { cloneSps, type Baseline } from "../tune/model.ts";
 import {
   SCARF, SP_BUDGET, SP_MAX, TIER_KEYS, applyTier, natureDir, spTotal, tierOf, type Offense, type Tier,
 } from "./lens.ts";
@@ -69,7 +71,7 @@ function useSpeedChain(input: SpeedInputDto | null, result: SpeedlineDto | null,
 }
 
 export function SpeedCard({
-  label, mon, setMon, pickerKey, dex, natures, items, format, offense, input, result, scarf,
+  label, mon, setMon, pickerKey, dex, natures, items, format, offense, input, result, scarf, baseline,
 }: {
   /** The side's name, for screen readers: the strip above already shows which card is whose. */
   label: string;
@@ -84,6 +86,8 @@ export function SpeedCard({
   input: SpeedInputDto | null;
   result: SpeedlineDto | null;
   scarf: { on: boolean; blocked: string | null; toggle: () => void };
+  /** The spread this Pokémon arrived with, what 还原 puts back (shared with the durability tool). */
+  baseline: Baseline;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -91,6 +95,7 @@ export function SpeedCard({
   const mega = literal?.isMega ? literal : megaFor(mon.slug, mon.item, dex, items);
   const entry = effectiveEntry(mon, dex, items);
   const requiredStone = mega ? items.find((i) => i.requiredBy?.includes(mega.name)) : undefined;
+  const usage = useMetaUsage(mon.slug, [format]);
   const chain = useSpeedChain(input, result, items);
   const total = spTotal(mon.sps);
   const over = total - SP_BUDGET;
@@ -110,13 +115,11 @@ export function SpeedCard({
   // stone, and the ability select describes the form the engine will calculate.
   useEffect(() => {
     if (requiredStone && mon.item !== requiredStone.name) setMon((s) => ({ ...s, item: requiredStone.name }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requiredStone?.name, mon.slug]);
   useEffect(() => {
     if (mega && !mega.abilities.some((a) => a.name === mon.ability)) {
       setMon((s) => ({ ...s, ability: mega.abilities[0]?.name ?? "" }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mega?.slug, mon.item]);
 
   /** Give an over-budget build back its excess from bulk (HP, Defense, Sp. Def) — only on request:
@@ -136,12 +139,20 @@ export function SpeedCard({
   return (
     <section className="panel mon-editor spd-card" aria-label={label}>
       <div className="mon-id">
-        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} />
+        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""}
+          member={() => monToMember(mon, dex)} />
         <MonNameRow slug={mon.slug} item={mon.item} dex={dex} items={items} pickerKey={pickerKey}
           actions={(
-            <BuildPickerButton slug={mon.slug} format={format}
-              currentKey={mon.buildRef?.signature === buildConfigSig(mon) ? mon.buildRef.key : undefined}
-              onPick={(option, index) => setMon((s) => applyBuildOption(s, option, index))} />
+            <>
+              <BuildPickerButton slug={mon.slug} format={format}
+                currentKey={mon.buildRef?.signature === buildConfigSig(mon) ? mon.buildRef.key : undefined}
+                onPick={(option, index) => setMon((s) => applyBuildOption(s, option, index))} />
+              <button type="button" className="ghost-btn tiny" disabled={!spreadChanged(mon, baseline)}
+                title={t("tune.ws.restoreHint")}
+                onClick={() => setMon((s) => ({ ...s, sps: cloneSps(baseline.sps), nature: baseline.nature }))}>
+                {t("tune.ws.restore")}
+              </button>
+            </>
           )}
           onSpecies={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))}
           onForme={(slug, dropStone) => setMon((s) => ({ ...s, slug, ...(dropStone ? { item: "" } : {}) }))} />
@@ -159,12 +170,11 @@ export function SpeedCard({
         </label>
         <label>{t("calc.nature")}
           <select value={mon.nature} onChange={(e) => setMon((s) => ({ ...s, nature: e.target.value }))}>
-            <option value="">—</option>
-            {natures.map((n) => <option key={n.name} value={n.name}>{natureLabel(n, lang)}</option>)}
+            <NatureOptions natures={natures} usage={usage} />
           </select>
         </label>
         <label>{t("calc.item")}
-          <ItemCombo idKey={pickerKey} value={mon.item} items={items} disabled={!!requiredStone}
+          <ItemCombo idKey={pickerKey} value={mon.item} items={items} disabled={!!requiredStone} usage={usage}
             onChange={(item) => setMon((s) => ({ ...s, item }))} />
         </label>
         <label>{t("calc.status")}

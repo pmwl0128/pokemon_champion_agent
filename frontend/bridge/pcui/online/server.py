@@ -26,11 +26,12 @@ from fastapi.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
 
 from . import builder, qa
+from .access_log import AccessLog
 from .jobs import JobStore
 from .limits import BudgetExhausted, OnlineLimits, RateLimited
 from .provider import LlmProvider, LlmUnavailable
-from .tester_keys import (AccessDenied, DeviceMismatch, TesterBudgetExhausted,
-                          TesterKeyStore, TesterReservation)
+from .tester_keys import (TOKEN_RE, AccessDenied, DeviceMismatch, TesterBudgetExhausted,
+                          TesterKeyStore, TesterReservation, device_tag)
 from ..openapi import install_openapi
 from ..team_matchup import MatchupInputError, run_actual_matchup
 from ..team_tune import TuneInputError, run_team_tune
@@ -52,11 +53,22 @@ STREAM_HEARTBEAT = 5.0
 PROGRESS_EVENT = '{"type":"progress"}\n'
 DIAGNOSE_TOP_K = 30             # independent live battery scope; team skill permits 1..60
 MATCHUP_QUEUE_WAIT = 20.0        # deterministic lane: bounded wait, never consumes model quota
-MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 12x60 costs 24 units
+MATCHUP_WORK_UNIT_PAIRS = 30     # ceil(member_count * top_k / 30); max 6x60 costs 12 units
 TUNE_QUEUE_WAIT = 20.0           # shares the heavy deterministic lane with actual matchup
 _DEPLOYMENT_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{2,80}\Z")
 _ACCESS_PATHS = frozenset(("/api/qa", "/api/builder", "/api/team/diagnose",
                            "/api/team/matchup", "/api/team/tune", "/api/quota"))
+# What the access log records: the metered entry points. The quota read every page load makes is
+# not a use of anything, and logging it would bury the uses.
+_LOGGED_PATHS = _ACCESS_PATHS - {"/api/quota"}
+
+
+def _error_code(detail) -> str | None:
+    """The `error.code` of an HTTPException detail built by `_err`, if it is one."""
+    if isinstance(detail, dict) and isinstance(detail.get("error"), dict):
+        code = detail["error"].get("code")
+        return code if isinstance(code, str) else None
+    return None
 
 
 def _err(code: str, message: str) -> dict:
@@ -94,6 +106,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                       dev_key: str | None = None,
                       smoke_key: str | None = None,
                       tester_keys: TesterKeyStore | None = None,
+                      access_log: AccessLog | None = None,
                       unmetered: bool = False,
                       jobs: JobStore | None = None) -> FastAPI:
     app = FastAPI(title="pcui online", docs_url=None, redoc_url=None, openapi_url=None)
@@ -161,16 +174,20 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             _push(str(event.get("type") or "progress"), event)
 
         async def worker() -> None:
+            # The HTTP status of a stream is always 200; the access log reads the real ending here.
             try:
                 result = await run(emit)
             except HTTPException as exc:
+                request.state.outcome = (exc.status_code, _error_code(exc.detail))
                 _push("error", {"type": "error", "status": exc.status_code,
                                 "detail": exc.detail})
             except Exception:
                 traceback.print_exc()   # the client gets a code, the operator gets the cause
+                request.state.outcome = (500, "bad_input")
                 _push("error", {"type": "error", "status": 500,
                                 "detail": _err("bad_input", "request failed")})
             else:
+                request.state.outcome = (200, None)
                 _push("done", {"type": "done", "result": result})
 
         task = asyncio.create_task(worker())
@@ -239,7 +256,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             return None
         if tester_keys is None:  # middleware cannot create a tester grant without the store
             raise AccessDenied("tester key store unavailable")
-        return tester_keys.reserve(request.state.tester_key_id, amount)
+        return tester_keys.reserve(request.state.tester_key_id, amount, request.url.path)
 
     def _settle_authorized(reservation: TesterReservation | None, tokens: int) -> None:
         if reservation is not None and tester_keys is not None:
@@ -279,9 +296,37 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         # ids (only the IP key would bind).
         new_cookie = None
         request.state.access_kind = "visitor"
+        started = time.monotonic()
+        logged = access_log is not None and request.url.path in _LOGGED_PATHS
+        device = network = None
+
+        def log(status: int, code: str | None = None, key_id: str | None = None) -> None:
+            if not logged:
+                return
+            try:
+                access_log.record(
+                    access=request.state.access_kind, route=request.url.path,
+                    method=request.method, status=status, code=code,
+                    key_id=key_id or getattr(request.state, "tester_key_id", None),
+                    device=device, network=network,
+                    duration_ms=int((time.monotonic() - started) * 1000))
+            except Exception:   # the log is for review; it must never fail the request
+                traceback.print_exc()
+
+        def refused(status: int, code: str, message: str, key_id: str | None = None) -> Response:
+            response = Response(status_code=status, media_type="application/json",
+                                content=json.dumps({"detail": _err(code, message)}))
+            if new_cookie:
+                _set_cookie(response, new_cookie)
+            log(status, code, key_id)
+            return response
+
         if request.url.path in _ACCESS_PATHS:
             device_id, new_cookie = limits.device_cookie(request.cookies.get(QA_COOKIE))
             request.state.device_id = device_id
+            device = device_tag(device_id)
+            client_ip = request.client.host if request.client else "unknown"
+            network = limits.ip_hash(client_ip)[:12]
             supplied = {
                 "dev": request.headers.get("x-pcui-dev-key", ""),
                 "tester": request.headers.get("x-pcui-tester-key", ""),
@@ -289,14 +334,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             }
             present = [(kind, value) for kind, value in supplied.items() if value]
             if len(present) > 1:
-                response = Response(
-                    status_code=400, media_type="application/json",
-                    content=json.dumps({"detail": _err(
-                        "ambiguous_access", "multiple access keys supplied")}),
-                )
-                if new_cookie:
-                    _set_cookie(response, new_cookie)
-                return response
+                return refused(400, "ambiguous_access", "multiple access keys supplied")
             if present:
                 kind, value = present[0]
                 try:
@@ -306,32 +344,36 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                     elif kind == "tester":
                         if tester_keys is None:
                             raise AccessDenied("tester key store unavailable")
-                        grant = tester_keys.authenticate_tester(value, device_id)
+                        grant = tester_keys.authenticate_tester(value, device_id, network)
                         request.state.tester_key_id = grant.key_id
                     elif not smoke_key or not hmac.compare_digest(value, smoke_key):
                         raise AccessDenied("invalid smoke key")
-                except DeviceMismatch:
-                    response = Response(
-                        status_code=403, media_type="application/json",
-                        content=json.dumps({"detail": _err(
-                            "device_mismatch", "access key is bound to another device")}),
-                    )
-                    if new_cookie:
-                        _set_cookie(response, new_cookie)
-                    return response
-                except AccessDenied:
-                    response = Response(
-                        status_code=401, media_type="application/json",
-                        content=json.dumps({"detail": _err(
-                            "invalid_access_key", "access key is invalid")}),
-                    )
-                    if new_cookie:
-                        _set_cookie(response, new_cookie)
-                    return response
+                except (DeviceMismatch, AccessDenied) as exc:
+                    # A refused key is logged against the id it names, as the visitor it still is.
+                    named = TOKEN_RE.fullmatch(value) if kind == "tester" else None
+                    key_id = named.group(1) if named else None
+                    if isinstance(exc, DeviceMismatch):
+                        return refused(403, "device_mismatch",
+                                       "access key is bound to another device", key_id)
+                    return refused(401, "invalid_access_key", "access key is invalid", key_id)
                 request.state.access_kind = kind
         response = await call_next(request)
         if new_cookie:
             _set_cookie(response, new_cookie)
+        if logged:
+            # Logged when the body has been sent, not when it starts: a streamed answer's ending
+            # and its real duration are known only then.
+            body = response.body_iterator
+
+            async def logged_body():
+                try:
+                    async for chunk in body:
+                        yield chunk
+                finally:
+                    status, code = getattr(request.state, "outcome", (response.status_code, None))
+                    log(status, code)
+
+            response.body_iterator = logged_body()
         return response
 
     @app.get("/api/health")
@@ -386,7 +428,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
         if unmetered or _authorized(request):
             empty = {"used": 0, "limit": 0}
             return {"qa": empty, "diagnose": empty, "builder": empty, "matchup": empty,
-                    "tune": empty}
+                    "tune": empty, "access": "authorized"}
         device_id = getattr(request.state, "device_id", None) or limits.device_cookie(None)[0]
         client_ip = request.client.host if request.client else "unknown"
         return {
@@ -399,6 +441,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                                    limits.cfg.matchup_daily_limit),
             "tune": _quota_for(device_id, client_ip, "ud", "ui",
                                 limits.cfg.tune_daily_limit),
+            "access": "visitor",
         }
 
     async def _execute_qa(request: Request, body: dict):
@@ -429,9 +472,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             try:
                 tester_reservation = _reserve_authorized(
                     request, limits.cfg.pessimistic_tokens)
-            except TesterBudgetExhausted:
-                raise HTTPException(503, _err(
-                    "tester_budget_exhausted", "tester daily model budget exhausted"))
+            except TesterBudgetExhausted as exc:
+                raise HTTPException(503, _err("tester_budget_exhausted", str(exc)))
             except AccessDenied:
                 raise HTTPException(401, _err("invalid_access_key", "access key was removed"))
         else:
@@ -637,12 +679,13 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             await on_report(report)
 
         # Optional reading uses the diagnosis allowance, never the separate Q&A allowance.
+        explain_reservation = (limits.cfg.diagnose_thinking_pessimistic_tokens if thinking
+                               else limits.cfg.pessimistic_tokens)
         if want_explain and selected_provider is not None:
             if bypass_limits:
                 tester_reservation: TesterReservation | None = None
                 try:
-                    tester_reservation = _reserve_authorized(
-                        request, limits.cfg.pessimistic_tokens)
+                    tester_reservation = _reserve_authorized(request, explain_reservation)
                     async with qa_slots:
                         explanation, tokens = await _in(
                             llm_pool, qa.explain_diagnose, selected_provider, report, lang)
@@ -658,7 +701,7 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                 return report
             try:
                 try:
-                    budget_day = limits.reserve_budget()
+                    budget_day = limits.reserve_budget(explain_reservation)
                 except BudgetExhausted:
                     raise
                 async with qa_slots:
@@ -666,9 +709,10 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
                         explanation, tokens = await _in(
                             llm_pool, qa.explain_diagnose, selected_provider, report, lang)
                     except Exception as e:
-                        limits.settle_budget(getattr(e, "tokens", 0), budget_day)
+                        limits.settle_budget(getattr(e, "tokens", 0), budget_day,
+                                             explain_reservation)
                         raise
-                limits.settle_budget(tokens, budget_day)
+                limits.settle_budget(tokens, budget_day, explain_reservation)
                 report["explanation"] = explanation
             except BudgetExhausted:
                 report["explanationError"] = "budget_exhausted"
@@ -882,9 +926,8 @@ def create_online_app(pool, provider: LlmProvider | None, limits: OnlineLimits, 
             used, limit = 0, 0
             try:
                 tester_reservation = _reserve_authorized(request, pess)
-            except TesterBudgetExhausted:
-                raise HTTPException(503, _err(
-                    "tester_budget_exhausted", "tester daily model budget exhausted"))
+            except TesterBudgetExhausted as exc:
+                raise HTTPException(503, _err("tester_budget_exhausted", str(exc)))
             except AccessDenied:
                 raise HTTPException(401, _err("invalid_access_key", "access key was removed"))
         else:

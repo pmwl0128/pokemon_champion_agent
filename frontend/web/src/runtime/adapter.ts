@@ -77,7 +77,7 @@ export interface RuntimeAdapter {
   resolve(names: string[], kind?: string): Promise<ResolveEntryDto[]>;
   damage(req: DamageRequestDto): Promise<DamageResultDto>;
   /** One attacker's moves × several defenders in a single fault-isolated batch (calc runtime only). */
-  damageBatch(items: DamageRequestDto[]): Promise<DamageBatchResultDto>;
+  damageBatch(items: DamageRequestDto[], options?: { lane?: "interactive" | "inference" }): Promise<DamageBatchResultDto>;
   /** A speed ladder (my mon + opponents) in one fault-isolated batch (calc runtime only). */
   speedBatch(items: SpeedInputDto[]): Promise<SpeedBatchResultDto>;
   /** Opponent standard-set KO matrix (team.matchup). Shipped STATIC cache — served by the bridge live

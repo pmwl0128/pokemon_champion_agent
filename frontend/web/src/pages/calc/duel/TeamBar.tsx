@@ -11,23 +11,26 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useT, type MsgKey } from "../../../i18n.ts";
+import { useLibraryDrop, useLibraryWorkspace } from "../../../lib/library/workspace.tsx";
+import { copyText } from "../../../lib/download.ts";
+import { formatPokepasteMon } from "../../../lib/pokepaste.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import { MonAvatar } from "./MonEditor.tsx";
-import { roveFocus, useFocusOnOpen, usePopover } from "./popover.ts";
-import { SIDE_FLAGS, type FieldState, type MonState, type SideId } from "./state.ts";
+import { roveFocus, useFocusOnOpen, usePopover } from "../../../lib/popover.ts";
+import { SIDE_FLAGS, effectiveEntry, type FieldState, type MonState, type SideId } from "./state.ts";
 
 /** Gap between condition chips; mirrors `.team-conds { gap }`. */
 const COND_GAP = 5;
 
-/** How many chips of a one-line row fit beside its trailing button, measured rather than guessed:
- * label length varies threefold across languages, and a fixed cap either wastes the row or pushes
- * the "+N" button — the only way to the rest — past the clipped edge.
+/** How many chips of a one-line row fit, measured rather than guessed: label length varies
+ * threefold across languages, and a fixed cap either wastes the row or pushes the "+N" chip — the
+ * only way to the rest — past the clipped edge.
  *
  * Every chip stays rendered (the overflow ones out of flow and invisible) so each can be measured,
- * and both faces of the button are measured from hidden twins. The answer depends only on those
- * widths, never on the face currently shown, so it cannot oscillate: when everything does not fit
- * beside "+ 状态", at least one chip folds and the narrower "+N" face is the one reserved for. */
+ * and the "+N" chip is measured from a hidden twin. The answer depends only on those widths, never
+ * on whether "+N" is currently shown, so it cannot oscillate: when the chips do not all fit, at
+ * least one folds and room is kept for "+N". */
 function useChipFit(row: { current: HTMLElement | null }, signature: string) {
   const [fit, setFit] = useState(Number.POSITIVE_INFINITY);
   const [width, setWidth] = useState(0);
@@ -46,9 +49,9 @@ function useChipFit(row: { current: HTMLElement | null }, signature: string) {
     const face = (kind: string) => node.querySelector<HTMLElement>(`[data-measure="${kind}"]`)
       ?.offsetWidth ?? 0;
     const room = node.clientWidth;
-    const all = chips.reduce((sum, w) => sum + w + COND_GAP, 0);
+    const all = chips.reduce((sum, w) => sum + w + COND_GAP, 0) - COND_GAP;
     let next = chips.length;
-    if (all + face("full") > room) {
+    if (all > room) {
       const count = face("count");
       next = 0;
       let used = 0;
@@ -70,7 +73,19 @@ export interface ImportOutcome {
   rescaledEvs: boolean;
 }
 
-export const TEAM_MAX = 6;
+import { TEAM_SIZE as TEAM_MAX } from "../../../lib/battle.ts";
+export { TEAM_SIZE as TEAM_MAX } from "../../../lib/battle.ts";
+
+/** A roster Pokémon as a Showdown block, in English canonicals: the block is read by other tools,
+ * so it is a join-key document, not a display (design §2.1). Null for a slot with no species. */
+function pasteOf(mon: MonState, dex: DexIndexEntry[], items: ItemRef[]): string | null {
+  const entry = effectiveEntry(mon, dex, items);
+  if (!entry) return null;
+  return formatPokepasteMon({
+    species: entry.name, item: mon.item, ability: mon.ability, nature: mon.nature,
+    sps: mon.sps, moves: mon.moves.filter(Boolean),
+  });
+}
 
 export function Caret() {
   return (
@@ -106,7 +121,7 @@ export function DuelBar({ field, children }: { field: FieldState; children: Reac
 export function TeamBar({
   label, teamLabel, team, index, onIndex, onAdd, onRemove, onReset,
   field, setField, side, allowedFlags, flagNote, lockedNote, inlineFlags = false,
-  dex, items, onImport, mirrored = false,
+  dex, items, onImport, mirrored = false, librarySide,
 }: {
   /** Short side name shown on the strip (我方 / 对方). */
   label: string;
@@ -137,8 +152,12 @@ export function TeamBar({
   /** Right-hand wing: the name, the roster and the conditions all pack toward the page edge, so the
    * two sides read as facing each other rather than as one list repeated twice. */
   mirrored?: boolean;
+  /** The roster side a team or Pokémon dropped from the library lands on (calc/LibraryTransfers.tsx). */
+  librarySide?: SideId;
 }) {
   const t = useT();
+  const drop = useLibraryDrop(librarySide ? [`calc-team-${librarySide}`, `calc-mon-${librarySide}`] : []);
+  const { requestSave } = useLibraryWorkspace("requestSave");
   const menu = usePopover();
   const paste = usePopover(menu.trigger);
   const conds = usePopover();
@@ -149,6 +168,21 @@ export function TeamBar({
 
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  // Which menu row just copied: it says so for a moment, then the menu closes by itself.
+  const [copied, setCopied] = useState<"mon" | "team" | null>(null);
+  const copy = async (which: "mon" | "team") => {
+    const blocks = (which === "mon" ? [team[index]] : team)
+      .flatMap((mon) => (mon ? pasteOf(mon, dex, items) ?? [] : []));
+    if (!blocks.length || !(await copyText(blocks.join("\n\n")))) return;
+    setCopied(which);
+    window.setTimeout(() => {
+      setCopied(null);
+      menu.setOpen(false);
+      menu.trigger.current?.focus();
+    }, 900);
+  };
+  const activeNamed = !!team[index]?.slug;
+  const anyNamed = team.some((mon) => !!mon.slug);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const run = async () => {
     setBusy(true);
@@ -184,7 +218,7 @@ export function TeamBar({
     const mon = team[i];
     if (mon) {
       return <MonAvatar key={mon.uid || i} mon={mon} dex={dex} items={items} active={i === index}
-        onClick={() => onIndex(i)} onRemove={team.length > 1 ? () => onRemove(i) : undefined} />;
+        onClick={() => onIndex(i)} onRemove={() => onRemove(i)} />;
     }
     if (i === team.length) {
       return (
@@ -198,7 +232,7 @@ export function TeamBar({
   });
 
   return (
-    <div className={`team-bar${mirrored ? " mirrored" : ""}`}>
+    <div className={`team-bar${mirrored ? " mirrored" : ""}`} {...drop}>
       <div className="team-who" ref={menu.wrap} onBlur={menu.onBlur}>
         <button ref={menu.trigger} type="button"
           className={`team-who-btn${menu.open ? " open" : ""}`}
@@ -215,6 +249,21 @@ export function TeamBar({
               onClick={() => { menu.setOpen(false); setOutcome(null); paste.setOpen(true); }}>
               {t("calc.importPaste")}…
             </button>
+            <button type="button" role="menuitem" className="duel-menu-row" disabled={!activeNamed}
+              onClick={() => void copy("mon")}>
+              {copied === "mon" ? t("calc.copied") : t("calc.copyActive")}
+            </button>
+            <button type="button" role="menuitem" className="duel-menu-row" disabled={!anyNamed}
+              onClick={() => void copy("team")}>
+              {copied === "team" ? t("calc.copied") : t("calc.exportTeam")}
+            </button>
+            {librarySide && (
+              // The side as a team in the reader's library: the dock opens on its save dialog.
+              <button type="button" role="menuitem" className="duel-menu-row" disabled={!anyNamed}
+                onClick={() => { menu.setOpen(false); requestSave(`calc-keep-${librarySide}`); }}>
+                {t("calc.saveTeam")}…
+              </button>
+            )}
             <div className="duel-menu-sep" role="separator" />
             <button type="button" role="menuitem" className="duel-menu-row danger"
               onClick={() => { menu.setOpen(false); onReset(); menu.trigger.current?.focus(); }}>
@@ -242,6 +291,16 @@ export function TeamBar({
         </div>
       ) : (
         <div className="team-conds-zone" ref={conds.wrap} onBlur={conds.onBlur}>
+          {/* The button keeps one place, under the side's name at the outer edge, however many
+              conditions are on; the switched-on ones line up under the roster they affect. */}
+          {offered.length > 0 && (
+            <button ref={conds.trigger} type="button"
+              className={`duel-cond-add team-cond-btn${conds.open ? " open" : ""}`}
+              aria-expanded={conds.open} title={condsTitle} aria-label={condsTitle}
+              onClick={conds.toggle}>
+              <PlusGlyph />{t("calc.condAdd")}
+            </button>
+          )}
           <div ref={condRow} className="team-conds" aria-label={condsTitle}>
             {active.map(({ flag, muted }, at) => {
               const name = flagName(flag);
@@ -258,27 +317,21 @@ export function TeamBar({
                 </button>
               );
             })}
-            {offered.length > 0 ? (
-              <button ref={conds.trigger} type="button"
-                className={`duel-cond-add${conds.open ? " open" : ""}${hidden ? " more" : ""}`}
-                aria-expanded={conds.open} title={hidden ? moreLabel : condsTitle}
-                aria-label={hidden ? moreLabel : condsTitle} onClick={conds.toggle}>
-                {hidden ? <span className="num">+{hidden}</span>
-                  : <><PlusGlyph />{t("calc.condAdd")}</>}
+            {hidden > 0 && (
+              <button type="button" className={`duel-cond-add more${conds.open ? " open" : ""}`}
+                aria-expanded={conds.open} title={moreLabel} aria-label={moreLabel}
+                onClick={conds.toggle}>
+                <span className="num">+{hidden}</span>
               </button>
-            ) : lockedNote ? (
+            )}
+            {offered.length === 0 && lockedNote && (
               <span className="duel-cond-lock" title={lockedNote}>{lockedNote}</span>
-            ) : null}
+            )}
             {offered.length > 0 && (
-              // Both faces of the button, measured by useChipFit; never seen, never focused.
-              <>
-                <span className="duel-cond-add spill" data-measure="full" aria-hidden>
-                  <PlusGlyph />{t("calc.condAdd")}
-                </span>
-                <span className="duel-cond-add more spill" data-measure="count" aria-hidden>
-                  <span className="num">+{Math.max(9, active.length)}</span>
-                </span>
-              </>
+              // The "+N" chip's widest face, measured by useChipFit; never seen, never focused.
+              <span className="duel-cond-add more spill" data-measure="count" aria-hidden>
+                <span className="num">+{Math.max(9, active.length)}</span>
+              </span>
             )}
           </div>
           {conds.open && (

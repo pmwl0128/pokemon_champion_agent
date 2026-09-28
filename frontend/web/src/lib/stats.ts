@@ -2,10 +2,9 @@
  * added DIRECTLY, capped at 32 per stat — NOT the mainline EV/4 term. This matches the calc
  * engine (ncp stat_data.js CALC_*_CHAMP); the displayed range is 0 SP up to 32 SP with a
  * boosting nature. */
-import type { StatKey, Stats } from "@pokemon-champions/protocol";
+import type { StatKey, NatureDto } from "@pokemon-champions/protocol";
 
 const LEVEL = 50;
-const SP_MAX = 32;   // Champions per-stat SP cap (66 across the spread)
 
 function hpAt(base: number, sp: number): number {
   if (base === 1) return 1;   // base-1 HP (Shedinja) is always exactly 1
@@ -31,19 +30,7 @@ export function boostMult(stage: number): number {
   return s >= 0 ? (2 + s) / 2 : 2 / (2 - s);
 }
 
-export interface StatRangeRow {
-  key: StatKey;
-  base: number;
-  min: number;      // 0 SP, neutral nature (HP: no nature)
-  max: number;      // 32 SP, boosting nature (HP: no nature)
-}
-
-export function statRanges(stats: Stats): StatRangeRow[] {
-  return (Object.keys(stats) as StatKey[]).map((key) => {
-    const base = stats[key];
-    if (key === "hp") {
-      return { key, base, min: hpAt(base, 0), max: hpAt(base, SP_MAX) };
-    }
-    return { key, base, min: statAt(base, 0, 1), max: statAt(base, SP_MAX, 1.1) };
-  });
+export function natureMultiplier(nature: Pick<NatureDto, "upStat" | "downStat"> | undefined, key: StatKey): 0.9 | 1 | 1.1 {
+  if (key === "hp" || !nature || nature.upStat === nature.downStat) return 1;
+  return nature.upStat === key ? 1.1 : nature.downStat === key ? 0.9 : 1;
 }

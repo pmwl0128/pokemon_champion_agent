@@ -27,12 +27,16 @@ const CATEGORY_LABELS: Record<string, { zh: string; en: string; ja: string }> = 
   Status: { zh: "变化", en: "Status", ja: "へんか" },
 };
 
-import { useLang } from "../i18n.ts";
+import { useLang, type Lang } from "../i18n.ts";
+
+export function typeLabel(type: string, lang: Lang): string {
+  return TYPE_LABELS[type]?.[lang] ?? type;
+}
 
 export function TypeBadge({ type, iconOnly = false }: { type: string; iconOnly?: boolean }) {
   const { lang } = useLang();
   const url = typeIconUrl(type);
-  const label = TYPE_LABELS[type]?.[lang] ?? type;
+  const label = typeLabel(type, lang);
   return (
     <span className={`type-badge${iconOnly ? " icon-only" : ""}`} title={label}>
       {url && <img src={url} alt={label} />}

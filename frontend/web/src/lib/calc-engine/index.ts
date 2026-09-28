@@ -1,49 +1,46 @@
 /** Main-thread client for the calc-engine worker (frontend/design.md §7.1).
  *
- * Lazily spins up ONE worker on first use (its ~840KB engine chunk loads only when the calc page
+ * Lazily spins up a worker per lane (interactive / inference; the engine chunk loads only when the calc page
  * actually computes), pairs requests to replies by id, and maps the vendored wrapper's raw output to
  * the Web DTO shapes — the browser twin of the bridge's mappers.map_damage / map_speedline, so the
  * OnlineAdapter returns byte-identical DTOs to what `pcui serve` would. */
 
-let worker: Worker | null = null;
+export type EngineLane = "interactive" | "inference";
+interface EngineReply { output: unknown; exit: number }
+interface Client {
+  worker: Worker;
+  pending: Map<number, { resolve: (value: EngineReply) => void; reject: (error: Error) => void }>;
+}
+const clients = new Map<EngineLane, Client>();
 let seq = 0;
-const pending = new Map<number, { resolve: (v: EngineReply) => void; reject: (e: Error) => void }>();
-
-interface EngineReply {
-  output: unknown;
-  exit: number;
-}
-
-function ensureWorker(): Worker {
-  if (worker) return worker;
-  const w = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-  w.onmessage = (e: MessageEvent<{ id: number; result?: EngineReply; error?: string }>) => {
-    const { id, result, error } = e.data;
-    const p = pending.get(id);
-    if (!p) return;
-    pending.delete(id);
-    if (error !== undefined) p.reject(new Error(error));
-    else p.resolve(result as EngineReply);
+function ensureClient(lane: EngineLane): Client {
+  const existing = clients.get(lane);
+  if (existing) return existing;
+  const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+  const client: Client = { worker, pending: new Map() };
+  worker.onmessage = (event: MessageEvent<{ id: number; result?: EngineReply; error?: string }>) => {
+    const { id, result, error } = event.data;
+    const request = client.pending.get(id);
+    if (!request) return;
+    client.pending.delete(id);
+    if (error !== undefined) request.reject(new Error(error));
+    else request.resolve(result!);
   };
-  // A worker-level failure (parse/eval blowup) rejects everything in flight rather than hanging the
-  // page forever; the next call re-creates the worker so a transient failure isn't terminal.
-  w.onerror = (e) => {
-    const err = new Error(`calc-engine worker error: ${e.message}`);
-    for (const [, p] of pending) p.reject(err);
-    pending.clear();
-    worker = null;
+  worker.onerror = (event) => {
+    for (const request of client.pending.values()) request.reject(new Error(event.message));
+    client.pending.clear();
+    worker.terminate();
+    clients.delete(lane);
   };
-  worker = w;
-  return w;
+  clients.set(lane, client);
+  return client;
 }
-
-function call(engine: "calc" | "speed", command: string, input: unknown, kind?: string): Promise<EngineReply> {
-  const w = ensureWorker();
-  const id = ++seq;
-  const inputJson = JSON.stringify(input);
-  return new Promise<EngineReply>((resolve, reject) => {
-    pending.set(id, { resolve, reject });
-    w.postMessage({ id, engine, command, inputJson, kind });
+function call(engine: "calc" | "speed", command: string, input: unknown, kind?: string,
+  lane: EngineLane = "interactive"): Promise<EngineReply> {
+  const client = ensureClient(lane), id = ++seq;
+  return new Promise((resolve, reject) => {
+    client.pending.set(id, { resolve, reject });
+    client.worker.postMessage({ id, engine, command, inputJson: JSON.stringify(input), kind });
   });
 }
 
@@ -115,8 +112,8 @@ export async function engineDamage(req: unknown): Promise<Record<string, unknown
 /** Batch calc. The wrapper's `batch` command is input.map(), so results align 1:1 with items and a
  * bad cell is an error object in place — never a dropped/shifted slot. Each cell is passed through
  * (error shape) or mapped (success). */
-export async function engineDamageBatch(items: unknown[]): Promise<unknown[]> {
-  const { output } = await call("calc", "batch", items);
+export async function engineDamageBatch(items: unknown[], lane: EngineLane = "interactive"): Promise<unknown[]> {
+  const { output } = await call("calc", "batch", items, undefined, lane);
   if (!Array.isArray(output)) throw new Error("calc batch produced a non-array");
   return output.map((r) => (isErr(r) ? r : mapDamage(r)));
 }

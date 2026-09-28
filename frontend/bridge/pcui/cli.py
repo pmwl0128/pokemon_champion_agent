@@ -159,6 +159,7 @@ def cmd_online_serve(ns) -> int:
                                   EchoProvider, FallbackProvider, OpenAIChatConfig,
                                   OpenAICompatibleProvider)
     from .online.server import create_online_app
+    from .online.access_log import AccessLog
     from .online.tester_keys import TesterKeyStore
     from .worker import WorkerPool
 
@@ -222,6 +223,7 @@ def cmd_online_serve(ns) -> int:
     dev_key = os.environ.get("PCUI_DEV_KEY") or None
     smoke_key = os.environ.get("PCUI_SMOKE_KEY") or None
     tester_keys = TesterKeyStore(data_dir() / "tester-keys.db")
+    access_log = AccessLog(data_dir() / "access-log.db")
     pool = WorkerPool()
     app = create_online_app(
         pool, provider, limits, thinking_provider=thinking_provider,
@@ -234,6 +236,7 @@ def cmd_online_serve(ns) -> int:
         dev_key=dev_key,
         smoke_key=smoke_key,
         tester_keys=tester_keys,
+        access_log=access_log,
         unmetered=unmetered,
         # web_jobs (§7.3): transient builder-job rows share online.db — same retention
         # discipline as the limits tables, swept on traffic.

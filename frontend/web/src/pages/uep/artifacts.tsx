@@ -10,8 +10,8 @@ import type { TuneCardDto } from "@pokemon-champions/protocol";
 import { TypeBadge } from "../../components/TypeBadge.tsx";
 import { optionalKey, useLang, useT } from "../../i18n.ts";
 import { TuneCard } from "../calc/TuneCard.tsx";
-import { MonRow } from "./MonChip.tsx";
-import { readTeamMembers, useDexByName, type TeamMemberish } from "./TeamCard.tsx";
+import { MonRow } from "../../components/team/MonChip.tsx";
+import { readTeamMembers, useDexByName, type TeamMemberish } from "../../components/team/TeamCard.tsx";
 
 const obj = (v: unknown): Record<string, unknown> | null =>
   v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -320,7 +320,6 @@ function CheckpointCard({ d }: { d: Record<string, unknown> }) {
 
 // -- draft (the structured answer: recommended teams at a glance) -----------------------------
 function DraftCard({ d }: { d: Record<string, unknown> }) {
-  const t = useT();
   const { lang } = useLang();
   const dex = useDexByName();
   const recommended = arr(d.recommended).map(obj).filter(Boolean) as Record<string, unknown>[];

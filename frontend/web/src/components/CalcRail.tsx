@@ -4,7 +4,7 @@
  * only that row's environment builds are fetched and rendered. This keeps the rail cheap while the
  * calculator is busy: typing touches this component tree, not any damage/speed/tune input state. */
 import type { FormatId } from "@pokemon-champions/protocol";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import { BuildSetSummary } from "./BuildPicker.tsx";
 import {
   DexRail, pokemonMatches, type DexFilters,
@@ -13,27 +13,31 @@ import type { RailState } from "./SideRail.tsx";
 import { useLearners } from "../hooks.ts";
 import { displayName, useLang, useT } from "../i18n.ts";
 import type { DexIndexEntry } from "../runtime/adapter.ts";
-import { useBuildOptions, type BuildOption } from "../pages/calc/shared.tsx";
+import { useBuildOptions, type BuildOption } from "./build/inputs.tsx";
 
-export type CalcRailTab = "damage" | "speed" | "tune" | "actual";
+export type CalcRailTab = "damage" | "speed" | "tune" | "infer" | "actual" | "teams";
 export type CalcRailTarget = "primary" | "secondary";
 
 export interface CalcRailPickResult {
   ok: boolean;
   reason?: "full";
+  /** The page's own words for what happened, in place of the calculator's "added to {side}". */
+  message?: string;
 }
 
 export interface CalcRailApi {
   format: FormatId;
   targets: ReadonlyArray<{ id: CalcRailTarget; label: string }>;
-  /** Most calculator sides hold six. Actual-matchup comparison intentionally accepts twelve. */
+  /** Most calculator sides hold six, as does the actual-sets comparison. */
   maxItems?: number;
+  /** A page's own choices and hint above the results (the teams page: which builds, which box). */
+  intro?: ReactNode;
   pick: (
     target: CalcRailTarget,
     entry: DexIndexEntry,
     option: BuildOption | null,
     optionIndex: number,
-  ) => CalcRailPickResult;
+  ) => CalcRailPickResult | Promise<CalcRailPickResult>;
 }
 
 const freshFilters = (): DexFilters => ({
@@ -59,7 +63,7 @@ export function CalcRail({ state, dex, tab, api }: {
   const [filters, setFilters] = useState<DexFilters>(freshFilters);
   const [expandedSlug, setExpandedSlug] = useState("");
   const [targetByTab, setTargetByTab] = useState<Record<CalcRailTab, CalcRailTarget>>({
-    damage: "primary", speed: "primary", tune: "primary", actual: "primary",
+    damage: "primary", speed: "primary", tune: "primary", infer: "primary", actual: "primary", teams: "primary",
   });
   const [loaded, setLoaded] = useState<{
     slug: string;
@@ -104,20 +108,21 @@ export function CalcRail({ state, dex, tab, api }: {
     return () => { current = false; };
     // `useBuildOptions` owns stable request caches; accordion identity and format are the only
     // request keys. Omitting its render-local function identity prevents duplicate fetch effects.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedSlug, api?.format]);
 
   useEffect(() => { setFeedback(null); }, [tab, target, api?.format]);
 
   const choose = (entry: DexIndexEntry, option: BuildOption | null, optionIndex: number) => {
     if (!api) return;
-    const result = api.pick(target, entry, option, optionIndex);
     const side = api.targets.find((candidate) => candidate.id === target)?.label ?? "";
-    setFeedback(result.ok
-      ? { ok: true, text: t("calc.rail.added")
-        .replace("{name}", displayName(entry, lang)).replace("{side}", side) }
-      : { ok: false, text: t("calc.rail.full").replace("{side}", side)
-        .replace("{count}", String(api.maxItems ?? 6)) });
+    void Promise.resolve(api.pick(target, entry, option, optionIndex)).then((result) => {
+      setFeedback(result.message ? { ok: result.ok, text: result.message }
+        : result.ok
+          ? { ok: true, text: t("calc.rail.added")
+            .replace("{name}", displayName(entry, lang)).replace("{side}", side) }
+          : { ok: false, text: t("calc.rail.full").replace("{side}", side)
+            .replace("{count}", String(api.maxItems ?? 6)) });
+    });
   };
 
   const expansion = (entry: DexIndexEntry) => {
@@ -163,10 +168,15 @@ export function CalcRail({ state, dex, tab, api }: {
         setExpandedSlug((current) => current === entry.slug ? "" : entry.slug);
       }}
       renderPokemonExpansion={expansion}
-      status={feedback && (
-        <div className={`calc-rail-feedback ${feedback.ok ? "ok" : "error"}`} role="status">
-          {feedback.text}
-        </div>
+      status={(api?.intro || feedback) && (
+        <>
+          {api?.intro}
+          {feedback && (
+            <div className={`calc-rail-feedback ${feedback.ok ? "ok" : "error"}`} role="status">
+              {feedback.text}
+            </div>
+          )}
+        </>
       )} />
   );
 }

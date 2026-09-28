@@ -1,7 +1,9 @@
 /* Design tokens — a data tool scanned by battlers, not read: neutral cool-grey grounds,
-   the 19-type color system is the ONLY chromatic layer (the subject's own color language),
-   brand blue reserved for links/focus. Numbers everywhere -> tabular-nums is the house rule. */
-:root {
+   type colours identify the subject, including build header gradients;
+   brand blue reserved for links/focus. Numbers everywhere -> tabular-nums is the house rule.
+   The theme blocks also match any element carrying `data-theme`, so a subtree can wear the other
+   theme than the page (the metagame share image renders its frame this way). */
+:root, [data-theme="light"] {
   color-scheme: light;
   --topbar-offset: 62px;
   --bg: #f6f8fc;
@@ -36,8 +38,11 @@
   --font-ui: -apple-system, "Segoe UI", "Microsoft YaHei", "Hiragino Sans", "Yu Gothic UI",
     system-ui, sans-serif;
   --font-mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  /* How much of a type colour survives when it is used as TEXT (the rest is ink): type colours are
+     tuned as fills and several are too light to read on white. */
+  --acc-ink-mix: 76%;
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"], [data-theme="dark"] {
     color-scheme: dark;
     --bg: #0d1420;
     --panel: #141e2d;
@@ -60,6 +65,7 @@
     --build-a: #7fa5ff; --build-b: #b48cf5; --build-c: #4fc0d4;
     --day: #edb45e; --day-soft: #3b2f15;
     --night: #a9b6ff; --night-soft: #232b52;
+    --acc-ink-mix: 55%;
 }
 
 * { box-sizing: border-box; }
@@ -103,7 +109,8 @@ button, input, select {
 .topbar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 16px;
   letter-spacing: -0.02em; color: var(--ink); }
 .topbar .logo img { width: 30px; height: 30px; filter: drop-shadow(0 3px 6px rgb(36 87 223 / 0.18)); }
-.topbar nav { display: flex; gap: 4px; flex: 1; }
+.topbar nav { display: flex; gap: 4px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.topbar nav a { flex-shrink: 0; white-space: nowrap; }
 .topbar nav a {
   position: relative; padding: 9px 12px; border-radius: 7px; color: var(--sub); font-weight: 600;
   white-space: nowrap;
@@ -148,19 +155,53 @@ button, input, select {
 .theme-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.85;
   stroke-linecap: round; stroke-linejoin: round; }
 .theme-toggle button.night.on svg { fill: color-mix(in srgb, var(--night) 24%, transparent); }
+/* Top-bar tools: the site search at the left end, the library dock at the right end. Both are on
+   every page in the same place, so nothing in the bar moves between pages. */
+.topbar-tool {
+  flex: none; height: 36px; min-width: 36px; display: inline-flex; align-items: center; justify-content: center;
+  gap: 7px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--panel); color: var(--sub); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.topbar-tool svg { width: 18px; height: 18px; stroke-width: 1.8; }
+.topbar-tool:hover { color: var(--ink); border-color: var(--line-strong); }
+.topbar-tool.on { color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
+  background: var(--brand-soft); }
+.topbar-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dock-toggle { padding: 0 6px; }
+
+/* The site search entry (components/SideRail.tsx): a search icon ahead of the brand. */
+.search-entry { margin-right: -8px; }
+.search-entry.on { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
+
+/* A page region a library payload can be dropped on, lit while one is being dragged. */
+[data-library-drop] { border-radius: 12px; transition: outline-color 120ms, background-color 120ms; }
+[data-library-drop="ready"] { outline: 2px dashed color-mix(in srgb, var(--brand) 55%, transparent); outline-offset: 4px; }
+[data-library-drop="over"] { outline: 2px solid var(--brand); outline-offset: 4px;
+  background-color: color-mix(in srgb, var(--brand-soft) 55%, transparent); }
+
 @media (max-width: 720px) {
-  :root { --topbar-offset: 101px; }
+  :root { --topbar-offset: 107px; }
   .topbar { flex-wrap: wrap; gap: 8px 10px; padding: 8px 10px; }
   .topbar .logo { flex: none; }
   .topbar .env { margin-left: auto; white-space: nowrap; }
   .topbar .env-date { display: none; }
   .topbar select { max-width: 88px; }
+  /* Two rows: search, brand and settings, then the working row — the sections and the library dock.
+     The zero-height ::after is the line break between them. */
+  .topbar::after { content: ""; order: 1; flex: 0 0 100%; height: 0; }
   .topbar nav {
-    order: 2; flex: 0 0 100%; min-width: 0; overflow-x: auto; padding-bottom: 2px;
+    order: 3; flex: 1 1 0; min-width: 0; overflow-x: auto; padding-bottom: 2px;
     scrollbar-width: none;
   }
   .topbar nav::-webkit-scrollbar { display: none; }
   .topbar nav a { flex: none; padding: 5px 10px; white-space: nowrap; }
+  .topbar .dock-toggle { order: 4; }
+  .topbar-tool { height: 32px; min-width: 32px; }
+}
+/* A phone's first row holds the brand, the environment, the theme and the language only with the
+   brand as its icon alone. */
+@media (max-width: 440px) {
+  .topbar .logo-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 }
 @media (min-width: 721px) and (max-width: 980px) {
   .topbar { gap: 10px; padding: 8px 12px; }
@@ -250,21 +291,7 @@ main.content:focus { outline: none; }
 .usage-bar .val { font-family: var(--font-mono); font-size: 12.5px; min-width: 46px; text-align: right; }
 
 /* ---- pokemon detail ---------------------------------------------------------- */
-.mon-hero {
-  border-radius: var(--radius); padding: 18px 22px; display: flex; gap: 20px; align-items: center;
-  color: #fff; position: relative; overflow: hidden;
-}
-.mon-hero img.sprite { width: 96px; height: 96px; image-rendering: auto; filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.35)); }
-.mon-hero .names h1 { margin: 0; font-size: 26px; letter-spacing: -0.01em; }
-.mon-hero .names .alt { opacity: 0.85; font-size: 14px; }
-.mon-hero .types { display: flex; gap: 8px; margin-top: 8px; }
-.mon-hero .type-badge { background: rgb(255 255 255 / 0.16); border-radius: 20px; padding: 3px 10px 3px 5px; color: #fff; }
-.mon-hero .rank-chip {
-  margin-left: auto; text-align: right; font-family: var(--font-mono);
-}
-.mon-hero .rank-chip b { font-size: 30px; display: block; }
 
-.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-top: 16px; }
 .panel h2 {
   margin: 0; padding: 12px 16px 10px; font-size: 13px; text-transform: uppercase;
   letter-spacing: 0.07em; color: var(--sub); border-bottom: 1px solid var(--line);
@@ -286,11 +313,6 @@ main.content:focus { outline: none; }
 .stat-row .fill { height: 100%; border-radius: 4px; }
 
 /* ---- dex grid ----------------------------------------------------------------- */
-.search-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
-.search-row input[type="search"] {
-  flex: 1; min-width: 220px; padding: 9px 14px; border: 1px solid var(--line);
-  border-radius: 9px; background: var(--panel);
-}
 .dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .dex-grid.dense { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
 .dex-card {
@@ -324,18 +346,6 @@ main.content:focus { outline: none; }
 .rank-badge.tier-D { background: var(--panel-2); color: var(--sub); }
 
 /* hero ability chips + rank links */
-.mon-hero .abilities { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.mon-hero .ability-chip {
-  background: rgb(255 255 255 / 0.16); border-radius: 6px; padding: 2px 9px; font-size: 12.5px;
-}
-.mon-hero .rank-chip { display: flex; gap: 14px; }
-.mon-hero .rank-chip button {
-  background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.25);
-  border-radius: 9px; padding: 6px 14px; color: #fff; cursor: pointer; text-align: center;
-  font-family: var(--font-mono);
-}
-.mon-hero .rank-chip button.on { background: rgb(255 255 255 / 0.3); font-weight: 700; }
-.mon-hero .rank-chip b { font-size: 22px; display: block; }
 
 /* matchup chips */
 .matchup-rows { padding: 10px 16px 14px; display: grid; gap: 8px; }
@@ -346,21 +356,6 @@ main.content:focus { outline: none; }
 /* stat range column */
 .stat-row.with-range { grid-template-columns: 42px 34px 1fr 96px; }
 .stat-row .range { font-family: var(--font-mono); font-size: 12px; color: var(--sub); text-align: right; }
-
-/* learnset */
-.learnset-panel .search-row { margin: 10px 14px 4px; }
-.learnset-panel input[type="search"] {
-  width: 100%; padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px;
-  background: var(--panel);
-}
-.learnset-table { max-height: 420px; overflow-y: auto; }
-.learnset-row {
-  display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center;
-  gap: 8px; min-height: 42px; padding: 7px 10px; font-size: 13.5px;
-  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent); background: var(--panel);
-}
-.learnset-row > .ehover { min-width: 0; width: 100%; }
-.learnset-row .lm-name { display: block; overflow: visible; white-space: normal; line-height: 1.35; }
 
 /* calc form */
 .side-grid { display: grid; gap: 10px; }
@@ -408,7 +403,6 @@ input[type="number"].num::-webkit-inner-spin-button { -webkit-appearance: none; 
 }
 .primary-btn:disabled { opacity: 0.5; cursor: default; }
 .result-panel { padding: 16px 18px; display: grid; gap: 10px; }
-.dmg-band { font-family: var(--font-mono); font-size: 22px; font-weight: 700; }
 .notice { padding: 10px 14px; border-radius: 8px; background: var(--panel-2); font-size: 13.5px; }
 
 /* fallback / placeholder states must be visible, never disguised (design §12) */
@@ -424,34 +418,6 @@ input[type="number"].num::-webkit-inner-spin-button { -webkit-appearance: none; 
 
 .footnote { margin-top: 26px; font-size: 12px; color: var(--sub); }
 
-/* ---- stats tornado (base ⇄ actual) ---------------------------------------------- */
-.stats-panel { grid-column: 1 / -1; }
-.stat-tornado { padding: 8px 16px 6px; display: grid; gap: 5px; }
-.stat-tornado-caption { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub);
-  text-transform: uppercase; letter-spacing: 0.05em; padding: 0 2px 2px; }
-.stat-tornado-row { display: flex; align-items: center; gap: 3px; }   /* 3px = the tiny center seam */
-.stat-tornado-row .half { flex: 1; display: flex; align-items: center; gap: 7px; min-width: 0; }
-.stat-tornado-row .half .k { width: 32px; font-size: 11.5px; color: var(--sub);
-  font-family: var(--font-mono); text-transform: uppercase; }
-.stat-tornado-row .half .v { font-family: var(--font-mono); font-size: 12.5px; }
-.stat-tornado-row .half.left .v { width: 30px; text-align: right; }
-.stat-tornado-row .half.right { flex-direction: row; }
-.stat-tornado-row .half.right .v { width: 66px; text-align: left; color: var(--sub); font-size: 12px; }
-.stat-tornado-row .half.right .k { text-align: right; }
-.stat-tornado-row .half .track { flex: 1; height: 8px; background: var(--panel-2);
-  border-radius: 4px; overflow: hidden; display: flex; }
-.stat-tornado-row .half.left .track { justify-content: flex-end; }   /* base fill hugs the center */
-.stat-tornado-row .half.right .track { justify-content: flex-start; } /* actual grows from center */
-.stat-tornado-row .fill { height: 100%; border-radius: 4px; }
-.stat-tornado-row .range-solid { height: 100%; background: var(--brand); opacity: 0.85; }
-.stat-tornado-row .range-ext { height: 100%; background: var(--brand); opacity: 0.32; }
-.stat-tornado-row.top .half.left .v { font-weight: 700; color: var(--ink); }
-.stat-tornado-row.top .half .track { height: 10px; }
-.stat-note { padding: 4px 16px 12px; font-size: 12px; color: var(--sub); }
-
-.mon-hero .cross-link { display: inline-block; margin-top: 8px; color: #fff; opacity: 0.9;
-  font-size: 12.5px; background: rgb(255 255 255 / 0.14); padding: 3px 10px; border-radius: 6px; }
-.mon-hero .cross-link:hover { text-decoration: none; opacity: 1; }
 
 /* ---- shared KO / grade cell tones (calc matrix + matchup grid) ------------------- */
 .ko-ohkoG { background: #b3261e; color: #fff; }
@@ -475,8 +441,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
   background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgb(0 0 0 / 0.20) 3px 5px); }
 
 /* ---- calc: move picker + defenders + matrix ------------------------------------- */
-.side-head { display: flex; align-items: center; justify-content: space-between; }
-.side-actions { display: flex; align-items: center; gap: 6px; }
 .mini-x { border: 0; background: var(--panel-2); color: var(--sub); border-radius: 6px;
   width: 24px; height: 24px; cursor: pointer; font-size: 12px; }
 .mini-x:hover { color: var(--ink); }
@@ -486,18 +450,9 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .mini-x.swap:hover { color: var(--brand); }
 /* boost-stage dropdown: as compact as the SP number cells it sits beside in the boosts grid. */
 .boost-sel { padding: 5px 2px; text-align: center; min-width: 0; }
-/* honest-default copy: the auto-fill is a marginal-mode stitch, not a real joint set (design §8). */
-.mini-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; }
-.mini-fields.four { grid-template-columns: repeat(4, 1fr); }
-@media (max-width: 720px) { .mini-fields, .mini-fields.four { grid-template-columns: 1fr 1fr; } }
-.sp-boost-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; align-items: start; }
-@media (max-width: 560px) { .sp-boost-row { grid-template-columns: 1fr; } }
-.side-grid { gap: 8px; }
-.field-row .primary-btn { margin-left: auto; align-self: end; flex: none; }
-.sp-cap { font-size: 12px; color: var(--sub); }
 /* SP budget readout: a thin divider between the "SP spread" label and the n/66 count, which is
    coloured by how it sits against the 66-point budget — under-spent (grey) / exactly full (green) /
-   illegal over (red). Shared by the side-form caption (.sp-sum) and the tune heading (.sp-total). */
+   illegal over (red). Shared by configuration editors (.sp-sum) and tune headings (.sp-total). */
 .sp-sep { color: var(--line); margin: 0 5px; }
 .sp-sum.under { color: var(--sub); }
 .sp-sum.full { color: #2b7a2b; font-weight: 700; }
@@ -514,9 +469,6 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .ghost-btn { border: 1px dashed var(--line); background: transparent; color: var(--brand);
   border-radius: 8px; padding: 6px 14px; cursor: pointer; font-weight: 600; }
 .ghost-btn:hover { border-color: var(--brand); }
-/* Two cards across a page width (drops to one when the viewport can't fit two ~430px cards) —
-   the per-side form (mon + 4 fields + 6 SP + 6 boosts) was cramped at the old 280px min. */
-.defenders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 430px), 1fr)); gap: 12px; }
 .matrix-wrap { padding: 0 16px 16px; scroll-margin-top: 76px; }
 .matrix-guide {
   display: flex; align-items: center; gap: 9px; min-height: 42px; padding: 9px 12px;
@@ -565,29 +517,8 @@ td.contested::after { content: ""; position: absolute; inset: 0; pointer-events:
 .result-caveat { padding: 8px 10px; border-radius: 8px; color: var(--sub);
   background: color-mix(in srgb, var(--warning) 8%, var(--panel)); font-size: 12.5px; }
 
-/* ---- dex detail: full-width stack, compact matchup strip, multi-column learnset ---- */
-.detail-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
 /* base / Mega / Mega-Z of one species: the sibling forms of whichever one you opened */
-.form-switcher { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.form-switcher .lbl { font-size: 11px; color: var(--sub); text-transform: uppercase;
-  letter-spacing: 0.04em; }
-.matchup-strip .matchup-groups { display: flex; flex-wrap: wrap; gap: 14px 22px; padding: 10px 16px 14px; }
 /* two columns: left defensive profile, right STAB coverage */
-.matchup-two { display: grid; grid-template-columns: 1fr 1fr; }
-.matchup-two .mcol { min-width: 0; }
-.matchup-two .mcol + .mcol { border-left: 1px solid var(--line); }
-.mcol-h { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--sub);
-  text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 16px 0; }
-.mcol-h .stab-types { display: inline-flex; gap: 3px; }
-@media (max-width: 640px) {
-  .matchup-two { grid-template-columns: 1fr; }
-  .matchup-two .mcol + .mcol { border-left: 0; border-top: 1px solid var(--line); }
-}
-.matchup-strip .mg { display: flex; flex-direction: column; gap: 5px; }
-.matchup-strip .mg .lbl { font-size: 11px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; }
-.matchup-strip .mg .chips { display: flex; gap: 4px; flex-wrap: wrap; min-height: 19px; align-items: center; }
-.learnset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 8px; max-height: 480px; overflow-y: auto; padding: 4px 10px 10px; }
 
 /* ---- calc: per-side status + boosts + doubles auras ---------------------------- */
 /* boosts are 5 stats (no HP) — give them their own 5-col track so the selects fill the width and the
@@ -887,8 +818,56 @@ button.speed-row-marker:active:not(:disabled) { transform: translateY(-50%); opa
 .party-copy-row .second-btn { padding: 5px 10px; font-size: 12px; }
 /* With a legality badge in the slot, the row becomes badge-left / copy-right on one line. The
    badges keep their own margin off so the shared row stays tight. */
-.party-copy-row.with-badges { justify-content: space-between; }
-.party-copy-row.with-badges .builder-badges { margin-bottom: 0; }
+/* The row above the party: badges and the export menu on the left, the page's hand-offs on the
+   right; on a narrow card the hand-offs wrap under. */
+.party-copy-row { justify-content: space-between; flex-wrap: wrap; row-gap: 8px; }
+.party-copy-row .builder-badges { margin-bottom: 0; }
+.party-row-lead, .party-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.team-save-btn { display: inline-flex; align-items: center; gap: 6px; }
+.party-row-actions { margin-left: auto; }
+.party-row-actions .second-btn { padding: 5px 12px; font-size: 12px; }
+.team-export { position: relative; display: inline-flex; align-items: center; gap: 8px; }
+.team-export-btn { display: inline-flex; align-items: center; gap: 5px; }
+.team-export-btn svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms var(--ease-out); }
+.team-export-btn.open svg { transform: rotate(180deg); }
+.team-export-failed { font-size: 11.5px; }
+.team-export-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 70; display: grid; gap: 2px;
+  min-width: 210px; padding: 6px; border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--panel); box-shadow: var(--shadow-raised);
+}
+.team-export-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px; width: 100%;
+  padding: 7px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.team-export-row b { font-weight: 600; }
+.team-export-row small { color: var(--sub); font-size: 11.5px; }
+.team-export-row:hover, .team-export-row:focus-visible { background: var(--panel-2); outline: none; }
+.team-export-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+.team-export-cap { padding: 4px 10px 2px; color: var(--sub); font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; }
+/* Read by screen readers, never seen. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* A button's one-line explanation (components/HintButton.tsx). It opens below and right-aligned: these
+   buttons close a row at the card's right edge. */
+.hint-tip { position: relative; }
+.hint-tip::after {
+  content: attr(data-tooltip); position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+  width: max-content; max-width: min(300px, 80vw); padding: 7px 10px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--ink);
+  box-shadow: var(--shadow-raised); font: 500 12px/1.55 var(--font-ui); text-align: left;
+  white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(-3px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+.hint-tip:hover::after, .hint-tip:focus-visible::after { opacity: 1; visibility: visible; transform: none; }
+/* A member label is laid out as a dex-hover label (it carries `ehover`); only its focus ring is its own. */
+.member-hover { outline: none; border-radius: 6px; }
+.member-hover:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 45%, transparent); }
 .party-strip {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px;
   padding: 12px 16px 6px;
@@ -941,20 +920,58 @@ button.speed-row-marker:active:not(:disabled) { transform: translateY(-50%); opa
 }
 /* Portalled to <body>: fixed coords (set inline) so no card/panel overflow or sticky header can
    crop or occlude it — top/left come from JS placement. */
-.mon-hover.mon-hover-portal { position: fixed; z-index: 1000; top: auto; left: auto; }
-.mon-hover-head { display: flex; gap: 10px; align-items: center; }
-.mon-hover-sprite { width: 56px; height: 56px; object-fit: contain; image-rendering: auto; }
-.mon-hover-name { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; }
-.mon-hover-sub { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--sub); }
-.mon-hover-stats { display: grid; gap: 3px; }
-.mh-stat { display: grid; grid-template-columns: 30px 30px 1fr; align-items: center; gap: 7px; }
-.mh-stat .k { font-size: 10.5px; color: var(--sub); font-family: var(--font-mono); }
-.mh-stat .v { font-family: var(--font-mono); font-size: 11.5px; text-align: right; }
-.mh-stat .track { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; display: block; }
-.mh-stat .fill { height: 100%; background: var(--brand); border-radius: 3px; display: block; }
-.mon-hover-set { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 7px; }
-.mh-line { display: flex; align-items: center; gap: 6px; }
-.mh-line .type-badge img { width: 15px; height: 15px; }
+/* A tooltip, nothing to press: it never takes a click meant for what it happens to cover. */
+.mon-hover.mon-hover-portal { position: fixed; z-index: 2050; top: auto; left: auto; pointer-events: none; }
+/* The build card: the form it battles as on its type colours, then item/ability/nature, the four
+   moves as type-tinted chips, and the Lv.50 values with their SP — dense, one glance. */
+.mon-hover.mh-card { width: 304px; padding: 0; gap: 0; overflow: hidden; font-size: 12.5px; }
+.mh-head { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; align-items: center;
+  padding: 9px 12px 8px 10px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(115deg, color-mix(in srgb, var(--t1) 17%, var(--panel)) 0%,
+    color-mix(in srgb, var(--t2) 9%, var(--panel)) 72%, var(--panel) 100%); }
+.mh-art { width: 62px; height: 62px; display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(circle at 50% 58%, color-mix(in srgb, var(--t1) 28%, transparent) 0%, transparent 70%); }
+.mh-art img { width: 58px; height: 58px; object-fit: contain; filter: drop-shadow(0 4px 6px rgb(0 0 0 / 0.18)); }
+.mh-id { display: grid; gap: 3px; min-width: 0; }
+.mh-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.mh-name b { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.mh-name .mega-badge { flex: none; margin: 0; }
+.mh-types { display: flex; gap: 8px; }
+.mh-types .type-badge { gap: 3px; font-size: 11.5px; font-weight: 600; }
+.mh-types .type-badge img { width: 15px; height: 15px; }
+.mh-item { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 12px; font-weight: 650; }
+.mh-item img { flex: none; width: 20px; height: 20px; object-fit: contain; }
+.mh-item span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mh-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 7px 12px 0; }
+.mh-facts > span { display: grid; align-content: start; gap: 1px; min-width: 0; }
+.mh-facts b { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.mh-facts i { font-style: normal; font-size: 10.5px; font-weight: 500; color: var(--sub); }
+.mh-nature { display: inline-flex; gap: 4px; margin-left: 5px; font-size: 10.5px; font-weight: 600; }
+.mh-nature em { font-style: normal; }
+.mh-nature .up { color: var(--success); }
+.mh-nature .down { color: var(--danger); }
+.mh-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 8px 12px 0; }
+.mh-move { display: flex; align-items: center; gap: 4px; min-width: 0; height: 24px; padding: 0 7px 0 3px;
+  border: 1px solid color-mix(in srgb, var(--mv, var(--line)) 30%, transparent); border-radius: 7px;
+  background: color-mix(in srgb, var(--mv, var(--panel-2)) 9%, var(--panel)); }
+.mh-move .type-badge img { width: 16px; height: 16px; }
+.mh-move .nm { flex: 1; min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.mh-move small { flex: none; color: var(--sub); font-size: 10.5px; }
+.mh-move.empty { border-style: dashed; border-color: var(--line); background: transparent; color: var(--sub); }
+.mh-move-dot { flex: none; width: 7px; height: 7px; margin: 0 4px; border-radius: 50%; background: var(--line-strong); }
+.mh-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 8px 12px 0; padding: 5px 2px;
+  border-radius: 8px; background: var(--panel-2); }
+.mh-stat { display: grid; justify-items: center; line-height: 1.25; min-width: 0; }
+.mh-stat + .mh-stat { border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.mh-stat i { font-style: normal; font-size: 10px; color: var(--sub); white-space: nowrap; }
+.mh-stat b { font-size: 13px; font-weight: 750; }
+.mh-stat small { font-size: 10px; font-weight: 650; color: var(--brand-strong); }
+.mh-stat small.zero { font-weight: 400; color: var(--sub); opacity: 0.6; }
+.mh-stat.up b { color: var(--success); }
+.mh-stat.down b { color: var(--danger); }
+.mh-foot { display: flex; justify-content: space-between; gap: 8px; padding: 5px 12px 8px; font-size: 10.5px; color: var(--sub); }
+.mh-foot b { color: var(--ink); }
+.mh-foot b.over { color: var(--danger); }
 
 /* party moves with type icons */
 .party-moves li { display: flex; align-items: center; gap: 5px; justify-content: center; }
@@ -1001,9 +1018,7 @@ button.speed-row-marker:active:not(:disabled) { transform: translateY(-50%); opa
    auto-disabled under prefers-reduced-motion (the !important reset above wins). */
 
 /* smooth state changes on every interactive surface */
-a, button, .topbar nav a, .seg button, .subtab, .move-chip, .speed-presets button,
-.session-card, .dex-card, .data-table tbody tr, .uep-species-chip, .rank-chip button,
-.party-card, .type-badge, .uep-chip, .uep-kind, .grade-pill, .vchip {
+a, button, .topbar nav a, .seg button, .subtab, .move-chip, .speed-presets button, .session-card, .dex-card, .data-table tbody tr, .uep-species-chip, .party-card, .type-badge, .uep-chip, .uep-kind, .grade-pill, .vchip {
   transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease,
     box-shadow 150ms ease, transform 150ms cubic-bezier(0.22, 1, 0.36, 1), opacity 130ms ease;
 }
@@ -1081,8 +1096,10 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
   width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--panel); color: var(--ink); font: inherit; resize: vertical;
 }
-.qa-actions { display: flex; gap: 10px; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; }
+/* The ask button owns its column: when its label grows to "查询中…" it must not wrap to a line of
+   its own (where it would jump to the left). The examples wrap inside their column instead. */
+.qa-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.qa-actions > .primary-btn { min-width: 96px; justify-self: end; }
 .qa-examples { display: flex; gap: 6px; flex-wrap: wrap; }
 .qa-example {
   border: 1px solid var(--line); background: var(--panel-2); color: var(--sub);
@@ -1292,7 +1309,17 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 .diag-check-count { border-radius: 999px; padding: 3px 10px; font-size: 12.5px;
   font-weight: 700; }
 .diag-check-shown { margin-left: 3px; font-size: 12px; }
-.diag-check-toggle { margin-left: auto; padding: 5px 11px; font-size: 12.5px; }
+/* Beside the "shown n/total" it changes: a quiet pill, its chevron turning when the list is open. */
+.diag-check-toggle { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px 0 10px;
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line)); border-radius: 999px;
+  background: color-mix(in srgb, var(--brand) 7%, var(--panel)); color: var(--brand-strong);
+  font: inherit; font-size: 12px; font-weight: 650; cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease; }
+.diag-check-toggle:hover { border-color: color-mix(in srgb, var(--brand) 50%, var(--line));
+  background: color-mix(in srgb, var(--brand) 13%, var(--panel)); }
+.diag-check-toggle svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms var(--ease-out); }
+.diag-check-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 .diag-fragile { font-size: 11.5px; }
 .builder-worst { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px;
   align-items: center; }
@@ -1370,7 +1397,7 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 }
 .ehover:hover .ehover-pop, .ehover:focus-visible .ehover-pop { display: grid; }
 .ehover-pop.ehover-pop-portal {
-  position: fixed; inset: auto; z-index: 1000; display: grid; transform: none; margin: 0;
+  position: fixed; inset: auto; z-index: 2050; display: grid; transform: none; margin: 0;
 }
 .ehover-pop.has-addon { width: min(330px, calc(100vw - 24px)); }
 .ehover-head, .ehover-line { display: flex; align-items: center; gap: 6px; }
@@ -1380,15 +1407,19 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
   .ehover-pop { left: 0; transform: none; }
 }
 
-/* corner hand-off on party member cards: real build -> calculator attacker */
+/* The corner action of a party member card: keep it in a box ("+"), or on the teams page take it out
+   of the team ("×"). Shown on hover; always on touch screens. */
 .party-card { position: relative; }
-.party-calc {
-  position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; line-height: 1;
-  border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
-  color: var(--sub); font-size: 12px; cursor: pointer; opacity: 0; transition: opacity 120ms;
+.party-corner { position: absolute; top: 6px; right: 6px; z-index: 1; opacity: 0; transition: opacity 120ms; }
+.party-corner .keep-mon { margin: 0; }
+.party-card:hover .party-corner, .party-corner:focus-within { opacity: 1; }
+.party-card.reorder-over { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent); }
+.party-card[draggable="true"] { cursor: grab; }
+.party-add {
+  display: grid; place-items: center; min-height: 120px; border-style: dashed !important;
+  background: transparent !important; color: var(--sub); font: inherit; font-size: 28px; cursor: pointer;
 }
-.party-card:hover .party-calc, .party-calc:focus-visible { opacity: 1; }
-.party-calc:hover { color: var(--ink); border-color: var(--sub); }
+.party-add:hover { color: var(--brand); border-color: var(--brand) !important; }
 
 /* matrix heads wrapped in EntityHover: the inner spans reproduce the th's original layout,
    and the pops open INTO the grid (the scroll container clips anything outside it) */
@@ -1432,18 +1463,11 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 .usage-mini-point { fill: var(--panel); stroke: var(--trend-end); stroke-width: 1.5; }
 .usage-mini-meta { font-size: 10px; line-height: 1.25; flex-wrap: wrap; }
 
-/* Scroll containers (dex tables, the pokemon page's learnset) clip absolute popovers.
+/* Scroll containers (dex tables) clip absolute popovers.
    position:fixed WITHOUT coordinates keeps the chip's static position but escapes ancestor
    overflow clipping entirely (no transform ancestors here), so the card renders whole. */
 .table-scroll .ehover-pop {
   position: fixed; left: auto; bottom: auto; transform: none; margin-top: 6px;
-}
-/* the learnset row is a FLEX box: a coordinate-less fixed pop lands at the flex static
-   position (far from the pointer) — open it right under the hovered name instead */
-.learnset-row { position: relative; }
-.learnset-row:hover { z-index: 6; }
-.learnset-row .ehover-pop {
-  position: absolute; bottom: auto; top: calc(100% + 4px); left: 0; transform: none;
 }
 /* the speed table's row head is a FLEX th — a coordinate-less fixed pop lands at the flex
    static position (end of the row), so open this one absolutely INTO the grid instead */
@@ -1460,7 +1484,6 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 /* diagnose compression row: the meaning tail reads as annotation, not another entity */
 .diag-sig-meaning { color: var(--sub); font-size: 12px; }
 
-
 /* diagnose tables: rows are readouts, not links — no pointer/stripe, cells centered so the
    row-hover band lines up with the chips (user-reported misalignment) */
 .diag-table td { vertical-align: middle; }
@@ -1468,13 +1491,6 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 .diag-table tbody tr:hover td:first-child { box-shadow: none; }
 
 /* hero name line as a form toggle (base / mega) */
-.mon-hero .names h1 .form-name {
-  background: none; border: 0; padding: 0; font: inherit; color: inherit;
-  cursor: pointer; opacity: 0.5;
-}
-.mon-hero .names h1 .form-name.on { opacity: 1; cursor: default; }
-.mon-hero .names h1 .form-name:not(.on):hover { opacity: 0.8; }
-.mon-hero .names h1 .form-sep { opacity: 0.45; }
 
 /* held-stone auto-Mega indicator on calc/speed/tune forms */
 .mega-badge {
@@ -1532,8 +1548,8 @@ button:active:not(:disabled), .session-card:active, .dex-card:active {
 .dex-abilities-table tbody tr:hover td:first-child { box-shadow: none; }
 
 /* list-panel contexts carry their own affordances — the dotted underline is noise there
-   (hero ability chips, meta detail rows, the dex learnset) */
-.mon-hero .ehover, .p-row .ehover, .learnset-row .ehover { border-bottom: none; }
+   (meta detail rows) */
+.p-row .ehover { border-bottom: none; }
 
 /* quick-solve per-move breakdown: each move's own minimum; ← marks the binding one */
 .tp-permove { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px;
@@ -1588,8 +1604,10 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
   outline: none;
 }
+/* Popovers portalled to <body> (lists, build picker, hover cards) sit above the modal layer (2000):
+   a dialog's own inputs and pickers open over it, never behind it. Toasts stay on top (2100). */
 .adaptive-listbox {
-  position: fixed; z-index: 2000; overflow-y: auto; overscroll-behavior: contain;
+  position: fixed; z-index: 2050; overflow-y: auto; overscroll-behavior: contain;
   padding: 4px; border: 1px solid var(--line-strong); border-radius: 10px;
   background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised);
 }
@@ -1602,10 +1620,19 @@ input:focus, select:focus, textarea:focus {
 .adaptive-listbox button span { min-width: 0; overflow-wrap: anywhere; }
 .adaptive-listbox button small { flex: none; max-width: 45%; color: var(--sub); overflow: hidden;
   text-overflow: ellipsis; white-space: nowrap; }
-.form-panel input:not([type="checkbox"]):not([type="radio"]), .form-panel select,
-.builder-field > input, .builder-field > textarea,
-.qa-form textarea, .uep-form textarea, .uep-checkpoint textarea,
-.learnset-panel input[type="search"], .search-row input[type="search"] {
+/* The build inputs' list: the metagame's picks first, faintly tinted, with their share; a hairline;
+   then everything else. Compact rows where a mouse is the pointer. */
+.adaptive-listbox.rich button > span { flex: 1 1 auto; }
+.adaptive-listbox.rich button.meta { background: color-mix(in srgb, var(--brand) 4%, transparent); }
+.adaptive-listbox.rich button.meta.active, .adaptive-listbox.rich button.active { background: var(--brand-soft); }
+.adaptive-share { flex: none; min-width: 36px; text-align: right; color: var(--brand-strong);
+  font: 700 11.5px var(--font-mono); }
+.adaptive-sep { height: 1px; margin: 4px 8px; background: var(--line-strong); opacity: 0.7; }
+@media (pointer: fine) {
+  .adaptive-listbox.rich button { min-height: 30px; padding: 4px 10px; font-size: 13px; }
+  .adaptive-listbox.rich button small { font-size: 11.5px; }
+}
+.form-panel input:not([type="checkbox"]):not([type="radio"]), .form-panel select, .builder-field > input, .builder-field > textarea, .qa-form textarea, .uep-form textarea, .uep-checkpoint textarea {
   min-height: 38px; border-radius: var(--radius-sm); border-color: var(--line);
   background: color-mix(in srgb, var(--panel) 97%, var(--bg));
 }
@@ -1639,7 +1666,7 @@ input:focus, select:focus, textarea:focus {
 @keyframes labSpin { to { transform: rotate(1turn); } }
 
 /* page rhythm + panel anatomy */
-.page-header, .mon-hero { animation: surfaceEnter 220ms var(--ease-out) both; }
+.page-header { animation: surfaceEnter 220ms var(--ease-out) both; }
 @keyframes surfaceEnter {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: none; }
@@ -1684,12 +1711,6 @@ input:focus, select:focus, textarea:focus {
 .dex-card .nm { font-size: 13px; letter-spacing: -0.01em; }
 .dex-card.ranked .rank-badge { top: 9px; left: 9px; min-width: 27px; text-align: center; }
 .rank-badge { border-radius: 6px; font-weight: 800; box-shadow: 0 1px 2px rgb(16 26 47 / 0.08); }
-.search-row {
-  margin: 0 0 18px; padding: 8px;
-  border: 1px solid var(--line); border-radius: 11px;
-  background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(10px);
-  box-shadow: var(--shadow);
-}
 .dex-item-card { min-height: 76px; border-color: var(--line); }
 .dex-item-card:hover {
   border-color: color-mix(in srgb, var(--brand) 52%, var(--line));
@@ -1697,47 +1718,6 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* Pokémon identity + detail */
-.mon-hero {
-  min-height: 174px; padding: 24px 28px; border-radius: 16px;
-  box-shadow: 0 18px 44px color-mix(in srgb, #101a2f 22%, transparent);
-}
-.mon-hero::after {
-  content: ""; position: absolute; width: 360px; height: 360px; right: -160px; top: -210px;
-  border: 1px solid rgb(255 255 255 / 0.22); border-radius: 50%; pointer-events: none;
-  box-shadow: 0 0 0 44px rgb(255 255 255 / 0.035), 0 0 0 92px rgb(255 255 255 / 0.025);
-}
-.mon-hero img.sprite { width: 118px; height: 118px; transition: transform 220ms var(--ease-out), filter 180ms ease; }
-.mon-hero:hover img.sprite { transform: translateY(-3px) scale(1.035); filter: drop-shadow(0 9px 14px rgb(0 0 0 / 0.38)); }
-.mon-hero .names h1 { font-size: clamp(25px, 2.5vw, 32px); letter-spacing: -0.035em; }
-.mon-hero .rank-chip { position: relative; z-index: 1; }
-.mon-hero .rank-chip button { min-width: 88px; border-color: rgb(255 255 255 / 0.24); }
-.mon-hero .rank-chip button:hover { background: rgb(255 255 255 / 0.24); transform: translateY(-2px); }
-.detail-grid, .detail-stack { gap: 16px; margin-top: 18px; }
-.detail-grid { align-items: start; }
-.stat-tornado { padding: 13px 16px 10px; gap: 6px; }
-.stat-tornado-row {
-  position: relative; border-radius: 8px; padding: 4px 6px;
-  transition: background-color 220ms ease, box-shadow 220ms ease;
-}
-.stat-tornado-row:hover {
-  background: color-mix(in srgb, var(--brand) 5%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 9%, transparent);
-}
-.stat-tornado-row .half .track {
-  position: relative; overflow: hidden;
-  transition: transform 220ms var(--ease-out), filter 220ms ease, background-color 220ms ease;
-}
-.stat-tornado-row:hover .half .track {
-  transform: scaleY(1.08); filter: saturate(1.04); background-color: var(--panel-3);
-}
-.stat-tornado-row .fill, .stat-tornado-row .range-solid, .stat-tornado-row .range-ext {
-  transition: filter 220ms ease, opacity 220ms ease;
-}
-.stat-tornado-row:hover .fill, .stat-tornado-row:hover .range-solid { filter: brightness(1.04); }
-.matchup-strip .type-badge, .learnset-row { border-radius: 6px; }
-.learnset-row { transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease; }
-.learnset-row:hover { background: color-mix(in srgb, var(--brand) 4%, var(--panel));
-  border-color: color-mix(in srgb, var(--brand) 22%, var(--line)); box-shadow: var(--shadow); }
 
 /* Meta detail rows: local focus, rail and a single-pass sheen. */
 .p-row { position: relative; isolation: isolate; min-height: 38px; overflow: hidden;
@@ -1758,31 +1738,24 @@ input:focus, select:focus, textarea:focus {
 .p-row:hover .mini, .p-row:hover .type-badge { transform: scale(1.035); filter: saturate(1.04); }
 
 /* charts + matrices */
-.trend-chart { padding: 10px; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
-.trend-mobile { display: none; }
-.trend-mobile.trend-snapshot { display: block; overflow: hidden; }
+.trend-chart { position: relative; padding: 10px; border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.trend-chart svg { display: block; }
+.trend-band.top { fill: rgb(255 193 7 / 0.10); }
+.trend-band.mid { fill: rgb(59 130 246 / 0.08); }
+.trend-tick line { stroke: var(--line-strong); stroke-dasharray: 4 4; opacity: 0.55; }
+.trend-tick text { fill: var(--sub); font-size: 10px; }
+.trend-period { fill: var(--sub); font-size: 11px; }
+.trend-line { cursor: pointer; }
+/* A wide invisible stroke under each line, so a 1px context line is still easy to point at. */
+.trend-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; }
+.trend-label { font-size: 11px; fill: #778394; }
+.trend-label.loud { font-weight: 700; }
+.trend-label.hot { fill: #fff; font-size: 12.5px; font-weight: 700; }
+.trend-tip { position: absolute; z-index: 5; display: grid; gap: 2px; max-width: 220px; padding: 7px 10px;
+  border: 1px solid var(--line-strong); border-radius: 9px; background: var(--panel); box-shadow: var(--shadow-raised);
+  font-size: 12px; line-height: 1.45; pointer-events: none; }
+.trend-tip small { font-size: 11px; }
 .trend-snapshot-note { margin-bottom: 10px; }
-.trend-table-scroll { width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
-.trend-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0;
-  font-variant-numeric: tabular-nums; }
-.trend-table th, .trend-table td { height: 42px; padding: 6px 11px; border-bottom: 1px solid var(--line);
-  text-align: center; white-space: nowrap; }
-.trend-table thead th { color: var(--sub); background: var(--panel-2); font-size: 11px;
-  font-weight: 700; }
-.trend-table tbody td { min-width: 76px; color: var(--sub); font: 12px var(--font-mono); }
-.trend-table tbody td.current { color: var(--ink); font-weight: 750; }
-.trend-table .trend-identity { position: sticky; left: 0; z-index: 1; width: 146px; min-width: 146px;
-  max-width: 146px; text-align: left; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
-.trend-table thead .trend-identity { z-index: 2; background: var(--panel-2); }
-.trend-table .trend-identity a { display: flex; align-items: center; justify-content: space-between;
-  gap: 7px; color: var(--ink); }
-.trend-table .trend-identity a:hover { text-decoration: none; }
-.trend-table .trend-identity span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.trend-table .trend-identity small { flex: none; font: 700 10.5px var(--font-mono); }
-.trend-table .trend-identity small.up { color: var(--success); }
-.trend-table .trend-identity small.down { color: var(--danger); }
-.trend-table .trend-identity small.flat { color: var(--sub); }
-.trend-table tbody tr:last-child th, .trend-table tbody tr:last-child td { border-bottom: 0; }
 .matchup-scroll { border-color: var(--line); border-radius: 12px; box-shadow: var(--shadow); background: var(--panel); }
 .matchup-grid thead th, .matchup-grid th.row-head { background: color-mix(in srgb, var(--panel) 96%, var(--panel-2)); }
 .matchup-grid td:not(.diag):hover {
@@ -1850,8 +1823,6 @@ input:focus, select:focus, textarea:focus {
 
 :root[data-theme="dark"] .topbar { box-shadow: 0 1px 0 rgb(255 255 255 / 0.025); }
 :root[data-theme="dark"] .primary-btn { color: #fff; }
-:root[data-theme="dark"] .search-row { background: color-mix(in srgb, var(--panel) 92%, transparent); }
-:root[data-theme="dark"] .mon-hero { box-shadow: 0 20px 50px rgb(0 0 0 / 0.36); }
 :root[data-theme="dark"] .dex-card:hover,
 :root[data-theme="dark"] .tune-card:hover,
 :root[data-theme="dark"] .party-card:hover,
@@ -1870,11 +1841,6 @@ input:focus, select:focus, textarea:focus {
   .dex-grid.dense { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .dex-card { min-height: 126px; padding: 16px 6px 11px; }
   .dex-card img.sprite { width: 54px; height: 54px; }
-  .mon-hero { min-height: 0; padding: 18px 16px; gap: 13px; }
-  .mon-hero img.sprite { width: 88px; height: 88px; }
-  .mon-hero::after { display: none; }
-  .mon-hero .rank-chip { gap: 5px; }
-  .mon-hero .rank-chip button { min-width: 68px; padding: 5px 8px; }
   .field-row { padding: 12px; }
   .result-inspector-head { align-items: start; flex-direction: column; }
   .result-band { white-space: normal; }
@@ -1916,16 +1882,11 @@ input:focus, select:focus, textarea:focus {
   .matchup-grid th.row-head { height: 40px; min-width: 132px; max-width: 132px; }
   .matchup-grid td { width: 40px; min-width: 40px; height: 40px; }
   .mini-x { width: 36px; height: 36px; font-size: 14px; }
-  .party-calc { width: 34px; height: 34px; opacity: 1; }
+  .party-corner { opacity: 1; }
   .party-copy-row .second-btn { min-height: 36px; }
   .speed-presets button { min-height: 36px; padding-top: 6px; padding-bottom: 6px; }
   .linkish { min-height: 36px; display: inline-flex; align-items: center; padding: 6px 4px; }
   .actual-topk-presets > button, .actual-topk-presets input { min-height: 36px; height: 36px; }
-}
-
-@media (max-width: 520px) and (orientation: portrait) {
-  .trend-chart { display: none; }
-  .trend-mobile { display: block; overflow: hidden; }
 }
 
 @media (max-width: 420px) {
@@ -1933,22 +1894,15 @@ input:focus, select:focus, textarea:focus {
   .dex-grid.dense { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dex-card .nm { font-size: 12.5px; }
   .page-heading-actions { overflow-x: auto; max-width: 100%; padding-bottom: 2px; flex-wrap: nowrap; }
-  .mon-hero { flex-wrap: wrap; }
-  .mon-hero .rank-chip { width: 100%; margin-left: 0; display: flex; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .spinner::before { animation: none; border-top-color: var(--line); }
-  .page-header, .mon-hero { animation: none; }
-  .p-row:hover, .stat-tornado-row:hover, .learnset-row:hover, .builder-gates li:hover,
-  .diag-table tbody tr.diag-row-click:hover, .primary-btn:hover:not(:disabled),
-  .move-chip:hover, .tune-card:hover, .dex-card:hover, .dex-item-card:hover,
-  .mon-hero .rank-chip button:hover, .qa-example:hover,
-  .builder-tactics label:hover { transform: none; }
-  .stat-tornado-row:hover .half .track, .p-row:hover .mini,
-  .p-row:hover .type-badge { transform: none; }
-  .p-row::after, .stat-tornado-row .half .track::after { display: none; }
-  .party-card:hover .party-sprite, .mon-hero:hover img.sprite { transform: none; }
+  .page-header { animation: none; }
+  .p-row:hover, .builder-gates li:hover, .diag-table tbody tr.diag-row-click:hover, .primary-btn:hover:not(:disabled), .move-chip:hover, .tune-card:hover, .dex-card:hover, .dex-item-card:hover, .qa-example:hover, .builder-tactics label:hover { transform: none; }
+  .p-row:hover .mini, .p-row:hover .type-badge { transform: none; }
+  .p-row::after { display: none; }
+  .party-card:hover .party-sprite { transform: none; }
 }
 
 /* ── meta edge rail ───────────────────────────────────────────────────────────────────────
@@ -1959,97 +1913,55 @@ input:focus, select:focus, textarea:focus {
    OVERLAY_FLOOR it covers instead; at that width there is no gutter left to borrow. */
 .shell {
   padding-left: var(--rail-left, 0px);
+  padding-right: var(--rail-right, 0px);
 }
-/* The rail starts BELOW the topbar, so the topbar keeps the full window width and the rail simply
-   overlaps its left end — padding it too would leave a blank corner above the open rail. */
+/* The rails start BELOW the topbar, so the topbar keeps the full window width and each rail simply
+   overlaps its end — padding it too would leave a blank corner above the open rail. */
 .shell > .topbar {
   margin-left: calc(-1 * var(--rail-left, 0px));
+  margin-right: calc(-1 * var(--rail-right, 0px));
 }
 @media (prefers-reduced-motion: no-preference) {
   .shell { transition: padding 200ms var(--ease-out); }
   .shell > .topbar { transition: margin 200ms var(--ease-out); }
 }
-.rail-handle {
-  position: fixed; top: calc(var(--topbar-offset) + 30px); z-index: 9;
-  font: inherit; font-size: 12.5px; font-weight: 650; letter-spacing: 0.05em;
-  padding: 12px 9px; cursor: pointer; color: var(--sub);
-  background: var(--panel); border: 1px solid var(--line-strong);
-  writing-mode: vertical-rl; box-shadow: var(--shadow);
+/* ---- site search panel (components/SideRail.tsx) -------------------------------------------------
+   A floating card under the search entry, at a fixed height: it never takes the page's full height
+   and never pushes the page aside. The filter panel is a second card beside it. */
+.rail-layer {
+  position: fixed; top: calc(var(--topbar-offset) + 8px); left: var(--search-left, 8px); z-index: 30;
+  display: flex; align-items: stretch; gap: 8px; max-width: calc(100vw - 16px);
+  height: min(620px, calc(100vh - var(--topbar-offset) - 24px));
 }
-.rail-handle.left { left: 0; border-left: 0; border-radius: 0 10px 10px 0; }
-.rail-handle.right { right: 0; border-right: 0; border-radius: 10px 0 0 10px; }
-.rail-handle:hover, .rail-handle[aria-expanded="true"] { color: var(--brand-strong); border-color: var(--brand); }
-@media (max-width: 950px) {
-  main.content > .rail-handle.left + .page-header { padding-inline-start: 34px; }
+.rail, .filter-flyout {
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-raised);
 }
-.rail-scrim { position: fixed; inset: var(--topbar-offset) 0 0; background: rgb(16 26 47 / 0.28); z-index: 11; }
-.rail-layer { position: fixed; inset: var(--topbar-offset) 0 0; z-index: 12; pointer-events: none; }
-.rail {
-  position: absolute; top: 0; bottom: 0; left: 0; width: var(--rail-width, 320px);
-  pointer-events: auto; background: var(--panel); border-right: 1px solid var(--line);
-  display: flex; flex-direction: column; min-height: 0;
-}
-.rail-layer.overlay .rail { box-shadow: var(--shadow-raised); width: min(var(--rail-width, 320px), 86vw); }
+.rail { position: relative; flex: none; width: var(--rail-width, 320px); }
 @media (prefers-reduced-motion: no-preference) {
-  .rail { animation: rail-in 200ms var(--ease-out); }
-  @keyframes rail-in { from { transform: translateX(-100%); } }
-  .rail.right { animation-name: rail-in-right; }
-  @keyframes rail-in-right { from { transform: translateX(100%); } }
+  .rail, .filter-flyout { animation: search-in 160ms var(--ease-out); }
+  @keyframes search-in { from { opacity: 0; transform: translateY(-6px); } }
 }
-.trend-rail-body {
-  min-height: 0; overflow-y: auto; flex: 1; padding: 16px 0;
-  display: flex; flex-direction: column; justify-content: safe center;
+@media (max-width: 720px) {
+  .rail-layer { left: 8px; right: 8px; height: min(72vh, calc(100vh - var(--topbar-offset) - 16px)); }
+  .rail { flex: 1; width: auto; }
 }
-.trend-rail-loading { min-height: 180px; display: grid; place-items: center; }
-.rail-layer.trend-overlay { z-index: 20; }
-.trend-overlay .rail.right {
-  width: min(1288px, 100%); background: var(--bg); box-shadow: var(--shadow-raised);
-}
-.trend-overlay .rail-head {
-  display: grid; grid-template-columns: max-content minmax(0, 1fr) auto auto;
-  align-items: center; gap: 12px; padding: 12px 24px;
-  background: var(--panel);
-}
-.trend-overlay .rail-head h3 {
-  grid-column: 1; grid-row: 1; align-self: end;
-  color: var(--ink); font-size: 22px; letter-spacing: normal; text-transform: none;
-}
-.trend-overlay .rail-head-description {
-  grid-column: 2; grid-row: 1; align-self: end; min-width: 0; margin: 0;
-  color: var(--sub); font-size: 12.5px; line-height: 1.5;
-}
-.trend-overlay .rail-head .page-tabs { grid-column: 3; grid-row: 1; }
-.trend-overlay .rail-head > button { grid-column: 4; grid-row: 1; }
-.trend-overlay-chart-scroll {
-  width: calc(100% - 48px); max-width: 1240px; min-width: 0; flex: none;
-  overflow-x: auto; overscroll-behavior-x: contain; margin: 0 auto;
-}
+/* The environment page's trend view (components/TrendView.tsx): the chart keeps its full width and
+   scrolls sideways on a narrow screen instead of being squeezed or replaced by a table. */
+.trend-view { display: grid; gap: 10px; }
+.trend-view-lead { margin: 0; font-size: 13px; line-height: 1.6; }
+.trend-view-scroll { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.trend-view .trend-chart { display: block; width: 100%; min-width: 900px; }
 .trend-scroll-hint { display: none; }
-.trend-overlay .trend-chart { display: block; width: 100%; min-width: 900px; }
 @media (max-width: 950px) {
-  .trend-overlay .rail-head {
-    grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto;
-    column-gap: 12px; row-gap: 7px;
-  }
-  .trend-overlay .rail-head h3 { grid-column: 1; grid-row: 1; }
-  .trend-overlay .rail-head-description { grid-column: 1 / -1; grid-row: 2; }
-  .trend-overlay .rail-head .page-tabs { grid-column: 2; grid-row: 1; }
-  .trend-overlay .rail-head > button { grid-column: 3; grid-row: 1; }
+  .trend-scroll-hint { display: block; margin: 0; color: var(--sub); font-size: 11px; }
 }
-@media (max-width: 950px) {
-  .trend-scroll-hint {
-    display: block; margin: 0 14px 8px; color: var(--sub); font-size: 11px;
-  }
-}
-@media (max-width: 520px) {
-  .trend-overlay .rail-head { padding: 12px 14px; }
-  .trend-overlay .rail-head h3 { font-size: 18px; }
-  .trend-overlay-chart-scroll { width: calc(100% - 24px); }
-}
-.rail-head { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none; }
-.rail-head h3 { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); flex: 1; white-space: nowrap; }
-.rail-head .count { font-size: 11.5px; color: var(--brand-strong); white-space: nowrap; }
-.rail-head > button { font: inherit; font-size: 18px; line-height: 1; border: 0; background: transparent; color: var(--sub); cursor: pointer; padding: 2px 5px; border-radius: 6px; }
+.rail-head { display: flex; align-items: center; gap: 8px; padding: 9px 9px 9px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.rail-head h3 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.rail-head .rail-format { flex: none; padding: 2px; }
+.rail-head .rail-format button { min-height: 0; padding: 3px 9px; font-size: 12px; }
+.rail-head .count { padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-strong); font-size: 11.5px; white-space: nowrap; }
+.rail-head > button { width: 28px; height: 28px; display: inline-grid; place-items: center; padding: 0; font: inherit; font-size: 18px; line-height: 1; border: 0; background: transparent; color: var(--sub); cursor: pointer; border-radius: 8px; }
 .rail-head > button:hover { color: var(--ink); background: var(--panel-2); }
 .rail-search { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); flex: none; }
 .rail-search input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel-2); color: var(--ink); }
@@ -2070,19 +1982,12 @@ input:focus, select:focus, textarea:focus {
 /* The filter panel is hinged to the rail RIGHT edge and may overlap the article. That overlap is
    the point: the checkbox and the list it changes stay on screen together, so a pick is answered
    where it is made instead of costing a trip back. It closes only on its own close button or Esc. */
-.filter-flyout {
-  position: absolute; top: 0; bottom: 0; left: var(--rail-width, 320px); z-index: 1;
-  width: min(392px, calc(100vw - var(--rail-width, 320px) - 14px)); min-width: 240px;
-  pointer-events: auto;
-  background: var(--panel); border-right: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-raised); display: flex; flex-direction: column; min-height: 0;
+.filter-flyout { position: relative; flex: 0 1 392px; min-width: 240px; }
+@media (max-width: 720px) {
+  .filter-flyout { position: absolute; inset: 0; z-index: 1; width: auto; min-width: 0; }
 }
-.rail-layer.overlay .filter-flyout { left: min(var(--rail-width, 320px), 86vw); }
-@media (prefers-reduced-motion: no-preference) {
-  .filter-flyout { animation: rail-in 180ms var(--ease-out); }
-}
-.flyout-head { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex: none; }
-.flyout-head h3 { margin: 0; font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sub); flex: 1; white-space: nowrap; }
+.flyout-head { display: flex; align-items: center; gap: 8px; padding: 9px 9px 9px 14px; border-bottom: 1px solid var(--line); flex: none; }
+.flyout-head h3 { margin: 0; flex: 1; white-space: nowrap; font-size: 13.5px; font-weight: 700; color: var(--ink); }
 .flyout-head .count { font-size: 11.5px; color: var(--brand-strong); white-space: nowrap; }
 .flyout-head > button:last-child { font: inherit; font-size: 18px; line-height: 1; border: 0; background: transparent; color: var(--sub); cursor: pointer; padding: 2px 5px; border-radius: 6px; }
 .flyout-head > button:last-child:hover { color: var(--ink); background: var(--panel-2); }
@@ -2141,56 +2046,8 @@ input:focus, select:focus, textarea:focus {
 .value-list .value-row.on { background: var(--brand-soft); }
 .value-list .value-row.on .box { border-color: var(--brand); background: var(--panel); }
 
-/* ── KO block ─────────────────────────────────────────────────────────────────────────────
-   A second data axis below the usage grid. Direction is encoded with the build-label pair (blue
-   outgoing / violet incoming) plus an arrow, NOT green/red: the matchup grid already owns the whole
-   KO ramp and the check-grade colors, so a warm/green split here would read as a verdict on a list
-   that carries no verdict. */
-.ko-block { margin-top: 26px; }
-.ko-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-bottom: 9px; border-bottom: 1px solid var(--line-strong); margin-bottom: 14px; }
-.ko-head h2 { margin: 0; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--sub); font-weight: 600; }
-.ko-duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
-.ko-notice { margin-top: 18px; }
-.ko-panel > h2.ko-dir { display: flex; align-items: baseline; gap: 9px; }
-.ko-panel .ko-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11.5px; margin-left: auto; }
-.ko-panel.out > h2 { border-top: 3px solid var(--build-a); }
-.ko-panel.in > h2 { border-top: 3px solid var(--build-b); }
-.ko-panel.out .arrow, .ko-panel.out .ko-badge { color: var(--build-a); }
-.ko-panel.in .arrow, .ko-panel.in .ko-badge { color: var(--build-b); }
-.ko-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 8px; padding: 16px 16px 18px; }
-.ko-mon { display: grid; justify-items: center; gap: 3px; text-align: center; min-width: 0; }
-.ko-thumb { position: relative; display: block; width: 54px; height: 54px; }
-.ko-thumb img { width: 54px; height: 54px; display: block; }
-.ko-badge {
-  position: absolute; top: -4px; left: -6px; z-index: 1;
-  width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
-  font-size: 9.5px; background: var(--panel); border: 1px solid var(--line-strong);
-}
-.ko-fc {
-  position: absolute; top: -4px; right: -6px; z-index: 1;
-  font-family: var(--font-mono); font-size: 9px; line-height: 1; padding: 2px 3px;
-  border-radius: 4px; color: var(--warning); background: var(--panel);
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
-}
-.ko-mon .ko-nm { font-size: 11.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.ko-mon .ko-use { font-size: 10px; color: var(--sub); }
-.ko-mon .ko-use.rare { color: var(--warning); }
-/* One line while the move tier is uncollected: label on the left, state on the right. */
-.ko-moves { border-top: 1px solid var(--line); background: var(--panel-2); padding: 9px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.ko-moves .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--sub); }
-.ko-moves .rows { flex: 1 0 100%; padding: 4px 0 0; margin-inline: -16px; }
-.ko-absent { display: inline-flex; gap: 7px; align-items: center; margin-left: auto; font-size: 12px; color: var(--sub); }
-.ko-absent .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warning); flex: none; }
-/* The partner column's new right-hand value is a RANK, not a percentage — same slot, different
-   fact, so it gets the same mono treatment and the rare-pick highlight the KO grid uses. */
-.p-row .p-pct.usage-rank.rare { color: var(--warning); }
 .panel h2 .panel-note { font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 11.5px; margin-left: auto; color: var(--sub); }
 .panel h2 { display: flex; align-items: baseline; gap: 9px; }
-@media (max-width: 720px) {
-  .ko-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .rail-handle { top: calc(var(--topbar-offset) + 8px); padding: 9px 7px; font-size: 11.5px; }
-}
-
 
 /* ==== calc: two-team damage workspace =============================================
    Two columns, one per side, with the RESULTS on top: the answer is what a calculator is
@@ -2702,16 +2559,16 @@ input.stat-cur.hp-cur {
 .dex-flyout-body {
   display: block; overflow-y: auto; padding: 4px 0 12px;
 }
-.filter-flyout:has(.dex-flyout-body) { width: min(400px, calc(100vw - var(--rail-width, 360px) - 14px)); }
+.filter-flyout:has(.dex-flyout-body) { flex-basis: 400px; }
 /* The rail list reuses the ranking rows, so a dex number sits where a rank does. */
 .rail-body.rank-list .rank-row .n { min-width: 34px; }
 
-/* ==== metagame detail: one card size, and picks that assemble a question ============ */
+/* ==== dex detail: one Pokemon, one colour ========================================== */
 
-/* -- one Pokemon, one colour ----------------------------------------------------------
-   `--accent` is the primary type's canonical ink, set inline by the page. Everything the site
+/* `--accent` is the primary type's canonical ink, set inline by the page. Everything the site
    normally paints in brand blue takes it instead, so the colour the hero already wears runs on
-   through the usage bars, the picks, the stat bars and the section rules below it.
+   through the stat bars and the section rules below it. (The metagame detail cards carry their own
+   type accent; see styles.meta.css.)
 
    The derived tokens are MIXES, never the raw type ink: the 19 type colours run from near-yellow to
    near-black, and only a mix toward the page's own ground keeps chrome visible and text legible
@@ -2721,174 +2578,8 @@ input.stat-cur.hp-cur {
 
    `display: contents` lets the wrapper carry the variables without adding a box, so the page's
    layout is exactly what it was before it had a colour. */
-.mon-theme { display: contents; }
-.mon-theme {
-  --brand: color-mix(in srgb, var(--accent, #2457df) 72%, #0d1a2c);
-  --brand-strong: color-mix(in srgb, var(--accent, #2457df) 46%, #071019);
-  --brand-soft: color-mix(in srgb, var(--accent, #2457df) 13%, #ffffff);
-  /* The ink, not the chrome tone: a focus ring has to carry whichever type this is, and only the
-     ink version clears 3:1 for the palest of them. */
-  --focus: var(--brand-strong);
-  --pct-fill: color-mix(in srgb, var(--accent, #2457df) 15%, transparent);
-}
-:root[data-theme="dark"] .mon-theme {
-    /* Mixed toward white instead: on the dark ground the same inks have to come up, not down. */
-    --brand: color-mix(in srgb, var(--accent, #7fa5ff) 76%, #ffffff);
-    --brand-strong: color-mix(in srgb, var(--accent, #7fa5ff) 52%, #ffffff);
-    --brand-soft: color-mix(in srgb, var(--accent, #7fa5ff) 26%, #0d1420);
-    --pct-fill: color-mix(in srgb, var(--accent, #7fa5ff) 20%, transparent);
-}
 
-/* Every panel is the same box whether it lists ten rows or two. A card that shrinks to its content
-   makes the grid ripple from Pokemon to Pokemon, and the reader re-finds the same panel in a
-   different place each time. Derived from the parts rather than typed as one number, so a font or
-   padding change carries through. */
-.detail-grid {
-  --panel-head-h: 44px;
-  --p-row-h: 38px;
-  --rows-pad: 12px;      /* .panel .rows, 6px top and bottom */
-  --panel-frame: 2px;    /* the card's own 1px border, top and bottom — a percentage max-height
-                            resolves against the CONTENT box, so leaving it out cost the tenth row
-                            two pixels and gave every full card a scrollbar. */
-  --detail-card-h: calc(var(--panel-head-h) + var(--rows-pad) + 10 * var(--p-row-h)
-                        + var(--panel-frame));
-  align-items: start;
-}
-.detail-grid > .panel, .detail-grid > .detail-pair { height: var(--detail-card-h); }
-.detail-grid > .panel > .rows { overflow-y: auto; max-height: calc(100% - var(--panel-head-h)); }
-
-/* The stat card and the abilities card share one cell, gap included, so the pair is exactly one
-   card tall. The abilities half is fixed at its three-row maximum: sizing it to content would make
-   the stat card above it change height from one Pokemon to the next, for no reason a reader could
-   name. */
-.detail-pair {
-  display: grid; grid-template-rows: 1fr auto; gap: 14px; min-width: 0;
-}
-.detail-pair > .ability-panel {
-  height: calc(var(--panel-head-h) + var(--rows-pad) + 3 * var(--p-row-h) + var(--panel-frame));
-}
-.detail-pair > .panel { min-height: 0; }
-
-/* -- the stat value card ------------------------------------------------------------- */
-.stat-values { display: flex; flex-direction: column; min-height: 0; }
-.sv-rows { display: grid; align-content: space-evenly; padding: 4px 16px 10px; flex: 1; min-height: 0; }
-.sv-row { display: grid; grid-template-columns: 38px 34px 1fr 72px; gap: 10px; align-items: center; }
-.sv-row .k { font-size: 11px; font-weight: 700; color: var(--sub); font-family: var(--font-mono); }
-.sv-row .base { font-size: 12.5px; color: var(--sub); text-align: right; }
-.sv-row .track {
-  display: flex; height: 8px; border-radius: 5px; background: var(--panel-2); overflow: hidden;
-}
-.sv-row .track .solid { background: var(--brand); }
-.sv-row .track .ext { background: color-mix(in srgb, var(--brand) 34%, transparent); }
-.sv-row .v { text-align: right; font-size: 13px; font-weight: 650; }
-.sv-row .v.up { color: var(--success); }
-.sv-row .v.down { color: var(--danger); }
-
-/* -- pressing a row takes it into the question ---------------------------------------
-   ONE shape says everything: a ring around the row, faint under the pointer and solid once picked.
-   A picked row therefore keeps its ring while hovered — the pointer deepens what is already there
-   instead of replacing it — and a row never carries two different markers at once.
-
-   Selection can NOT be a background tint here: the row background already carries the usage bar,
-   and a second wash in the same hue reads as more usage rather than as a choice. It is also not a
-   trailing glyph: that costs width the names need, and ten of them turn a card into a checklist.
-   The rank keeps being the rank. */
-.p-row.pickable { cursor: pointer; user-select: none; }
-/* The site's left rail is the hover language for rows that GO somewhere. These rows toggle, so the
-   ring is their only marker — the rail beside it was the second small bar in a different colour. */
-.p-row.pickable::before { display: none; }
-/* The ring is a LAYER of its own, not a radius on the row. Rounding the row itself rounds the usage
-   bar with it, and ten stacked rounded bars scallop the card's left edge into notches. Inset from
-   the sides so the ring reads as a mark on the row rather than a second card border, and behind the
-   text (the row is a stacking context, so z-index:-1 is still above the row's own background). */
-.p-row.pickable::after {
-  content: ""; display: block; position: absolute; inset: 1px 6px; z-index: -1;
-  border-radius: 8px; pointer-events: none;
-  box-shadow: inset 0 0 0 1.5px transparent;
-  transition: box-shadow 130ms ease, background-color 130ms ease;
-}
-.p-row.pickable:hover::after {
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--brand) 34%, transparent);
-}
-/* Pressed is the picked look, arriving on mousedown: the row answers the finger, not the release. */
-.p-row.pickable:active::after, .p-row.pickable.picked::after,
-.p-row.pickable.picked:hover::after {
-  box-shadow: inset 0 0 0 1.5px var(--brand);
-  background: color-mix(in srgb, var(--brand) 7%, transparent);
-}
-.p-row.pickable:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.p-row.locked { cursor: default; opacity: 0.5; }
-.p-row.locked:hover::after, .p-row.locked:active::after {
-  box-shadow: inset 0 0 0 1.5px transparent; background: none;
-}
-.p-row.picked .p-name { font-weight: 700; color: var(--ink); }
-.p-row.picked .p-rank { color: var(--brand-strong); font-weight: 700; }
-
-/* A row is exactly one row tall. A long name shortens rather than wrapping: a wrapped line pushes
-   the tenth row past the card's fixed height, and the card grows a scrollbar it was sized never to
-   need — the very rippling the fixed height exists to prevent. */
-.detail-grid .p-row { height: var(--p-row-h); min-height: 0; white-space: nowrap; }
-.detail-grid .p-row .p-name { min-width: 0; overflow: hidden; }
-.detail-grid .p-row .p-name > .ehover { min-width: 0; max-width: 100%; }
-
-/* A KO tile picks from its portrait and travels from its name, so each target says which it is.
-   Same ring as the rows, drawn outside the sprite so the art stays whole. */
-.ko-thumb { position: relative; border-radius: 9px;
-  transition: box-shadow 130ms ease, background-color 130ms ease, transform 120ms var(--ease-out); }
-.ko-thumb.pickable { cursor: pointer; }
-.ko-thumb.pickable:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 34%, transparent); }
-.ko-thumb.pickable:active { transform: scale(0.955); }
-.ko-thumb.locked { cursor: default; opacity: 0.45; }
-.ko-thumb.locked:hover, .ko-thumb.locked:active { box-shadow: none; transform: none; }
-.ko-mon.picked .ko-thumb, .ko-mon.picked .ko-thumb.pickable:hover {
-  box-shadow: 0 0 0 2px var(--brand);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-}
-/* The portrait is a picture, not a row: it has no name to embolden and no rank to recolour, so the
-   badge is what states "picked" at a glance across a grid of twelve. */
-.ko-tick {
-  position: absolute; right: -4px; bottom: -4px; width: 17px; height: 17px;
-  display: grid; place-items: center; border-radius: 50%;
-  background: var(--brand-strong); color: #fff; font-size: 11px; font-weight: 800;
-  box-shadow: 0 0 0 2px var(--panel);
-}
-/* The accent ink comes UP toward white on the dark ground, so the glyph on it goes down. */
-:root[data-theme="dark"] .ko-tick { color: #0d1420; }
-.ko-mon.picked .ko-nm { font-weight: 700; color: var(--brand-strong); }
-.ko-nm { color: inherit; }
-a.ko-nm:hover { color: var(--brand-strong); }
-
-/* -- the usage grid's own section head ------------------------------------------------ */
-.meta-head {
-  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  margin: 20px 0 0; padding-bottom: 9px; border-bottom: 1px solid var(--line-strong);
-}
-.meta-head h2 {
-  margin: 0; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.15em;
-  text-transform: uppercase; color: var(--sub); font-weight: 600;
-}
-.meta-head-hint { margin-left: auto; font-size: 12px; color: var(--sub); }
-.meta-head + .detail-grid { margin-top: 14px; }
-
-/* -- the hero's action, under the rank chips -----------------------------------------
-   The auto margin that used to push the chips to the hero's right edge now belongs to the column
-   that holds them; stretching that column puts the chips at the top and the action at the bottom,
-   which lands it level with the ability chips on the other side of the header. */
-.mon-hero .hero-side {
-  margin-left: auto; align-self: stretch; gap: 10px;
-  display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between;
-}
-.mon-hero .hero-side .rank-chip { margin-left: 0; }
-.mon-hero .hero-action {
-  font: inherit; font-size: 13px; font-weight: 650; white-space: nowrap; cursor: pointer;
-  padding: 7px 16px; border-radius: 8px;
-  border: 1px solid rgb(255 255 255 / 0.45); background: rgb(255 255 255 / 0.16); color: #fff;
-}
-.mon-hero .hero-action:hover { background: rgb(255 255 255 / 0.28); }
-
-@media (max-width: 720px) {
-  .mon-hero .hero-side { align-self: auto; }
-}
+/* -- the dex hero's rank column ---------------------------------------------------------- */
 
 /* ==== calc workspace, eighth pass ================================================== */
 
@@ -2901,7 +2592,6 @@ a.ko-nm:hover { color: var(--brand-strong); }
 .duel-roll-read {
   flex: none; display: inline-flex; align-items: baseline; gap: 4px; min-width: 0;
 }
-.rail.right { left: auto; right: 0; border-right: 0; border-left: 1px solid var(--line); }
 .duel-roll-read strong { font-size: 15px; font-weight: 750; }
 .duel-roll-read .muted { font-size: 11px; }
 .duel-roll-lane { flex: 0 1 31%; width: 31%; max-width: 31%; min-width: 70px; }
@@ -2970,7 +2660,7 @@ input.stat-cur.hp-cur { text-align: center; }
    Both anchors already show the species. Start directly with the choices and spend the saved
    height on the fields that distinguish two real builds. */
 .build-picker {
-  position: fixed; z-index: 1050; max-height: min(70vh, 620px); overflow: auto;
+  position: fixed; z-index: 2050; max-height: min(70vh, 620px); overflow: auto;
   padding: 5px; border: 1px solid var(--line-strong); border-radius: 12px;
   background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised);
   text-align: left; cursor: default;
@@ -2981,6 +2671,12 @@ input.stat-cur.hp-cur { text-align: center; }
 }
 .build-picker-state { padding: 18px 12px; color: var(--sub); text-align: center; font-size: 12px; }
 .build-picker-list { list-style: none; display: grid; gap: 4px; margin: 4px 0 0; padding: 0; }
+.build-picker-sections { display: grid; gap: 10px; margin-top: 4px; }
+.build-picker.split .build-picker-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.build-picker-section-head {
+  position: sticky; top: -5px; z-index: 1; margin: 0; padding: 6px 7px 4px; background: var(--panel);
+  font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: 0.02em;
+}
 .build-card {
   display: block; width: 100%; padding: 6px 7px; border: 1px solid var(--line);
   border-radius: 9px; background: color-mix(in srgb, var(--panel-2) 58%, transparent);
@@ -3005,6 +2701,15 @@ input.stat-cur.hp-cur { text-align: center; }
   border-bottom: 1px solid var(--line); background: var(--panel-2); }
 .calc-rail-builds .build-card { background: var(--panel); }
 .calc-rail-custom { font-size: 12px; font-weight: 700; min-height: 30px; }
+/* The teams page's rail head: which builds it offers, which box it fills, and how. */
+.teams-rail-intro { display: grid; gap: 6px; padding: 8px 14px 9px; border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--brand) 4%, var(--panel)); }
+.teams-rail-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12px; color: var(--sub); }
+.teams-rail-row .rail-format { flex: none; padding: 2px; }
+.teams-rail-row .rail-format button { min-height: 0; padding: 3px 9px; font-size: 12px; }
+.teams-rail-row label { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.teams-rail-row select { min-height: 0; height: 28px; padding: 0 26px 0 8px; font-size: 12.5px; }
+.teams-rail-hint { margin: 0; font-size: 11.5px; line-height: 1.5; }
 .calc-rail-feedback { padding: 8px 14px; border-bottom: 1px solid var(--line);
   font-size: 11.5px; line-height: 1.35; }
 .calc-rail-feedback.ok { color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--panel)); }
@@ -3165,8 +2870,7 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   align-self: center; margin-left: auto;
 }
 .tune-command > .tune-note, .tune-command > .tune-proposal { margin-top: 10px; }
-@media (max-width: 800px) {
-}
+
 .build-card.on {
   border-color: var(--brand); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 24%, transparent);
   background: color-mix(in srgb, var(--brand) 9%, var(--panel));
@@ -3195,8 +2899,12 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   color: var(--sub); font-size: 10.5px; line-height: 1.25; white-space: nowrap;
 }
 .build-card-identity > span:not(.build-card-sep) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.build-card-identity > span:last-child { flex: none; }
+.build-card-identity > span:last-of-type { flex: none; }
+.build-card-identity .keep-mon { margin-left: 4px; }
 .build-card-share { display: grid; justify-items: end; gap: 1px; color: var(--sub); font-size: 10.5px; white-space: nowrap; }
+/* The corner's actions sit on the card's first line, level with the tag and the item. */
+.build-card-corner { display: inline-flex; align-items: center; gap: 4px; align-self: center; }
+.build-card-corner .keep-mon { margin: 0; }
 .build-card-share em { color: var(--brand); font-size: 9px; font-style: normal; font-weight: 700; }
 .build-card-title { font-size: 11px; font-weight: 700; }
 .build-card-sep { flex: none; margin: 0 3px; color: currentColor; opacity: .78; }
@@ -3436,6 +3144,9 @@ button.swap-seam:active:not(:disabled) { transform: none; }
    invisible, and clipped by the row so they never add scroll width. */
 .team-conds .spill { position: absolute; top: 0; left: 0; visibility: hidden; pointer-events: none; }
 .team-bar.mirrored .team-conds { grid-column: 1; flex-direction: row-reverse; }
+/* "+ 状态" holds the outer corner under the side's name; the chips start under the roster. */
+.team-cond-btn { grid-column: 1; grid-row: 2; justify-self: start; align-self: center; }
+.team-bar.mirrored .team-cond-btn { grid-column: 2; justify-self: end; }
 .duel-bar [data-cat="wall"] { --cat: var(--cond-wall); }
 .duel-bar [data-cat="boost"] { --cat: var(--cond-boost); }
 .duel-bar [data-cat="speed"] { --cat: var(--cond-speed); }
@@ -3607,6 +3318,7 @@ button.swap-seam:active:not(:disabled) { transform: none; }
 .duel-menu-row:hover { background: var(--panel-2); }
 .duel-menu-row.on { background: var(--brand-soft); color: var(--brand-strong); font-weight: 700; }
 .duel-menu-row.danger { color: var(--danger); }
+.duel-menu-row:disabled { opacity: .45; cursor: default; background: none; }
 .duel-menu-sep { height: 1px; margin: 4px 6px; background: var(--line); }
 .field-pick-pop { left: 50%; translate: -50% 0; min-width: 100%; width: max-content; }
 .team-cond-pop, .field-shared-pop { max-width: calc(100cqw - 24px); padding: 10px; }
@@ -3684,6 +3396,7 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   .team-bar.mirrored .team-strip, .team-bar.mirrored .team-conds {
     grid-column: 2; flex-direction: row;
   }
+  .team-bar.mirrored .team-cond-btn { grid-column: 1; justify-self: start; }
   .team-bar.mirrored .team-who-btn { justify-items: start; padding: 3px 8px 3px 6px; text-align: left; }
   .team-bar.mirrored .duel-menu, .team-bar.mirrored .team-cond-pop,
   .team-bar.mirrored .paste-pop { left: 0; right: auto; }
@@ -3757,6 +3470,9 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mt) 26%, transparent);
 }
 .duel-portrait .hp-bar-sprite { width: 44px; height: 44px; }
+/* An editor's portrait carries the whole build: dragged onto a dock box cell it is kept there. */
+.duel-portrait.draggable { cursor: grab; }
+.duel-portrait.draggable:active { cursor: grabbing; }
 .duel-ident { display: grid; gap: 3px; min-width: 0; }
 .duel-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .duel-name {
@@ -3772,6 +3488,89 @@ button.swap-seam:active:not(:disabled) { transform: none; }
 .duel-dmg-pct.ko-text-none { color: var(--sub); }
 .duel-dmg-hp { font-size: 12px; font-weight: 650; color: var(--sub); }
 .duel-dmg-hp small { font-size: 10.5px; font-weight: 600; }
+/* Under the percent: the KO verdict, with this matchup's caveat glyph just before it. */
+.duel-verdict-line { display: inline-flex; align-items: center; gap: 6px; min-height: 18px; }
+.duel-verdict-line .duel-summary-verdict { height: 18px; padding: 0; font-size: 12.5px; }
+.duel-verdict-line .muted { font-size: 12px; font-weight: 500; }
+/* The glyph sits at the card's right edge, so its note opens leftward instead of centring. */
+.duel-verdict-line .hp-warning::after { left: auto; right: -6px; transform: translate(0, 3px); }
+.duel-verdict-line .hp-warning:hover::after,
+.duel-verdict-line .hp-warning:focus-visible::after { transform: translate(0, 0); }
+/* The same band in HP rides on the percent as its tooltip. */
+.duel-tip { position: relative; cursor: help; outline: none; }
+.duel-tip::after {
+  content: attr(data-tooltip); position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 40;
+  width: max-content; padding: 5px 9px; border: 1px solid var(--line-strong); border-radius: 7px;
+  background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised);
+  font: 650 12px/1.4 var(--font-ui); letter-spacing: 0; font-variant-numeric: tabular-nums;
+  opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(3px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+.duel-tip:hover::after, .duel-tip:focus-visible::after { opacity: 1; visibility: visible; transform: none; }
+.duel-tip:focus-visible { border-radius: 4px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 45%, transparent); }
+
+/* The roll row: reading, a shorter slider, the named rolls and hit flags right after it, and the
+   copy control closing the row. */
+.duel-rolls .duel-roll-lane { flex: 0 1 22%; width: 22%; max-width: 22%; min-width: 64px; }
+.duel-rolls .duel-roll-btns { margin-left: 2px; }
+.duel-copy { position: relative; flex: none; margin-left: auto; }
+.duel-copy-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 60;
+  display: grid; gap: 8px; width: min(460px, 82vw); padding: 10px 12px;
+  border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel);
+  box-shadow: var(--shadow-raised); text-align: left;
+  opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms var(--ease-out), visibility 140ms ease;
+}
+.duel-copy:hover .duel-copy-pop, .duel-copy:focus-within .duel-copy-pop {
+  opacity: 1; visibility: visible; transform: none;
+}
+.duel-copy-pop .duel-summary {
+  height: auto; overflow: visible; white-space: normal; line-height: 1.7;
+  font-size: 13px; color: var(--ink);
+}
+.duel-copy-pop .duel-line-text {
+  display: block; padding: 8px 10px; border-radius: 7px; background: var(--panel-2);
+  font-size: 11.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--sub);
+}
+@media (max-width: 720px) {
+  .duel-rolls .duel-roll-lane { flex-basis: 60%; width: 60%; max-width: 60%; }
+}
+
+/* -- the result block, tidied: one accent per job ------------------------------------------
+   KO tone colours the damage percent (the headline and each move) and nothing else; the verdict
+   under the headline is the same fact in words, in ink. */
+.duel-verdict-line .duel-summary-verdict { color: var(--ink); font-weight: 650; }
+.duel-verdict-line .duel-summary-verdict.guaranteed { font-weight: 750; }
+/* The HP numbers sit on the bar itself, lifted by a halo instead of boxed in pills; only the
+   fainted tag keeps a fill, because it is the one that must stop the eye. */
+.hp-bar-track .hp-bar-tag { padding: 0; background: none; color: var(--ink); letter-spacing: .04em;
+  text-shadow: 0 0 3px var(--panel), 0 0 1px var(--panel); }
+.hp-bar-track .hp-bar-tag.out { padding: 1px 7px; background: var(--danger); color: #fff; text-shadow: none; }
+.hp-bar-track .hp-bar-read { text-shadow: 0 0 3px var(--panel), 0 0 1px var(--panel); }
+.hp-bar-track .hp-bar-pct { margin-left: 6px; padding: 0; background: none; color: var(--sub); font-weight: 650; }
+/* The roll row speaks one button language: the named rolls are a segmented group, crit and single
+   target stand apart as flags in the same face, and copy wears it too. Pressed = soft brand fill. */
+.duel-rolls .roll-btn, .duel-copy .ghost-btn.tiny {
+  height: 26px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px;
+  background: var(--panel); color: var(--sub); font-size: 11.5px; font-weight: 600;
+}
+.duel-rolls .duel-roll-group { border-radius: 7px; }
+.duel-rolls .duel-roll-group .roll-btn { height: 24px; border: 0; border-right: 1px solid var(--line); border-radius: 0; }
+.duel-rolls .duel-roll-group .roll-btn:last-child { border-right: 0; }
+.duel-rolls .roll-btn.flag, .duel-rolls .roll-btn.flag.on { border-style: solid; }
+.duel-rolls .roll-btn.on, .duel-rolls .duel-roll-group .roll-btn.on {
+  background: var(--brand-soft); color: var(--brand-strong); box-shadow: none;
+}
+.duel-rolls .roll-btn.flag.on { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); }
+.duel-rolls .roll-btn:hover:not(:disabled):not(.on),
+.duel-copy .ghost-btn.tiny:hover:not(:disabled) { color: var(--ink); border-color: var(--line-strong); background: var(--panel); }
+/* The reading keeps fixed columns, so a digit more or less never slides the slider. */
+.duel-roll-read {
+  display: inline-grid; grid-template-columns: 3.3ch 6.3ch; column-gap: 5px; align-items: baseline;
+}
+.duel-roll-read strong { text-align: right; }
+.duel-roll-read .muted { text-align: left; }
 
 /* -- health: the bar at the selected roll, the band across all sixteen ---------------------- */
 .hp-bar-track {
@@ -4253,4 +4052,52 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   .tw-chips { height: 68px; }
   .tw-chips-empty { white-space: normal; line-height: 1.4; }
   .tw-solve .tw-action { width: 100%; }
+}
+
+/* ==== shared overlays: modal dialog + toasts (components/Modal.tsx, components/Toast.tsx) ==== */
+.modal-backdrop { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 16px;
+  background: rgb(8 14 24 / 0.55); }
+.modal { display: grid; gap: 12px; max-height: calc(100vh - 32px); overflow: auto; padding: 14px 18px 16px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: var(--shadow-raised); }
+.modal:focus { outline: none; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-head h2 { margin: 0; font-size: 16px; }
+.modal-close { flex: none; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--sub);
+  font-size: 20px; line-height: 1; cursor: pointer; }
+.modal-close:hover { background: var(--panel-2); color: var(--ink); }
+.modal-body { display: grid; gap: 12px; min-width: 0; }
+.modal-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+
+.toast-region { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 2100;
+  display: grid; justify-items: center; gap: 8px; transform: translateX(-50%); pointer-events: none; }
+.toast { display: inline-flex; align-items: center; gap: 14px; min-height: 40px; max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 10px 8px 16px; border-radius: 10px; background: var(--ink); color: var(--panel); font-size: 13.5px;
+  box-shadow: var(--shadow-raised); pointer-events: auto; animation: toastIn 180ms var(--ease-out) both; }
+.toast button { flex: none; padding: 5px 10px; border: 0; border-radius: 7px; background: transparent;
+  color: color-mix(in srgb, var(--brand) 55%, var(--panel)); font-weight: 700; cursor: pointer; }
+.toast button:hover { background: color-mix(in srgb, var(--panel) 12%, transparent); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* The "+" that keeps one Pokémon in the current box (components/KeepMonButton.tsx). It sits inline
+   after a build's nature on compact cards, so it reads as part of that build line. */
+.keep-mon {
+  flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0;
+  margin-left: 6px; vertical-align: -5px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--panel); color: var(--sub); cursor: pointer;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
+}
+.keep-mon svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.keep-mon:hover:not(:disabled) { color: #fff; background: var(--brand); border-color: var(--brand); }
+.keep-mon:disabled { opacity: 0.5; cursor: default; }
+.keep-mon:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+/* Beside the environment-build button of an editor, where the row already spaces its controls. */
+.mon-editor-actions .keep-mon { margin-left: 0; vertical-align: middle; }
+@media (pointer: coarse) {
+  .modal-close, .keep-mon, .ghost-btn.tiny, .second-btn.tiny, .lib-box-rename,
+  .team-export-btn, .mon-build-btn, .mon-form-toggle, .topbar .topbar-tool,
+  .theme-toggle button, .topbar select, .primary-btn, .second-btn, .ghost-btn,
+  .seg button, .seg.page-tabs button, .field-format.seg button, .subtabs button {
+    min-width: 44px; min-height: 44px;
+  }
+  .topbar nav a { min-height: 44px; display: inline-flex; align-items: center; }
 }

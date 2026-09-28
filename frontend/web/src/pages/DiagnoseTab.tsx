@@ -1,11 +1,12 @@
 /** Team diagnose tab (team.validate, design §7.5): free-form team text (Showdown export or
- * team-json) -> parse -> validate + diagnose report, with an optional AI reading. Lives
- * inside the builder page (same "teams" domain, shares TeamCard) and
- * accepts a hand-off from the wizard result ("diagnose this team"). Report facts render
- * with dex-localized species chips; session continuity mirrors the wizard's. */
+ * team-json) -> parse -> validate + diagnose report, with an optional AI reading. Lives on the
+ * assist page and accepts a team handed over from a saved team or the wizard result ("diagnose
+ * this team"). Report facts render with dex-localized species chips; session continuity mirrors
+ * the wizard's. */
+import "../styles.assist.css";
 import type { DiagnoseReportDto, FormatId } from "@pokemon-champions/protocol";
 import { DIAGNOSE_TEXT_MAX_CHARS, DiagnoseReportDtoSchema } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { EntityHover } from "../components/EntityHover.tsx";
 import { FormatTabs } from "../components/FormatTabs.tsx";
 import { TypeBadge } from "../components/TypeBadge.tsx";
@@ -16,14 +17,21 @@ import { useNavigate } from "react-router-dom";
 import { useDamageText } from "../lib/damageText.tsx";
 import { useAbilitiesByName, useItemsByName, useOppCache } from "../hooks.ts";
 import {
-  readTeamMembers, rememberMatchupSource, stashCalcTeams, stashDamageFill,
+  readTeamMembers, stashCalcTeams, stashDamageFill,
   stashMatchupFill, teamToCalcMembers,
 } from "../lib/team.ts";
-import { slugify } from "./uep/MonChip.tsx";
+import { MemberHover, slugify, useMemberProse, useMemberSets } from "../components/team/MonChip.tsx";
+import type { TeamMemberish } from "../lib/team.ts";
 import { useProseRenderer } from "../lib/prose.tsx";
 import { HttpError } from "../runtime/adapter.ts";
 import { useRuntime } from "../runtime/context.tsx";
-import { TeamCard } from "./uep/TeamCard.tsx";
+import { TeamCard } from "../components/team/TeamCard.tsx";
+import { HintButton } from "../components/HintButton.tsx";
+import { setMember } from "../components/BuildPicker.tsx";
+import { KeepMonButton } from "../components/KeepMonButton.tsx";
+import { useTransferT } from "../lib/library/transferMessages.ts";
+import { useLibraryDrop, useLibraryReceiver, useLibrarySource } from "../lib/library/workspace.tsx";
+import { toTeamDoc } from "../lib/teamDoc.ts";
 
 type ErrorKind = "limit" | "unparseable" | "generic";
 
@@ -123,7 +131,7 @@ function DiagnoseProgress({ submission, reportReady }: {
       {!reportReady && team ? (
         <div className="diag-progress-preview">
           <h3>{t("diag.progress.preview")}</h3>
-          <TeamCard team={team} />
+          <TeamCard team={team} keepOrigin="diagnose" />
         </div>
       ) : !reportReady ? (
         <p className="muted diag-progress-note">{t("diag.progress.previewPending")}</p>
@@ -146,22 +154,30 @@ function writeStash(s: DiagStash): void {
   } catch { /* storage blocked */ }
 }
 
-/** Localized species chips (English canonical in, dex display name out). */
-function SpeciesChips({ names }: { names: string[] }) {
+/** The diagnosed team's members by species, for the chips below that name one of them. */
+const MemberSets = createContext<(species: string) => TeamMemberish | undefined>(() => undefined);
+
+/** Localized species chips (English canonical in, dex display name out). A chip that names one of
+ * the diagnosed team's members shows that member's build on hover; an `opponent` chip keeps the dex
+ * hover even when the opponent shares a member's species. */
+function SpeciesChips({ names, opponent = false }: { names: string[]; opponent?: boolean }) {
   const dex = useDexByName();
   const { lang } = useLang();
+  const memberOf = useContext(MemberSets);
   if (names.length === 0) return <span className="muted">—</span>;
   return (
     <span className="gate-detail-chips">
       {names.map((n, i) => {
         const entry = dex.get(n);
-        return (
-          <EntityHover key={`${n}-${i}`} kind="pokemon" name={n}>
-            <span className="gate-chip" title={n}>
-              {entry ? displayName(entry, lang) : n}
-            </span>
-          </EntityHover>
+        const chip = (
+          <span className="gate-chip" title={n}>
+            {entry ? displayName(entry, lang) : n}
+          </span>
         );
+        const member = opponent ? undefined : memberOf(n);
+        return member
+          ? <MemberHover key={`${n}-${i}`} mon={member}>{chip}</MemberHover>
+          : <EntityHover key={`${n}-${i}`} kind="pokemon" name={n}>{chip}</EntityHover>;
       })}
     </span>
   );
@@ -257,6 +273,7 @@ function CheckRowDetail({ row, team, format }: {
             <div className="md-line md-caveat">
               {damageText.name([oppSet.item, oppSet.ability, oppSet.nature]
                 .filter(Boolean).join(" · "))}
+              <KeepMonButton member={() => setMember(oppSet)} origin="diagnose" />
               {cell.coverage != null && (
                 <span className="muted num"> · {(cell.coverage * 100).toFixed(1)}%</span>
               )}
@@ -546,8 +563,11 @@ function ModePressure({ report }: { report: DiagnoseReportDto }) {
 
 function Report({ report }: { report: DiagnoseReportDto }) {
   const t = useT();
+  const navigate = useNavigate();
   const prose = useProseRenderer();
-  const damageText = useDamageText();
+  const memberProse = useMemberProse(report.team);
+  const memberOf = useMemberSets(report.team);
+  const teamFormat = (report.team as { format?: string })?.format === "double" ? "double" : "single";
   const [selOpp, setSelOpp] = useState<string | null>(null);
   const [showAllChecks, setShowAllChecks] = useState(false);
   const valid = report.legality.status === "valid";
@@ -570,11 +590,6 @@ function Report({ report }: { report: DiagnoseReportDto }) {
     setSelOpp(null);
     setShowAllChecks(false);
   }, [report]);
-  useEffect(() => {
-    const format = (report.team as { format?: string })?.format === "double" ? "double" : "single";
-    rememberMatchupSource({ source: "diagnose", label: t("actual.source.diagnose"), format,
-      team: report.team });
-  }, [report, t]);
   const issueText = (issue: (typeof issues)[number]) => {
     const key = optionalKey(`validation.${issue.code}`);
     return key ? fillTemplate(t(key), issue.params) : t("diag.warningGeneric");
@@ -614,7 +629,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
     });
   };
   return (
-    <>
+    <MemberSets.Provider value={memberOf}>
       <div className="panel result-panel builder-result">
         {bare.some && (
           <p className="notice diag-partial">{t("diag.partial")}</p>
@@ -633,14 +648,26 @@ function Report({ report }: { report: DiagnoseReportDto }) {
               : <li>{t("diag.warningGeneric")}</li>}
           </ul>
         )}
-        <TeamCard team={report.team} badges={
+        <TeamCard team={report.team} keepOrigin="diagnose" badges={
           <div className="builder-badges">
             <span className={valid ? "badge-ok" : unknown ? "badge-note" : "badge-err"}>
               {valid ? "✓ " : unknown ? "? " : "✗ "}
               {t(`diag.legality.${valid ? "valid" : unknown ? "unknown" : "invalid"}`)}
             </span>
           </div>
-        } />
+        } actions={<>
+          <HintButton hint={t("team.sendCalcHint")}
+            onClick={() => {
+              stashCalcTeams({ format: teamFormat,
+                attackers: teamToCalcMembers(report.team), defenders: [] });
+              navigate("/calc?tab=damage");
+            }}>{t("team.sendCalc")}</HintButton>
+          <HintButton hint={t("actual.sendMatchupHint")} onClick={() => {
+            stashMatchupFill({ source: "diagnose", label: t("actual.source.diagnose"),
+              format: teamFormat, team: report.team });
+            navigate("/matchup?mode=actual");
+          }}>{t("actual.sendMatchup")}</HintButton>
+        </>} />
         <MegaFacts team={report.team} />
       </div>
 
@@ -649,7 +676,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
         <div className="panel builder-result diag-section diag-explain">
           <h2>{t("diag.explanation")}</h2>
           {report.explanation.split(/\n+/).map((para, i) => (
-            <p key={i} className="qa-answer-text">{prose(para)}</p>
+            <p key={i} className="qa-answer-text">{memberProse(para)}</p>
           ))}
         </div>
       )}
@@ -675,7 +702,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
                 .replace("{total}", String(allCheckRows.length))}
             </span>
             {allCheckRows.length > 10 && (
-              <button type="button" className="secondary-btn diag-check-toggle"
+              <button type="button" className="diag-check-toggle" aria-expanded={showAllChecks}
                 onClick={() => {
                   if (showAllChecks && selOpp
                       && !allCheckRows.slice(0, 10).some((row) => row.opponent === selOpp)) {
@@ -685,6 +712,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
                 }}>
                 {t(showAllChecks ? "diag.checks.showTop" : "diag.checks.showAll")
                   .replace("{total}", String(allCheckRows.length))}
+                <svg viewBox="0 0 12 12" aria-hidden><path d="M3 4.5 6 7.5 9 4.5" /></svg>
               </button>
             )}
           </div>
@@ -711,7 +739,7 @@ function Report({ report }: { report: DiagnoseReportDto }) {
                       className={`${clickable ? "diag-row-click" : ""}${on ? " on" : ""}`}
                       onClick={clickable
                         ? () => setSelOpp(on ? null : row.opponent) : undefined}>
-                    <td><SpeciesChips names={[row.opponent]} /></td>
+                    <td><SpeciesChips names={[row.opponent]} opponent /></td>
                     <td>
                       <span className={`diag-grade diag-grade-${grade}`}>{grade}</span>
                       {!row.calculationComplete && (
@@ -872,20 +900,19 @@ function Report({ report }: { report: DiagnoseReportDto }) {
           ))}
         </div>
       </div>}
-    </>
+    </MemberSets.Provider>
   );
 }
 
 export function DiagnoseTab({ active, fill, onConsumeFill }: {
   active: boolean;
-  /** A team-json handed over from the wizard result ("diagnose this team"). */
+  /** A team-json handed over from a saved team or the wizard result ("diagnose this team"). */
   fill: unknown | null;
   onConsumeFill: () => void;
 }) {
   const { adapter } = useRuntime();
   const t = useT();
   const { lang } = useLang();
-  const navigate = useNavigate();
   const stash = useMemo(readStash, []);
   const [format, setFormat] = useState<FormatId>(stash.format ?? "single");
   const [text, setText] = useState(stash.text ?? "");
@@ -1008,30 +1035,40 @@ export function DiagnoseTab({ active, fill, onConsumeFill }: {
     }
   };
 
-  // Wizard hand-off only fills the editable form. The visitor may change sets, format,
+  // A hand-off only fills the editable form. The visitor may change sets, format,
   // AI-reading mode, or thinking mode before consciously spending a diagnosis allowance.
-  useEffect(() => {
-    if (fill === null) return;
-    const teamText = JSON.stringify(fill, null, 1);
-    const fmt = (fill as { format?: string }).format === "double" ? "double" : "single";
-    setFormat(fmt);
-    setText(teamText);
+  const takeTeam = (team: unknown) => {
+    setFormat((team as { format?: string }).format === "double" ? "double" : "single");
+    setText(JSON.stringify(team, null, 1));
     setReport(null);
     setError(null);
     setHandoffReady(true);
-    onConsumeFill();
     requestAnimationFrame(() => document.getElementById("diag-text")?.focus());
+  };
+  useEffect(() => {
+    if (fill === null) return;
+    takeTeam(fill);
+    onConsumeFill();
   }, [fill]);
 
+  // The library workspace (design §2.4), while this tab is the one on screen: a saved team goes
+  // into the form, and the team a report was made for can be kept.
+  const bt = useTransferT();
+  useLibraryReceiver(active ? { id: "diagnose-team", kind: "team", label: bt("transfer.diagnose.team"),
+    receive: ({ doc }) => { takeTeam(doc); return { ok: true }; } } : null);
+  useLibrarySource(active && report ? { id: "diagnose-keep", origin: "diagnose", kind: "team", label: bt("transfer.diagnose.save"),
+    read: () => toTeamDoc(report.team, format) } : null);
+  const drop = useLibraryDrop(["diagnose-team"]);
+
   return (
-    <div>
+    <div className="assist-surface">
       <p className="notice page-disclosure">{t("diag.disclosure")}</p>
       <div className="panel form-panel builder-form">
         <div className="builder-field">
           <label>{t("format.single")} / {t("format.double")}</label>
           <FormatTabs format={format} onChange={setFormat} />
         </div>
-        <div className="builder-field">
+        <div className="builder-field" {...drop}>
           <label htmlFor="diag-text">{t("diag.text")}</label>
           <textarea id="diag-text" rows={8} value={text}
                     maxLength={DIAGNOSE_TEXT_MAX_CHARS}
@@ -1048,6 +1085,11 @@ export function DiagnoseTab({ active, fill, onConsumeFill }: {
                    }} />
             {t("diag.explain")}
           </label>
+        </div>
+        {/* The submit cluster mirrors the wizard's: thinking mode over the quota and the primary
+          * button. The form stays mounted while a report is on screen, so the quota is rendered
+          * ONLY here — the result panel used to repeat it, showing "2/4" twice at once. */}
+        <div className="assist-submit">
           <ThinkingToggle checked={thinking} onChange={(checked) => {
             setThinking(checked);
             if (checked) setExplain(true);
@@ -1055,39 +1097,17 @@ export function DiagnoseTab({ active, fill, onConsumeFill }: {
             disabled={running || thinkingUnavailable} label={t("thinking.label")}
             tip={`${t("diag.thinkingTip")}${quota !== null && quota.limit > 0
               && quota.limit - quota.used < 2 ? ` ${t("thinking.insufficient")}` : ""}`} />
-        </div>
-        {/* One action row, mirroring the wizard: quota, then secondary actions, then the primary
-          * button. The form stays mounted while a report is on screen, so the quota is rendered
-          * ONLY here — the result panel used to repeat it, showing "2/4" twice at once. */}
-        <div className="builder-actions">
-          {quota && <span className="muted num qa-quota">
-            {t("diag.quota")} {quota.limit === 0
-              ? t("quota.unlimited") : `${quota.used}/${quota.limit}`}
-          </span>}
-          {report && (
-            <button type="button" className="second-btn" title={t("team.sendCalcHint")}
-              onClick={() => {
-                const teamFormat = (report.team as { format?: string })?.format === "double"
-                  ? "double" : "single";
-                stashCalcTeams({ format: teamFormat,
-                  attackers: teamToCalcMembers(report.team), defenders: [] });
-                navigate("/calc?tab=damage");
-              }}>{t("team.sendCalc")}</button>
-          )}
-          {report && (
-            <button type="button" className="second-btn" onClick={() => {
-              const teamFormat = (report.team as { format?: string })?.format === "double"
-                ? "double" : "single";
-              stashMatchupFill({ source: "diagnose", label: t("actual.source.diagnose"),
-                format: teamFormat, team: report.team });
-              navigate("/matchup?mode=actual");
-            }}>{t("actual.sendMatchup")}</button>
-          )}
-          <button type="button" className="primary-btn"
-                  disabled={running || !!(quota && quota.limit > 0 && quota.used >= quota.limit)}
-                  onClick={() => void run()}>
-            {running ? t("diag.running") : t("diag.run")}
-          </button>
+          <div className="builder-actions">
+            {quota && <span className="muted num qa-quota">
+              {t("diag.quota")} {quota.limit === 0
+                ? t("quota.unlimited") : `${quota.used}/${quota.limit}`}
+            </span>}
+            <button type="button" className="primary-btn"
+                    disabled={running || !!(quota && quota.limit > 0 && quota.used >= quota.limit)}
+                    onClick={() => void run()}>
+              {running ? t("diag.running") : t("diag.run")}
+            </button>
+          </div>
         </div>
       </div>
 

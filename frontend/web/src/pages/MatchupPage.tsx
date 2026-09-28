@@ -5,14 +5,15 @@
  * a cell opens its facts. Every cell is `low` confidence (retained observed builds, NOT your team) —
  * surfaced up top, never hidden. Available on either runtime when team.matchup is advertised. */
 import type {
-  FormatId, OppCheckGrade, OppCheckGridDto, OppKoGridDto, OppKoSummaryDto,
+  FormatId, OppCheckGridDto, OppKoGridDto, OppKoSummaryDto,
   OppOffenseDto, OppSetDto,
   SpeciesRowDto,
 } from "@pokemon-champions/protocol";
 import "../styles.matchup.css";
 import type { ReactNode } from "react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import {
+  lazy, memo, Suspense, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { stashDamageFill } from "../lib/team.ts";
 import { FormatTabs } from "../components/FormatTabs.tsx";
@@ -24,9 +25,9 @@ import { SegmentedControl, segmentedPanelId, segmentedTabId }
   from "../components/SegmentedControl.tsx";
 import { useOppCache, useOppChecks, useOppKo, useOppSets } from "../hooks.ts";
 import { useRuntime } from "../runtime/context.tsx";
-import { displayName, optionalKey, useLang, useT, type Lang } from "../i18n.ts";
+import { displayName, useLang, useT, type Lang } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
-import { koLabel, koTone } from "../lib/ko.ts";
+import { koTone } from "../lib/ko.ts";
 import { populatedAxes } from "../lib/matchupGrid.ts";
 import {
   CellInspector, type InspectorBuild, type InspectorDamage,
@@ -180,6 +181,143 @@ function inspectorBuilds(sets: Record<string, OppSetDto> | undefined,
 
 
 
+// -- grid rows ----------------------------------------------------------------------------------
+
+/** What a grid row needs from its grid. Everything is stable across renders (state setters, the
+ * memoized view's arrays, the downloaded document's row), so a selected cell or an opened header
+ * re-renders only the rows it touches — not all 3,600 cells. */
+interface GridRowProps<Cell> {
+  r: SpeciesRowDto;
+  rk: string;
+  cols: SpeciesRowDto[];
+  colKeys: string[];
+  cells: Record<string, Cell | null> | undefined;
+  /** The selected cell's column when the selection is in this row. */
+  selCol: string | null;
+  lang: Lang;
+  picks: Record<string, string>;
+  sets: Record<string, OppSetDto> | undefined;
+  setsBusy: boolean;
+  open: boolean;
+  setOpenPicker: Dispatch<SetStateAction<string | null>>;
+  setPicks: Dispatch<SetStateAction<Record<string, string>>>;
+}
+
+function GridRowHead({ r, lang, picks, sets, setsBusy, open, setOpenPicker, setPicks }: GridRowProps<unknown>) {
+  return (
+    <RowHead s={r} lang={lang} picks={picks} sets={sets} setsBusy={setsBusy} showSetHover open={open}
+             onToggle={() => setOpenPicker((k) => k === `row:${r.slug}` ? null : `row:${r.slug}`)}
+             onPick={(key) => setPicks((p) => ({ ...p, [r.slug]: key }))}
+             onClose={() => setOpenPicker(null)} />
+  );
+}
+
+const KoRow = memo(function KoRow(props: GridRowProps<OppKoSummaryDto> & {
+  setSel: Dispatch<SetStateAction<{ a: string; d: string } | null>>;
+}) {
+  const { rk, cols, colKeys, cells, selCol, lang, setSel } = props;
+  const damageText = useDamageText();
+  return (
+    <tr>
+      <GridRowHead {...(props as GridRowProps<unknown>)} />
+      {cols.map((c, index) => {
+        const ck = colKeys[index]!;
+        // Only the true self-pair is blanked. Two BUILDS of one species face each other
+        // for real, and so does a build against its own mirror — but a cell comparing a
+        // build to itself carries no information the row header doesn't already give.
+        // The mirror IS computed (a build against its own twin is a real matchup and a
+        // direct read on its bulk-vs-power balance), so it renders like any other cell —
+        // only outlined so the same-build case stays legible.
+        const o: OppKoSummaryDto | null = cells?.[ck] ?? null;
+        if (!o) return <td key={c.slug} className="ko-none" />;
+        // Community 确N/乱N: 确N when even the WORST roll KOes in N
+        // (koGuaranteed === koPossible); 乱N shows the BEST-roll turn count when
+        // the worst roll needs more (e.g. 45–51% => 确3 by rolls, 乱2 shown).
+        // koExact only says the 2+ turn number is a static approximation — it is
+        // NOT the guaranteed/possible split (earlier bug).
+        // "Guaranteed" must agree with the recovery-aware verdict, not just with the
+        // static rolls: a defender holding Leftovers can turn a static 2HKO into an 87.5%
+        // chance, and the grade already reads it that way. Labelling that cell 确2 while
+        // the check grid called the kill uncertain made the two tables contradict.
+        const [minPercent, maxPercent, kp, g, chanceN, chanceGuaranteed,
+          chancePct] = o;
+        const chance = chanceN != null || chanceGuaranteed != null || chancePct != null
+          ? { text: "", ...(chanceN != null ? { n: chanceN } : {}),
+              ...(chanceGuaranteed != null ? { guaranteed: chanceGuaranteed } : {}),
+              ...(chancePct != null ? { chancePct } : {}) }
+          : null;
+        const certain = chance != null
+          ? chance.guaranteed === true
+          : g != null && (kp == null || g === kp);
+        const turns = chance?.n ?? (certain ? g : kp);
+        const tone = koTone(turns, certain, maxPercent);
+        const on = selCol === ck;
+        return (
+          <td key={c.slug} className={`ko-${tone}${ck === rk ? " mirror" : ""}${on ? " on" : ""}`}
+            title={`${minPercent}–${maxPercent}% · ${damageText.ko(chance ?? {
+              text: "", n: certain ? (g ?? undefined) : (kp ?? g ?? undefined),
+              guaranteed: certain,
+            })}`}
+            role="button" tabIndex={0} aria-pressed={on}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault(); setSel({ a: rk, d: ck });
+              }
+            }}
+            onClick={() => setSel({ a: rk, d: ck })}>
+            {tone === "immune"
+              ? "0"
+              : turns != null
+                ? certain
+                  ? lang === "en" ? turns : lang === "ja" ? `確${turns}` : `确${turns}`
+                  : lang === "en" ? `~${turns}` : `乱${turns}`
+                : ""}
+          </td>
+        );
+      })}
+    </tr>
+  );
+});
+
+type CheckCell = OppCheckGridDto["grid"][string][string];
+
+const CheckRow = memo(function CheckRow(props: GridRowProps<CheckCell> & {
+  setSel: Dispatch<SetStateAction<{ m: string; o: string } | null>>;
+}) {
+  const { rk, cols, colKeys, cells, selCol, setSel } = props;
+  const t = useT();
+  return (
+    <tr>
+      <GridRowHead {...(props as GridRowProps<unknown>)} />
+      {cols.map((c, index) => {
+        // Each cell is exactly the two builds it names — the grid holds every ordered build pair,
+        // so a column reads its own build rather than an aggregate over the species.
+        const ck = colKeys[index]!;
+        const cl = cells?.[ck] ?? null;
+        const g = cl?.grade;
+        if (!g) return <td key={c.slug} className="ko-none" />;
+        const wall = g === "C0" && cl!.c0Kind === "wall_no_ko";
+        const contested = !!cl!.contested;
+        const on = selCol === ck;
+        return (
+          <td key={c.slug}
+            className={`grade-${g}${wall ? " wall" : ""}${contested ? " contested" : ""}${on ? " on" : ""}`}
+            title={`${g}${contested ? ` · ${t("matchup.contested")}` : ""}`}
+            role="button" tabIndex={0} aria-pressed={on}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault(); setSel({ m: rk, o: ck });
+              }
+            }}
+            onClick={() => setSel({ m: rk, o: ck })}>
+            {g}
+          </td>
+        );
+      })}
+    </tr>
+  );
+});
+
 // -- KO / offense grid --------------------------------------------------------------------------
 
 function KoGrid({ format }: { format: FormatId }) {
@@ -239,7 +377,8 @@ function KoGrid({ format }: { format: FormatId }) {
     // Attacker rows are decided by the ACTIVE build: switching a species to a build that has no
     // offense row (meta-only) correctly drops it from the rows.
     const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
-    return { overview, cols, rows, byVariant, omittedCols: all.length - cols.length };
+    const colKeys = cols.map((c) => activeKey(c, colPicks));
+    return { overview, cols, colKeys, rows, byVariant, omittedCols: all.length - cols.length };
   }, [prepared, rowPicks, colPicks]);
 
   if (state.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
@@ -249,7 +388,7 @@ function KoGrid({ format }: { format: FormatId }) {
       : t("state.errorDetail")}</div>;
   }
   if (!view) return null;
-  const { overview, cols, rows, byVariant, omittedCols } = view;
+  const { overview, cols, colKeys, rows, byVariant, omittedCols } = view;
   const detailCell = sel ? detailCache?.matrix[sel.a]?.[sel.d] : null;
   const detailOff = detailCell?.offense ?? null;
 
@@ -284,69 +423,10 @@ function KoGrid({ format }: { format: FormatId }) {
             {rows.map((r) => {
               const rk = activeKey(r, rowPicks);
               return (
-              <tr key={r.slug}>
-                <RowHead s={r} lang={lang} picks={rowPicks}
-                         sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
-                         open={openPicker === `row:${r.slug}`}
-                         onToggle={() => setOpenPicker((k) => k === `row:${r.slug}` ? null : `row:${r.slug}`)}
-                         onPick={(key) => setRowPicks((p) => ({ ...p, [r.slug]: key }))}
-                         onClose={() => setOpenPicker(null)} />
-                {cols.map((c) => {
-                  const ck = activeKey(c, colPicks);
-                  // Only the true self-pair is blanked. Two BUILDS of one species face each other
-                  // for real, and so does a build against its own mirror — but a cell comparing a
-                  // build to itself carries no information the row header doesn't already give.
-                  // The mirror IS computed (a build against its own twin is a real matchup and a
-                  // direct read on its bulk-vs-power balance), so it renders like any other cell —
-                  // only outlined so the same-build case stays legible.
-                  const o: OppKoSummaryDto | null = overview.grid[rk]?.[ck] ?? null;
-                  if (!o) return <td key={c.slug} className="ko-none" />;
-                  // Community 确N/乱N: 确N when even the WORST roll KOes in N
-                  // (koGuaranteed === koPossible); 乱N shows the BEST-roll turn count when
-                  // the worst roll needs more (e.g. 45–51% => 确3 by rolls, 乱2 shown).
-                  // koExact only says the 2+ turn number is a static approximation — it is
-                  // NOT the guaranteed/possible split (earlier bug).
-                  // "Guaranteed" must agree with the recovery-aware verdict, not just with the
-                  // static rolls: a defender holding Leftovers can turn a static 2HKO into an 87.5%
-                  // chance, and the grade already reads it that way. Labelling that cell 确2 while
-                  // the check grid called the kill uncertain made the two tables contradict.
-                  const [minPercent, maxPercent, kp, g, chanceN, chanceGuaranteed,
-                    chancePct] = o;
-                  const chance = chanceN != null || chanceGuaranteed != null || chancePct != null
-                    ? { text: "", ...(chanceN != null ? { n: chanceN } : {}),
-                        ...(chanceGuaranteed != null ? { guaranteed: chanceGuaranteed } : {}),
-                        ...(chancePct != null ? { chancePct } : {}) }
-                    : null;
-                  const certain = chance != null
-                    ? chance.guaranteed === true
-                    : g != null && (kp == null || g === kp);
-                  const turns = chance?.n ?? (certain ? g : kp);
-                  const tone = koTone(turns, certain, maxPercent);
-                  const on = sel?.a === rk && sel?.d === ck;
-                  return (
-                    <td key={c.slug} className={`ko-${tone}${ck === rk ? " mirror" : ""}${on ? " on" : ""}`}
-                      title={`${minPercent}–${maxPercent}% · ${damageText.ko(chance ?? {
-                        text: "", n: certain ? (g ?? undefined) : (kp ?? g ?? undefined),
-                        guaranteed: certain,
-                      })}`}
-                      role="button" tabIndex={0} aria-pressed={on}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault(); setSel({ a: rk, d: ck });
-                        }
-                      }}
-                      onClick={() => setSel({ a: rk, d: ck })}>
-                      {tone === "immune"
-                        ? "0"
-                        : turns != null
-                          ? certain
-                            ? lang === "en" ? turns : lang === "ja" ? `確${turns}` : `确${turns}`
-                            : lang === "en" ? `~${turns}` : `乱${turns}`
-                          : ""}
-                    </td>
-                  );
-                })}
-              </tr>
+                <KoRow key={r.slug} r={r} rk={rk} cols={cols} colKeys={colKeys} cells={overview.grid[rk]}
+                  selCol={sel?.a === rk ? sel.d : null} lang={lang} picks={rowPicks} sets={headerSets}
+                  setsBusy={buildState.status === "loading"} open={openPicker === `row:${r.slug}`}
+                  setOpenPicker={setOpenPicker} setPicks={setRowPicks} setSel={setSel} />
               );
             })}
           </tbody>
@@ -449,13 +529,9 @@ function CheckGrid({ format }: { format: FormatId }) {
     const { checks, all, available, byVariant } = prepared;
     const cols = all.filter((s) => available.cols.has(activeKey(s, colPicks)));
     const rows = all.filter((s) => available.rows.has(activeKey(s, rowPicks)));
-    return { checks, cols, rows, byVariant, omittedCols: all.length - cols.length };
+    const colKeys = cols.map((c) => activeKey(c, colPicks));
+    return { checks, cols, colKeys, rows, byVariant, omittedCols: all.length - cols.length };
   }, [prepared, rowPicks, colPicks]);
-
-  // Each cell is exactly the two builds it names — the grid holds every ordered build pair, so a
-  // column reads its own build rather than an aggregate over the species.
-  const readCell = (grid: OppCheckGridDto["grid"], rowKey: string, colKey: string) =>
-    grid[rowKey]?.[colKey] ?? null;
 
   if (state.status === "loading") return <div className="spinner">{t("state.loading")}</div>;
   if (state.status === "error") {
@@ -464,7 +540,7 @@ function CheckGrid({ format }: { format: FormatId }) {
       : t("state.errorDetail")}</div>;
   }
   if (!view) return null;
-  const { checks, cols, rows, byVariant, omittedCols } = view;
+  const { checks, cols, colKeys, rows, byVariant, omittedCols } = view;
   const selCell = sel ? checks.grid[sel.m]?.[sel.o] ?? null : null;
   // Damage/speed for the selected pair come from the KO matrix — this grid intentionally does not
   // duplicate them (they are derived from it).
@@ -502,37 +578,10 @@ function CheckGrid({ format }: { format: FormatId }) {
             {rows.map((r) => {
               const rk = activeKey(r, rowPicks);
               return (
-                <tr key={r.slug}>
-                  <RowHead s={r} lang={lang} picks={rowPicks}
-                           sets={headerSets} setsBusy={buildState.status === "loading"} showSetHover
-                           open={openPicker === `row:${r.slug}`}
-                           onToggle={() => setOpenPicker((k) => k === `row:${r.slug}` ? null : `row:${r.slug}`)}
-                           onPick={(key) => setRowPicks((p) => ({ ...p, [r.slug]: key }))}
-                           onClose={() => setOpenPicker(null)} />
-                  {cols.map((c) => {
-                    const ck = activeKey(c, colPicks);
-                    const cl = readCell(checks.grid, rk, ck);
-                    const g = cl?.grade;
-                    if (!g) return <td key={c.slug} className="ko-none" />;
-                    const wall = g === "C0" && cl!.c0Kind === "wall_no_ko";
-                    const contested = !!cl!.contested;
-                    const on = sel?.m === rk && sel?.o === ck;
-                    return (
-                      <td key={c.slug}
-                        className={`grade-${g}${wall ? " wall" : ""}${contested ? " contested" : ""}${on ? " on" : ""}`}
-                        title={`${g}${contested ? ` · ${t("matchup.contested")}` : ""}`}
-                        role="button" tabIndex={0} aria-pressed={on}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault(); setSel({ m: rk, o: ck });
-                          }
-                        }}
-                        onClick={() => setSel({ m: rk, o: ck })}>
-                        {g}
-                      </td>
-                    );
-                  })}
-                </tr>
+                <CheckRow key={r.slug} r={r} rk={rk} cols={cols} colKeys={colKeys} cells={checks.grid[rk]}
+                  selCol={sel?.m === rk ? sel.o : null} lang={lang} picks={rowPicks} sets={headerSets}
+                  setsBusy={buildState.status === "loading"} open={openPicker === `row:${r.slug}`}
+                  setOpenPicker={setOpenPicker} setPicks={setRowPicks} setSel={setSel} />
               );
             })}
           </tbody>

@@ -20,7 +20,10 @@ import { HttpError, type SessionApi } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { renderArtifactCard } from "./artifacts.tsx";
 import { KindBadge, localTime, prettyPayload, shortHash } from "./kinds.tsx";
-import { TeamCard } from "./TeamCard.tsx";
+import { TeamCard } from "../../components/team/TeamCard.tsx";
+import { useTransferT } from "../../lib/library/transferMessages.ts";
+import { useLibrarySource } from "../../lib/library/workspace.tsx";
+import { toTeamDoc } from "../../lib/teamDoc.ts";
 
 /** Payload view: a structured card when the kind renderer recognizes the shape (real gate
  * artifacts), with a raw-JSON toggle; raw only when it doesn't. */
@@ -96,7 +99,6 @@ function useGateReads(sessions: SessionApi, session: SessionWithLedgerDto | null
     const [draft, answerAudit, checkpoint] = await Promise.all(
       [fetch1(keys[0]), fetch1(keys[1]), fetch1(keys[2])]);
     return { draft, answerAudit, checkpoint };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, keys);
   return state.status === "ready" ? state.data
     : { draft: null, answerAudit: null, checkpoint: null };
@@ -160,7 +162,6 @@ function DecisionForm({ sessions, session, checkpoint, onCommitted }: {
     if (survivorOpts.length > 0 && !survivorOpts.includes(candidateIndex)) {
       setCandidateIndex(survivorOpts[0]!);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [survivorOpts.join(","), candidateIndex]);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -291,7 +292,8 @@ function ResultSection({ draft, intent, sessionId, provisional }: {
         const megaRat = asObj(o.mega_registration_rationale);
         return (
           <div key={i} className="uep-team-block">
-            <TeamCard team={o.team} />
+            <TeamCard team={o.team} keepOrigin="session" />
+            <KeepSessionTeam team={o.team} index={i} count={recommended.length} />
             {(megaDev || megaRat) && (
               <div className="uep-result-block muted">
                 {megaDev && (
@@ -464,4 +466,12 @@ export function SessionPage() {
       </details>
     </main>
   );
+}
+
+/** A recommended team can be kept in the library (design §2.4); with several, each is numbered. */
+function KeepSessionTeam({ team, index, count }: { team: unknown; index: number; count: number }) {
+  const bt = useTransferT();
+  const label = count > 1 ? `${bt("transfer.session.save")} ${index + 1}` : bt("transfer.session.save");
+  useLibrarySource({ id: `session-keep-${index}`, origin: "session", kind: "team", label, read: () => toTeamDoc(team) });
+  return null;
 }

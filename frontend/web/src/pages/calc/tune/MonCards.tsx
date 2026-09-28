@@ -1,21 +1,30 @@
 /** The two editable combatants of the durability workbench. They wear the damage calculator's
  * name row, build row and move cells on purpose — the same mon should look like the same form on
  * both tabs — and differ only in between: our side edits the bulk spread, theirs its offence. */
-import type { FormatId, LearnsetDto, NatureDto } from "@pokemon-champions/protocol";
-import { memo, useCallback, useEffect, useMemo } from "react";
+import type { FormatId, LearnsetDto, NatureDto, TeamMemberDoc } from "@pokemon-champions/protocol";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { displayName, useLang, useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import {
-  BOOST_STAGES, BuildPickerButton, ItemCombo, STATUSES, boostLabel, clampNum, megaFor,
-  natureLabel, spSum, spSumClass, type BuildOption,
-} from "../shared.tsx";
+  BOOST_STAGES, BuildPickerButton, ItemCombo, NatureOptions, STATUSES, boostLabel, clampNum, megaFor,
+  spSum, spSumClass, type BuildOption,
+} from "../../../components/build/inputs.tsx";
+import { useMetaUsage } from "../../../lib/metaUsage.ts";
 import { MonNameRow, MonPortrait } from "../duel/MonEditor.tsx";
-import { MoveCell } from "../duel/MoveCell.tsx";
-import { boostedStat, effectiveEntry, finalStat, type MonState } from "../duel/state.ts";
+import { MoveCell } from "../../../components/build/MoveCell.tsx";
+import { boostedStat, effectiveEntry, finalStat, monToMember, type MonState } from "../duel/state.ts";
 import { attackIndex, pressedStat, type Baseline, type BulkStat, type Rolls } from "./model.ts";
 
 type MonUpdate = (update: (mon: MonState) => MonState) => void;
+
+/** The build as it stands, read when the portrait is dragged into a box. It reads through a ref, so
+ * the memoised identity row is not re-rendered by every slider tick. */
+function useMemberReader(mon: MonState, dex: DexIndexEntry[]) {
+  const latest = useRef(mon);
+  useEffect(() => { latest.current = mon; });
+  return useCallback(() => monToMember(latest.current, dex), [dex]);
+}
 
 const BULK_STATS: BulkStat[] = ["hp", "def", "spd"];
 const OTHER_STATS = ["atk", "spa", "spe"] as const;
@@ -34,13 +43,11 @@ function useMegaConsistency(slug: string, item: string, ability: string, dex: De
     if (requiredStone && item !== requiredStone.name) {
       onChange((current) => ({ ...current, item: requiredStone.name }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requiredStone?.name, slug]);
   useEffect(() => {
     if (mega && !mega.abilities.some((candidate) => candidate.name === ability)) {
       onChange((current) => ({ ...current, ability: mega.abilities[0]?.name ?? "" }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mega?.slug, item]);
   return { literal, mega, requiredStone };
 }
@@ -49,7 +56,7 @@ function useMegaConsistency(slug: string, item: string, ability: string, dex: De
  * the member so a slider tick - which only moves SP - never re-renders the pickers, whose desktop
  * datalists carry every species and item in the game. */
 const Identity = memo(function Identity({ slug, ability, nature, item, status, dex, natures, items, format,
-  idKey, restore, onSpecies, onChange, onPickBuild }: {
+  idKey, restore, member, onSpecies, onChange, onPickBuild }: {
   slug: string;
   ability: string;
   nature: string;
@@ -62,8 +69,10 @@ const Identity = memo(function Identity({ slug, ability, nature, item, status, d
   items: ItemRef[];
   format: FormatId;
   idKey: string;
-  /** Our card's revert control; `enabled` is false while the spread still equals its baseline. */
+  /** The card's revert control; `enabled` is false while the spread still equals its baseline. */
   restore?: { enabled: boolean; onRestore: () => void };
+  /** The whole build, for dragging the portrait into a box. */
+  member: () => TeamMemberDoc | null;
   onSpecies: (slug: string) => void;
   onChange: MonUpdate;
   onPickBuild: (option: BuildOption) => void;
@@ -72,6 +81,7 @@ const Identity = memo(function Identity({ slug, ability, nature, item, status, d
   const { lang } = useLang();
   const { literal, mega, requiredStone } = useMegaConsistency(slug, item, ability, dex, items, onChange);
   const entry = mega ?? literal;
+  const usage = useMetaUsage(slug, [format]);
   const actions = (
     <>
       <BuildPickerButton slug={slug} format={format} onPick={onPickBuild} />
@@ -86,7 +96,7 @@ const Identity = memo(function Identity({ slug, ability, nature, item, status, d
   return (
     <>
       <div className="mon-id">
-        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} />
+        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} member={member} />
         <MonNameRow slug={slug} item={item} dex={dex} items={items} pickerKey={idKey} actions={actions}
           onSpecies={onSpecies}
           onForme={(next, dropStone) => onChange((current) => ({
@@ -105,14 +115,11 @@ const Identity = memo(function Identity({ slug, ability, nature, item, status, d
         <label>{t("calc.nature")}
           <select value={nature}
             onChange={(event) => onChange((current) => ({ ...current, nature: event.target.value }))}>
-            <option value="">—</option>
-            {natures.map((candidate) => (
-              <option key={candidate.name} value={candidate.name}>{natureLabel(candidate, lang)}</option>
-            ))}
+            <NatureOptions natures={natures} usage={usage} />
           </select>
         </label>
         <label>{t("calc.item")}
-          <ItemCombo idKey={idKey} value={item} items={items} disabled={!!requiredStone}
+          <ItemCombo idKey={idKey} value={item} items={items} disabled={!!requiredStone} usage={usage}
             onChange={(next) => onChange((current) => ({ ...current, item: next }))} />
         </label>
         <label>{t("calc.status")}
@@ -191,6 +198,13 @@ function StatStrip({ label, value, stage, onValue, onStage, stageLabel }: {
 /** Our side: the spread being tuned. HP / Def / SpD get full-width sliders because they are the axis
  * this tool exists for; the other three get short ones, since they only matter as the 66-point budget
  * that bulk has to come out of. */
+/** Whether a mon's SP or nature has moved off the spread it arrived with. */
+export function spreadChanged(mon: MonState, baseline: Baseline): boolean {
+  return baseline.nature !== mon.nature
+    || (["hp", "atk", "def", "spa", "spd", "spe"] as const).some((key) =>
+      (baseline.sps[key] ?? 0) !== (mon.sps[key] ?? 0));
+}
+
 export const DefenderCard = memo(function DefenderCard({ mon, baseline, dex, natures, items, format,
   pressed, onSpecies, onChange, onPickBuild, onRestore }: {
   mon: MonState;
@@ -216,9 +230,8 @@ export const DefenderCard = memo(function DefenderCard({ mon, baseline, dex, nat
     nature?.upStat === key && nature.downStat !== key ? "up"
       : nature?.downStat === key && nature.upStat !== key ? "down" : "";
   const baselineMon: MonState = { ...mon, sps: baseline.sps, nature: baseline.nature };
-  const changed = baseline.nature !== mon.nature
-    || (["hp", "atk", "def", "spa", "spd", "spe"] as const).some((key) =>
-      (baseline.sps[key] ?? 0) !== (mon.sps[key] ?? 0));
+  const changed = spreadChanged(mon, baseline);
+  const member = useMemberReader(mon, dex);
   const restoreOn = useMemo(() => ({ enabled: true, onRestore }), [onRestore]);
   const restoreOff = useMemo(() => ({ enabled: false, onRestore }), [onRestore]);
   const setSp = (key: string, value: number) =>
@@ -236,7 +249,7 @@ export const DefenderCard = memo(function DefenderCard({ mon, baseline, dex, nat
       <Identity slug={mon.slug} ability={mon.ability} nature={mon.nature} item={mon.item}
         status={mon.status} dex={dex} natures={natures} items={items} format={format}
         idKey="tune-mine" onSpecies={onSpecies} onChange={onChange} onPickBuild={onPickBuild}
-        restore={changed ? restoreOn : restoreOff} />
+        restore={changed ? restoreOn : restoreOff} member={member} />
 
       <div className="tw-sp">
         <div className="tw-sp-head">
@@ -310,9 +323,11 @@ export interface MoveReading {
 
 /** Their side: the attacker's set and the four moves. Picking a move is what the verdict below reads,
  * so each move carries its own damage range and the whole cell is the selection target. */
-export const AttackerCard = memo(function AttackerCard({ mon, dex, natures, items, format, learnset,
-  cells, selectedSlot, onSelectSlot, onSpecies, onChange, onPickBuild }: {
+export const AttackerCard = memo(function AttackerCard({ mon, baseline, dex, natures, items, format,
+  learnset, cells, selectedSlot, onSelectSlot, onSpecies, onChange, onPickBuild, onRestore }: {
   mon: MonState;
+  /** The spread this attacker arrived with, what 还原 puts back. */
+  baseline: Baseline;
   dex: DexIndexEntry[];
   natures: NatureDto[];
   items: ItemRef[];
@@ -324,14 +339,20 @@ export const AttackerCard = memo(function AttackerCard({ mon, dex, natures, item
   onSpecies: (slug: string) => void;
   onChange: MonUpdate;
   onPickBuild: (option: BuildOption) => void;
+  onRestore: () => void;
 }) {
   const t = useT();
+  const changed = spreadChanged(mon, baseline);
+  const member = useMemberReader(mon, dex);
+  const restoreOn = useMemo(() => ({ enabled: true, onRestore }), [onRestore]);
+  const restoreOff = useMemo(() => ({ enabled: false, onRestore }), [onRestore]);
   const setMove = useCallback((slot: number, name: string) => onChange((current) => {
     const moves = [...current.moves];
     while (moves.length < 4) moves.push("");
     moves[slot] = name;
     return { ...current, moves };
   }), [onChange]);
+  const moveUsage = useMetaUsage(mon.slug, [format]);
   const categoryOf = (name: string) => learnset?.moves.find((move) => move.name === name)?.category;
   const { lang } = useLang();
   const entry = effectiveEntry(mon, dex, items);
@@ -355,7 +376,7 @@ export const AttackerCard = memo(function AttackerCard({ mon, dex, natures, item
       <Identity slug={mon.slug} ability={mon.ability} nature={mon.nature} item={mon.item}
         status={mon.status} dex={dex} natures={natures} items={items} format={format}
         idKey="tune-foe" onSpecies={onSpecies} onChange={onChange}
-        onPickBuild={onPickBuild} />
+        onPickBuild={onPickBuild} restore={changed ? restoreOn : restoreOff} member={member} />
 
       <div className="tw-offense">
         {(["atk", "spa"] as const).map((key) => {
@@ -395,7 +416,7 @@ export const AttackerCard = memo(function AttackerCard({ mon, dex, natures, item
             const category = categoryOf(name);
             const status = !!name && category !== undefined && pressedStat(name, category) === null;
             return (
-              <MoveCell key={slot} index={slot} value={name} learnset={learnset}
+              <MoveCell key={slot} index={slot} value={name} learnset={learnset} usage={moveUsage}
                 selected={slot === selectedSlot} pending={cell?.pending} onSelect={onSelectSlot}
                 onChange={setMove}>
                 {status ? <span className="muted">{t("tune.ws.statusMove")}</span>

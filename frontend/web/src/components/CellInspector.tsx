@@ -5,10 +5,11 @@
  * `md-line` there), different heads, and different amounts of information — the KO grid showed the
  * engine's caveats and both sides' sets, the actual-sets grid showed neither. Callers now normalise
  * their facts into the shapes below and this component owns the layout. */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 import { useT } from "../i18n.ts";
 import { useDamageText } from "../lib/damageText.tsx";
 import { BuildSetSummary, type BuildCardOption } from "./BuildPicker.tsx";
+import { ExportMenu } from "./ExportMenu.tsx";
 
 
 /** A KO verdict in the shape `damageText.ko` renders. Callers MUST prefer the engine's
@@ -63,17 +64,11 @@ export function CellInspector({
   const t = useT();
   const damageText = useDamageText();
   const rootRef = useRef<HTMLDivElement>(null);
-  const resetTimer = useRef<number | null>(null);
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const attachRef = useCallback((node: HTMLDivElement | null) => {
     rootRef.current = node;
     if (typeof panelRef === "function") panelRef(node);
     else if (panelRef) (panelRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
   }, [panelRef]);
-
-  useEffect(() => () => {
-    if (resetTimer.current != null) window.clearTimeout(resetTimer.current);
-  }, []);
 
   const speedResult = speed?.mine != null && speed.theirs != null && speed.mine === speed.theirs
     ? t("matchup.faster.tie")
@@ -81,9 +76,10 @@ export function CellInspector({
       ? t("matchup.faster.named").replace("{name}", speed.fasterName)
       : null;
 
-  const copyAll = async () => {
+  /** The panel as plain text: the head, each side's build field by field, both directions, extras. */
+  const plainText = (): string => {
     const root = rootRef.current;
-    if (!root) return;
+    if (!root) return "";
     const clean = (node: Element | null) => (node as HTMLElement | null)?.innerText
       .split("\n").map((line) => line.trim()).filter(Boolean).join("\n") ?? "";
     const sections = [clean(root.querySelector(".md-head-summary"))];
@@ -111,24 +107,7 @@ export function CellInspector({
     });
     const extraText = clean(root.querySelector(".md-extra"));
     if (extraText) sections.push(extraText);
-    const text = sections.filter(Boolean).join("\n\n");
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
-      await navigator.clipboard.writeText(text);
-      setCopyState("copied");
-    } catch {
-      const area = document.createElement("textarea");
-      area.value = text;
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      document.body.appendChild(area);
-      area.select();
-      const copied = document.execCommand("copy");
-      area.remove();
-      setCopyState(copied ? "copied" : "failed");
-    }
-    if (resetTimer.current != null) window.clearTimeout(resetTimer.current);
-    resetTimer.current = window.setTimeout(() => setCopyState("idle"), 1800);
+    return sections.filter(Boolean).join("\n\n");
   };
 
   return (
@@ -147,10 +126,8 @@ export function CellInspector({
         </div>
         <div className="md-head-actions">
           {calculate}
-          <button type="button" className="second-btn md-copy" onClick={() => void copyAll()}>
-            {t(copyState === "copied" ? "matchup.copied"
-              : copyState === "failed" ? "matchup.copyFailed" : "matchup.copy")}
-          </button>
+          <ExportMenu className="md-copy" text={plainText} shot={rootRef} exclude=".md-head-actions, .keep-mon"
+            fileName={(scale) => `matchup_${new Date().toISOString().slice(0, 10)}_${scale}x.png`} />
         </div>
       </div>
       {!!builds?.length && (
@@ -159,7 +136,7 @@ export function CellInspector({
             <div className="build-card md-build-slot" data-copy-label={build.label}
                  key={build.option?.key ?? build.label + "-" + index}>
               {build.option
-                ? <BuildSetSummary option={build.option} index={build.index ?? index} />
+                ? <BuildSetSummary option={build.option} index={build.index ?? index} keep="meta" />
                 : <span className="md-build-missing">—</span>}
             </div>
           ))}

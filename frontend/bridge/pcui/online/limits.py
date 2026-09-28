@@ -42,16 +42,22 @@ class QaLimitConfig:
     # SAME daily token budget as QA: one breaker protects the one wallet.
     builder_daily_limit: int = 2
     builder_pessimistic_tokens: int = 60_000
+    # A thinking-mode diagnose reading: the ~28 KB report as input plus a long answer whose reasoning
+    # counts against the same cap (qa.DIAGNOSE_EXPLAIN_THINKING_MAX_TOKENS) — twice the plain QA
+    # reservation, so the breaker admits it only when the day can actually afford it.
+    diagnose_thinking_pessimistic_tokens: int = 24_000
     # Team diagnose has a separate allowance from QA. A thinking explanation consumes two
     # units; the ordinary deterministic/quick path consumes one.
     diagnose_daily_limit: int = 4
     # CPU-heavy actual-set batteries use workload units, not a flat request count. One unit is
-    # 30 source-set x Top-K pairs; 24 units lets a client run the full 12 x 60 battery once while
+    # 30 source-set x Top-K pairs; 24 units lets a client run the full 6 x 60 battery twice while
     # allowing proportionally more small reads. Device and IP both consume the same units.
     matchup_daily_limit: int = 24
-    # Precise SP tuning is charged per benchmark. Twelve units permit one maximal request or
-    # several focused checks while keeping repeated multi-process cliff scans bounded.
-    tune_daily_limit: int = 12
+    # Precise SP tuning is charged per benchmark. A benchmark costs tens of milliseconds on the
+    # in-process calc engine, so this is an abuse ceiling rather than a cost budget: ten maximal
+    # (12-target) solves, or thirty-odd untargeted ones, a day. It exists because tune shares the
+    # single heavy deterministic slot with actual matchup, and an unmetered script could hold it.
+    tune_daily_limit: int = 120
 
 
 class OnlineLimits:

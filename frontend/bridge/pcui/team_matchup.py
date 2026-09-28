@@ -18,7 +18,7 @@ from .online.teamtext import extract_species, normalize_team_text, resolve_speci
 
 MATCHUP_TOP_K_MIN = 1
 MATCHUP_TOP_K_MAX = 60
-MATCHUP_SOURCE_MAX = 12
+MATCHUP_SOURCE_MAX = 6     # one team's worth of builds
 MATCHUP_TEXT_MAX = 16_000
 MATCHUP_TIMEOUT = 240.0
 
@@ -164,7 +164,7 @@ def run_actual_matchup(pool: Any, body: dict[str, Any],
             raise MatchupInputError(f"at most {MATCHUP_SOURCE_MAX} source sets are allowed")
         # Online deployments inject a cheap quota callback here, after parsing/canonicalization but
         # before the expensive team-skill session. Local callers leave it unset and retain the full
-        # operator range. The callback meters work; it never narrows the legal 12 x top-60 shape.
+        # operator range. The callback meters work; it never narrows the legal 6 x top-60 shape.
         if workload_fn is not None:
             workload_fn(len(members), top_k)
         team = {"schema_version": 1, "format": fmt, "season": None, "rule": None,

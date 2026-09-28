@@ -1,13 +1,17 @@
+import { useEscapeLayer } from "./EscapeLayers.tsx";
 /** Compact, complete configuration cards shared by the calculator's environment picker and the
  * simulation table headers. The surrounding Pokemon card/header already establishes the species,
  * so this popover deliberately starts with the configurations instead of repeating its portrait. */
 import { STAT_KEYS, type OppSetDto, type StatKey } from "@pokemon-champions/protocol";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { displayName, useLang, useT } from "../i18n.ts";
 import { useDexByName, useMovesByName, useNatures } from "../hooks.ts";
 import { localName, useNameMaps } from "../lib/names.ts";
-import { actualStat } from "../lib/stats.ts";
+import { actualStat, natureMultiplier } from "../lib/stats.ts";
+import { SP_MAX, MOVE_SLOTS } from "../lib/battle.ts";
+import type { LibraryOrigin } from "../lib/library/records.ts";
+import { KeepMonButton } from "./KeepMonButton.tsx";
 import { TypeBadge } from "./TypeBadge.tsx";
 
 export interface BuildCardOption {
@@ -28,13 +32,26 @@ const STAT_SHORT: Record<StatKey, string> = {
   hp: "H", atk: "A", def: "B", spa: "C", spd: "D", spe: "S",
 };
 
+/** A source build; the library entry normalizes its Mega form, stone and ability together. */
+export function setMember(set: OppSetDto) {
+  return {
+    species: set.species, item: set.item ?? null, ability: set.baseAbility ?? set.ability ?? null,
+    nature: set.nature ?? null, moves: set.moves ?? [], spread: set.sps ?? null,
+  };
+}
+
 /** The direct-on-card configuration summary. It is intentionally dense, but no field is hidden
- * behind another hover: item, ability, nature, every SP value and all retained moves are visible. */
-export function BuildSetSummary({ option, index, selected = false, title }: {
+ * behind another hover: item, ability, nature, every SP value and all retained moves are visible.
+ * With `keep` the card's top-right corner carries the small "+" that keeps this build in the reader's
+ * current box instead of its share — only on cards that stay on screen (a result panel), never in a
+ * popover. `corner` puts the caller's own actions there instead (a library box's edit / delete). */
+export function BuildSetSummary({ option, index, selected = false, title, keep, corner }: {
   option: BuildCardOption;
   index: number;
   selected?: boolean;
   title?: ReactNode;
+  keep?: LibraryOrigin;
+  corner?: ReactNode;
 }) {
   const { lang } = useLang();
   const t = useT();
@@ -59,13 +76,11 @@ export function BuildSetSummary({ option, index, selected = false, title }: {
   const natureLabel = set.nature ? localName(maps.nature, set.nature, lang) : "—";
   const actuals = STAT_KEYS.map((key) => {
     if (!entry || !set.sps || (key !== "hp" && !nature)) return { key, value: null };
-    const mult: 0.9 | 1 | 1.1 = key === "hp" ? 1
-      : nature?.upStat === key && nature.downStat !== key ? 1.1
-        : nature?.downStat === key && nature.upStat !== key ? 0.9 : 1;
+    const mult = natureMultiplier(nature, key);
     return { key, value: actualStat(entry.stats[key], key, set.sps[key] ?? 0, mult) };
   });
   const actualMax = Math.max(1, ...actuals.map(({ value }) => value ?? 0));
-  const moveSlots = Array.from({ length: 4 }, (_, index) => set.moves?.[index] ?? "");
+  const moveSlots = Array.from({ length: MOVE_SLOTS }, (_, index) => set.moves?.[index] ?? "");
 
   return (
     <span className={`build-card-body${selected ? " selected" : ""}`}>
@@ -83,10 +98,16 @@ export function BuildSetSummary({ option, index, selected = false, title }: {
             <span>{natureLabel}</span>
           </span>
         </span>
-        <span className="build-card-share num">
-          {sideLabel}
-          {option.isModal && option.source === "aggregate" && <em>{t("matchup.variantModal")}</em>}
-        </span>
+        {corner || keep ? (
+          <span className="build-card-corner">
+            {corner ?? <KeepMonButton member={() => setMember(set)} origin={keep!} />}
+          </span>
+        ) : (
+          <span className="build-card-share num">
+            {sideLabel}
+            {option.isModal && option.source === "aggregate" && <em>{t("matchup.variantModal")}</em>}
+          </span>
+        )}
       </span>
       {title && <span className="build-card-title">{title}</span>}
       <span className="build-card-sp-row num">
@@ -94,7 +115,7 @@ export function BuildSetSummary({ option, index, selected = false, title }: {
         <span className="build-card-sp-bars">
           {STAT_KEYS.map((key) => {
             const value = set.sps?.[key] ?? 0;
-            const width = Math.round((value / 32) * 100);
+            const width = Math.round((value / SP_MAX) * 100);
             return (
               <span key={key} className="build-card-sp-stat"
                 style={{
@@ -136,10 +157,22 @@ export function BuildSetSummary({ option, index, selected = false, title }: {
   );
 }
 
+/** One labelled group of cards (a format's builds when the picker shows both formats at once). */
+export interface BuildPickerSection {
+  key: string;
+  label: ReactNode;
+  options: BuildCardOption[];
+}
+
+const CARD_WIDTH = 352;
+const SPLIT_GAP = 12;
+
 export function BuildPicker({
-  options, currentKey, onPick, onClose, anchorRef, hint, busy = false,
+  options, sections, currentKey, onPick, onClose, anchorRef, hint, busy = false,
 }: {
   options: BuildCardOption[];
+  /** Instead of `options`: groups shown one under the other, or side by side when that is too tall. */
+  sections?: BuildPickerSection[];
   currentKey?: string;
   onPick: (option: BuildCardOption) => void;
   onClose: () => void;
@@ -148,14 +181,23 @@ export function BuildPicker({
   busy?: boolean;
 }) {
   const t = useT();
+  useEscapeLayer(true, onClose, 50);
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<CSSProperties>({ visibility: "hidden" });
+  const [split, setSplit] = useState(false);
+
+  // Two groups that do not fit one above the other go side by side, when the window is wide enough.
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!sections || busy || split || !node) return;
+    if (node.scrollHeight > node.clientHeight + 1 && window.innerWidth >= CARD_WIDTH * 2 + SPLIT_GAP + 28) setSplit(true);
+  }, [sections, busy, split]);
 
   useEffect(() => {
     const place = () => {
       const anchor = anchorRef.current?.getBoundingClientRect();
       if (!anchor) return;
-      const width = Math.min(352, window.innerWidth - 16);
+      const width = Math.min(split ? CARD_WIDTH * 2 + SPLIT_GAP + 12 : CARD_WIDTH, window.innerWidth - 16);
       const height = Math.min(ref.current?.offsetHeight ?? 300, window.innerHeight - 16);
       const gap = 8;
       const left = Math.min(Math.max(8, anchor.right - width), window.innerWidth - width - 8);
@@ -171,7 +213,6 @@ export function BuildPicker({
       const target = event.target as Node;
       if (!ref.current?.contains(target) && !anchorRef.current?.contains(target)) onClose();
     };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     const scrollAway = (event: Event) => {
       // The list itself may need to scroll to reach a Meta fallback. Only movement of the page or
       // an enclosing grid invalidates the fixed anchor position.
@@ -179,38 +220,47 @@ export function BuildPicker({
       if (!(target instanceof Node) || !ref.current?.contains(target)) onClose();
     };
     document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", escape);
     window.addEventListener("resize", onClose);
     window.addEventListener("scroll", scrollAway, true);
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", escape);
       window.removeEventListener("resize", onClose);
       window.removeEventListener("scroll", scrollAway, true);
     };
-  }, [anchorRef, onClose]);
+  }, [anchorRef, onClose, split]);
+
+  const list = (items: BuildCardOption[]) => items.length ? (
+    <ul className="build-picker-list">
+      {items.map((option, index) => (
+        <li key={option.key}>
+          <button type="button" className={`build-card${option.key === currentKey ? " on" : ""}`}
+            aria-pressed={option.key === currentKey}
+            onClick={() => { onPick(option); onClose(); }}>
+            <BuildSetSummary option={option} index={index}
+              selected={option.key === currentKey} title={option.note} />
+          </button>
+        </li>
+      ))}
+    </ul>
+  ) : <div className="build-picker-state">{t("calc.noSetOptions")}</div>;
 
   return createPortal(
-    <div className="build-picker" ref={ref} role="dialog" aria-label={t("calc.setPick")}
+    <div className={`build-picker${split ? " split" : ""}`} ref={ref} role="dialog" aria-label={t("calc.setPick")}
          style={pos}>
       <div className="build-picker-note">{hint}</div>
       {busy ? <div className="build-picker-state">{t("state.loading")}</div>
-        : options.length ? (
-          <ul className="build-picker-list">
-            {options.map((option, index) => (
-              <li key={option.key}>
-                <button type="button" className={`build-card${option.key === currentKey ? " on" : ""}`}
-                  aria-pressed={option.key === currentKey}
-                  onClick={() => { onPick(option); onClose(); }}>
-                  <BuildSetSummary option={option} index={index}
-                    selected={option.key === currentKey} title={option.note} />
-                </button>
-              </li>
+        : sections ? (
+          <div className="build-picker-sections">
+            {sections.map((section) => (
+              <section key={section.key} className="build-picker-section">
+                <h3 className="build-picker-section-head">{section.label}</h3>
+                {list(section.options)}
+              </section>
             ))}
-          </ul>
-        ) : <div className="build-picker-state">{t("calc.noSetOptions")}</div>}
+          </div>
+        ) : list(options)}
     </div>,
-    document.body,
+    anchorRef.current?.closest(".modal") ?? document.body,
   );
 }

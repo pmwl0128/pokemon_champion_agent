@@ -10,7 +10,6 @@ import {
   CapabilitiesSchema, DamageBatchResultDtoSchema,
   DamageResultDtoSchema, DiagnoseReportDtoSchema, MetaDetailDtoSchema, OppCacheDtoSchema,
   OnlineQuotaDtoSchema, OppCheckGridDtoSchema, OppKoGridDtoSchema, OppSetCatalogDtoSchema,
-  PokemonCardDtoSchema,
   QaAnswerDtoSchema, RankingDtoSchema,
   LearnersDtoSchema, MetaFacetsDtoSchema, MetaKoDtoSchema,
   MetaKoTrendDtoSchema, SpeedBatchResultDtoSchema, TrendDtoSchema, UsageTrendDtoSchema,
@@ -31,9 +30,8 @@ import {
   type BuilderApi, type DexIndexEntry, type RuntimeAdapter, type RuntimeConfig,
 } from "./adapter.ts";
 
-interface CardsFile {
-  cards: PokemonCardDto[];
-}
+import { loadCards, loadProjectionDexIndex } from "./projection.ts";
+export { loadProjectionDexIndex } from "./projection.ts";
 
 const API_ONLY_CAPABILITIES = new Set([
   "llm.qa", "llm.builder", "team.validate", "team.tune",
@@ -43,29 +41,6 @@ function staticCapabilities(raw: unknown): Capabilities {
   const parsed = CapabilitiesSchema.parse(raw);
   return { ...parsed,
     capabilities: parsed.capabilities.filter((id) => !API_ONLY_CAPABILITIES.has(id)) };
-}
-
-// Single fetch + Zod-validate of cards.json, shared by the browse index AND the card lookup
-// (they were two independent loads with different validation — the index skipped Zod).
-const cardsOnce = new AsyncOnce<PokemonCardDto[]>();
-function loadCards(base: string): Promise<PokemonCardDto[]> {
-  return cardsOnce.get(() =>
-    fetchJson<CardsFile>(`${base}/dex/cards.json${versionParam()}`).then((f) =>
-      f.cards.map((c) => PokemonCardDtoSchema.parse(c))));
-}
-
-const dexIndexOnce = new AsyncOnce<DexIndexEntry[]>();
-
-export function loadProjectionDexIndex(base: string): Promise<DexIndexEntry[]> {
-  return dexIndexOnce.get(() =>
-    loadCards(base).then((cards) => cards.map((c) => ({
-      key: c.key, slug: c.slug, name: c.name,
-      ...(c.nameZh !== undefined ? { nameZh: c.nameZh } : {}),
-      ...(c.nameJa !== undefined ? { nameJa: c.nameJa } : {}),
-      nationalDex: c.nationalDex, types: c.types, stats: c.stats,
-      abilities: c.abilities, isMega: c.isMega,
-      ...(c.baseSpecies !== undefined ? { baseSpecies: c.baseSpecies } : {}),
-    }))));
 }
 
 export class OnlineAdapter implements RuntimeAdapter {
@@ -199,8 +174,8 @@ export class OnlineAdapter implements RuntimeAdapter {
   }
 
   /** One attacker's moves × several defenders in a single fault-isolated batch, run in the worker. */
-  async damageBatch(items: DamageRequestDto[]): Promise<DamageBatchResultDto> {
-    return DamageBatchResultDtoSchema.parse(await engineDamageBatch(items));
+  async damageBatch(items: DamageRequestDto[], options?: { lane?: "interactive" | "inference" }): Promise<DamageBatchResultDto> {
+    return DamageBatchResultDtoSchema.parse(await engineDamageBatch(items, options?.lane));
   }
 
   /** A speed ladder resolved in one fault-isolated speedline batch, run in the worker. */

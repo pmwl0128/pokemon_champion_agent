@@ -87,6 +87,13 @@ Rules:
   call speed_ladder ONCE — it returns X plus the ranked field already sorted and split into
   outspeedsMe / ties / slowerThanMe. Do NOT loop calc_speed over the ranking: that runs out of
   tool rounds before you have enough of the field, and the answer ends up incomplete.
+- For "which pokemon can learn X (and Y)" / "who learns X" / "which X-type pokemon have ability
+  Y" questions, call dex_find ONCE with every condition together — it searches the whole
+  battle dex, which is exactly the set of Pokemon available under the current ruleset. Report
+  the count and the names compactly; mention Mega forms as such. Copy every name EXACTLY as the
+  tool lists it, one canonical name per entry: forms stay separate entries ("Gourgeist-Average,
+  Gourgeist-Large"), never merged into a group like "Gourgeist (Average/Large forms)" and never
+  shortened to the bare species — the site can only localize the exact canonical name.
 - repset_lookup gives the representative REAL-TEAM joint set (ability+item+nature+moves+SP
   played together) — prefer it over stitching independent usage modes when the question is
   "how is X actually built".
@@ -110,6 +117,23 @@ TOOLS: list[dict] = [
             "kind": {"type": "string", "enum": list(DEX_KINDS)},
             "name": {"type": "string", "description": "entity name in any language"},
         }, "required": ["kind", "name"]},
+    }},
+    {"type": "function", "function": {
+        "name": "dex_find",
+        "description": "Reverse search of the battle dex: every pokemon (forms and Megas "
+                       "included) matching ALL the given conditions — learns every listed "
+                       "move, has the listed types / ability, meets the base-stat bounds. The "
+                       "dex holds exactly the Pokemon available under the current ruleset. Use "
+                       "it for 'which pokemon can learn X and Y' / 'who learns X'. Quote the "
+                       "returned names verbatim, one per entry — never merge forms.",
+        "parameters": {"type": "object", "properties": {
+            "moves": {"type": "array", "items": {"type": "string"}, "maxItems": 4,
+                      "description": "moves the pokemon must all learn (any language)"},
+            "types": {"type": "array", "items": {"type": "string"}, "maxItems": 2},
+            "ability": {"type": "string"},
+            "stats": {"type": "array", "items": {"type": "string"}, "maxItems": 3,
+                      "description": "base-stat bounds such as 'spe>=100' or 'hp<=60'"},
+        }},
     }},
     {"type": "function", "function": {
         "name": "meta_ranking",
@@ -354,6 +378,61 @@ def _modal_combatant(pool: Any, fmt: str, name: str, timeout: float,
     return {"name": name}, "no usage data — default neutral set"
 
 
+_STAT_BOUND = re.compile(r"(hp|atk|def|spa|spd|spe)(>=|<=|>|<|=)(\d{1,3})")
+# A full list is handed to the model only while it stays well inside the answer budget
+# (QA_MAX_ANSWER_TOKENS): an English canonical name costs one to three tokens, so sixty names plus
+# the sentence around them is a few hundred. Past that the model gets the count and a sample, and is
+# told to say so — a longer list would be cut off mid-name by the token cap, not finished.
+DEX_FIND_FULL_LIST_MAX = 60
+DEX_FIND_SAMPLE = 40
+DEX_FIND_MEGA_SAMPLE = 10
+
+
+def _dex_find(pool: Any, args: dict, timeout: float) -> tuple[tuple[str, str, dict] | None, str]:
+    """Reverse search: all conditions at once, one dex call. Names are resolved first (typo
+    tolerant); `find` itself is exact. The answer is a name list, which the generic clip would cut
+    at twelve entries — so it is built compactly here, base forms and Mega forms apart."""
+    def names(value: Any, cap: int) -> list[str]:
+        items = value if isinstance(value, list) else [value] if isinstance(value, str) else []
+        return [n for n in (_clean_name(item) for item in items[:cap]) if n]
+
+    moves = [_resolve_query(pool, move, "move", timeout) for move in names(args.get("moves"), 4)]
+    abilities = [_resolve_query(pool, a, "ability", timeout) for a in names(args.get("ability"), 1)]
+    types = names(args.get("types"), 2)
+    stats = [str(bound).replace(" ", "").lower() for bound in (args.get("stats") or [])[:3]
+             if isinstance(bound, str)]
+    if any(not _STAT_BOUND.fullmatch(bound) for bound in stats):
+        return None, json.dumps({"error": "stats must look like 'spe>=100'"})
+    conditions = ([("move", m) for m in moves] + [("type", t) for t in types]
+                  + [("ability", a) for a in abilities] + [("stat", b) for b in stats])
+    if not conditions:
+        return None, json.dumps({"error": "dex_find needs at least one condition"})
+    argv = ["find"]
+    for field, value in conditions:
+        argv += [field, value]
+    doc = pool.request_json("dex", [*argv, "--format", "json"], timeout=timeout)
+    results = doc.get("results") if isinstance(doc, dict) else None
+    label = " + ".join(value for _field, value in conditions)
+    trace = ("dex.find", f"dex find {label}", {"conditions": label})
+    if not isinstance(results, list):
+        return trace, clip_json(doc)
+    found = [r for r in results if isinstance(r, dict) and r.get("name")]
+    base = [r["name"] for r in found if not r.get("is_mega")]
+    mega = [r["name"] for r in found if r.get("is_mega")]
+    out: dict[str, Any] = {"conditions": [f"{f} {v}" for f, v in conditions], "count": len(found)}
+    if len(found) <= DEX_FIND_FULL_LIST_MAX:
+        out.update({"pokemon": base, "megaForms": mega})
+    else:
+        out.update({"pokemonSample": base[:DEX_FIND_SAMPLE], "megaFormsSample": mega[:DEX_FIND_MEGA_SAMPLE],
+                    "note": f"{len(found)} matches are too many to list in one answer: give the total, "
+                            "name a few examples from the sample, and suggest narrowing the search "
+                            "by type, ability or a base-stat bound."})
+    unresolved = doc.get("unresolved_conditions") if isinstance(doc, dict) else None
+    if unresolved:
+        out["unresolved"] = unresolved
+    return trace, json.dumps(out, ensure_ascii=False)
+
+
 def _run_tool(pool: Any, name: str, args: dict,
               timeout: float = QA_TOOL_TIMEOUT,
               budget: float | None = None) -> tuple[tuple[str, str, dict] | None, str]:
@@ -372,6 +451,8 @@ def _run_tool(pool: Any, name: str, args: dict,
             q = _resolve_query(pool, q, kind, timeout)
             doc = pool.request_json("dex", [kind, q, "--format", "json"], timeout=timeout)
             return (f"dex.{kind}", f"dex {kind} {q}", {"kind": kind, "name": q}), clip_json(doc)
+        if name == "dex_find":
+            return _dex_find(pool, args, timeout)
         if name == "meta_ranking":
             fmt = args.get("format")
             if fmt not in ("single", "double"):
@@ -639,28 +720,27 @@ site's own table prints — every other word must be written in the answer's lan
 
 DIAGNOSE_EXPLAIN_THINKING_PROFILE = """\
 
-Thinking-mode output profile — this OVERRIDES the earlier 120-word/2-3-problem length only;
-all factual and roster constraints above remain mandatory. Write a substantial, specific
-interpretation as 3 short plain-text paragraphs (no headings or markdown): about 450-700
-Chinese characters, 220-320 English words, or 550-850 Japanese characters.
-- Explain the team's concrete structure using ONLY the coverage entries marked present and the
-  members listed under them. Cite actual members and supplied moves/items/abilities, but do not
-  add a mechanics explanation from memory.
-- Connect 2-4 consequential risks across report sections. For an opponent row, report only what
-  that row states — the weakest answer found, the observed builds it occurs on, which of my
-  members supply the strongest answer there, the grade against the representative build, how much
-  of the real-team sample the retained builds cover, and whether every retained build was
-  calculated — described in words, never by field name. The compact payload intentionally has
-  no damage cells: do not explain WHY a grade was assigned, infer turns-to-KO, or add speed,
-  accuracy, typing, Focus Sash, weather, or damage claims.
-- Close with 2-3 priorities phrased as selection/preservation needs or a CURRENT slot/role whose
-  robustness needs checking. Name relevant opponents and members, but not an exact new set.
-Every paragraph must contain concrete team entities or report facts. Vary the prose naturally;
-avoid headings and repeated template labels that could describe an arbitrary team.
-- This is an evidence briefing, NOT a rebuild. Never recommend a new named Pokemon, move, item,
-  ability, spread, or type-based counter: the payload has no learnset/replacement authority.
-  Describe only the needed function and which CURRENT slot could be reconsidered; exact changes
-  require a later legality/calc check. This overrides the earlier request to suggest changes.
+Thinking-mode output profile — this OVERRIDES the earlier 120-word/2-3-problem length and shape
+only; every factual, roster and vocabulary rule above stays mandatory. The reader chose the long
+reading: give them a real analyst's briefing, not a template.
+- Length: about 700-1200 Chinese characters, 350-550 English words, or 850-1400 Japanese
+  characters. Organise it as you judge best in 3-6 plain-text paragraphs. A paragraph may open with
+  a short label of your own followed by a colon, and priorities may be a numbered list ("1. ...").
+  No markdown syntax: no **, #, tables or "-" bullets.
+- Explain how the team actually plays: its structure, likely leads and back lines, how members
+  cover each other, and the win routes the supplied sets point to. You MAY use standard battle
+  mechanics of the moves, abilities and items the team already carries (what Intimidate, Trick
+  Room, Choice items, a weather or terrain does) to explain that plan.
+- Connect 2-4 consequential risks across report sections. For an opponent row, use what the row
+  states — the weakest answer found, which of my members answer it best, the grade against the
+  representative build, how much of the real-team sample the observed builds cover, whether every
+  build was calculated — in words, never by field name. The payload has no damage cells: never
+  state or imply numbers it does not carry (damage, turns-to-KO, speed tiers, probabilities).
+- Close with 2-4 priorities: what to preserve, what to select or lead into which opponents, and
+  which CURRENT slot or role most deserves a second look and why.
+- This is an evidence briefing, NOT a rebuild: never name a new Pokemon, move, item, ability,
+  spread or type-based counter that the report does not contain — there is no legality authority
+  for it. Describe the needed function and the current slot instead.
 - Pokemon Champions has team selection but no ban phase. Say select/lead/preserve/position;
   never tell the user to ban an opponent.
 - Entity spelling is non-negotiable even in Chinese/Japanese prose: write `Pelipper 的 Drizzle`,
@@ -668,22 +748,21 @@ avoid headings and repeated template labels that could describe an arbitrary tea
 """
 
 DIAGNOSE_EXPLAIN_THINKING_USER_CONTRACT = """\
-FINAL OUTPUT CONTRACT: exactly 3 plain-text paragraphs and follow the language-specific length
-range in the thinking-mode profile.
-This is evidence interpretation, not a rebuild. Use English canonical entity spellings even
-inside Chinese prose. Do not introduce or recommend ANY named entity absent from [report].
-For opponent matchups use only the facts that row carries, stated in words. No internal
-identifier may reach the prose: no field name, no key path, no snake_case or camelCase token, no
-present=true. Never explain a grade's cause
-or invent mechanics, moves, items, damage, speed, accuracy, or type interactions. Adjustment
-priorities may name a current slot and a needed function only. No headings, markdown, ban phase,
-or generic filler.
+FINAL OUTPUT CONTRACT: a thorough, specific reading in the thinking-mode length range, 3-6
+plain-text paragraphs in whatever order serves this team; short paragraph labels and a numbered
+priority list are fine, markdown is not. Mechanics of the team's own moves, abilities and items may
+explain the plan. Never introduce or recommend a named entity absent from [report], never state a
+number the report does not carry, never let an internal identifier (field name, key path,
+snake_case or camelCase token, present=true) reach the prose, and never mention a ban phase. Use
+English canonical entity spellings even inside Chinese or Japanese prose.
 """
 
 DIAGNOSE_EXPLAIN_INPUT_BYTES = 28_000
 DIAGNOSE_EXPLAIN_MAX_TOKENS = 650
-DIAGNOSE_EXPLAIN_THINKING_MAX_TOKENS = 6000
-DIAGNOSE_EXPLAIN_THINKING_TIMEOUT = 120.0
+# The thinking reading is two to three times the quick one, and reasoning tokens count against the
+# same cap, so both the cap and the wall clock grow with it (the NDJSON heartbeat keeps the CDN open).
+DIAGNOSE_EXPLAIN_THINKING_MAX_TOKENS = 9000
+DIAGNOSE_EXPLAIN_THINKING_TIMEOUT = 150.0
 
 
 # ---------------------------------------------------------------------------------------- #

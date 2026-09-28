@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { GameImage } from "../../../components/GameImage.tsx";
 import { displayName, optionalKey, useLang, useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
-import { natureLabel, spSum } from "../shared.tsx";
+import { natureLabel, spSum } from "../../../components/build/inputs.tsx";
 import type { MonState } from "../duel/state.ts";
 import {
   formatProbability, lanesOf, num, record, survival, targetProbability,

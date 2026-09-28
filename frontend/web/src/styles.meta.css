@@ -1,0 +1,288 @@
+/* Metagame detail page: the usage card, the KO card and the share-image dialog.
+   The cards lay out by their OWN width (container queries), not the viewport: the share image
+   renders them at desktop width even when it is made on a phone. Colours come from theme tokens
+   only, so a card follows whichever `data-theme` element encloses it (page root or share frame). */
+
+/* Tabular numerals subset (frontend/assets/fonts/pc-numerals/README.md). unicode-range hands only
+   digits and a few symbols to it; every other character falls through to the UI font. */
+@font-face { font-family: "PC Numerals"; font-weight: 500; font-display: swap;
+  src: url("../../assets/fonts/pc-numerals/pc-numerals-500.woff2") format("woff2");
+  unicode-range: U+0020, U+0023, U+0025, U+002B-003A, U+00B7, U+00D7, U+2013, U+2212; }
+@font-face { font-family: "PC Numerals"; font-weight: 600; font-display: swap;
+  src: url("../../assets/fonts/pc-numerals/pc-numerals-600.woff2") format("woff2");
+  unicode-range: U+0020, U+0023, U+0025, U+002B-003A, U+00B7, U+00D7, U+2013, U+2212; }
+@font-face { font-family: "PC Numerals"; font-weight: 700; font-display: swap;
+  src: url("../../assets/fonts/pc-numerals/pc-numerals-700.woff2") format("woff2");
+  unicode-range: U+0020, U+0023, U+0025, U+002B-003A, U+00B7, U+00D7, U+2013, U+2212; }
+@font-face { font-family: "PC Numerals"; font-weight: 800; font-display: swap;
+  src: url("../../assets/fonts/pc-numerals/pc-numerals-800.woff2") format("woff2");
+  unicode-range: U+0020, U+0023, U+0025, U+002B-003A, U+00B7, U+00D7, U+2013, U+2212; }
+
+.mc-page { display: grid; gap: 18px; }
+
+.mc-card {
+  --font-num: "PC Numerals", var(--font-ui);
+  --mc-row: 27px;
+  --acc: var(--brand);
+  --acc2: var(--acc);
+  --acc-ink: color-mix(in srgb, var(--acc) var(--acc-ink-mix), var(--ink));
+  container: mc-card / inline-size;
+  position: relative; overflow: hidden;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+  font-variant-numeric: tabular-nums;
+}
+.mc-card .ehover { display: block; border-bottom: 0; }
+.mc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mc-strip { height: 4px; background: linear-gradient(90deg, var(--acc) 0 50%, var(--acc2) 50% 100%); }
+
+/* ── hero ─────────────────────────────────────────────────────────────── */
+/* The identity column is exactly half the card, so its edge continues the split of the SP / teammate
+   row and of the KO card below (1.77 = 0.95 + 0.82). */
+.mc-hero {
+  display: grid; grid-template-columns: minmax(0, 1.77fr) minmax(0, 0.95fr) minmax(0, 0.82fr);
+  border-bottom: 1px solid var(--line);
+  background: radial-gradient(250px 190px at 150px 52%, color-mix(in srgb, var(--acc) 20%, transparent), transparent 72%), var(--panel);
+}
+.mc-hero > * { padding: 12px 26px; min-width: 0; }
+.mc-hero > * + * { border-left: 1px solid var(--line); }
+.mc-id { position: relative; display: flex; align-items: center; gap: 16px; min-height: 146px; padding-left: 18px; }
+.mc-ghost { position: absolute; left: 4px; top: 50%; transform: translateY(-54%);
+  font: 800 196px/1 var(--font-num); letter-spacing: -0.05em;
+  color: color-mix(in srgb, var(--acc) 14%, transparent); pointer-events: none; user-select: none; }
+.mc-sprite { position: relative; flex: none; width: 146px; height: 146px; object-fit: contain; margin-left: 42px;
+  filter: drop-shadow(0 12px 14px rgb(16 26 47 / 0.2)); }
+/* Forms span the whole row; the format switch takes the free right edge beside name, number and
+   types (rows 2-4), so it never narrows the form tabs above it. */
+.mc-names { position: relative; flex: 1 1 auto; min-width: 0; display: grid; column-gap: 16px;
+  grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: repeat(4, auto); }
+.mc-names > * { grid-column: 1; }
+.mc-names > .mc-forms { grid-row: 1; grid-column: 1 / -1; }
+/* One line whatever the names: the form being shown keeps its full label (the title repeats it
+   anyway), the others shorten first. A second line of tabs would push the card past the fold. */
+.mc-forms { display: flex; gap: 6px; min-width: 0; margin-bottom: 8px; }
+.mc-form { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 2px; min-width: 0; height: 26px; padding: 0 9px 0 2px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub);
+  font-size: 12px; cursor: pointer; }
+.mc-form img { flex: none; width: 22px; height: 22px; object-fit: contain; }
+.mc-form-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mc-form[aria-pressed="true"] { flex: none; color: var(--ink); font-weight: 700; border-color: color-mix(in srgb, var(--acc) 60%, var(--line)); }
+.mc-name { margin: 0; font-size: 32px; line-height: 1.15; font-weight: 800; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.mc-name.mid { font-size: 25px; line-height: 1.3; }
+.mc-name.small { font-size: 20px; line-height: 1.45; }
+.mc-alt { margin-top: 4px; font-size: 13px; color: var(--sub); }
+.mc-dexno { color: inherit; font-family: var(--font-num); font-weight: 600; }
+.mc-types { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.mc-type .type-badge { height: 25px; padding: 0 11px 0 3px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  background: color-mix(in srgb, var(--tc) 15%, transparent); color: color-mix(in srgb, var(--tc) 62%, var(--ink)); }
+.mc-type .type-badge img { width: 19px; height: 19px; }
+
+.mc-stats { display: grid; align-content: center; gap: 3px; }
+.mc-stat { display: grid; grid-template-columns: 40px 34px minmax(0, 1fr); align-items: center; gap: 10px;
+  height: 20px; font-size: 12.5px; border-radius: 4px; }
+.mc-stats > .ehover:hover .mc-stat, .mc-stats > .ehover:focus-visible .mc-stat { background: var(--panel-2); }
+.mc-stat-k { color: var(--sub); white-space: nowrap; }
+.mc-stat-v { font: 600 15px var(--font-num); text-align: right; }
+.mc-stat-bar { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+.mc-stat-bar i { display: block; height: 100%; width: var(--w); border-radius: 3px;
+  background: color-mix(in srgb, var(--acc) 58%, transparent); }
+.mc-stat.top .mc-stat-bar i { background: var(--acc); }
+.mc-stat.top .mc-stat-k { color: var(--ink); font-weight: 700; }
+.mc-stat.total { margin-top: 4px; }
+.mc-stat.total .mc-stat-v { font-weight: 800; }
+.mc-stat-note { font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mc-stat-pop { display: grid; gap: 2px; }
+
+/* Abilities read like the panels below: head at the top; the snapshot line, site mark and share
+   action sit at the column's foot. */
+.mc-side { display: flex; flex-direction: column; gap: 10px; }
+.mc-side-foot { margin-top: auto; }
+/* The format switch: two rank pills, stacked and set off against each other, top-aligned with the
+   name in the identity block's free right edge. The format on screen is a tonal pill — a wash and
+   hairline of the type colour, its ink for the text — with a filled dot; the other is a quiet
+   outline with a hollow dot. The dot carries the state without relying on colour (§2.2). */
+.mc-names > .mc-seg { grid-column: 2; grid-row: 2 / 5; }
+.mc-seg { align-self: start; margin-top: 4px; display: grid; justify-items: start; gap: 10px; }
+.mc-seg > :nth-child(2) { margin-left: 18px; }
+.mc-seg > button, .mc-seg > span { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 16px 0 13px;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--sub);
+  white-space: nowrap; cursor: pointer; transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease; }
+.mc-seg > span { cursor: default; }
+.mc-seg-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px currentColor; }
+.mc-seg-label { font-size: 14px; font-weight: 600; letter-spacing: 0.03em; }
+.mc-seg b { font: 700 21px/1 var(--font-num); letter-spacing: -0.01em; }
+.mc-seg > button:hover { border-color: var(--line-strong); color: var(--ink); }
+.mc-seg > [aria-pressed="true"], .mc-seg > [aria-current="true"] { cursor: default;
+  border-color: color-mix(in srgb, var(--acc) 38%, transparent); background: color-mix(in srgb, var(--acc) 11%, transparent);
+  color: var(--acc-ink); }
+.mc-seg > [aria-pressed="true"] .mc-seg-dot, .mc-seg > [aria-current="true"] .mc-seg-dot { background: currentColor; }
+
+/* ── real-build strip ─────────────────────────────────────────────────── */
+.mc-set { display: flex; align-items: center; gap: 14px; min-height: 44px; padding: 5px 24px 5px 26px;
+  border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--acc) 5%, var(--panel)); font-size: 13px; }
+.mc-set-tag { flex: none; padding: 1px 7px; border: 1px solid color-mix(in srgb, var(--acc) 40%, transparent);
+  border-radius: 5px; color: var(--acc-ink); font-size: 11.5px; font-weight: 700; }
+.mc-set-body { flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; min-width: 0; }
+.mc-set-body > * { display: inline-flex; align-items: center; gap: 5px; padding: 0 11px; border-left: 1px solid var(--line); white-space: nowrap; }
+.mc-set-body > :first-child { padding-left: 0; border-left: 0; }
+.mc-set-body > .keep-mon { padding: 0; border-left: 1px solid var(--line-strong); }
+.mc-set-body .keep-mon { display: inline-grid; }
+.mc-set-item img { width: 22px; height: 22px; object-fit: contain; }
+.mc-set small { margin-left: 3px; color: var(--sub); font-size: 11.5px; }
+.mc-set-moves { gap: 10px; }
+.mc-set-move { display: inline-flex; align-items: center; gap: 3px; }
+.mc-set-move .type-badge.icon-only img { width: 16px; height: 16px; }
+.mc-set-sp { gap: 11px; color: var(--sub); font-size: 12.5px; }
+.mc-set-sp b { margin-left: 2px; color: var(--acc-ink); font: 700 13.5px var(--font-num); }
+.mc-set-note { flex: none; color: var(--sub); font-size: 12px; }
+.mc-set-pager { flex: none; display: inline-flex; align-items: center; gap: 4px; }
+.mc-set-pager button { width: 24px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); color: var(--ink); font-size: 15px; line-height: 1; cursor: pointer; }
+.mc-set-pager button:hover { border-color: var(--line-strong); }
+.mc-set-count { min-width: 36px; text-align: center; color: var(--sub); font: 600 12px var(--font-num); }
+
+/* ── usage panels ─────────────────────────────────────────────────────── */
+/* The two rows split at different points: three list panels above, and below the SP matrix and the
+   teammate grid at half each, lined up with the two halves of the KO card underneath. */
+.mc-grid { display: grid; gap: 1px; background: var(--line);
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.44fr) minmax(0, 0.56fr) minmax(0, 1fr);
+  grid-template-areas: "moves items items natures" "spreads spreads partners partners"; }
+.mc-panel { min-width: 0; padding: 11px 22px 12px; background: var(--panel); }
+.mc-moves { grid-area: moves; } .mc-items { grid-area: items; } .mc-natures { grid-area: natures; }
+.mc-spreads { grid-area: spreads; } .mc-partners { grid-area: partners; }
+.mc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; height: 24px; margin-bottom: 6px; }
+.mc-head h3 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
+.mc-head-note { min-width: 0; overflow: hidden; color: var(--sub); font-size: 11.5px; white-space: nowrap; text-overflow: ellipsis; }
+.mc-abilities .mc-head { margin-bottom: 2px; }
+
+.mc-row { display: grid; grid-template-columns: 18px minmax(0, 1fr) 54px 44px; column-gap: 10px; align-items: center;
+  height: var(--mc-row); padding-right: 4px; border-radius: 6px; font-size: 13.5px; }
+.mc-row.no-delta { grid-template-columns: 18px minmax(0, 1fr) 54px; }
+.mc-card .ehover:hover > .mc-row, .mc-card .ehover:focus-visible > .mc-row,
+.mc-card .ehover:hover > .mc-sp-row, .mc-card .ehover:focus-visible > .mc-sp-row,
+.mc-card .ehover:hover > .mc-tile, .mc-card .ehover:focus-visible > .mc-tile { background: var(--panel-2); }
+.mc-rk { color: var(--sub); font: 500 12px var(--font-num); text-align: right; opacity: 0.8; }
+.mc-main { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; height: 100%; padding-bottom: 6px; }
+.mc-main::before, .mc-main::after { content: ""; position: absolute; left: 0; bottom: 2px; height: 3px; border-radius: 2px; pointer-events: none; }
+.mc-main::before { right: 0; background: var(--panel-2); }
+.mc-main::after { width: var(--w); background: color-mix(in srgb, var(--bar, var(--acc)) 55%, transparent); }
+.mc-row.lead .mc-main::after { background: var(--bar, var(--acc)); }
+.mc-label { display: flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: 0; line-height: 18px; }
+.mc-label .type-badge.icon-only img { width: 17px; height: 17px; }
+.mc-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mc-row.lead .mc-text { font-weight: 700; }
+.mc-item-img { flex: none; width: 22px; height: 22px; object-fit: contain; }
+.mc-power { flex: none; color: var(--sub); font: 500 11.5px var(--font-num); }
+.mc-sub { flex: none; color: var(--sub); font-size: 11px; white-space: nowrap; }
+.mc-pct { font: 600 14.5px var(--font-num); text-align: right; white-space: nowrap; }
+.mc-pct small { margin-left: 1px; color: var(--sub); font-size: 10px; font-weight: 500; }
+.mc-row.lead .mc-pct, .mc-sp-row.lead .mc-pct { color: var(--acc-ink); font-weight: 700; }
+.mc-dl { color: var(--sub); font: 500 12px var(--font-num); text-align: right; white-space: nowrap; }
+.mc-dl.up { color: var(--ink); }
+.mc-dl.minor { color: var(--sub); opacity: 0.6; }
+.mc-dl.new { color: var(--acc-ink); font: 700 10.5px var(--font-ui); }
+
+.mc-sp-row { display: grid; grid-template-columns: 18px repeat(6, minmax(0, 1fr)) 54px 44px; column-gap: 8px; align-items: center;
+  height: var(--mc-row); padding-right: 4px; border-radius: 6px; }
+.mc-sp-cols { height: 22px; color: var(--sub); font-size: 11.5px; text-align: center; white-space: nowrap; }
+.mc-sp-cols .end { text-align: right; }
+.mc-sp-slot { display: block; min-width: 0; }
+.mc-sp-cell { display: grid; place-items: center; height: 21px; border-radius: 5px; color: var(--ink);
+  background: color-mix(in srgb, var(--acc) var(--a), transparent); font: 600 13px var(--font-num); }
+.mc-sp-cell.zero { background: transparent; color: var(--sub); font-weight: 400; opacity: 0.6; }
+.mc-sp-cell.strong { color: #fff; }
+.mc-sp-cell.max { font-weight: 800; }
+
+.mc-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.mc-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; padding: 8px 4px 7px; border-radius: 12px; }
+.mc-tile-img { width: 58px; height: 58px; object-fit: contain; }
+.mc-tile-rank { position: absolute; top: 5px; left: 8px; color: var(--sub); font: 600 11.5px var(--font-num); opacity: 0.85; }
+.mc-tile-fc { position: absolute; top: 6px; right: 6px; padding: 0 2px; border: 1px solid var(--line); border-radius: 3px;
+  color: var(--sub); font-size: 9.5px; line-height: 1.2; }
+.mc-tile-name { max-width: 100%; margin-top: 2px; overflow: hidden; font-size: 12.5px; font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+.mc-tile-use { color: var(--sub); font: 500 12px var(--font-num); line-height: 1.3; }
+.mc-tile-use.rare { color: var(--warning); }
+
+.mc-body-state { padding: 28px 24px; color: var(--sub); text-align: center; }
+
+.mc-brand { display: flex; align-items: center; gap: 8px; color: var(--sub); font-size: 12.5px; }
+.mc-brand img { width: 18px; height: 18px; }
+.mc-brand .mc-share-btn { margin-left: auto; }
+.mc-share-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px;
+  border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font-size: 12px; cursor: pointer; }
+.mc-share-btn:hover { border-color: var(--line-strong); }
+.mc-share-btn svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── KO card ──────────────────────────────────────────────────────────── */
+.mc-ko-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 14px 24px 12px 26px; border-bottom: 1px solid var(--line); }
+.mc-ko-head h2 { margin: 0; font-size: 15px; }
+.mc-ko-note { color: var(--sub); font-size: 11.5px; }
+.mc-ko-stamp { margin-left: auto; color: var(--sub); font-size: 12px; white-space: nowrap; }
+.mc-ko-sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+.mc-ko-side { min-width: 0; padding: 14px 22px 18px; background: var(--panel); }
+.mc-ko-side.out { --bar: var(--build-a); }
+.mc-ko-side.in { --bar: var(--build-b); }
+.mc-ko-dir { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 14px; font-weight: 700;
+  color: color-mix(in srgb, var(--bar) 80%, var(--ink)); }
+.mc-ko-arrow { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 1.5px solid var(--bar); border-radius: 50%;
+  font-size: 12px; line-height: 1; }
+.mc-ko-movehead { display: flex; justify-content: space-between; margin: 14px 0 6px; color: var(--sub); font-size: 12px; }
+.mc-ko-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 26px; }
+.mc-ko-side .mc-row.lead .mc-pct { color: color-mix(in srgb, var(--bar) 78%, var(--ink)); }
+.mc-ko-absent { display: grid; place-items: center; height: calc(var(--mc-row) * 5); border: 1px dashed var(--line-strong);
+  border-radius: 9px; color: var(--sub); font-size: 12.5px; }
+.mc-ko-absent span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%;
+  background: var(--warning); vertical-align: 1px; }
+.mc-ko-missing { padding: 18px 22px; color: var(--sub); }
+
+/* ── narrower cards ───────────────────────────────────────────────────── */
+@container mc-card (max-width: 1080px) {
+  .mc-hero { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .mc-side { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--line); }
+  .mc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "moves items" "natures partners" "spreads spreads"; }
+  .mc-ko-sides { grid-template-columns: minmax(0, 1fr); }
+  .mc-ko-stamp { margin-left: 0; }
+}
+@container mc-card (max-width: 680px) {
+  .mc-hero { grid-template-columns: minmax(0, 1fr); }
+  .mc-hero > * + * { border-left: 0; border-top: 1px solid var(--line); }
+  .mc-id { min-height: 0; padding-left: 12px; }
+  .mc-names { grid-template-columns: minmax(0, 1fr); }
+  .mc-names > .mc-seg { grid-column: 1; grid-row: 5; margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+  .mc-seg > :nth-child(2) { margin-left: 0; }
+  .mc-ghost { font-size: 132px; }
+  .mc-sprite { width: 104px; height: 104px; margin-left: 28px; }
+  .mc-name { font-size: 26px; }
+  .mc-set { flex-wrap: wrap; row-gap: 6px; padding-inline: 12px; }
+  .mc-set-note { margin-left: auto; }
+  .mc-set-body { order: 3; flex-basis: 100%; gap: 6px 14px; }
+  .mc-set-body > * { flex-wrap: wrap; padding: 0; border-left: 0; white-space: normal; }
+  .mc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "moves" "items" "natures" "spreads" "partners"; }
+  .mc-panel { padding-inline: 12px; }
+  .mc-sp-row { column-gap: 3px; }
+  .mc-ko-moves { grid-template-columns: minmax(0, 1fr); }
+  .mc-tiles { gap: 6px 4px; }
+  .mc-tile { padding-inline: 2px; }
+  .mc-tile-img { width: 48px; height: 48px; }
+  .mc-ko-absent { height: calc(var(--mc-row) * 3); }
+  .mc-ko-stamp { white-space: normal; }
+}
+
+/* ── share dialog ─────────────────────────────────────────────────────── */
+.mc-share-options { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.mc-share-opt { display: inline-flex; align-items: center; gap: 8px; color: var(--sub); font-size: 13px; }
+.mc-share-seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); }
+.mc-share-seg button { padding: 3px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--sub); font-size: 13px; cursor: pointer; }
+.mc-share-seg button.on { background: var(--panel); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgb(16 26 47 / 0.12); }
+.mc-share-stage { min-width: 0; }
+.mc-share-preview { position: relative; margin: 0 auto; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; }
+.mc-share-scale { transform-origin: 0 0; }
+.mc-share-frame { position: relative; overflow: hidden; pointer-events: none; color-scheme: light;
+  background: radial-gradient(1100px 520px at 50% -8%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%), var(--bg);
+  color: var(--ink); font: 14px/1.58 var(--font-ui); }
+.mc-share-frame[data-theme="dark"] { color-scheme: dark; }
+.mc-share-snap { position: absolute; right: 44px; bottom: 16px; color: var(--sub); font: 500 13px var(--font-num); letter-spacing: 0.03em; }
+.mc-share-content { position: absolute; top: 50%; left: 50%; display: grid; gap: 18px; width: 1240px; transform-origin: center; }
+.mc-share-size { color: var(--sub); font: 12px var(--font-mono); }
+.mc-share-status { flex: 1; min-width: 0; color: var(--sub); font-size: 12.5px; }
+.mc-share .modal-foot button:disabled { cursor: progress; }

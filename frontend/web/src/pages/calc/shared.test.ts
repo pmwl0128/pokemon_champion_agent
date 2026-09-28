@@ -5,7 +5,7 @@ import type { ItemRef } from "../../runtime/projection.ts";
 import {
   buildConfigSig, modalForEntry, observedBuildOptions, sideFromBuild, sideIsBare,
   withMega, type ModalSet,
-} from "./shared.tsx";
+} from "../../components/build/inputs.tsx";
 import { buildCardOptionForMon } from "./duel/MonEditor.tsx";
 import { applyBuildOption, makeMon, rollModifier } from "./duel/state.ts";
 

@@ -15,7 +15,7 @@ import { displayName, effectText, useLang, useT } from "../i18n.ts";
 import { GameImage } from "./GameImage.tsx";
 import { CategoryBadge, TypeBadge } from "./TypeBadge.tsx";
 
-export type EntityKind = "pokemon" | "move" | "item" | "ability" | "nature" | "spread";
+export type EntityKind = "pokemon" | "move" | "item" | "ability" | "nature" | "spread" | "stat";
 
 const STAT_ORDER = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
 const STAT_SHORT: Record<(typeof STAT_ORDER)[number], string> = {
@@ -124,7 +124,6 @@ export function EntityHover({
     // fresh previewAddon element on every render; depending on that identity tears down and
     // recreates the ResizeObserver after each position update and can recurse until React aborts.
     // The observer already re-places the card when changed content alters its measured size.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, hasPreview]);
 
   if (!hasPreview && !href) return <>{children}</>;   // unknown and going nowhere: plain render
@@ -240,8 +239,10 @@ export function EntityHover({
           onMouseEnter={() => { setHovered(true); reveal(); }}
           onMouseLeave={() => setHovered(false)}
           onFocus={(event) => {
-            // Click-borne focus does not open a passive card; keyboard focus does.
-            if (passive && !(event.target as HTMLElement).matches?.(":focus-visible")) return;
+            // Only keyboard focus opens the card. A mouse click also focuses the anchor, and that
+            // focus outlives the hover: the card would stay up after the pointer left, until a click
+            // somewhere else blurred it. The pointer already opens the card by hovering.
+            if (!(event.target as HTMLElement).matches?.(":focus-visible")) return;
             setFocused(true);
             reveal();
           }}

@@ -1,12 +1,14 @@
-import type { FormatId } from "@pokemon-champions/protocol";
-import { Component, Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from "react";
-import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { EscapeLayers } from "./components/EscapeLayers.tsx";
+import { Component, Suspense, lazy, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { BRAND_LOGO } from "./assets/icons.ts";
-import { FormatTabs } from "./components/FormatTabs.tsx";
-import { RailHandle, RailLayer, useRailEscape, type RailState } from "./components/SideRail.tsx";
+import { PageRailProvider, SearchEntry, useSiteSearch } from "./components/SideRail.tsx";
+import { LibraryDockButton } from "./components/LibraryDockButton.tsx";
+import { LibraryWorkspaceProvider, useLibraryWorkspace } from "./lib/library/workspace.tsx";
 import { LangContext, detectLang, saveLang, useLang, useT, type Lang } from "./i18n.ts";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RuntimeProvider, useRuntime } from "./runtime/context.tsx";
+import { ToastProvider } from "./components/Toast.tsx";
 
 type Theme = "light" | "dark";
 const THEME_KEY = "pcui-theme";
@@ -64,7 +66,9 @@ const loadMetaPage = () => import("./pages/MetaPage.tsx");
 const loadMatchupPage = () => import("./pages/MatchupPage.tsx");
 const loadCalcPage = () => import("./pages/CalcPage.tsx");
 const loadAssistantPage = () => import("./pages/AssistantPage.tsx");
+const loadTeamsPage = () => import("./pages/TeamsPage.tsx");
 const loadUepPages = () => import("./pages/uep/index.ts");
+const loadLibraryDock = () => import("./components/library/LibraryDock.tsx");
 
 const DexPage = lazy(() => loadDexPage().then((m) => ({ default: m.DexPage })));
 const PokemonPage = lazy(() => loadPokemonPage().then((m) => ({ default: m.PokemonPage })));
@@ -72,9 +76,11 @@ const MetaPage = lazy(() => loadMetaPage().then((m) => ({ default: m.MetaPage })
 const MatchupPage = lazy(() => loadMatchupPage().then((m) => ({ default: m.MatchupPage })));
 const CalcPage = lazy(() => loadCalcPage().then((m) => ({ default: m.CalcPage })));
 const AssistantPage = lazy(() => loadAssistantPage().then((m) => ({ default: m.AssistantPage })));
-// The trend rail is intentionally absent from the entry graph until its handle is pressed.
-const TrendDrawer = lazy(() => import("./components/TrendDrawer.tsx")
-  .then((m) => ({ default: m.TrendDrawer })));
+const TeamsPage = lazy(() => loadTeamsPage().then((m) => ({ default: m.TeamsPage })));
+// The environment search pages without their own fall back to, loaded the first time it is opened.
+const MetaSearch = lazy(() => import("./components/MetaSearch.tsx").then((m) => ({ default: m.MetaSearch })));
+// The library dock (and the storage code under it) loads the first time it is opened.
+const LibraryDock = lazy(() => loadLibraryDock().then((m) => ({ default: m.LibraryDock })));
 // Both local UEP pages intentionally share one chunk; online runtimes never request it.
 const SessionsPage = lazy(() => loadUepPages().then((m) => ({ default: m.SessionsPage })));
 const SessionPage = lazy(() => loadUepPages().then((m) => ({ default: m.SessionPage })));
@@ -148,66 +154,45 @@ function MissingRoute() {
   );
 }
 
-function EnvironmentTrendRail() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const t = useT();
-  const environmentRoute = location.pathname === "/" || location.pathname.startsWith("/meta/");
-  const searchParams = new URLSearchParams(location.search);
-  const format = searchParams.get("format") === "double"
-    ? "double" as const : "single" as const;
-  const open = environmentRoute && searchParams.get("trend") === "1";
-  const setOpen = useCallback((open: boolean) => {
-    const updated = new URLSearchParams(location.search);
-    if (open) updated.set("trend", "1");
-    else updated.delete("trend");
-    navigate({ pathname: location.pathname, search: updated.toString() }, { replace: true });
-  }, [location.pathname, location.search, navigate]);
-  const setFormat = useCallback((next: FormatId) => {
-    const updated = new URLSearchParams(location.search);
-    updated.set("format", next);
-    navigate({ pathname: location.pathname, search: updated.toString() }, { replace: true });
-  }, [location.pathname, location.search, navigate]);
-  // The URL marker is authoritative across detail navigation and reloads. This rail is a
-  // viewport overlay, not a gutter rail: it never writes shell padding or resizes the page.
-  const state: RailState = { open, setOpen, overlay: false, width: 320, side: "right" };
-  useRailEscape(state);
+/** The site search on a page without its own. */
+function FallbackSearch() {
+  const { slot, fallbackOpen } = useSiteSearch();
+  if (slot || !fallbackOpen) return null;
+  return <Suspense fallback={null}><MetaSearch /></Suspense>;
+}
 
-  if (!environmentRoute) return null;
-  return (
-    <>
-      <RailHandle state={state} label={t("nav.trend")} />
-      {state.open && (
-        /* Keep the animated rail shell mounted while the first lazy chunk resolves. Replacing one
-         * RailLayer with another restarted its entrance animation and made the underlying page look
-         * as though it had refreshed. Only the body crosses the Suspense boundary now. */
-        <RailLayer state={state} label={t("trend.title")} className="trend-overlay"
-          headDescription={t("trend.description")}
-          headActions={<FormatTabs format={format} onChange={setFormat} className="page-tabs" />}>
-          <Suspense fallback={
-            <div className="spinner trend-rail-loading">{t("state.loading")}</div>
-          }>
-            <TrendDrawer format={format} />
-          </Suspense>
-        </RailLayer>
-      )}
-    </>
-  );
+/** The dock, once opened: the shell owns it, so it stays open across pages. */
+function LibraryDockLayer() {
+  const { open } = useLibraryWorkspace("open");
+  if (!open) return null;
+  return <Suspense fallback={null}><LibraryDock /></Suspense>;
 }
 
 function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => void }) {
+  const topbar = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const node = topbar.current;
+    if (!node) return;
+    const update = () => document.documentElement.style.setProperty("--topbar-offset", `${Math.ceil(node.getBoundingClientRect().height)}px`);
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    update();
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty("--topbar-offset"); };
+  }, []);
   const { capabilities, can } = useRuntime();
   const t = useT();
   const { lang, setLang } = useLang();
   return (
     <div className="shell">
+      <EscapeLayers />
       <RouteScrollReset />
       <a className="skip-link" href="#main-content">{t("a11y.skipContent")}</a>
-      <EnvironmentTrendRail />
-      <header className="topbar">
+      <header ref={topbar} className="topbar">
+        {/* First in the bar, on every page: the site search (components/SideRail.tsx). */}
+        <SearchEntry />
         <span className="logo">
           <img src={BRAND_LOGO} alt="" aria-hidden />
-          Champions
+          <span className="logo-text">Champions</span>
         </span>
         <nav aria-label={t("a11y.primaryNav")}>
           <NavItem to="/" end label={t("nav.ranking")} />
@@ -218,9 +203,11 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           {can("team.matchup") && (
             <NavItem to="/matchup" label={t("nav.matchup")} preload={loadMatchupPage} />
           )}
-          {(can("llm.qa") || can("llm.builder")) && (
+          {(can("team.validate") || can("llm.qa") || can("llm.builder")) && (
             <NavItem to="/assist" label={t("nav.assistant")} preload={loadAssistantPage} />
           )}
+          {/* The library is the browser's own, so both runtimes have this page. */}
+          <NavItem to="/teams" label={t("nav.teams")} preload={loadTeamsPage} />
           {can("team.uep") && (
             <NavItem to="/sessions" label={t("nav.sessions")} preload={loadUepPages} />
           )}
@@ -237,7 +224,10 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           <option value="en">English</option>
           <option value="ja">日本語</option>
         </select>
+        <LibraryDockButton preload={() => void loadLibraryDock()} />
       </header>
+      <LibraryDockLayer />
+      <FallbackSearch />
       <main id="main-content" className="content" tabIndex={-1}>
         <Suspense fallback={<RouteLoading />}>
           <Routes>
@@ -245,10 +235,11 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           <Route path="/dex" element={<DexPage />} />
           <Route path="/pokemon/:slug" element={<PokemonPage />} />
           <Route path="/meta/:slug" element={<MetaPage />} />
-          <Route path="/trend" element={<Navigate to="/?trend=1" replace />} />
+          <Route path="/trend" element={<Navigate to="/?view=trend" replace />} />
           <Route path="/matchup" element={<MatchupPage />} />
           <Route path="/calc" element={<CalcPage />} />
-          {(can("llm.qa") || can("llm.builder")) && (
+          <Route path="/teams" element={<TeamsPage />} />
+          {(can("team.validate") || can("llm.qa") || can("llm.builder")) && (
             <Route path="/assist" element={<AssistantPage />} />
           )}
           {can("llm.qa") && <Route path="/qa" element={<Navigate to="/assist" replace />} />}
@@ -266,6 +257,15 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
         </Suspense>
       </main>
     </div>
+  );
+}
+
+/** App-level objects every page can reach: the page rail slot and the library workspace. */
+function Workspace({ children }: { children: ReactNode }) {
+  return (
+    <PageRailProvider>
+      <LibraryWorkspaceProvider>{children}</LibraryWorkspaceProvider>
+    </PageRailProvider>
   );
 }
 
@@ -297,7 +297,11 @@ export function App() {
     <LangContext.Provider value={{ lang, setLang }}>
       <AppErrorBoundary>
         <RuntimeProvider>
-          <Shell theme={theme} setTheme={setTheme} />
+          <ToastProvider>
+            <Workspace>
+              <Shell theme={theme} setTheme={setTheme} />
+            </Workspace>
+          </ToastProvider>
         </RuntimeProvider>
       </AppErrorBoundary>
     </LangContext.Provider>

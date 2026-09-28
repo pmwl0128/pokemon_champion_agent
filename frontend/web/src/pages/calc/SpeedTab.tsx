@@ -37,14 +37,14 @@ import type { ItemRef } from "../../runtime/projection.ts";
 import { useRoster } from "./roster.tsx";
 import {
   buildConfigSig, observedBuildOptions, useBuildOptions, withMega, type BuildOption,
-} from "./shared.tsx";
+} from "../../components/build/inputs.tsx";
 import { FieldPanel, useFieldOffers } from "./duel/FieldPanel.tsx";
 import { buildCardOptionForMon } from "./duel/MonEditor.tsx";
 import { monsFromPaste } from "./duel/paste.ts";
 import { SwapSeam } from "./duel/SwapSeam.tsx";
 import { DuelBar, TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  applyBuildOption, effectiveEntry, makeMon, type MonState, type SharedFlagKey, type SideId,
+  applyBuildOption, effectiveEntry, makeMon, withoutMember, type MonState, type SharedFlagKey, type SideId,
 } from "./duel/state.ts";
 import {
   SCARF, SPEED_SIDE_FLAGS, SP_MAX, TIER_KEYS, TIER_SPEC, movesFirst, natureDir, neutralNature,
@@ -173,7 +173,7 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
   const t = useT();
   const { lang } = useLang();
   const moveVocab = useMovesByName();
-  const { teams, active, field, setTeams, setActive, setField, swapSides } = useRoster();
+  const { teams, active, field, setTeams, setActive, setField, swapSides, baselineOf } = useRoster();
   const format: FormatId = field.format;
   const neutral = useMemo(() => neutralNature(natures), [natures]);
   const natureNames = useMemo(() => ({
@@ -292,7 +292,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       });
     }, 160);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamPlan.sig, visible]);
 
   const speedOf = useCallback((mon: MonState) => teamRun?.byUid[mon.uid]?.finalSpeed ?? null, [teamRun]);
@@ -385,7 +384,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       });
     });
     return { base, inputs, desc, sig: `${JSON.stringify(inputs)}#${base.length}` };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rankingRows, view.topN, rosterKey, dex, items, catalogData, field.weather, field.terrain, neutral, natureNames]);
 
   const [metaRows, setMetaRows] = useState<{ sig: string; rows: TierRow[] } | null>(null);
@@ -421,7 +419,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       console.error("Speed table calculation failed:", e);
       if (token === tableToken.current) setError(t("calc.error"));
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tablePlan.sig, visible]);
 
   // -- the Meta stitch: the environment picker's last card, loaded per species on demand ---------
@@ -449,7 +446,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       const onRoster = rosterSlugs.includes(row.slug);
       if (!row.real.length || onRoster) requestMeta(row.slug);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaRows, tablePlan.sig, rosterKey, format]);
 
   const metaPlan = useMemo(() => {
@@ -475,7 +471,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       setMetaSpeeds({ sig: plan.sig, byKey });
     }).catch((e) => console.error("Meta speed calculation failed:", e));
     return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metaPlan.sig, visible]);
 
   // -- roster Pokémon in their species' rows, and what each 实配 cell shows -----------------------
@@ -527,7 +522,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
     const tailwind = shown?.member?.tailwind ?? null;
     const speed = tailwind ?? shown?.speed ?? null;
     return { row, entry, members, cards, shown, speed, tailwind: tailwind != null };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [metaRows, teams, teamRun, picks, metaSets, metaSpeeds, field.sides, dex, items, lang]);
 
   const sorted = useMemo(() => {
@@ -613,7 +607,6 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
     format,
     targets: [{ id: "primary", label: t("speed.ours") }, { id: "secondary", label: t("speed.theirs") }],
     pick: pickFromRail,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [format, pickFromRail, lang]);
   useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
@@ -637,7 +630,7 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
       setActive((p) => ({ ...p, [side]: teams[side].length }));
     },
     onRemove: (i: number) => {
-      setTeams((p) => ({ ...p, [side]: p[side].filter((_, j) => j !== i) }));
+      setTeams((p) => ({ ...p, [side]: withoutMember(p[side], i) }));
       setActive((p) => ({ ...p, [side]: Math.max(0, Math.min(p[side], teams[side].length - 2)) }));
     },
     onReset: () => {
@@ -716,21 +709,23 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
   return (
     <div className="spd-page">
       <DuelBar field={field}>
-        <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...wing("a")} />
+        <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...wing("a")} librarySide="a" />
         <FieldPanel field={field} setField={setField} sharedFlags={SPEED_SHARED} inlineShared
           weatherSuggestions={offers.weather} terrainSuggestions={offers.terrain} />
-        <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...wing("b")} mirrored />
+        <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...wing("b")} librarySide="b" mirrored />
       </DuelBar>
 
       <div className="spd-top swap-seam-host">
         <SpeedCard label={t("speed.ours")} mon={mine} setMon={setMine} pickerKey="spd-a" dex={dex}
           natures={natures} items={items} format={format} offense={offenseMine} input={mineInput}
-          result={teamRun?.byUid[mine.uid] ?? null} scarf={scarfFor(mine, "a")} />
+          result={teamRun?.byUid[mine.uid] ?? null} scarf={scarfFor(mine, "a")}
+          baseline={baselineOf(mine)} />
         <SwapSeam onSwap={swapSides} />
         <SpeedCard label={t("speed.theirs")} mon={foe} setMon={setFoe} pickerKey="spd-b" dex={dex}
           natures={natures} items={items} format={format} offense={offenseOf(foe, foeEntry, category)}
           input={speedInputOf(foe, field, "b", dex, items, neutral)}
-          result={teamRun?.byUid[foe.uid] ?? null} scarf={scarfFor(foe, "b")} />
+          result={teamRun?.byUid[foe.uid] ?? null} scarf={scarfFor(foe, "b")}
+          baseline={baselineOf(foe)} />
       </div>
 
       {error && <div className="notice mono">{error}</div>}

@@ -109,18 +109,23 @@ function buildVocab(dex: DexIndexEntry[], moveList: MoveRef[], itemList: ItemRef
   return { re, mons, moves, items, abilities, natures, types: new Set(TYPE_TOKENS) };
 }
 
+/** Lets a caller that knows which Pokémon a text is about give their names another hover — a team
+ * member's build instead of its dex entry. Returning null keeps the dex hover. */
+export type ProseMonRenderer = (name: string, label: ReactNode, key: number) => ReactNode | null;
+
 function renderToken(vocab: Vocab, token: string, lang: Lang, t: ReturnType<typeof useT>,
-                     key: number): ReactNode {
+                     key: number, renderMon?: ProseMonRenderer): ReactNode {
   const mon = vocab.mons.get(token);
   if (mon) {
-    return (
-      <EntityHover key={key} kind="pokemon" name={mon.name}>
-        <span className="prose-mon" title={mon.name}>
-          <GameImage assetKey={`pokemon:${mon.slug}`} role="dense" alt={displayName(mon, lang)}
-                     className="prose-mon-img" />
-          {displayName(mon, lang)}
-        </span>
-      </EntityHover>
+    const label = (
+      <span className="prose-mon" title={mon.name}>
+        <GameImage assetKey={`pokemon:${mon.slug}`} role="dense" alt={displayName(mon, lang)}
+                   className="prose-mon-img" />
+        {displayName(mon, lang)}
+      </span>
+    );
+    return renderMon?.(mon.name, label, key) ?? (
+      <EntityHover key={key} kind="pokemon" name={mon.name}>{label}</EntityHover>
     );
   }
   const mv = vocab.moves.get(token);
@@ -189,7 +194,7 @@ function shouldRenderEntity(vocab: Vocab, token: string, text: string, at: numbe
 }
 
 /** Render agent prose with inline entities. Returns nodes — use inside a <li>/<p>/<span>. */
-export function useProseRenderer(): (text: string) => ReactNode {
+export function useProseRenderer(renderMon?: ProseMonRenderer): (text: string) => ReactNode {
   const { lang } = useLang();
   const t = useT();
   const dexState = useDexIndex();
@@ -241,7 +246,7 @@ export function useProseRenderer(): (text: string) => ReactNode {
       if (!duplicate) {
         if (gap) parts.push(gap);
         if (renderEntity) {
-          parts.push(renderToken(vocab, token, lang, t, k++));
+          parts.push(renderToken(vocab, token, lang, t, k++, renderMon));
           previousIdentity = identity;
         } else {
           parts.push(plainGlossEnd === null ? token : text.slice(at, plainGlossEnd));
@@ -253,5 +258,5 @@ export function useProseRenderer(): (text: string) => ReactNode {
     }
     if (last < text.length) parts.push(text.slice(last));
     return parts.length === 1 ? parts[0] : <>{parts}</>;
-  }, [vocab, lang, t]);
+  }, [vocab, lang, t, renderMon]);
 }

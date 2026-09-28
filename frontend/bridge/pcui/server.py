@@ -60,6 +60,9 @@ def _raw_or_error(doc: Any) -> Any:
 _BAD_INPUT_ITEM = {"ok": False, "error": {"code": "bad_input", "message": "item must be an object"}}
 
 
+_RELATIVE_REF_RE = re.compile(r"""((?:src|href)=["'])\./""")
+
+
 class _SpaStaticFiles(StaticFiles):
     """Static SPA hosting: unknown paths fall back to index.html so client-side routes
     survive a refresh (the /api and /projection mounts resolve first). Starlette signals
@@ -91,6 +94,15 @@ class _SpaStaticFiles(StaticFiles):
         # hashed and stay immutable-cacheable.
         # "." is what Starlette's normpath yields for a bare "/" request; "" / "index.html" cover the
         # other direct hits, and served_index covers client-route fallbacks.
+        if served_index and response.status_code == 200:
+            # A deploy-neutral build names its bundles `./assets/...`. Served as the fallback for a
+            # nested client route (`/meta/<slug>`), that resolves under the route (`/meta/assets/`)
+            # and every bundle comes back as this same HTML. The SPA is always mounted at the root,
+            # so root the relative references; a release-bound index uses absolute scoped URLs and
+            # passes through unchanged.
+            index = Path(self.directory or ".") / "index.html"
+            html = _RELATIVE_REF_RE.sub(r"\1/", index.read_text(encoding="utf-8"))
+            response = Response(html, media_type="text/html")
         if served_index or path in ("", ".", "index.html"):
             response.headers["Cache-Control"] = "no-cache"
         return response

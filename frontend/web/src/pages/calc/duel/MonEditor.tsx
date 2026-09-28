@@ -7,117 +7,30 @@
  * benchmark, and re-deriving it in your head is exactly the arithmetic this page exists to remove. */
 import type { FormatId, NatureDto } from "@pokemon-champions/protocol";
 import { STAT_KEYS } from "@pokemon-champions/protocol";
-import { useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { BuildSetSummary, type BuildCardOption } from "../../../components/BuildPicker.tsx";
 import { EntityHover } from "../../../components/EntityHover.tsx";
 import { GameImage } from "../../../components/GameImage.tsx";
-import { PLACEHOLDERS, typeColor } from "../../../assets/icons.ts";
-import { TypeBadge } from "../../../components/TypeBadge.tsx";
+import { PLACEHOLDERS } from "../../../assets/icons.ts";
+import { KeepMonButton } from "../../../components/KeepMonButton.tsx";
 import { displayName, useLang, useT } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import {
-  BuildPickerButton, ItemCombo, MonPicker, STATUSES, boostLabel, clampNum, megaFor, natureLabel,
+  BuildPickerButton, ItemCombo, NatureOptions, STATUSES, boostLabel, clampNum, megaFor,
   buildConfigSig, spSum, spSumClass, type BuildOption,
-} from "../shared.tsx";
+} from "../../../components/build/inputs.tsx";
+import { useMetaUsage } from "../../../lib/metaUsage.ts";
 import {
   ABILITY_NEEDS_TRIGGER, boostedStat, curHPOf, effectiveEntry, finalStat, makeMon,
-  maxHPOf, type MonState,
+  maxHPOf, monToMember, type MonState,
 } from "./state.ts";
 
-/** Species (and, for a species with Mega forms, the forme) as one identity row: a single field, or
- * two side by side when a forme exists. Shared by the calculator and the bulk tool so the same mon
- * is named the same way on both. `actions` rides on the row's label line. */
-/** The mon's portrait on a soft wash of its primary type, beside the name row of a build. */
-export function MonPortrait({ entry, name }: { entry: DexIndexEntry | undefined; name: string }) {
-  const primary = entry?.types[0];
-  return (
-    <span className="duel-portrait"
-      style={primary ? { ["--mt" as string]: typeColor(primary) } : undefined}>
-      {entry
-        ? <GameImage assetKey={entry.key} role="dense" alt={name} className="hp-bar-sprite" />
-        : <img className="hp-bar-sprite" src={PLACEHOLDERS.pokemon} alt="" aria-hidden />}
-    </span>
-  );
-}
-
-export function MonNameRow({ slug, item, dex, items, pickerKey, actions, identityShown = false,
-  onSpecies, onForme }: {
-  slug: string;
-  item: string;
-  dex: DexIndexEntry[];
-  items: ItemRef[];
-  pickerKey: string;
-  actions?: ReactNode;
-  /** The surface already prints this mon's types and Mega state beside its portrait (the damage
-   * calculator's result headline), so the row leaves them out instead of saying them twice. */
-  identityShown?: boolean;
-  /** A different species: the caller decides what of the old build survives. */
-  onSpecies: (slug: string) => void;
-  /** A forme switch keeps the build; `dropStone` asks the caller to clear a held Mega stone. */
-  onForme: (slug: string, dropStone: boolean) => void;
-}) {
-  const { lang } = useLang();
-  const t = useT();
-  const literal = dex.find((e) => e.slug === slug);
-  const mega = literal?.isMega ? literal : megaFor(slug, item, dex, items);
-  const entry = mega ?? literal;
-  // Forme picker: the base species plus every Mega form the dex lists for it. Derived from the
-  // browse index that is already loaded — a forme switch must not cost a round trip.
-  const baseName = entry?.isMega ? entry.baseSpecies : entry?.name;
-  const formes = useMemo(() => {
-    if (!baseName) return [];
-    const base = dex.find((e) => e.name === baseName && !e.isMega);
-    const megas = dex.filter((e) => e.isMega && e.baseSpecies === baseName);
-    return megas.length && base ? [base, ...megas] : [];
-  }, [dex, baseName]);
-  const actionBox = actions ? <span className="mon-editor-actions">{actions}</span> : null;
-
-  return (
-    // Species and forme are one identity, so they sit on one row when both exist — a forme select
-    // stacked underneath would push the card taller than its partner across the page.
-    <div className={`mon-editor-namerow${formes.length ? " split" : ""}`}>
-      <div className="mon-editor-namefield">
-        <span className="mon-editor-label-line">
-          <span>{t("calc.name")}</span>
-          {!identityShown && (
-            <span className="mon-editor-types">
-              {(entry?.types ?? []).map((ty) => <TypeBadge key={ty} type={ty} />)}
-            </span>
-          )}
-          {!formes.length && actionBox}
-        </span>
-        <MonPicker idKey={pickerKey} slug={slug} dex={dex} ariaLabel={t("calc.name")}
-          onSlug={(next) => { if (next !== slug) onSpecies(next); }} />
-      </div>
-      {formes.length > 0 && (
-        <div className="mon-editor-namefield">
-          <span className="mon-editor-form-heading">
-            {t("calc.forme")}
-            {mega && !identityShown && <span className="mega-badge" title={displayName(mega, lang)}>MEGA</span>}
-            {actionBox}
-          </span>
-          <select value={entry?.slug ?? ""} aria-label={t("calc.forme")}
-            onChange={(e) => {
-              const next = dex.find((x) => x.slug === e.target.value);
-              // Dropping back to the base must also drop the stone, or the held item would silently
-              // re-Mega it and the picker would disagree with the numbers.
-              const dropStone = !!next && !next.isMega
-                && items.some((i) => i.name === item && i.requiredBy?.length);
-              onForme(e.target.value, dropStone);
-            }}>
-            {formes.map((f) => (
-              <option key={f.slug} value={f.slug}>{displayName(f, lang)}</option>
-            ))}
-          </select>
-        </div>
-      )}
-    </div>
-  );
-}
+import { MonNameRow, MonPortrait } from "../../../components/build/MonIdentity.tsx";
+export { MonNameRow, MonPortrait } from "../../../components/build/MonIdentity.tsx";
 
 export function MonEditor({
-  label, mon, setMon, dex, natures, items, format, onSetPick, onExport,
+  label, mon, setMon, dex, natures, items, format, onSetPick, keep = true,
 }: {
   label: string;
   mon: MonState;
@@ -127,13 +40,16 @@ export function MonEditor({
   items: ItemRef[];
   format: FormatId;
   onSetPick: (set: BuildOption, index: number) => void;
-  onExport: () => void;
+  /** Offer the single-mon "+" (keep in a box). A card whose build is a known quantity it merely
+   * reads from (the set-inference tool's own side) leaves it out. */
+  keep?: boolean;
 }) {
   const { lang } = useLang();
   const t = useT();
   const literal = dex.find((e) => e.slug === mon.slug);
   const mega = literal?.isMega ? literal : megaFor(mon.slug, mon.item, dex, items);
   const entry = effectiveEntry(mon, dex, items);
+  const usage = useMetaUsage(mon.slug, [format]);
   // The stone is what activates a Mega, so a base species holding one IS that Mega for every number
   // on the page. The forme control and the item lock therefore key off the EFFECTIVE form, not the
   // literal pick — otherwise the card computes Mega Garchomp Z while its own fields still read
@@ -146,7 +62,6 @@ export function MonEditor({
     if (requiredStone && mon.item !== requiredStone.name) {
       setMon((s) => ({ ...s, item: requiredStone.name }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requiredStone?.name, mon.slug]);
 
   // The ability selector must describe the form the engine will calculate, so a stone swap or an
@@ -156,7 +71,6 @@ export function MonEditor({
     if (mega && !mega.abilities.some((a) => a.name === mon.ability)) {
       setMon((s) => ({ ...s, ability: mega.abilities[0]?.name ?? "" }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mega?.slug, mon.item]);
 
   /** Which way this mon's nature bends a stat — "" when it does not touch it. */
@@ -165,7 +79,6 @@ export function MonEditor({
     (nature?.upStat === key && nature.downStat !== key ? "up"
       : nature?.downStat === key && nature.upStat !== key ? "down" : "");
 
-  const [exported, setExported] = useState(false);
   const maxHP = maxHPOf(mon, dex, items);
   const curHP = curHPOf(mon, maxHP);
   const spTotal = spSum(mon.sps);
@@ -201,25 +114,20 @@ export function MonEditor({
       ? { ...current, buildRef } : current);
   }, [currentBuildSig, matchedSet?.key, matchedSetIndex, setMon]);
 
+  const name = entry ? displayName(entry, lang) : "";
+  const member = () => monToMember(mon, dex);
   const editorActions = (
     <>
       <BuildPickerButton slug={mon.slug} format={format} currentKey={currentSetKey}
         onOptions={setSetOptions} onPick={onSetPick} />
-      <button className="ghost-btn tiny" disabled={!mon.slug}
-        onClick={() => {
-          onExport();
-          setExported(true);
-          window.setTimeout(() => setExported(false), 1600);
-        }}>
-        {exported ? t("calc.copied") : t("calc.exportMon")}
-      </button>
+      {entry && keep && <KeepMonButton member={member} name={name} origin="calc" />}
     </>
   );
 
   return (
     <div className="mon-editor">
       <div className="mon-id">
-        <MonPortrait entry={entry} name={entry ? displayName(entry, lang) : ""} />
+        <MonPortrait entry={entry} name={name} member={member} />
         <MonNameRow slug={mon.slug} item={mon.item} dex={dex} items={items} pickerKey={label}
           actions={editorActions} identityShown
           onSpecies={(slug) => setMon((s) => (s.slug === slug ? s : makeMon(slug)))}
@@ -241,12 +149,11 @@ export function MonEditor({
         <label>{t("calc.nature")}
           <select value={mon.nature}
             onChange={(e) => setMon((s) => ({ ...s, nature: e.target.value }))}>
-            <option value="">—</option>
-            {natures.map((n) => <option key={n.name} value={n.name}>{natureLabel(n, lang)}</option>)}
+            <NatureOptions natures={natures} usage={usage} />
           </select>
         </label>
         <label>{t("calc.item")}
-          <ItemCombo idKey={label} value={mon.item} items={items} disabled={!!requiredStone}
+          <ItemCombo idKey={label} value={mon.item} items={items} disabled={!!requiredStone} usage={usage}
             onChange={(item) => setMon((s) => ({ ...s, item }))} />
         </label>
         <label>{t("calc.status")}

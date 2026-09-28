@@ -5,13 +5,14 @@
  * roll — so the two columns together read as one turn: each side's output on its own card, each
  * side's remaining health under its own name. */
 import type { DamageResultDto, LearnsetDto } from "@pokemon-champions/protocol";
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { TypeBadge } from "../../../components/TypeBadge.tsx";
 import { useLang, useT } from "../../../i18n.ts";
 import { useDamageText } from "../../../lib/damageText.tsx";
 import { koLabel, koTone } from "../../../lib/ko.ts";
+import type { MetaUsage } from "../../../lib/metaUsage.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
-import { MoveCell } from "./MoveCell.tsx";
+import { MoveCell } from "../../../components/build/MoveCell.tsx";
 import {
   ROLL_COUNT, ROLL_MODES, rollIndexOf, rollModeAt, rollModifier, rollValue,
 } from "./state.ts";
@@ -36,13 +37,18 @@ export function turnsOf(res: DamageResultDto): number | null {
   return Math.ceil(100 / Math.max(res.maxPercent, 0.01));
 }
 
-function Headline({ entry, name, result }: {
+function Headline({ entry, name, result, verdict, notes }: {
   entry: DexIndexEntry | undefined;
   name: string;
   result: DamageResultDto | null;
+  /** The KO verdict line, or — without a result — why there is none. */
+  verdict: ReactNode;
+  notes: string[];
 }) {
   const turns = result ? turnsOf(result) : null;
   const tone = result ? koTone(turns, result.koChance?.guaranteed ?? false, result.max) : "none";
+  const hpRange = result
+    ? `${result.min} – ${result.max}${result.defenderHP > 0 ? ` / ${result.defenderHP}` : ""} HP` : "";
   // No portrait here: the roster bar right above already shows who is up; the build below carries it.
   return (
     <div className="duel-head">
@@ -55,14 +61,26 @@ function Headline({ entry, name, result }: {
           {(entry?.types ?? []).map((type) => <TypeBadge key={type} type={type} />)}
         </span>
       </span>
-      {/* Percent first: it is the number a damage question is asked in. The HP figures under it
-          are the same band in absolute terms. */}
+      {/* Percent first: it is the number a damage question is asked in. The same band in HP is
+          its tooltip; the line under it is the answer the percent leads to — the KO verdict, with
+          any caveat about this matchup right before it. */}
       <span className="duel-dmg">
-        <strong className={`duel-dmg-pct num ko-text-${tone}`}>
+        <strong className={`duel-dmg-pct num ko-text-${tone}${result ? " duel-tip" : ""}`}
+          tabIndex={result ? 0 : undefined} data-tooltip={hpRange || undefined}
+          aria-label={result ? `${result.minPercent.toFixed(1)} – ${result.maxPercent.toFixed(1)}%, ${hpRange}`
+            : undefined}>
           {result ? <>{result.minPercent.toFixed(1)} – {result.maxPercent.toFixed(1)}<small>%</small></> : "—"}
         </strong>
-        <span className="duel-dmg-hp num">
-          {result ? <>{result.min} – {result.max} <small>HP</small></> : ""}
+        <span className="duel-verdict-line">
+          {notes.length > 0 && (
+            <span className="hp-warning" tabIndex={0} role="img"
+              aria-label={notes.join("；")} data-tooltip={notes.join("\n")}>
+              <span aria-hidden>!</span>
+            </span>
+          )}
+          <span className={`duel-summary-verdict${result?.koChance?.guaranteed ? " guaranteed" : ""}`}>
+            {verdict}
+          </span>
         </span>
       </span>
     </div>
@@ -104,13 +122,15 @@ function HpBar({ name, maxHP, remaining, band }: {
 }
 
 export function ResultCard({
-  monName, entry, slots, learnset, selected, onSelect, onMove, roll, onRoll, crit, onCrit,
+  monName, entry, slots, learnset, usage, selected, onSelect, onMove, roll, onRoll, crit, onCrit,
   singleTarget, onSingleTarget, singleTargetAvailable, maxHP, remaining, band, busy, notes,
 }: {
   monName: string;
   entry: DexIndexEntry | undefined;
   slots: SlotResult[];
   learnset: LearnsetDto | null;
+  /** This mon's metagame moves, which lead each slot's list. */
+  usage?: MetaUsage | null;
   selected: number;
   onSelect: (index: number) => void;
   onMove: (index: number, name: string) => void;
@@ -134,6 +154,7 @@ export function ResultCard({
   const t = useT();
   const damageText = useDamageText();
   const [copied, setCopied] = useState(false);
+  const copyTipId = useId();
 
   const active = slots[selected];
   const res = active?.result ?? null;
@@ -152,20 +173,23 @@ export function ResultCard({
   const pickedPct = res && res.defenderHP > 0 && picked != null
     ? (picked / res.defenderHP) * 100 : null;
 
+  const line = res ? (res.koChance?.text ? `${res.description} -- ${res.koChance.text}` : res.description) : "";
+  const idle = <span className="muted">{busy ? t("state.loading")
+    : active?.failed ? t("calc.error") : t("calc.noMoveSelected")}</span>;
+
   const copyLine = () => {
     if (!res) return;
     // The engine's own English line, with the KO verdict appended: it names the investment, item and
     // field that produced these numbers, and it is the spelling every other calculator shares.
-    const text = res.koChance?.text
-      ? `${res.description} -- ${res.koChance.text}` : res.description;
-    void navigator.clipboard.writeText(text).then(
+    void navigator.clipboard.writeText(line).then(
       () => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); },
       () => { setCopied(false); });
   };
 
   return (
     <div className="duel-result">
-      <Headline entry={entry} name={monName} result={res} />
+      <Headline entry={entry} name={monName} result={res} notes={notes}
+        verdict={res ? verdict : idle} />
       <HpBar name={monName} maxHP={maxHP} remaining={remaining} band={band} />
 
       {/* The four slots sit INSIDE the result, under the health they are about to spend: typing a
@@ -180,7 +204,7 @@ export function ResultCard({
           const tone = r && !status
             ? koTone(turns, r.koChance?.guaranteed ?? false, r.max) : "none";
           return (
-            <MoveCell key={i} index={i} value={slot.move} learnset={learnset}
+            <MoveCell key={i} index={i} value={slot.move} learnset={learnset} usage={usage}
               selected={i === selected} onSelect={onSelect} onChange={onMove}>
               {status ? <span className="muted">{t("category.Status")}</span>
                 : !slot.move ? null
@@ -227,7 +251,6 @@ export function ResultCard({
               onChange={(e) => onRoll(Number(e.target.value))} />
           </span>
         </span>
-        <span className="duel-roll-mod num" aria-hidden>{res ? randomModifier : "—"}</span>
         <span className="duel-roll-btns">
           <span className="duel-roll-group" role="group" aria-label={t("calc.roll")}>
             {ROLL_MODES.map((mode) => {
@@ -250,37 +273,20 @@ export function ResultCard({
               onClick={() => onSingleTarget(!singleTarget)}>{t("calc.singleTarget")}</button>
           )}
         </span>
-      </div>
-
-      {/* The copy control rides on the sentence it copies, not on the raw line below it. */}
-      <div className="duel-summary-row">
-        <span className="duel-summary">
-          {res ? damageText.summary(res)
-            : <span className="muted">{busy ? t("state.loading")
-              : active?.failed ? t("calc.error") : t("calc.noMoveSelected")}</span>}
+        {/* The conclusion — the sentence and the engine's own line — is what this button copies,
+            so it lives in the button's tooltip rather than taking two rows of the card. */}
+        <span className="duel-copy">
+          <button type="button" className="ghost-btn tiny" onClick={copyLine} disabled={!res}
+            aria-describedby={res ? copyTipId : undefined}>
+            {copied ? t("calc.copied") : t("calc.copyLine")}
+          </button>
+          {res && (
+            <span className="duel-copy-pop" role="tooltip" id={copyTipId}>
+              <span className="duel-summary">{damageText.summary(res)}</span>
+              <code className="duel-line-text">{line}</code>
+            </span>
+          )}
         </span>
-        {/* Caveats about THIS mon, however they arrived, collapse into one focusable glyph after the
-            sentence they qualify: the full copy stays available without changing the card's height. */}
-        {notes.length > 0 && (
-          <span className="hp-warning" tabIndex={0} role="img"
-            aria-label={notes.join("；")} data-tooltip={notes.join("\n")}>
-            <span aria-hidden>!</span>
-          </span>
-        )}
-        <span className={`duel-summary-verdict${res?.koChance?.guaranteed ? " guaranteed" : ""}`}
-          title={verdict || undefined}>
-          {verdict}
-        </span>
-        <button type="button" className="ghost-btn tiny" onClick={copyLine} disabled={!res}>
-          {copied ? t("calc.copied") : t("calc.copyLine")}
-        </button>
-      </div>
-
-      <div className="duel-line">
-        <code className="duel-line-text" title={res?.description ?? ""}>
-          {res ? (res.koChance?.text
-            ? `${res.description} -- ${res.koChance.text}` : res.description) : ""}
-        </code>
       </div>
     </div>
   );

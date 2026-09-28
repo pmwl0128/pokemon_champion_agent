@@ -144,8 +144,7 @@ export function teamToCalcMembers(team: unknown): CalcMember[] {
   }));
 }
 
-/** Cross-feature team hand-off. The recent-source shelf is intentionally browser-session local:
- * it contains user sets, needs no server history, and is cleared when the browser session ends. */
+/** A team handed to the matchup page (a teams page or result card's "配置模拟"): read once, there. */
 export interface MatchupTeamSource {
   id: string;
   source: "builder" | "diagnose" | "session" | "other";
@@ -155,59 +154,12 @@ export interface MatchupTeamSource {
   savedAt: number;
 }
 
-const MATCHUP_SOURCES_KEY = "pc-matchup-sources-v1";
 const MATCHUP_FILL_KEY = "pc-matchup-fill-v1";
 
-function matchupTeamKey(team: unknown, format?: "single" | "double"): string {
-  const rows = readTeamMembers(team).map((member) => JSON.stringify({
-    species: member.species.trim().toLowerCase(),
-    item: member.item?.trim().toLowerCase() ?? "",
-    ability: member.ability?.trim().toLowerCase() ?? "",
-    nature: member.nature?.trim().toLowerCase() ?? "",
-    moves: (member.moves ?? []).map((move) => move.trim().toLowerCase()).sort(),
-    spread: Object.entries(member.spread ?? {}).sort(([a], [b]) => a.localeCompare(b)),
-  })).sort();
-  const resolvedFormat = format ?? ((team as { format?: string })?.format === "double" ? "double" : "single");
-  return JSON.stringify([resolvedFormat, rows]);
-}
-
-export function rememberMatchupSource(source: Omit<MatchupTeamSource, "id" | "savedAt">): void {
-  if (readTeamMembers(source.team).length === 0) return;
-  try {
-    const key = matchupTeamKey(source.team, source.format);
-    const rows = readMatchupSources().filter((row) =>
-      matchupTeamKey(row.team, row.format) !== key && row.source !== source.source);
-    const next: MatchupTeamSource = {
-      ...source, id: `${source.source}-${Date.now()}`, savedAt: Date.now(),
-    };
-    sessionStorage.setItem(MATCHUP_SOURCES_KEY, JSON.stringify([next, ...rows].slice(0, 6)));
-  } catch { /* storage blocked — direct navigation still works without the recent shelf */ }
-}
-
-export function readMatchupSources(): MatchupTeamSource[] {
-  try {
-    const raw = JSON.parse(sessionStorage.getItem(MATCHUP_SOURCES_KEY) ?? "[]") as unknown;
-    if (!Array.isArray(raw)) return [];
-    const valid = raw.filter((row): row is MatchupTeamSource =>
-      !!row && typeof row === "object" && "team" in row &&
-      readTeamMembers((row as MatchupTeamSource).team).length > 0);
-    const seen = new Set<string>();
-    return valid.filter((row) => {
-      const key = matchupTeamKey(row.team, row.format);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  } catch {
-    return [];
-  }
-}
-
 export function stashMatchupFill(source: Omit<MatchupTeamSource, "id" | "savedAt">): void {
-  rememberMatchupSource(source);
   try {
     sessionStorage.setItem(MATCHUP_FILL_KEY, JSON.stringify(source));
-  } catch { /* recent shelf may still have succeeded */ }
+  } catch { /* storage blocked — the matchup page just opens empty */ }
 }
 
 export function takeMatchupFill(): Omit<MatchupTeamSource, "id" | "savedAt"> | null {
@@ -276,6 +228,28 @@ export function takeCalcTeams(): CalcTeamsFill | null {
       attackers: members(parsed.attackers),
       defenders: members(parsed.defenders),
     };
+  } catch {
+    return null;
+  }
+}
+
+const DIAGNOSE_FILL_KEY = "pc-diagnose-fill-v1";
+
+/** "Diagnose this team" from another page (builder result, library). The diagnose tab lives on the
+ * assist page, so the team crosses a navigation instead of a sibling-tab state. */
+export function stashDiagnoseFill(team: unknown): void {
+  try {
+    sessionStorage.setItem(DIAGNOSE_FILL_KEY, JSON.stringify(team));
+  } catch { /* storage blocked — the diagnose tab just opens on its own form */ }
+}
+
+/** Read AND CLEAR, like every hand-off: one trip only. */
+export function takeDiagnoseFill(): unknown | null {
+  try {
+    const raw = sessionStorage.getItem(DIAGNOSE_FILL_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(DIAGNOSE_FILL_KEY);
+    return JSON.parse(raw) as unknown;
   } catch {
     return null;
   }

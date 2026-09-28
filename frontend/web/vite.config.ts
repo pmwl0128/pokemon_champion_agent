@@ -125,8 +125,7 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
-    // Budget guard (frontend/design.md §7.1): warn when a chunk approaches the 300KB lazy-chunk
-    // budget; echarts is isolated into the trend page's dynamic chunk.
-    chunkSizeWarningLimit: 700,
+    // Uncompressed main-thread chunks. check-dist enforces this and the separate worker budget.
+    chunkSizeWarningLimit: 300,
   },
 });

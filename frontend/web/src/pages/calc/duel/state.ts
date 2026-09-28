@@ -10,17 +10,18 @@
  * only adds what a full combatant needs: its four move slots, its current HP, and an explicit
  * ability-trigger answer. */
 import type {
-  CombatantDto, DamageRequestDto, FieldDto, FormatId, NatureDto, Terrain, Weather,
+  CombatantDto, DamageRequestDto, FieldDto, FormatId, NatureDto, TeamMemberDoc, Terrain, Weather,
 } from "@pokemon-champions/protocol";
 import { STAT_KEYS } from "@pokemon-champions/protocol";
-import { actualStat } from "../../../lib/stats.ts";
+import { actualStat, natureMultiplier } from "../../../lib/stats.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
 import {
   BOOST_KEYS, EMPTY_SIDE, buildConfigSig, modalSig, withMega, type BuildOption, type SideState,
-} from "../shared.tsx";
+} from "../../../components/build/inputs.tsx";
 
-export const MOVE_SLOTS = 4;
+import { MOVE_SLOTS } from "../../../lib/battle.ts";
+export { MOVE_SLOTS } from "../../../lib/battle.ts";
 
 export interface BuildReference {
   key: string;
@@ -69,6 +70,13 @@ export function makeMon(slug = ""): MonState {
   return { ...EMPTY_MON, uid: newMonUid(), slug, moves: ["", "", "", ""], sps: {}, boosts: {} };
 }
 
+/** The team without member `index`. A side always keeps one slot, so removing its last member
+ * leaves an empty one instead of an empty team. */
+export function withoutMember(team: MonState[], index: number): MonState[] {
+  const next = team.filter((_, at) => at !== index);
+  return next.length ? next : [makeMon()];
+}
+
 export function withMoves(mon: MonState, moves: string[]): MonState {
   const slots = [...moves.slice(0, MOVE_SLOTS)];
   while (slots.length < MOVE_SLOTS) slots.push("");
@@ -115,12 +123,7 @@ export const otherSide = (side: SideId): SideId => (side === "a" ? "b" : "a");
 
 export function natureMult(natures: NatureDto[], nature: string,
                            key: (typeof STAT_KEYS)[number]): 0.9 | 1 | 1.1 {
-  if (key === "hp") return 1;
-  const n = natures.find((x) => x.name === nature);
-  if (!n) return 1;
-  if (n.upStat === key && n.downStat !== key) return 1.1;
-  if (n.downStat === key && n.upStat !== key) return 0.9;
-  return 1;
+  return natureMultiplier(natures.find((entry) => entry.name === nature), key);
 }
 
 /** The dex entry the engine will actually calculate: a held Mega stone substitutes the Mega form,
@@ -348,4 +351,19 @@ export function boostedStat(value: number, stage: number): number {
   const s = Math.max(-6, Math.min(6, Math.trunc(stage)));
   if (!s) return value;
   return s > 0 ? Math.floor((value * (2 + s)) / 2) : Math.floor((value * 2) / (2 - s));
+}
+
+/** A calculator Pokémon as a library box member (team-json member): the species by its canonical
+ * name, what is filled in, the empty move slots dropped. A Mega picked by name is written as its base
+ * species holding the stone (the editor pins the stone), as team-json writes it. Null when no
+ * species is picked. */
+export function monToMember(mon: MonState, dex: DexIndexEntry[]): TeamMemberDoc | null {
+  const entry = mon.slug ? dex.find((candidate) => candidate.slug === mon.slug) : undefined;
+  if (!entry) return null;
+  const species = entry.name;
+  return {
+    species, item: mon.item || null, ability: mon.ability || null, nature: mon.nature || null,
+    moves: mon.moves.filter(Boolean),
+    spread: Object.keys(mon.sps).length ? { ...mon.sps } : null,
+  };
 }

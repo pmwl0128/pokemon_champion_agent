@@ -232,7 +232,7 @@ class AnthropicMessagesConfig:
 
     api_key: str
     provider: str = "mimo"
-    base_url: str = "https://api.xiaomimimo.com/anthropic"
+    base_url: str = "https://token-plan-cn.xiaomimimo.com/anthropic"
     api_path: str = "/v1/messages"
     model: str = "mimo-v2.6-pro"
     api_style: str = "anthropic-messages"
@@ -257,7 +257,7 @@ class AnthropicMessagesConfig:
         extra = _extra_body(values, reserved)
         if provider == "mimo":
             base_url = values.get(
-                "PCUI_MIMO_BASE_URL", "https://api.xiaomimimo.com/anthropic").strip()
+                "PCUI_MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/anthropic").strip()
             api_path = values.get("PCUI_MIMO_API_PATH", "/v1/messages").strip()
             model = values.get("PCUI_MIMO_MODEL", "mimo-v2.6-pro").strip()
             api_key = values.get("PCUI_MIMO_API_KEY", "").strip()

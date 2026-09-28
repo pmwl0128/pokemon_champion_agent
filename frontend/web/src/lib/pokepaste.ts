@@ -38,7 +38,7 @@ const STAT_LABELS: Record<string, StatKey> = {
   spe: "spe", spd_: "spd", speed: "spe",
 };
 
-const SP_MAX = 32;          // Champions per-stat cap
+import { SP_MAX } from "./battle.ts";
 const EV_MAX = 252;         // mainline per-stat cap, the scale a Showdown export is written on
 
 /** Mainline EVs -> Champions SP. Both scales express the same thing (all-in on a stat), and the

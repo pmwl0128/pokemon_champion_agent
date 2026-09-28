@@ -20,11 +20,10 @@ import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx"
 import { useAsync, useMovesByName } from "../../hooks.ts";
 import { useDamageText } from "../../lib/damageText.tsx";
 import { displayName, useLang, useT } from "../../i18n.ts";
-import { formatPokepasteMon } from "../../lib/pokepaste.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
-import type { BuildOption } from "./shared.tsx";
+import type { BuildOption } from "../../components/build/inputs.tsx";
 import { AllMatchups, type GridCol, type GridRow } from "./duel/AllMatchups.tsx";
 import { loadDuelView, saveDuelView } from "./duel/persist.ts";
 import { FieldPanel, useFieldOffers } from "./duel/FieldPanel.tsx";
@@ -36,9 +35,10 @@ import { DuelBar, TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.t
 import {
   MOVE_SLOTS,
   ROLL_TOP, applyBuildOption, curHPOf, damageRequest, effectiveEntry, makeMon, maxHPOf, otherSide,
-  rollValue, type MonState, type SideId,
+  rollValue, withoutMember, type MonState, type SideId,
 } from "./duel/state.ts";
 import { useRoster } from "./roster.tsx";
+import { useMetaUsage } from "../../lib/metaUsage.ts";
 
 const SIDES: SideId[] = ["a", "b"];
 /** The calc batch bound (DamageBatchRequestDtoSchema). The duel takes at most 8 of it. */
@@ -156,7 +156,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     ],
     pick: pickFromRail,
   // `useT()` returns a render-local function; language, not that function identity, is the input.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [field.format, pickFromRail, lang]);
   useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
@@ -167,6 +166,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const learnset = perSide(
     learnsetA.status === "ready" ? learnsetA.data : null,
     learnsetB.status === "ready" ? learnsetB.data : null);
+  const usage = perSide(useMetaUsage(mon.a.slug, [field.format]), useMetaUsage(mon.b.slug, [field.format]));
 
   /** Plain localized move name. The result rows and grid headers print this directly rather than
    * going through the prose renderer, which would add a type chip and a nested link to every one. */
@@ -183,20 +183,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
     setTeams((prev) => ({ ...prev, [side]: mons }));
     setActive((prev) => ({ ...prev, [side]: 0 }));
     return outcome;
-  };
-
-  const exportMon = (side: SideId) => {
-    const target = mon[side];
-    const entry = effectiveEntry(target, dex, items);
-    if (!entry) return;
-    // English canonicals: a Showdown block is a join key document, read by other tools (design §2.1).
-    const text = formatPokepasteMon({
-      species: entry.name, item: target.item, ability: target.ability, nature: target.nature,
-      sps: target.sps, moves: target.moves.filter(Boolean),
-    });
-    void navigator.clipboard.writeText(text).catch((e) => {
-      console.error("copying the set failed:", e);
-    });
   };
 
   // -- the duel batch (both directions, all four slots each) ------------------------------
@@ -259,7 +245,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
       }).finally(() => { if (!cancelled) setDuelBusy(false); });
     }, 220);
     return () => { cancelled = true; window.clearTimeout(timer); setDuelBusy(false); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duelPlan, adapter, moveVocab, moveLabel]);
 
   // -- the all-pairs grid -----------------------------------------------------------------
@@ -341,7 +326,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   // teams — calling runGrid inside the click would compute the old direction again.
   useEffect(() => {
     if (gridRerun > 0) void runGrid();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridRerun]);
 
   // -- derived view ------------------------------------------------------------------------
@@ -387,7 +371,6 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const moveSetters = useMemo(() => perSide(
     (index: number, name: string) => setMove("a", index, name),
     (index: number, name: string) => setMove("b", index, name),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [active.a, active.b, setMonAt]);
 
   const nameOf = (side: SideId): string => {
@@ -422,6 +405,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         type: moveVocab.get(mon[side].moves[i] ?? "")?.type, result: null, failed: false,
       }))}
       learnset={learnset[side]}
+      usage={usage[side]}
       selected={shownSlot(side)}
       onSelect={(i) => setSlot((prev) => prev[side] === i ? prev : { ...prev, [side]: i })}
       onMove={moveSetters[side]}
@@ -452,7 +436,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
       {duelError && <div className="notice mono">{duelError}</div>}
 
       <DuelBar field={field}>
-        <TeamBar label={sideLabel.a} teamLabel={t("calc.attackerTeam")} team={teams.a}
+        <TeamBar label={sideLabel.a} teamLabel={t("calc.attackerTeam")} team={teams.a} librarySide="a"
           index={active.a} onIndex={(i) => setActive((p) => ({ ...p, a: i }))}
           onAdd={() => {
             if (teams.a.length >= TEAM_MAX) return;
@@ -460,7 +444,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setActive((p) => ({ ...p, a: teams.a.length }));
           }}
           onRemove={(i) => {
-            setTeams((p) => ({ ...p, a: p.a.filter((_, j) => j !== i) }));
+            setTeams((p) => ({ ...p, a: withoutMember(p.a, i) }));
             setActive((p) => ({ ...p, a: Math.max(0, Math.min(p.a, teams.a.length - 2)) }));
           }}
           onReset={() => resetSide("a")}
@@ -470,7 +454,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
         <FieldPanel field={field} setField={setField}
           weatherSuggestions={offers.weather} terrainSuggestions={offers.terrain} />
 
-        <TeamBar label={sideLabel.b} teamLabel={t("calc.defenderTeam")} team={teams.b}
+        <TeamBar label={sideLabel.b} teamLabel={t("calc.defenderTeam")} team={teams.b} librarySide="b"
           index={active.b} onIndex={(i) => setActive((p) => ({ ...p, b: i }))}
           onAdd={() => {
             if (teams.b.length >= TEAM_MAX) return;
@@ -478,7 +462,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
             setActive((p) => ({ ...p, b: teams.b.length }));
           }}
           onRemove={(i) => {
-            setTeams((p) => ({ ...p, b: p.b.filter((_, j) => j !== i) }));
+            setTeams((p) => ({ ...p, b: withoutMember(p.b, i) }));
             setActive((p) => ({ ...p, b: Math.max(0, Math.min(p.b, teams.b.length - 2)) }));
           }}
           onReset={() => resetSide("b")}
@@ -498,7 +482,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
                 format={field.format}
                 onSetPick={(option, index) => setMonAt(
                   side, active[side], (current) => applyBuildOption(current, option, index))}
-                onExport={() => exportMon(side)} />
+ />
             </section>
           </Fragment>
         ))}

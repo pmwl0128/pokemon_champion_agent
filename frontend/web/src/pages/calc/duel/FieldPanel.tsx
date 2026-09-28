@@ -15,7 +15,7 @@ import { TERRAINS, WEATHERS } from "@pokemon-champions/protocol";
 import { useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useLang, useT } from "../../../i18n.ts";
 import { localName, useNameMaps } from "../../../lib/names.ts";
-import { roveFocus, useFocusOnOpen, usePopover } from "./popover.ts";
+import { roveFocus, useFocusOnOpen, usePopover } from "../../../lib/popover.ts";
 import {
   TERRAIN_ABILITIES, WEATHER_ABILITIES, type FieldState, type MonState, type SharedFlagKey,
 } from "./state.ts";

@@ -48,7 +48,6 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): Async<T> {
       },
     );
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
   return sameDeps(result.deps, deps) ? result.state : LOADING;
 }
@@ -58,6 +57,38 @@ interface QueryEntry<T> {
   state: Async<T>;
   /** Approximate retained JSON characters. Good enough for a coarse browser-memory budget. */
   bytes: number;
+}
+
+/** Approximate JSON characters of a DTO without serializing it: exact for small nodes, sampled
+ * for long arrays and wide objects. Projection rows are homogeneous, so evenly spread samples
+ * scaled by the count are close enough for the cache's coarse memory budget — while a full
+ * `JSON.stringify` of a multi-MiB matchup grid was a long main-thread task on every page open. */
+export function approxJsonChars(value: unknown, depth = 0): number {
+  if (value === null || value === undefined) return 4;
+  if (typeof value === "string") return value.length + 2;
+  if (typeof value === "number") return 6;
+  if (typeof value === "boolean") return 5;
+  if (typeof value !== "object" || depth > 24) return 0;
+  const sample = depth < 2 ? 24 : 8;
+  if (Array.isArray(value)) {
+    const n = value.length;
+    const step = Math.max(1, n / sample);
+    let sum = 0;
+    let seen = 0;
+    for (let at = 0; at < n; at += step, seen += 1) sum += approxJsonChars(value[Math.floor(at)], depth + 1) + 1;
+    return 2 + (seen ? Math.round((sum * n) / seen) : 0);
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record);
+  const n = keys.length;
+  const step = Math.max(1, n / sample);
+  let sum = 0;
+  let seen = 0;
+  for (let at = 0; at < n; at += step, seen += 1) {
+    const key = keys[Math.floor(at)]!;
+    sum += key.length + 4 + approxJsonChars(record[key], depth + 1);
+  }
+  return 2 + (seen ? Math.round((sum * n) / seen) : 0);
 }
 
 /** Session-scoped static-fact cache. Pending work is shared across consumers and allowed to finish
@@ -128,10 +159,8 @@ export class QueryCache {
     const promise = make().then(
       (data) => {
         entry.state = { status: "ready", data };
-        // Do this once when the response settles, never during eviction. JSON DTOs are the cache's
-        // contract; stringify length is intentionally approximate and avoids retaining a second
-        // encoded copy merely to obtain exact UTF-8 bytes.
-        try { entry.bytes = JSON.stringify(data).length; } catch { entry.bytes = 0; }
+        // Do this once when the response settles, never during eviction.
+        entry.bytes = approxJsonChars(data);
         if (this.entries.get(key) === entry) {
           this.retainedBytes += entry.bytes;
           this.touch(key, entry as QueryEntry<unknown>);
@@ -176,10 +205,13 @@ export function useRanking(format: FormatId): Async<RankingDto> {
   return useQuery(`ranking:${format}`, () => adapter.ranking(format), [format, adapter]);
 }
 
+/** An empty slug means "not resolved yet": it stays loading and requests nothing. */
 export function useDetail(format: FormatId, slug: string): Async<MetaDetailDto> {
   const { adapter } = useRuntime();
-  return useQuery(`detail:${format}:${slug}`, () => adapter.detail(format, slug),
+  const result = useQuery(slug ? `detail:${format}:${slug}` : "detail:disabled",
+    () => slug ? adapter.detail(format, slug) : Promise.resolve(null as unknown as MetaDetailDto),
     [format, slug, adapter]);
+  return slug ? result : LOADING;
 }
 
 export function useTrend(format: FormatId): Async<TrendDto> {
@@ -192,7 +224,10 @@ export function useTrend(format: FormatId): Async<TrendDto> {
  * "this snapshot was not collected", which the page must show as a named gap, not as an empty list. */
 export function useKo(format: FormatId, slug: string): Async<MetaKoDto> {
   const { adapter } = useRuntime();
-  return useQuery(`ko:${format}:${slug}`, () => adapter.ko(format, slug), [format, slug, adapter]);
+  const result = useQuery(slug ? `ko:${format}:${slug}` : "ko:disabled",
+    () => slug ? adapter.ko(format, slug) : Promise.resolve(null as unknown as MetaKoDto),
+    [format, slug, adapter]);
+  return slug ? result : LOADING;
 }
 
 /** Facet index for the filter rail — fetched only once the rail is actually opened. */

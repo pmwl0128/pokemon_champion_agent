@@ -50,11 +50,11 @@ export const TeamStrip = memo(function TeamStrip({ teams, active, field, setFiel
   });
   return (
     <DuelBar field={field}>
-      <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...roster("mine")}
+      <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...roster("mine")} librarySide="a"
         side="a" allowedFlags={SCREEN_KEYS} flagNote={t("tune.ws.screensNote")} />
       <FieldPanel field={field} setField={setField} weatherSuggestions={[]} terrainSuggestions={[]}
         sharedFlags={NO_SHARED} />
-      <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...roster("foe")}
+      <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...roster("foe")} librarySide="b"
         side="b" allowedFlags={NO_FLAGS} lockedNote={t("tune.ws.foeNoConds")} mirrored />
     </DuelBar>
   );

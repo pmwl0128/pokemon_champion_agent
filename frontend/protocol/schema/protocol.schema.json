@@ -3,8 +3,8 @@
   "$id": "urn:pokemon-champions:protocol:0.1.0",
   "title": "Pokemon Champions Web Protocol",
   "description": "Generated from @pokemon-champions/protocol Zod schemas; do not edit by hand.",
-  "x-schema-count": 99,
-  "x-export-fingerprint": "f31a228ec15551b17c44ea8f92db2c2fd238c0e5b8d15047a52b740ad2c171e8",
+  "x-schema-count": 102,
+  "x-export-fingerprint": "192848d4b1d433677198c38ed46ed565824793a1563dba47c7c9ac3d21da0ec6",
   "$defs": {
     "AbilityDtoSchema": {
       "type": "object",
@@ -8472,6 +8472,13 @@
         },
         "tune": {
           "$ref": "#/$defs/OnlineQuotaDtoSchema/$defs/__schema0"
+        },
+        "access": {
+          "type": "string",
+          "enum": [
+            "visitor",
+            "authorized"
+          ]
         }
       },
       "required": [
@@ -12739,6 +12746,359 @@
         "Asleep",
         "Frozen"
       ]
+    },
+    "TeamDocSchema": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "number",
+          "const": 1
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "single",
+            "double"
+          ]
+        },
+        "season": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pokemon": {
+          "minItems": 1,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TeamDocSchema/$defs/__schema0"
+          }
+        },
+        "provenance": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "format",
+        "season",
+        "rule",
+        "pokemon",
+        "provenance"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "object",
+          "properties": {
+            "species": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "item": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ability": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "moves": {
+              "default": [],
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TeamDocSchema/$defs/__schema1"
+              }
+            },
+            "nature": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "spread": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "hp": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "atk": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "def": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "spa": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "spd": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "spe": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "tera": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "completeness": {
+              "type": "string",
+              "enum": [
+                "observed_full_set",
+                "observed_species_only",
+                "extracted_set",
+                "inferred_set"
+              ]
+            }
+          },
+          "required": [
+            "species",
+            "item",
+            "ability",
+            "moves",
+            "nature",
+            "spread"
+          ],
+          "additionalProperties": false
+        },
+        "__schema1": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      }
+    },
+    "TeamMemberCompletenessSchema": {
+      "type": "string",
+      "enum": [
+        "observed_full_set",
+        "observed_species_only",
+        "extracted_set",
+        "inferred_set"
+      ]
+    },
+    "TeamMemberDocSchema": {
+      "type": "object",
+      "properties": {
+        "species": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "item": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ability": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "moves": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TeamMemberDocSchema/$defs/__schema0"
+          }
+        },
+        "nature": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "spread": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "hp": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "atk": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "def": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "spa": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "spd": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "spe": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tera": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completeness": {
+          "type": "string",
+          "enum": [
+            "observed_full_set",
+            "observed_species_only",
+            "extracted_set",
+            "inferred_set"
+          ]
+        }
+      },
+      "required": [
+        "species",
+        "item",
+        "ability",
+        "moves",
+        "nature",
+        "spread"
+      ],
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      }
     },
     "TerrainSchema": {
       "type": "string",

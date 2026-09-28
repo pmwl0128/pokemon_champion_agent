@@ -19,15 +19,15 @@ import type { CalcRailApi, CalcRailTarget } from "../../components/CalcRail.tsx"
 import { useAsync, useMovesByName } from "../../hooks.ts";
 import { displayName, useLang, useT } from "../../i18n.ts";
 import { takeTuneFill } from "../../lib/team.ts";
-import type { DexIndexEntry } from "../../runtime/adapter.ts";
+import { HttpError, type DexIndexEntry } from "../../runtime/adapter.ts";
 import { useRuntime } from "../../runtime/context.tsx";
 import { loadLearnset, type ItemRef } from "../../runtime/projection.ts";
-import { BOOST_KEYS, buildConfigSig, type BuildOption } from "./shared.tsx";
+import { BOOST_KEYS, type BuildOption } from "../../components/build/inputs.tsx";
 import { monsFromPaste } from "./duel/paste.ts";
 import { SwapSeam } from "./duel/SwapSeam.tsx";
 import { TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  EMPTY_FIELD, applyBuildOption, damageRequest, effectiveEntry, makeMon,
+  EMPTY_FIELD, applyBuildOption, damageRequest, effectiveEntry, makeMon, withoutMember,
   type FieldState, type MonState, type SideId,
 } from "./duel/state.ts";
 import { useRoster } from "./roster.tsx";
@@ -74,7 +74,8 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   const moveVocab = useMovesByName();
   const store = useDamageStore(adapter);
   const roster = useRoster();
-  const { teams, setTeams, active, setActive, slot, setSlot, setField, swaps, swapSides, demoMon } = roster;
+  const { teams, setTeams, active, setActive, slot, setSlot, setField, swaps, swapSides, demoMon,
+    baselineOf } = roster;
   // The build session a team was handed over from, if any: its team-level fields ride along with
   // every solve. (The roster itself was filled from it once, by the provider.)
   const fill = useRef(takeTuneFill()).current;
@@ -132,21 +133,9 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     });
   }, [teams]);
 
-  // -- loaded spreads ("还原" points) --------------------------------------------------------------
-  // The spread a mon arrived with. A mon that is exactly an environment card right now (picked or
-  // auto-filled, on either tab) takes that card as its point; hand edits after that do not move it.
-  const baselines = useRef(new Map<string, Baseline>());
-  const baselineOf = (mon: MonState): Baseline => {
-    const exact = !!mon.buildRef && mon.buildRef.signature === buildConfigSig(mon);
-    let baseline = baselines.current.get(mon.uid);
-    if (!baseline || (exact && (baseline.nature !== mon.nature
-      || STAT_KEYS.some((key) => (baseline!.sps[key] ?? 0) !== (mon.sps[key] ?? 0))))) {
-      baseline = { sps: cloneSps(mon.sps), nature: mon.nature };
-      baselines.current.set(mon.uid, baseline);
-    }
-    return baseline;
-  };
+  // -- loaded spreads ("还原" points, kept by the shared roster) --------------------------------
   const mineBaseline = baselineOf(mine);
+  const foeBaseline = baselineOf(foe);
 
   // -- member edits ----------------------------------------------------------------------
 
@@ -184,10 +173,11 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   const foePick = useCallback((option: BuildOption) =>
     updateMon(foeId, (mon) => applyBuildOption(mon, option)), [updateMon, foeId]);
 
-  const restoreMine = useCallback(() => {
-    const baseline = baselines.current.get(mineId);
-    if (baseline) updateMon(mineId, (mon) => ({ ...mon, sps: cloneSps(baseline.sps), nature: baseline.nature }));
-  }, [updateMon, mineId]);
+  const restore = useCallback((uid: string, baseline: Baseline) =>
+    updateMon(uid, (mon) => ({ ...mon, sps: cloneSps(baseline.sps), nature: baseline.nature })),
+  [updateMon]);
+  const restoreMine = useCallback(() => restore(mineId, mineBaseline), [restore, mineId, mineBaseline]);
+  const restoreFoe = useCallback(() => restore(foeId, foeBaseline), [restore, foeId, foeBaseline]);
 
   const foeLearnset = useAsync<LearnsetDto | null>(
     () => foe.slug ? loadLearnset(foe.slug) : Promise.resolve(null), [foe.slug]);
@@ -227,13 +217,15 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
   const removeMember = useCallback((side: TuneSide, index: number) => {
     const team = teams[SIDE[side]];
     const removed = team[index];
-    if (!removed || team.length <= 1) return;
-    setTeams((previous: Teams) => ({ ...previous,
-      [SIDE[side]]: previous[SIDE[side]].filter((mon) => mon.uid !== removed.uid) }));
+    if (!removed) return;
+    setTeams((previous: Teams) => {
+      const at = previous[SIDE[side]].findIndex((mon) => mon.uid === removed.uid);
+      return at < 0 ? previous : { ...previous, [SIDE[side]]: withoutMember(previous[SIDE[side]], at) };
+    });
     // Keep the same mon selected when an earlier one is dropped.
     setActive((previous) => {
       const at = previous[SIDE[side]];
-      return { ...previous, [SIDE[side]]: Math.min(at > index ? at - 1 : at, team.length - 2) };
+      return { ...previous, [SIDE[side]]: Math.max(0, Math.min(at > index ? at - 1 : at, team.length - 2)) };
     });
   }, [teams, setTeams, setActive]);
 
@@ -268,7 +260,6 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     ],
     pick: pickFromRail,
   // `useT()` returns a render-local function; language, not that function identity, is the input.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [field.format, pickFromRail, lang]);
   useEffect(() => { onRailApi?.(railApi); }, [onRailApi, railApi]);
 
@@ -299,7 +290,6 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     const timer = window.setTimeout(() => void store.fetchMissing(requests), 40);
     return () => window.clearTimeout(timer);
     // planKey is the content signature of both plans.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planKey]);
 
   // While a new input is being computed, a slot keeps showing its previous numbers (marked pending)
@@ -316,12 +306,10 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     const previous = lastCells.current[index];
     return { rolls: previous && previous.move === move ? previous.rolls : null, pending: true };
     // store.version is the store's change signal.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [livePlan, store.version]);
 
   const goalRolls = useMemo(() => new Map(goalPlan.map(({ goal, request }) =>
     [goal.id, store.read(request) ?? null])),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   [goalPlan, store.version]);
 
   // Idle sweep: once the visible numbers are current, fetch every HP / Def / SpD position of our
@@ -351,7 +339,6 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     if (!variants.length) return;
     const timer = window.setTimeout(() => void store.fetchMissing(variants), 160);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planKey, settled]);
 
   // -- verdict & targets -------------------------------------------------------------------------
@@ -364,7 +351,6 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
     if (!currentGoal) return;
     setHits(currentGoal.hits);
     setTarget(currentGoal.target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGoal?.id]);
 
   const updateGoal = useCallback((id: string, patch: Partial<Pick<Goal, "hits" | "target">>) =>
@@ -508,7 +494,11 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
       setRun({ entries, cards: output.cards, contextSig: sig });
     } catch (error) {
       console.error("durability solve failed:", error);
-      setSolveError(t("calc.error"));
+      // A refused solve says why: an exhausted daily allowance and a busy heavy-calculation slot
+      // are not calculation errors, and "failed" for them reads as a broken tool.
+      const refused = error instanceof HttpError && error.status === 429;
+      setSolveError(t(!refused ? "calc.error"
+        : error.message.includes('"busy"') ? "tune.ws.busy" : "tune.ws.limit"));
     } finally {
       setSolveBusy(false);
     }
@@ -541,7 +531,8 @@ export function TuneWorkspace({ dex, natures, items, onRailApi }: {
           format={field.format} pressed={pressedStat(selectedMove, moveVocab.get(selectedMove)?.category)}
           onSpecies={mineSpecies} onChange={changeMine} onPickBuild={minePick} onRestore={restoreMine} />
         <SwapSeam onSwap={swapSides} />
-        <AttackerCard mon={foe} dex={dex} natures={natures} items={items} format={field.format}
+        <AttackerCard mon={foe} baseline={foeBaseline} dex={dex} natures={natures} items={items}
+          format={field.format} onRestore={restoreFoe}
           learnset={foeLearnset.status === "ready" ? foeLearnset.data : null}
           cells={cells} selectedSlot={selectedSlot} onSelectSlot={selectSlot}
           onSpecies={foeSpecies} onChange={changeFoe} onPickBuild={foePick} />

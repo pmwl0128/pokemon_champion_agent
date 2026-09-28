@@ -4,8 +4,6 @@
  * and answers `calc`/`speed` commands over postMessage. Running off the UI thread keeps a 200-mon speed
  * table or an 8×12 damage grid from freezing the page. See frontend/design.md §7.1. */
 import { CALC_API, SOURCES, SPEED_API } from "./sources.ts";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const g = globalThis as any;
 
 // loadCalculator()'s runFile() reads each vendored file through this global (replaces ncp_engine.py's

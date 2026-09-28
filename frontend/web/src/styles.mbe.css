@@ -1,0 +1,75 @@
+/* The build editor (components/library/MonBuildEditor.tsx): the box page's detail, the dock's and a team
+   card's dialog, and the matchup page's own builds. It loads with the editor, wherever that is. */
+/* ---- the shared build editor; compact arrangement inside dialogs ---- */
+.mon-build-editor { display: grid; gap: 12px; min-width: 0; }
+.mon-build-editor select, .mon-build-editor input:not([type="range"]) {
+  width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 13px;
+}
+.mbe-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; }
+.mbe-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mbe-row label { display: grid; gap: 4px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--sub); }
+.mbe-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mbe-sp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; align-items: end; }
+.mbe-sp-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--sub); }
+
+/* ---- the box page's detail: the Pokémon on its type colours, the build, moves beside the stats ---- */
+.mon-build-editor.spread { gap: 14px; }
+.mbe-hero {
+  display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 16px; align-items: center;
+  padding: 10px 14px 10px 10px; border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--t1) 26%, var(--line));
+  background: linear-gradient(115deg, color-mix(in srgb, var(--t1) 16%, var(--panel)) 0%,
+    color-mix(in srgb, var(--t2) 10%, var(--panel)) 70%, var(--panel) 100%);
+}
+.mbe-hero-art {
+  width: 116px; height: 116px; display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(circle at 50% 58%, color-mix(in srgb, var(--t1) 26%, transparent) 0%, transparent 70%);
+}
+.mbe-hero-art img { width: 108px; height: 108px; object-fit: contain; filter: drop-shadow(0 8px 10px rgb(0 0 0 / 0.18)); }
+.mbe-hero-main { display: grid; gap: 10px; min-width: 0; }
+.mbe-hero .mbe-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr); gap: 8px; }
+.mbe-split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 16px; align-items: start; }
+.mbe-col { display: grid; gap: 6px; min-width: 0; }
+.mbe-col .mbe-moves { grid-template-columns: minmax(0, 1fr); }
+.mbe-cap { font-size: 12px; font-weight: 600; color: var(--sub); }
+.mbe-stats {
+  display: grid; gap: 5px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--panel-2) 55%, var(--panel));
+}
+.mbe-stats-head, .mbe-stat {
+  display: grid; grid-template-columns: 32px 28px minmax(0, 1fr) 46px minmax(0, 1fr) 40px; align-items: center; gap: 6px;
+}
+.mbe-stats-head { font-size: 10.5px; font-weight: 700; color: var(--sub); }
+.mbe-stats-head .l { grid-column: 2 / 4; text-align: right; }
+.mbe-stats-head .c { grid-column: 4; text-align: center; }
+.mbe-stats-head .r { grid-column: 5 / 7; }
+.mbe-stat .k { font-family: var(--font-mono); font-size: 10.5px; font-weight: 800; color: var(--sub); }
+.mbe-stat .bv { font-size: 12px; font-weight: 700; text-align: right; }
+.mbe-stat .track { position: relative; height: 8px; overflow: hidden; border-radius: 4px; background: var(--panel-3); }
+.mbe-stat .track .fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.mbe-stat .track.base .fill { right: 0; }
+.mbe-stat .track.actual .fill { left: 0; background: color-mix(in srgb, var(--brand) 62%, transparent); }
+.mbe-stat.up .track.actual .fill { background: color-mix(in srgb, var(--success) 72%, transparent); }
+.mbe-stat.down .track.actual .fill { background: color-mix(in srgb, var(--danger) 55%, transparent); }
+.mon-build-editor .mbe-stat input { height: 28px; min-height: 28px; padding: 0 4px; text-align: center; font-weight: 700; }
+.mbe-stat .av { font-size: 13px; font-weight: 800; text-align: right; white-space: nowrap; }
+.mbe-stat.up .av { color: var(--success); }
+.mbe-stat.down .av { color: var(--danger); }
+.mbe-stats-foot {
+  display: flex; justify-content: space-between; gap: 8px; padding-top: 6px; margin-top: 2px;
+  border-top: 1px dashed var(--line); font-size: 12px; color: var(--sub);
+}
+.mbe-stats-foot b { margin-left: 4px; color: var(--ink); }
+@media (max-width: 1180px) { .mbe-split { grid-template-columns: minmax(0, 1fr); } }
+.mbe-sp-cell { display: grid; gap: 3px; min-width: 0; font-size: 11.5px; color: var(--sub); text-align: center; }
+.mon-build-editor .mbe-sp-cell input { height: 32px; padding: 0 4px; text-align: center; }
+@media (max-width: 560px) {
+  .mbe-hero { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 12px; }
+  .mbe-hero-art { width: 80px; height: 80px; justify-self: center; }
+  .mbe-hero-art img { width: 80px; height: 80px; }
+  .mbe-hero .mbe-row { grid-template-columns: minmax(0, 1fr); }
+  .mbe-row { grid-template-columns: minmax(0, 1fr); }
+  .mbe-moves { grid-template-columns: minmax(0, 1fr); }
+  .mbe-sp { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

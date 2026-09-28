@@ -98,6 +98,9 @@ export interface Rolls {
   minPercent: number;
   maxPercent: number;
   category: string;
+  isSpread?: boolean;
+  /** The engine reports one hit of a multi-hit move, not the total. */
+  multiHit?: boolean;
 }
 
 export interface Survival {
@@ -212,6 +215,8 @@ function slim(result: DamageResultDto): Rolls {
   return {
     damage: result.damage, defenderHP: result.defenderHP, min: result.min, max: result.max,
     minPercent: result.minPercent, maxPercent: result.maxPercent, category: result.category,
+    ...(result.isSpread ? { isSpread: true } : {}),
+    ...(result.hitsRange[1] > 1 ? { multiHit: true } : {}),
   };
 }
 
@@ -219,16 +224,28 @@ function slim(result: DamageResultDto): Rolls {
  * served for inputs it was not computed from, and anything already seen — a slider position you
  * pass twice, or one the idle sweep prefetched — is answered from memory instead of the engine.
  * `version` changes whenever results land; derive views from it. */
-export function useDamageStore(adapter: RuntimeAdapter) {
+export function useDamageStore(adapter: RuntimeAdapter, cap = STORE_CAP, lane: "interactive" | "inference" = "interactive") {
   const store = useRef(new Map<string, Rolls | null>());
   const inflight = useRef(new Set<string>());
+  const retained = useRef(new Set<string>());
   const [version, setVersion] = useState(0);
   const [error, setError] = useState(false);
+  const retain = useCallback((requests: DamageRequestDto[]) => {
+    retained.current = new Set(requests.map(requestKey));
+  }, []);
 
   const read = useCallback((request: DamageRequestDto | null): Rolls | null | undefined =>
     request ? store.current.get(requestKey(request)) : null, []);
 
-  const fetchMissing = useCallback(async (requests: DamageRequestDto[]) => {
+  const snapshot = useCallback((requests: DamageRequestDto[]) => {
+    const out = new Map<string, Rolls | null>();
+    for (const request of requests) {
+      const key = requestKey(request), value = store.current.get(key);
+      if (value !== undefined) out.set(key, value);
+    }
+    return out;
+  }, []);
+  const fetchMissing = useCallback(async (requests: DamageRequestDto[], signal?: AbortSignal) => {
     const seen = new Set<string>();
     const missing: Array<{ key: string; request: DamageRequestDto }> = [];
     for (const request of requests) {
@@ -238,40 +255,47 @@ export function useDamageStore(adapter: RuntimeAdapter) {
       missing.push({ key, request });
     }
     if (!missing.length) return;
-    missing.forEach(({ key }) => inflight.current.add(key));
     const chunks: Array<typeof missing> = [];
     for (let at = 0; at < missing.length; at += BATCH_CAP) {
       chunks.push(missing.slice(at, at + BATCH_CAP));
     }
+    const owned = new Set<string>();
     try {
-      await Promise.all(chunks.map(async (chunk) => {
-        const output = await adapter.damageBatch(chunk.map((item) => item.request));
+      for (const scheduled of chunks) {
+        if (signal?.aborted) break;
+        const chunk = scheduled.filter(({ key }) => !store.current.has(key) && !inflight.current.has(key));
+        if (!chunk.length) continue;
+        chunk.forEach(({ key }) => { inflight.current.add(key); owned.add(key); });
+        const output = await adapter.damageBatch(chunk.map((item) => item.request), { lane });
         chunk.forEach(({ key }, index) => {
           const result = output[index];
           // An engine refusal for these exact inputs is itself a stable answer: keep it as null so
           // the same request is not retried on every render.
           store.current.set(key, result && !isErrorShape(result)
             ? slim(result as DamageResultDto) : null);
+          inflight.current.delete(key);
+          owned.delete(key);
         });
-      }));
+      }
       setError(false);
     } catch (failure) {
       console.error("durability damage batch failed:", failure);
       setError(true);
     } finally {
-      missing.forEach(({ key }) => inflight.current.delete(key));
+      owned.forEach((key) => inflight.current.delete(key));
       // Oldest-first eviction keeps the map bounded across a long session of edits.
-      const overflow = store.current.size - STORE_CAP;
+      const overflow = store.current.size - cap;
       if (overflow > 0) {
         let dropped = 0;
         for (const key of store.current.keys()) {
+          if (retained.current.has(key)) continue;
           if (dropped++ >= overflow) break;
           store.current.delete(key);
         }
       }
       setVersion((value) => value + 1);
     }
-  }, [adapter]);
+  }, [adapter, cap, lane]);
 
-  return { version, error, read, fetchMissing };
+  return { version, error, read, snapshot, retain, fetchMissing };
 }

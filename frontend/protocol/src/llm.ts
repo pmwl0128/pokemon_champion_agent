@@ -25,6 +25,10 @@ export const OnlineQuotaDtoSchema = z.object({
   matchup: DailyQuotaDtoSchema,
   /** Present on deployments that expose the authoritative online tune operator. */
   tune: DailyQuotaDtoSchema.optional(),
+  /** Who is asking: an anonymous visitor, or a browser the server lets past visitor limits (owner
+   * dev key, tester key, smoke, a local unmetered rehearsal). Absent from older servers, which
+   * means visitor. It gates allowances that live in the browser, such as library capacity. */
+  access: z.enum(["visitor", "authorized"]).optional(),
 });
 export type OnlineQuotaDto = z.infer<typeof OnlineQuotaDtoSchema>;
 

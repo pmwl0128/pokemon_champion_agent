@@ -2,15 +2,30 @@
  * vocab). These are dex facts — identical on local and online — so they never go through
  * the adapter; pages import them directly. Cached per session. */
 import {
-  AbilityDtoSchema, ItemDtoSchema, LearnsetDtoSchema, NatureDtoSchema,
+  AbilityDtoSchema, ItemDtoSchema, LearnsetDtoSchema, NatureDtoSchema, PokemonCardDtoSchema,
   type AbilityDto, type ItemDto, type LearnsetDto, type NatureDto,
 } from "@pokemon-champions/protocol";
 import { z } from "zod";
-import { AsyncOnce, fetchJson, versionParam } from "./adapter.ts";
+import { AsyncOnce, fetchJson, versionParam, type DexIndexEntry } from "./adapter.ts";
 
 let base = "/projection";
 export function configureProjection(projectionBase: string): void {
   base = projectionBase;
+}
+
+const cardsOnce = new AsyncOnce<import("@pokemon-champions/protocol").PokemonCardDto[]>();
+export function loadCards(projectionBase = base) {
+  return cardsOnce.get(() => fetchJson<{ cards: unknown[] }>(`${projectionBase}/dex/cards.json${versionParam()}`)
+    .then((file) => file.cards.map((card) => PokemonCardDtoSchema.parse(card))));
+}
+
+const dexIndexOnce = new AsyncOnce<DexIndexEntry[]>();
+export function loadProjectionDexIndex(projectionBase = base): Promise<DexIndexEntry[]> {
+  return dexIndexOnce.get(() => loadCards(projectionBase).then((cards) => cards.map((c) => ({
+    key: c.key, slug: c.slug, name: c.name, nameZh: c.nameZh, nameJa: c.nameJa,
+    nationalDex: c.nationalDex, types: c.types, stats: c.stats, abilities: c.abilities,
+    isMega: c.isMega, baseSpecies: c.baseSpecies,
+  }))));
 }
 
 const learnsetCache = new Map<string, Promise<LearnsetDto>>();
