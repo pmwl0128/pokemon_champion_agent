@@ -1,10 +1,32 @@
 /** The inferred state, drawn: one ruler per defence (HP x Def, HP x SpD) on a bulk-equivalent SP
  * scale, and one lane per power item for each attacking stat. Every mark a reader might not parse at
  * a glance carries its reading as a tooltip. */
-import type { BulkKey, Lane, Ruler } from "./model.ts";
+import type { BulkKey, Lane, Ruler, StatView } from "./model.ts";
 import { useInferT } from "./messages.ts";
 
 type T = ReturnType<typeof useInferT>;
+
+/** Only inference values belong here; a reference build's SP never supplies a fallback. */
+export function InferredCell({ view, loading = false, showScope = false }: {
+  view: StatView | null; loading?: boolean; showScope?: boolean;
+}) {
+  const t = useInferT();
+  const observed = !loading && !!view?.observed;
+  const range = loading ? t("infer.pending")
+    : !view ? "—" : !observed && !showScope ? t("infer.ruler.unobserved")
+      : view.lo <= view.hi ? (view.lo === view.hi ? String(view.lo) : `${view.lo}–${view.hi}`) : "—";
+  return (
+    <span className="inf-foe-inferred">
+      <span className={`inf-cells${observed ? "" : " hatched"}`} aria-hidden>
+        {(observed ? view!.mass : new Array<number>(33).fill(0)).map((value, sp) => (
+          <i key={sp} className={value > 0 ? "on" : ""}
+            style={observed ? { opacity: value > 0 ? 0.22 + value * 0.78 : 1 } : undefined} />
+        ))}
+      </span>
+      <span className={`num inf-foe-range${observed ? "" : " muted"}`}>{range}</span>
+    </span>
+  );
+}
 
 const pct = (value: number, [lo, hi]: [number, number]) =>
   Math.max(0, Math.min(100, ((value - lo) / Math.max(1, hi - lo)) * 100));

@@ -65,12 +65,12 @@ export function MoveSlot({ value, onChange, learnset, index, usage }: {
         onValueChange={(next) => {
           setText(next);
           const hit = resolve(next);
-          if (hit !== null && (hit === "" || moves.some((m) => m.name === hit
+          if (hit !== null && hit !== value && (hit === "" || moves.some((m) => m.name === hit
             && displayName(m, lang) === next.trim()))) onChange(hit);
         }}
         onCommit={(raw) => {
           const hit = resolve(raw);
-          if (hit !== null) onChange(hit);
+          if (hit !== null) { if (hit !== value) onChange(hit); }
           else setText(current ? displayName(current, lang) : "");
         }} />
     </div>

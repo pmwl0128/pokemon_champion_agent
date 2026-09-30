@@ -14,7 +14,7 @@ import {
   bulkUse, buildSpace, frameOf, hitRequests, liveFrame, offenseUse,
   type HitFrame, type KnownFacts, type Observation, type RequestKit, type SpaceInfo,
 } from "./context.ts";
-import type { Candidate, Inference, InferKey, Mult, Nearest, Prediction } from "./model.ts";
+import type { Candidate, Inference, InferKey, Mult, Prediction } from "./model.ts";
 import type { InferenceJob } from "./evaluate.ts";
 
 const STORE_CAP = 60000;
@@ -37,7 +37,6 @@ export interface SetReading {
   /** Share of rolls reproduced, per enabled observation in order; null while pending. */
   shares: number[] | null;
   fits: boolean;
-  nearest: Nearest | null;
 }
 
 export interface SpreadReading {

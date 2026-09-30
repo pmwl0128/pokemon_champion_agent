@@ -612,7 +612,7 @@ export function SpeedTab({ dex, natures, items, onRailApi, active: visible = tru
 
   // -- roster bar ---------------------------------------------------------------------------------
 
-  const offers = useFieldOffers([mine, foe], field);
+  const offers = useFieldOffers();
   const importPaste = async (side: SideId, text: string): Promise<ImportOutcome> => {
     const { mons, outcome } = await monsFromPaste(text, { dex, items, natures, adapter });
     if (!mons.length) return outcome;

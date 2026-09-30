@@ -132,8 +132,8 @@ button, input, select {
   border-radius: var(--radius-sm); padding: 0 28px 0 10px;
 }
 .theme-toggle {
-  flex: none; display: inline-grid; grid-template-columns: repeat(2, auto); align-items: center;
-  min-height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  flex: none; display: inline-grid; grid-template-columns: repeat(3, auto); gap: 2px; align-items: center;
+  height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--panel) 82%, var(--bg));
 }
 .theme-toggle button {
@@ -144,6 +144,7 @@ button, input, select {
 }
 .theme-toggle button.day:hover { color: var(--day); }
 .theme-toggle button.night:hover { color: var(--night); }
+.theme-toggle button.auto:hover { color: var(--brand); }
 .theme-toggle button.day.on {
   color: var(--day); background: var(--day-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--day) 34%, transparent);
@@ -152,8 +153,14 @@ button, input, select {
   color: var(--night); background: var(--night-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--night) 34%, transparent);
 }
-.theme-toggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.85;
+.theme-toggle button.auto.on {
+  color: var(--brand-strong); background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 34%, transparent);
+}
+.theme-toggle svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8;
   stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle .auto-sun { stroke: var(--day); }
+.theme-toggle .auto-moon { stroke: var(--night); fill: color-mix(in srgb, var(--night) 14%, transparent); }
 .theme-toggle button.night.on svg { fill: color-mix(in srgb, var(--night) 24%, transparent); }
 /* Top-bar tools: the site search at the left end, the library dock at the right end. Both are on
    every page in the same place, so nothing in the bar moves between pages. */
@@ -167,7 +174,41 @@ button, input, select {
 .topbar-tool.on { color: var(--brand-strong); border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
   background: var(--brand-soft); }
 .topbar-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.dock-toggle { padding: 0 6px; }
+.library-entry { position: relative; display: inline-flex; flex: none; }
+.dock-toggle { position: relative; padding: 0 6px; }
+.library-discovery-dot {
+  position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--day); box-shadow: 0 0 0 2px var(--panel); pointer-events: none;
+}
+.library-discovery-ring {
+  position: absolute; inset: 3px; border: 1.5px solid var(--day); border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--day) 9%, transparent);
+  pointer-events: none; opacity: 0; animation: library-discovery-ring 1100ms ease-out 2;
+}
+@keyframes library-discovery-ring {
+  0% { transform: scale(0.82); opacity: 0; }
+  16% { opacity: 0.62; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+.library-discovery-hint {
+  position: absolute; right: 0; top: calc(100% + 10px); width: min(278px, calc(100vw - 32px));
+  display: flex; align-items: start; gap: 12px; padding: 12px 13px; border: 1px solid var(--line-strong);
+  border-radius: 11px; background: var(--panel); box-shadow: var(--shadow-raised); font-size: 12px;
+  animation: surfaceEnter 160ms var(--ease-out) both;
+}
+.library-discovery-hint::before {
+  content: ""; position: absolute; right: 12px; top: -5px; width: 8px; height: 8px;
+  border-top: 1px solid var(--line-strong); border-left: 1px solid var(--line-strong);
+  background: var(--panel); transform: rotate(45deg);
+}
+.library-discovery-hint strong { color: var(--ink); font-weight: 650; }
+.library-discovery-hint p { color: var(--sub); line-height: 1.65; margin: 4px 0 0; }
+.library-discovery-hint button {
+  flex: none; display: grid; place-items: center; padding: 0; width: 22px; height: 22px;
+  background: transparent; border: 0; border-radius: 5px; color: var(--sub); cursor: pointer;
+}
+.library-discovery-hint button:hover { color: var(--ink); background: var(--panel-2); }
+.library-discovery-hint button svg { width: 14px; height: 14px; }
 
 /* The site search entry (components/SideRail.tsx): a search icon ahead of the brand. */
 .search-entry { margin-right: -8px; }
@@ -185,7 +226,7 @@ button, input, select {
   .topbar .logo { flex: none; }
   .topbar .env { margin-left: auto; white-space: nowrap; }
   .topbar .env-date { display: none; }
-  .topbar select { max-width: 88px; }
+  .topbar select { max-width: 88px; padding-right: 14px; }
   /* Two rows: search, brand and settings, then the working row — the sections and the library dock.
      The zero-height ::after is the line break between them. */
   .topbar::after { content: ""; order: 1; flex: 0 0 100%; height: 0; }
@@ -195,13 +236,14 @@ button, input, select {
   }
   .topbar nav::-webkit-scrollbar { display: none; }
   .topbar nav a { flex: none; padding: 5px 10px; white-space: nowrap; }
-  .topbar .dock-toggle { order: 4; }
+  .topbar .library-entry { order: 4; }
   .topbar-tool { height: 32px; min-width: 32px; }
 }
 /* A phone's first row holds the brand, the environment, the theme and the language only with the
    brand as its icon alone. */
 @media (max-width: 440px) {
   .topbar .logo-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .theme-toggle button { width: 24px; }
 }
 @media (min-width: 721px) and (max-width: 980px) {
   .topbar { gap: 10px; padding: 8px 12px; }
@@ -218,6 +260,44 @@ main.content {
   scroll-margin-top: 72px;
 }
 main.content:focus { outline: none; }
+.site-footer { border-top: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 65%, var(--bg)); }
+.site-footer-inner { width: min(1240px, 100% - 48px); margin: 0 auto; padding: 22px 0 18px; }
+.site-footer-main { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.footer-copyright { font-size: 12px; color: var(--sub); white-space: nowrap; }
+.footer-community { display: flex; align-items: center; gap: 24px; font-size: 12px; }
+.footer-community a { display: inline-flex; align-items: center; gap: 7px; color: var(--sub); white-space: nowrap; }
+.footer-community a:hover { color: var(--ink); text-decoration: none; }
+.footer-community svg { width: 15px; height: 15px; stroke-width: 1.8; }
+.footer-qq { position: relative; display: inline-flex; align-items: center; gap: 5px; }
+.footer-qr-toggle {
+  display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  color: var(--sub); background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+}
+.footer-qr-toggle:hover, .footer-qr-toggle[aria-expanded="true"] { color: var(--brand); border-color: var(--line); background: var(--panel); }
+.footer-qr-popover {
+  position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 20; width: min(248px, calc(100vw - 32px));
+  padding: 10px; border: 1px solid var(--line-strong); border-radius: 12px;
+  color: var(--ink); background: var(--panel); box-shadow: var(--shadow-raised);
+}
+.footer-qr-popover::after { content: ""; position: absolute; bottom: -12px; left: 0; right: 0; height: 12px; }
+.footer-qr-popover > strong { display: block; margin: 1px 2px 8px; font-weight: 600; font-size: 12px; }
+.footer-qr-frame { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 8px; background: #1b1b1b; }
+.footer-qr-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.footer-qr-caption { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 8px 2px 0; color: var(--sub); font-size: 11px; }
+.footer-qr-caption button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 5px;
+  background: transparent; color: var(--brand); border: 0; border-radius: 5px; cursor: pointer; font-size: inherit; }
+.footer-qr-caption button:hover { background: var(--brand-soft); }
+.footer-qr-caption svg { width: 13px; height: 13px; }
+.footer-disclaimer { margin: 14px 0 0; font-size: 11px; line-height: 1.75; color: var(--sub); }
+@media (max-width: 720px) {
+  .site-footer-inner { width: calc(100% - 20px); padding: 18px 0 16px; }
+  .site-footer-main { align-items: start; flex-direction: column; gap: 12px; }
+  .footer-community { width: 100%; justify-content: space-between; gap: 12px; }
+  .footer-disclaimer { margin-top: 12px; }
+}
+@media (max-height: 540px) {
+  .footer-qr-popover { position: fixed; top: calc(var(--topbar-offset) + 12px); bottom: auto; right: 16px; width: 210px; }
+}
 .route-loading { min-height: 160px; display: grid; place-items: center; }
 @media (max-width: 720px) {
   main.content { width: min(100% - 20px, 1240px); padding-top: 18px; scroll-margin-top: 140px; }
@@ -3285,17 +3365,18 @@ button.swap-seam:active:not(:disabled) { transform: none; }
   white-space: nowrap;
 }
 .field-format.seg button.on { font-weight: 750; }
-/* An offer is a suggestion, not a state: the warning hue the page keeps for "look at this", and
-   gone the moment the field it would fill is set. */
+/* Entry-source hints stay clickable; colour follows the actual current field, including manual picks. */
 .field-offer {
+  --offer-hue: var(--danger);
   flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 9px;
-  border: 1px dashed color-mix(in srgb, var(--warning) 55%, var(--line)); border-radius: 999px;
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
-  color: color-mix(in srgb, var(--warning) 78%, var(--ink));
+  border: 1px dashed color-mix(in srgb, var(--offer-hue) 55%, var(--line)); border-radius: 999px;
+  background: color-mix(in srgb, var(--offer-hue) 9%, transparent);
+  color: var(--offer-hue);
   font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
   transition: background-color 120ms ease;
 }
-.field-offer:hover { border-style: solid; background: color-mix(in srgb, var(--warning) 17%, transparent); }
+.field-offer.effective { --offer-hue: var(--success); }
+.field-offer:hover { border-style: solid; background: color-mix(in srgb, var(--offer-hue) 17%, transparent); }
 .field-offer b { font-weight: 750; }
 .field-offer-arrow { opacity: .65; }
 
@@ -4100,4 +4181,19 @@ button.swap-seam:active:not(:disabled) { transform: none; }
     min-width: 44px; min-height: 44px;
   }
   .topbar nav a { min-height: 44px; display: inline-flex; align-items: center; }
+  /* Large touch targets must not overflow the segmented control's desktop-height frame. */
+  .topbar .env, .topbar select, .theme-toggle { height: 46px; min-height: 46px; }
+  .theme-toggle { padding: 0; }
+  .theme-toggle button { width: 44px; height: 44px; }
+  .footer-qr-toggle, .footer-qr-caption button { min-height: 44px; min-width: 44px; }
+}
+@media (pointer: coarse) and (max-width: 720px) {
+  /* Keep touch-sized settings on one aligned row instead of stranding the language picker. */
+  .topbar nav, .topbar .library-entry { order: 0; }
+  .topbar .env, .theme-toggle, .topbar select { order: 2; }
+  .topbar .env { flex: none; margin-left: 0; }
+  .theme-toggle { flex: none; }
+  .topbar select { flex: 1; min-width: 0; max-width: none; }
+  .topbar .library-entry { position: static; }
+  .library-discovery-hint { top: calc(100% + 8px); right: 10px; }
 }

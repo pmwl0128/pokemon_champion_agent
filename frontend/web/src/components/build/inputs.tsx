@@ -575,7 +575,7 @@ export function ItemCombo({ value, onChange, items, disabled, usage }: {
   };
   const commit = (raw: string) => {
     const hit = resolve(raw);
-    if (hit !== null) onChange(hit);
+    if (hit !== null) { if (hit !== value) onChange(hit); }
     else {
       const cur = items.find((i) => i.name === value);
       setText(cur ? displayName(cur, lang) : "");
@@ -588,8 +588,8 @@ export function ItemCombo({ value, onChange, items, disabled, usage }: {
           const q = next.trim();
           const exact = items.find((i) =>
             displayName(i, lang) === q || i.name === q || i.nameZh === q || i.nameJa === q);
-          if (exact) onChange(exact.name);
-          else if (!q) onChange("");
+          if (exact) { if (exact.name !== value) onChange(exact.name); }
+          else if (!q && value !== "") onChange("");
         }}
         onCommit={commit} />
   );

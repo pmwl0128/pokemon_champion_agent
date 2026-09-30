@@ -109,6 +109,100 @@ describe("budgeted weighted marginals", () => {
     const result = infer({ ...space, items: [space.items[0]!] }, [])!;
     expect(result.count).toBe(10510209);
     expect(result.stats.hp.mass[32]).toBeCloseTo(0.11305749, 7);
+    expect(result.natureShares).toEqual([1]);
+  });
+  it("matches independently enumerated nature weights across all budget-compatible joint builds", () => {
+    const joint: FoeSpace = { ...space, natures: SPACE.natures,
+      abilities: [{ name: "Rough Skin", prior: 0.6 }, { name: "Fur Coat", prior: 0.4 }] };
+    const bulk = (ability: string, mult: Mult, sp: number, item: string) => {
+      if (sp !== 0 && sp !== 32) return [];
+      const damage = 30 + sp / 32 + (mult > 1 ? 1 : 0);
+      return item === "berry" || ability === "Fur Coat"
+        ? [damage, damage, damage + 1, 200] : [damage, 200, 201, 202];
+    };
+    const attack = (_item: string, _ability: string, mult: Mult, sp: number) =>
+      sp !== 0 && sp !== 32 ? [] : mult > 1 ? [10, 10, 10, 50] : [10, 50, 50, 50];
+    const evidence: Evidence[] = [
+      { kind: "bulk", key: "def", before: 100, after: 84, rolls: bulk },
+      { kind: "bulk", key: "spd", before: 100, after: 84, rolls: bulk },
+      { kind: "offense", key: "atk", before: 100, after: 90, rolls: attack },
+      { kind: "offense", key: "spa", before: 100, after: 90, rolls: attack },
+    ];
+    const natureMass = joint.natures.map(() => 0);
+    const speedMass = Array<number>(33).fill(0);
+    const speedCaps = Array<number>(joint.natures.length * joint.items.length * joint.abilities.length).fill(-1);
+    let count = 0, maximumWeight = 0;
+    joint.natures.forEach((nature, n) => {
+      for (const [i, item] of joint.items.entries()) for (const [a, ability] of joint.abilities.entries())
+        for (let hp = 0; hp <= 32; hp++) for (const def of [0, 32]) for (const spd of [0, 32])
+          for (const atk of [0, 32]) for (const spa of [0, 32]) {
+            if (hp + def + spd + atk + spa > 66) continue;
+            const sps = { hp, def, spd, atk, spa };
+            let weight = nature.prior * item.prior * ability.prior;
+            for (const e of evidence) {
+              const rolls = e.kind === "bulk"
+                ? bulk(ability.name, nature.mult[e.key], sps[e.key], item.name)
+                : attack(item.name, ability.name, nature.mult[e.key], sps[e.key]);
+              weight *= rolls.filter((damage) => e.kind === "bulk"
+                ? foeRollFits(damage, actualStat(BASE.hp, "hp", hp, 1), e.before, e.after)
+                : mineRollFits(damage, e.before, e.after)).length / rolls.length;
+            }
+            if (!(weight > 0)) continue;
+            count++;
+            natureMass[n]! += weight;
+            maximumWeight = Math.max(maximumWeight, weight);
+            const cap = Math.min(32, 66 - hp - def - spd - atk - spa);
+            const index = (n * joint.items.length + i) * joint.abilities.length + a;
+            speedCaps[index] = Math.max(speedCaps[index]!, cap);
+            for (let spe = 0; spe <= cap; spe++) speedMass[spe]! += weight;
+          }
+    });
+    const result = infer(joint, evidence)!;
+    const total = natureMass.reduce((sum, weight) => sum + weight, 0);
+    expect(count).toBeGreaterThan(0);
+    expect(result.count).toBe(count);
+    expect(result.speedCaps).toEqual(speedCaps);
+    const topSpeed = Math.max(...speedMass);
+    result.stats.spe.mass.forEach((value, spe) => expect(value).toBeCloseTo(speedMass[spe]! / topSpeed, 10));
+    result.natureShares!.forEach((value, n) => expect(value).toBeCloseTo(natureMass[n]! / total, 10));
+    expect(result.natureShares!.reduce((sum, value) => sum + value, 0)).toBeCloseTo(1, 12);
+    const example = result.mostLikely!;
+    const nature = joint.natures.find((row) => row.name === example.nature)!;
+    let exampleWeight = nature.prior * joint.items.find((row) => row.name === example.item)!.prior
+      * joint.abilities.find((row) => row.name === example.ability)!.prior;
+    for (const e of evidence) {
+      const rolls = e.kind === "bulk"
+        ? bulk(example.ability, nature.mult[e.key], example.sps[e.key]!, example.item)
+        : attack(example.item, example.ability, nature.mult[e.key], example.sps[e.key]!);
+      exampleWeight *= rolls.filter((damage) => e.kind === "bulk"
+        ? foeRollFits(damage, actualStat(BASE.hp, "hp", example.sps.hp!, 1), e.before, e.after)
+        : mineRollFits(damage, e.before, e.after)).length / rolls.length;
+    }
+    expect(exampleWeight).toBeCloseTo(maximumWeight, 12);
+    expect(Object.values(example.sps).reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(66);
+    expect(example.sps.spe).toBe(0);
+    expect(infer(joint, [])!.natureShares).toEqual(expect.arrayContaining([
+      expect.closeTo(0.4, 10), expect.closeTo(0.2, 10),
+    ]));
+  });
+  it("returns no nature percentages for count-only, zero-weight or empty results and updates exclusions", () => {
+    const evidence: Evidence[] = [{ kind: "offense", key: "atk", before: 100, after: 90,
+      rolls: (_item, _ability, mult, sp) => mult > 1 && sp === 32 ? [10] : [50] }];
+    expect(infer(SPACE, evidence)!.natureShares).toEqual([0, 1, 0]);
+    expect(infer(SPACE, evidence)!.speedCaps).toEqual([-1, -1, 32, 32, -1, -1]);
+    expect(infer(SPACE, evidence, true)!.natureShares).toBeNull();
+    expect(infer(SPACE, evidence, true)!.mostLikely).toBeNull();
+    const zeroWeight = infer({ ...SPACE, natures: SPACE.natures.map((nature) => ({ ...nature, prior: 0 })) }, evidence)!;
+    expect(zeroWeight.natureShares).toBeNull();
+    expect(zeroWeight.mostLikely).not.toBeNull();
+    const impossible: Evidence = { ...evidence[0]!, rolls: () => [50] };
+    const conflict = infer(SPACE, [...evidence, impossible])!;
+    expect(conflict.count).toBe(0);
+    expect(conflict.natureShares).toBeNull();
+    expect(conflict.mostLikely).toBeNull();
+    const template = { nature: "Jolly", item: "plain", ability: "Rough Skin", sps: { hp: 29, atk: 31, def: 6, spe: 0 } };
+    const example = infer({ ...space, items: [space.items[0]!] }, [], false, template)!.mostLikely!;
+    expect(example.sps).toEqual({ hp: 29, atk: 31, def: 6, spd: 0, spa: 0, spe: 0 });
   });
   it("matches independent joint enumeration with item-dependent likelihoods", () => {
     const bulk = (_ability: string, _mult: Mult, sp: number, item: string) =>
@@ -157,6 +251,11 @@ describe("budgeted weighted marginals", () => {
         rolls: (_item, _ability, _mult, sp) => sp === 32 ? [50] : [0] },
     ];
     const result = infer(space, constrained)!;
+    expect(result.stats.spe).toMatchObject({ observed: true, lo: 0, hi: 2 });
+    expect(result.speedCaps).toEqual([2, 2]);
+    const initial = infer(space, [])!;
+    expect(initial.stats.spe).toMatchObject({ observed: false, lo: 0, hi: 32 });
+    expect(initial.speedCaps).toEqual([32, 32]);
     const nearest = nearestSurviving(space, result, { nature: "Jolly", item: "plain", ability: "Rough Skin",
       sps: { hp: 2, atk: 32, spe: 32 } })!;
     expect(Object.values(nearest.sps).reduce((a, b) => a + b)).toBeLessThanOrEqual(66);

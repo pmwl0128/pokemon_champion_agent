@@ -1,10 +1,7 @@
 /** Set inference (配置反推): read the opponent's build back from damage actually seen in a battle.
  *
- * Top to bottom: both rosters with the full battle frame (a real hit happened under real
- * conditions, so every condition the calculator carries is offered); the pairing on screen in both
- * directions — our selected Pokémon's moves into their selected one, and theirs into ours — each move
- * reading the damage predicted over what is inferred so far, with a form to record a real hit; and
- * the inference for their selected Pokémon, drawn and matched against the real builds.
+ * The shared roster and battle frame stay above the tools. The result and observation inputs sit
+ * together; environment references and writes back to the shared calculator sit below them.
  *
  * Their builds are the unknown, ours are known: every recorded hit belongs to the opponent it was
  * dealt to or by, keyed on its uid, so switching our Pokémon keeps everything learned about theirs.
@@ -23,7 +20,7 @@ import { monsFromPaste } from "./duel/paste.ts";
 import { MonEditor } from "./duel/MonEditor.tsx";
 import { DuelBar, TeamBar, TEAM_MAX, type ImportOutcome } from "./duel/TeamBar.tsx";
 import {
-  MOVE_SLOTS, applyBuildOption, effectiveEntry, makeMon, maxHPOf, natureMult, withoutMember, type MonState,
+  MOVE_SLOTS, applyBuildOption, effectiveEntry, makeMon, maxHPOf, natureMult, updateRosterMon, withoutMember, type MonState,
   type SideId,
   type SharedFlagKey,
 } from "./duel/state.ts";
@@ -32,9 +29,12 @@ import { fixedItem, isPowerItem, type KnownFacts, type Observation } from "./inf
 import { FoeCard } from "./infer/FoeCard.tsx";
 import { ObservationLog } from "./infer/ObservationLog.tsx";
 import { InferPanel, type Labels } from "./infer/InferPanel.tsx";
+import { ReferencePanel } from "./infer/ReferencePanel.tsx";
+import { useInferT } from "./infer/messages.ts";
 import { MoveSection, useFrameText } from "./infer/MoveSection.tsx";
 import { loadInferRecords, saveInferRecords, type InferRecords } from "./infer/persist.ts";
 import { useInference } from "./infer/useInference.ts";
+import { readSpeedProjection, speedPlan } from "./infer/speed.ts";
 import "../../styles.infer.css";
 
 /** The inference forces switch-in drops off (a recorded hit states its own stages), so the console
@@ -56,6 +56,7 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
 }) {
   const { adapter } = useRuntime();
   const t = useT();
+  const ti = useInferT();
   const { lang } = useLang();
   const moveVocab = useMovesByName();
   const abilityVocab = useAbilitiesByName();
@@ -100,16 +101,7 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
 
   // -- roster edits --------------------------------------------------------------------------
   const updateMon = useCallback((uid: string, update: (mon: MonState) => MonState) => {
-    setTeams((previous) => {
-      for (const side of ["a", "b"] as const) {
-        const at = previous[side].findIndex((candidate) => candidate.uid === uid);
-        if (at < 0) continue;
-        const next = [...previous[side]];
-        next[at] = update(previous[side][at]!);
-        return { ...previous, [side]: next };
-      }
-      return previous;
-    });
+    setTeams((previous) => updateRosterMon(previous, uid, update));
   }, [setTeams]);
   /** A stable setter per roster uid, for the card editors (their reconciliation effects depend on
    * it); a proven no-op keeps the roster's identity. */
@@ -118,19 +110,7 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
     return (uid: string) => {
       let setter = cache.get(uid);
       if (!setter) {
-        setter = (update) => setTeams((previous) => {
-          for (const side of ["a", "b"] as const) {
-            const at = previous[side].findIndex((candidate) => candidate.uid === uid);
-            const current = previous[side][at];
-            if (!current) continue;
-            const next = typeof update === "function" ? update(current) : update;
-            if (next === current) return previous;
-            const team = [...previous[side]];
-            team[at] = next;
-            return { ...previous, [side]: team };
-          }
-          return previous;
-        });
+        setter = (update) => setTeams((previous) => updateRosterMon(previous, uid, update));
         cache.set(uid, setter);
       }
       return setter;
@@ -224,6 +204,13 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
     active: visible, adapter, kit, moves: moveVocab, foe, mine, mineTeam: teams.a, observations,
     known: record?.known, field,
   });
+  const speedInference = view.inference ?? view.prior;
+  const speedRequests = useMemo(() => visible && !view.loading && !view.error && view.info && speedInference
+    ? speedPlan(view.info.space, speedInference, mine, foe, field, dex, items, natures) : null,
+  [visible, view.loading, view.error, view.info, speedInference, mine, foe, field, dex, items, natures]);
+  const speedSignature = JSON.stringify(speedRequests);
+  const speedView = useAsync(() => speedRequests ? readSpeedProjection(adapter, speedRequests) : Promise.resolve(null),
+    [adapter, speedSignature]);
 
   const learnsetMine = useAsync<LearnsetDto | null>(
     () => (mine.slug ? loadLearnset(mine.slug) : Promise.resolve(null)), [mine.slug]);
@@ -257,10 +244,9 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
     powerItem: (name) => isPowerItem(name, kit),
   }), [nameOfUid, moveVocab, items, abilityVocab, natures, lang, kit]);
 
-  const offers = useFieldOffers([mine, foe], field);
+  const offers = useFieldOffers();
   const ready = !!mineEntry && !!foeEntry;
   const frameOf = useFrameText(labels.stat);
-  const observed = observations.some((observation) => observation.enabled && !view.skipped.has(observation.id));
   // The environment card their build still is exactly, if any (an edit since makes it custom).
   const adoptedKey = foe.buildRef && foe.buildRef.signature === buildConfigSig(foe) ? foe.buildRef.key : null;
 
@@ -282,38 +268,55 @@ export function InferTab({ dex, natures, items, onRailApi, visible }: {
           dex={dex} items={items} onImport={(text) => importPaste("b", text)} mirrored />
       </DuelBar>
 
-      <ObservationLog foeName={foeEntry ? displayName(foeEntry, lang) : "—"} observations={observations}
-        view={view} monName={labels.mon} moveName={labels.move} frameOf={frameOf}
-        onToggle={toggleObservation} onRemove={removeObservation} />
-
-      <div className="inf-stage">
-        <section className="panel inf-side mine" aria-label={t("speed.ours")}>
-          <MoveSection kind="bulk" attacker={mine}
-            entries={{ attacker: mineEntry, defender: foeEntry }} readings={view.into}
-            learnset={learnsetMine.status === "ready" ? learnsetMine.data : null}
-            selected={intoSlot} onSelect={(slot) => setPick((previous) => ({ ...previous, into: slot }))}
-            onMove={setMoveOf(mine.uid)} mine={mine} foe={foe} field={field} ourMax={ourMax}
-            onAdd={addObservation} />
-          <MonEditor label="infer-mine" mon={mine} setMon={setMonOf(mine.uid)} dex={dex} natures={natures}
-            items={items} format={field.format} keep={false}
-            onSetPick={(option, index) => setMonOf(mine.uid)((current) => applyBuildOption(current, option, index))} />
-        </section>
-        <section className="panel inf-side foe" aria-label={t("speed.theirs")}>
-          <MoveSection kind="offense" attacker={foe}
-            entries={{ attacker: foeEntry, defender: mineEntry }} readings={view.from}
-            learnset={learnsetFoe.status === "ready" ? learnsetFoe.data : null}
-            selected={fromSlot} onSelect={(slot) => setPick((previous) => ({ ...previous, from: slot }))}
-            onMove={setMoveOf(foe.uid)} mine={mine} foe={foe} field={field} ourMax={ourMax}
-            onAdd={addObservation} />
-          <FoeCard foe={foe} setFoe={setMonOf(foe.uid)} dex={dex} natures={natures} items={items}
-            format={field.format} adoptedKey={adoptedKey} onAdopt={(option) => applySet(option)}
-            info={view.info} known={record?.known ?? {}} onKnown={setKnown}
-            stats={(view.inference ?? view.prior)?.stats ?? null} fit={view.currentFits} />
-        </section>
+      <div className="inf-workspace">
+        {ready ? <InferPanel foeName={displayName(foeEntry!, lang)} view={view} speedView={speedView}
+          observations={observations} labels={labels} /> : (
+          <section className="panel inf-panel" aria-label={ti("infer.result.title")}>
+            <header className="inf-panel-head"><h2>{ti("infer.result.title")}</h2></header>
+            <p className="inf-empty muted">{ti("infer.result.choose")}</p>
+          </section>
+        )}
+        <div className="inf-inputs">
+          <FoeCard foe={foe} setFoe={setMonOf(foe.uid)} dex={dex} items={items}
+            info={view.info} known={record?.known ?? {}} onKnown={setKnown} />
+          <details className="panel inf-mine-config">
+            <summary>{ti("infer.mine.config")}
+              <span className="muted">{mineEntry ? displayName(mineEntry, lang) : "—"}
+                {mine.ability ? ` · ${labels.ability(mine.ability)}` : ""}
+                {mine.nature ? ` · ${labels.nature(mine.nature)}` : ""}
+                {mine.item ? ` · ${labels.item(mine.item)}` : ""}</span>
+            </summary>
+            <MonEditor label="infer-mine" mon={mine} setMon={setMonOf(mine.uid)} dex={dex} natures={natures}
+              items={items} format={field.format} keep={false}
+              onSetPick={(option, index) => setMonOf(mine.uid)((current) => applyBuildOption(current, option, index))} />
+          </details>
+          <ObservationLog foeName={foeEntry ? displayName(foeEntry, lang) : "—"} observations={observations}
+            view={view} monName={labels.mon} moveName={labels.move} frameOf={frameOf}
+            onToggle={toggleObservation} onRemove={removeObservation} />
+          <section className="panel inf-direction mine" aria-label={t("speed.ours")}>
+            <MoveSection kind="bulk" attacker={mine}
+              entries={{ attacker: mineEntry, defender: foeEntry }} readings={view.into}
+              learnset={learnsetMine.status === "ready" ? learnsetMine.data : null}
+              selected={intoSlot} onSelect={(slot) => setPick((previous) =>
+                previous.into === slot ? previous : { ...previous, into: slot })}
+              onMove={setMoveOf(mine.uid)} mine={mine} foe={foe} field={field} ourMax={ourMax}
+              onAdd={addObservation} />
+          </section>
+          <section className="panel inf-direction foe" aria-label={t("speed.theirs")}>
+            <MoveSection kind="offense" attacker={foe}
+              entries={{ attacker: foeEntry, defender: mineEntry }} readings={view.from}
+              learnset={learnsetFoe.status === "ready" ? learnsetFoe.data : null}
+              selected={fromSlot} onSelect={(slot) => setPick((previous) =>
+                previous.from === slot ? previous : { ...previous, from: slot })}
+              onMove={setMoveOf(foe.uid)} mine={mine} foe={foe} field={field} ourMax={ourMax}
+              onAdd={addObservation} />
+          </section>
+        </div>
       </div>
 
       {ready && (
-        <InferPanel foeName={displayName(foeEntry!, lang)} view={view} observed={observed}
+        <ReferencePanel foe={foe} dex={dex} items={items} natures={natures} format={field.format}
+          view={view} observations={observations}
           adoptedKey={adoptedKey} onApply={applySet} onUnadopt={unadopt} labels={labels} />
       )}
     </div>

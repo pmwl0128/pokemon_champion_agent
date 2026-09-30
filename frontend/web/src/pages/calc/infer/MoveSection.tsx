@@ -148,15 +148,17 @@ function RecordForm({ kind, reading, mine, foe, field, ourMax, onAdd }: {
         <label className="inf-hp-field"><span>{t("infer.form.after")}</span>
           <input className="num" inputMode="numeric" value={after} onChange={(e) => setAfter(e.target.value)} />
           <em>{kind === "offense" ? `${unit} / ${ourMax}` : unit}</em></label>
-        <label className="inf-check"><input type="checkbox" checked={crit} onChange={(e) => setCrit(e.target.checked)} />
-          {t("infer.form.crit")}</label>
-        {spreadOption && (
-          <label className="inf-check" title={t("infer.form.singleHint")}>
-            <input type="checkbox" checked={single} onChange={(e) => setSingle(e.target.checked)} />
-            {t("infer.form.single")}</label>
-        )}
-        <button type="submit" className="tw-action inf-add" disabled={!valid}
-          title={t("infer.form.addHint")}>{t("infer.form.add")}</button>
+        <div className="inf-form-actions">
+          <label className="inf-check"><input type="checkbox" checked={crit} onChange={(e) => setCrit(e.target.checked)} />
+            {t("infer.form.crit")}</label>
+          {spreadOption && (
+            <label className="inf-check" title={t("infer.form.singleHint")}>
+              <input type="checkbox" checked={single} onChange={(e) => setSingle(e.target.checked)} />
+              {t("infer.form.single")}</label>
+          )}
+          <button type="submit" className="tw-action inf-add" disabled={!valid}
+            title={t("infer.form.addHint")}>{t("infer.form.add")}</button>
+        </div>
       </div>
       {(after.trim() !== "" && !valid) && (
         <p className="inf-form-note bad">{t(kind === "bulk" ? "infer.form.badFoe" : "infer.form.badMine")}</p>

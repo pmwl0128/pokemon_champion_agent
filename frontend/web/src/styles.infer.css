@@ -4,9 +4,13 @@
 :root[data-theme="dark"] .inf { --inf-up: #f08a74; --inf-down: #86a8ee; }
 .inf-lead { margin: 0; font-size: 12.5px; line-height: 1.6; }
 
-/* Two cards, one per side: the moves into the other side on top, the build underneath. */
-.inf-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; min-width: 0; }
-.inf-side { display: grid; grid-template-rows: auto 1fr; align-content: start; min-width: 0; }
+/* Only the presentation changes: the shared roster remains above both columns. Results come first
+   in the DOM so narrow screens see them before the full input editors. */
+.inf-workspace { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px; align-items: start; min-width: 0; }
+.inf-workspace > .inf-panel { grid-column: 2; grid-row: 1; position: sticky; top: 80px; }
+.inf-inputs { grid-column: 1; grid-row: 1; display: grid; gap: 12px; min-width: 0; }
+.inf-direction { min-width: 0; }
 .inf-moves { display: grid; gap: 9px; align-content: start; min-width: 0; padding: 14px 16px 12px;
   border-bottom: 1px solid var(--line); }
 .inf-pair-head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14.5px; }
@@ -24,7 +28,7 @@
 .inf-predict-text { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
 
 .inf-form { display: grid; gap: 6px; padding-top: 9px; border-top: 1px dashed var(--line); }
-.inf-form-hp { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; min-height: 34px; }
+.inf-form-hp { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; min-height: 34px; }
 .inf-form-cap { margin-right: 2px; font-size: 13px; font-weight: 750; white-space: nowrap; }
 .inf-hp-field { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .inf-hp-field span { font-size: 12px; color: var(--sub); }
@@ -37,55 +41,90 @@
 .inf-check { display: inline-flex; align-items: center; gap: 5px; margin: 0; font-size: 12.5px; line-height: 1;
   cursor: pointer; white-space: nowrap; }
 .inf-check input { width: 15px; height: 15px; margin: 0; }
-.inf-add { margin-left: auto; width: auto; min-width: 104px; height: 34px; }
+.inf-form-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.inf-add { width: auto; min-width: 84px; height: 34px; }
 .inf-add:disabled { opacity: .5; cursor: default; box-shadow: none; }
 .inf-form-note { margin: 0; font-size: 11.5px; line-height: 1.5; }
 .inf-form-note.bad { color: var(--danger); }
 .inf-form-idle { padding-top: 9px; border-top: 1px dashed var(--line); }
 
-/* Their card: observable fields are the calculator's controls; the adopted build reads as fixed. */
-.inf-cap { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.inf-cap em { overflow: hidden; font-style: normal; font-size: 11px; color: var(--sub); white-space: nowrap;
-  text-overflow: ellipsis; opacity: .85; }
-.inf-adopted { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 2px 6px;
-  min-width: 0; font-size: 11.5px; white-space: nowrap; }
-.inf-adopt-btn.on { color: var(--brand-strong); border-style: solid; border-color: color-mix(in srgb, var(--brand) 45%, var(--line));
-  background: var(--brand-soft); font-weight: 700; }
-.inf-fit { padding: 1px 8px; font-size: 11px; }
+/* Inputs contain observable facts; reference values only appear in the footer. */
+.inf-cap { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; min-width: 0; }
+.inf-cap em { font-style: normal; font-size: 10.5px; color: var(--sub); }
 .inf-tip { cursor: help; text-decoration: underline dotted color-mix(in srgb, var(--sub) 60%, transparent);
   text-underline-offset: 3px; }
-.inf-unadopt .hover { display: none; }
-.inf-unadopt:hover .rest, .inf-unadopt:focus-visible .rest { display: none; }
-.inf-unadopt:hover .hover, .inf-unadopt:focus-visible .hover { display: inline; color: var(--danger); }
-.inf-unadopt .rest::after { content: " ✕"; opacity: .6; }
-.inf-foe-editor .mon-editor-actions { min-width: 0; }
-.inf-fit, .inf-adopt-btn { line-height: 1.3; }
-/* The two cards read row by row across the page: the same caption, table head and row heights. */
-.inf-cap { height: 19px; align-items: center; }
-.inf-side .mon-editor-label-line { height: 22px; }
-.inf-side .mon-editor-form-heading { height: 26px; }
-.inf-side .mon-build-row > label { grid-template-rows: 19px 38px; }
-.inf-side .stat-table-head { height: 16px; }
-.inf-side .stat-table-row { height: 33px; }
-.inf-adopted .tw-state { padding: 1px 8px; font-size: 11px; }
-.inf-fixed {
-  display: flex; align-items: center; height: 38px; padding: 0 10px; min-width: 0; overflow: hidden;
-  border: 1px dashed var(--line); border-radius: var(--radius-sm);
-  font-size: 13px; color: var(--ink); white-space: nowrap; text-overflow: ellipsis;
+.inf-fixed { display: flex; align-items: center; min-height: 38px; padding: 0 10px; min-width: 0;
+  border: 1px dashed var(--line); border-radius: var(--radius-sm); font-size: 13px;
+  color: var(--ink); overflow-wrap: anywhere; }
+.inf-conditions { min-width: 0; }
+.inf-input-head { padding: 14px 16px 0; }
+.inf-input-head h3 { margin: 0; font-size: 14.5px; }
+.inf-input-note { margin: 6px 16px 0; font-size: 12px; line-height: 1.55; }
+.inf-foe-editor .mon-build-row.inf-known-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.inf-boost-grid { display: grid; gap: 8px; margin-top: 10px; }
+.inf-boost-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center;
+  gap: 12px; font-size: 12px; }
+.inf-boost-row .boost-slider { width: 100%; }
+.inf-mine-config > summary, .inf-reference-panel > summary { padding: 14px 16px; }
+.inf-mine-config > summary span, .inf-reference-panel > summary span { font-size: 12px; font-weight: 400; }
+.inf-mine-config[open] > summary { border-bottom: 1px solid var(--line); }
+.inf-analysis > summary, .inf-boosts > summary, .inf-possible > summary {
+  min-height: 36px; font-size: 13px;
 }
-.inf-foe-table .stat-table-head, .inf-foe-table .stat-table-row {
-  grid-template-columns: 34px 36px minmax(116px, 2fr) 34px minmax(84px, 1.2fr) 46px;
+.inf :is(.inf-mine-config, .inf-reference-panel, .inf-analysis, .inf-boosts, .inf-possible) > summary {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; cursor: pointer; font-weight: 650;
 }
-.inf-foe-inferred { display: grid; grid-template-columns: minmax(0, 1fr) 40px; align-items: center; gap: 6px; min-width: 0; }
-.inf-foe-range { font-size: 11px; font-weight: 700; text-align: right; white-space: nowrap; }
-.inf-foe-adopted { font-weight: 700; color: var(--sub); }
-.inf-foe-table .stat-table-row { min-height: 30px; }
+.inf :is(.inf-mine-config, .inf-reference-panel, .inf-analysis, .inf-boosts, .inf-possible) > summary::before {
+  content: "›"; font-size: 18px; line-height: 1; color: var(--sub);
+}
+.inf :is(.inf-mine-config, .inf-reference-panel, .inf-analysis, .inf-boosts, .inf-possible)[open] > summary::before {
+  transform: rotate(90deg);
+}
+.inf-boosts > summary span { font-size: 11.5px; font-weight: 400; overflow-wrap: anywhere; }
+.inf-panel { display: grid; gap: 16px; min-width: 0; padding: 20px;
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--line)); border-top: 3px solid var(--brand); }
+.inf-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.inf-panel .inf-panel-head h2 { margin: 2px 0 0; padding: 0; border: 0;
+  color: var(--ink); font-size: 22px; line-height: 1.3; }
+.inf-panel-head h3 { margin: 0; font-size: 15px; }
+.inf-result-head.inf-panel-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  align-items: center; position: relative; }
+.inf-result-status { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; min-width: 0; }
+.inf-result-status .tw-state { white-space: normal; text-align: right; }
+.inf-eyebrow { color: var(--sub); font-size: 12px; }
+.inf-evidence-counts { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 3px 10px;
+  font-size: 11.5px; line-height: 1.4; text-align: right; }
+.inf-evidence-counts .bad { color: var(--danger); }
+.inf-nature-result, .inf-sp-result { display: grid; gap: 9px; }
+.inf-nature-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.inf-nature-head h3 { flex: none; }
+.inf-nature-note { font-size: 11px; line-height: 1.5; font-weight: 400; }
+.inf-nature-result > .inf-chips { align-items: center; gap: 5px; }
+.inf-nature-result > .inf-chips > .inf-chip { padding-inline: 7px; }
+.inf-nature-result h3, .inf-sp-result h3 { margin: 0; font-size: 14px; }
+.inf-possible { margin-top: 2px; border-top: 1px dashed var(--line); padding-top: 4px; }
+.inf-possible > summary, .inf-speed-ruler .inf-vis-head { position: relative; }
+.inf-possible-hint.hint-tip, .inf-speed-hint.hint-tip, .inf-result-hint.hint-tip { position: static; }
+.inf-possible-hint.hint-tip::after, .inf-speed-hint.hint-tip::after, .inf-result-hint.hint-tip::after { max-width: min(360px, 100%); }
+.inf-possible-hint.hint-tip:focus::after, .inf-speed-hint.hint-tip:focus::after, .inf-result-hint.hint-tip:focus::after {
+  opacity: 1; visibility: visible; transform: none; }
+.inf-possible-hint:focus-visible, .inf-speed-hint:focus-visible, .inf-result-hint:focus-visible {
+  outline: 2px solid var(--focus); outline-offset: 3px; }
+.inf-possible > summary .tw-state { font-size: 10.5px; font-weight: 500; }
+.inf-possible-body { display: grid; gap: 10px; padding-top: 8px; min-width: 0; }
+.inf-possible-build { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.inf-possible-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.inf-possible-stats > div { display: grid; gap: 3px; font-size: 11.5px; padding: 6px;
+  border-radius: var(--radius-sm); background: var(--panel-2); }
+.inf-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.inf-stat-result { display: grid; gap: 8px; min-width: 0; padding: 10px;
+  background: var(--panel-2); border-radius: var(--radius-sm); font-size: 12px; font-weight: 650; }
+.inf-foe-inferred { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-width: 0; }
+.inf-foe-range { font-size: 11px; font-weight: 650; text-align: right; white-space: nowrap; }
+.inf-legend, .inf-result-note { margin: 0; font-size: 12px; line-height: 1.65; }
+.inf-analysis { padding-top: 6px; border-top: 1px solid var(--line); }
+.inf-analysis .inf-vis-col { margin-top: 14px; }
 
-.inf-panel { display: grid; gap: 12px; min-width: 0; padding: 16px 18px; }
-.inf-panel-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
-.inf-panel-head h3 { margin: 0; font-size: 16px; }
-.inf-natures { margin-left: auto; }
-.inf-space-note { margin: -4px 0 0; font-size: 12px; }
 .inf-chips { display: inline-flex; flex-wrap: wrap; gap: 5px; }
 .inf-chip {
   display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 9px; border-radius: 999px;
@@ -104,8 +143,21 @@
 }
 .inf-empty { margin: 0; font-size: 12.5px; }
 
-.inf-panel-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px 26px;
-  align-items: start; min-width: 0; }
+.inf-reference-content { display: grid; gap: 20px; padding: 0 18px 18px; min-width: 0; }
+.inf-reference-left { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.inf-current-reference { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--panel-2); min-width: 0; }
+.inf-current-reference .inf-panel-head h3 { font-size: 13.5px; }
+.inf-current-title { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-width: 0; }
+.inf-current-title .tw-state { font-size: 10.5px; }
+.inf-current-reference .inf-result-note { font-size: 11.5px; line-height: 1.55; }
+.inf-reference-build { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.inf-reference-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.inf-reference-stats > div { display: grid; gap: 2px; font-size: 11.5px; }
+.inf-reference-stats > div > span:first-child { font-weight: 650; }
+.inf-reference-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.inf-reference-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 26px; min-width: 0; }
+.inf-reference-panel[open] > summary { margin-bottom: 12px; border-bottom: 1px solid var(--line); }
 .inf-vis-col { display: grid; gap: 16px; align-content: start; min-width: 0; }
 .inf-vis-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .inf-vis-head b { font-size: 13px; }
@@ -156,9 +208,22 @@
   background: repeating-linear-gradient(135deg, var(--line) 0 2px, transparent 2px 6px); }
 .inf-cells.hatched i { background: transparent; box-shadow: none; }
 .inf-lane-span { text-align: right; font-size: 11.5px; font-weight: 650; color: var(--sub); white-space: nowrap; }
+.inf-speed-ruler { display: grid; gap: 8px; min-width: 0; padding: 12px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.inf-speed-row { display: grid; grid-template-columns: 68px minmax(0, 1fr) 68px; gap: 8px; align-items: center; }
+.inf-speed-name { display: grid; gap: 2px; font-size: 12px; }
+.inf-speed-name small { font-size: 10px; }
+.inf-speed-track { position: relative; height: 16px; border: 1px solid var(--line);
+  border-radius: 4px; background: var(--panel-2); }
+.inf-speed-band { position: absolute; top: 3px; bottom: 3px; background: var(--brand); opacity: .42; border-radius: 2px; }
+.inf-speed-dot { position: absolute; top: 2px; width: 10px; height: 10px; margin-left: -5px;
+  border-radius: 50%; background: var(--inf-up); border: 1px solid var(--panel); }
+.inf-speed-legend { display: inline-block; width: 9px; height: 9px; margin-right: 5px;
+  border-radius: 50%; background: var(--inf-up); }
+.inf-speed-axis { display: flex; justify-content: space-between; margin: 0 76px; font-size: 10px; }
 
 .inf-block { display: grid; gap: 6px; align-content: start; min-width: 0; }
-.inf-block h4 { margin: 0 0 2px; font-size: 13.5px; }
+.inf-block h3 { margin: 0 0 2px; font-size: 13.5px; }
 .inf-h-note { margin-left: 6px; font-size: 11.5px; font-weight: 400; }
 .inf-set {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main side" "sp side";
@@ -175,46 +240,48 @@
 .inf-share { font-size: 11.5px; font-weight: 700; color: var(--success); }
 .inf-share.zero { color: var(--danger); }
 .inf-spread {
-  display: grid; grid-template-columns: minmax(170px, 260px) 52px minmax(0, 1fr); align-items: center; gap: 10px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: 4px 0; border-top: 1px dashed var(--line); font-size: 12.5px;
 }
+.inf-spread .inf-chips { grid-column: 1 / -1; }
+.inf-spread.out { opacity: .6; color: var(--sub); }
 .inf-log-panel { display: grid; gap: 8px; min-width: 0; padding: 12px 16px; }
 .inf-log-head { display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; }
 .inf-log-head h3 { margin: 0; font-size: 14.5px; }
 .inf-log { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .inf-log-row {
-  display: grid; grid-template-columns: 22px minmax(0, 1.2fr) auto minmax(0, 1fr) 84px auto; align-items: center;
-  gap: 10px; padding: 5px 8px; border-radius: 8px; background: var(--panel-2); font-size: 12.5px;
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center;
+  gap: 4px 8px; padding: 5px 8px; border-radius: 8px; background: var(--panel-2); font-size: 12.5px;
 }
 .inf-log-row.off { opacity: .5; }
 .inf-log-mark { font-weight: 700; color: var(--sub); }
-.inf-log-who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inf-log-num { font-weight: 700; }
-.inf-log-flags { overflow: hidden; font-size: 11.5px; white-space: nowrap; text-overflow: ellipsis; }
-.inf-log-left { text-align: right; font-weight: 700; color: var(--brand); }
-.inf-log-actions { display: flex; gap: 4px; }
-.inf-log-bad { grid-column: 2 / -1; margin: 0; font-size: 12px; color: var(--danger); cursor: help; }
-.inf-log-bad { grid-column: 2 / -1; margin: 0; font-size: 12px; color: var(--danger); cursor: help; }
+.inf-log-main { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.inf-log-who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inf-log-num { flex: none; font-weight: 700; font-size: 12px; white-space: nowrap; }
+.inf-log-detail { grid-column: 2; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.inf-log-flags { flex: 1; min-width: 0; overflow: hidden; font-size: 11.5px; white-space: nowrap; text-overflow: ellipsis; }
+.inf-log-left { flex: none; font-size: 11.5px; font-weight: 700; color: var(--brand); white-space: nowrap; }
+.inf-log-actions { display: flex; flex: none; gap: 4px; margin-left: auto; }
+.inf-log-actions button { min-width: 42px; min-height: 32px; padding: 3px 8px; font-size: 11.5px; white-space: nowrap; }
+.inf-log-bad { color: var(--danger); cursor: help; }
 
+@media (max-width: 960px) {
+  .inf-workspace { grid-template-columns: minmax(0, 1fr); }
+  .inf-workspace > .inf-panel, .inf-inputs { grid-column: 1; grid-row: auto; position: static; }
+  .inf-reference-grid { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 560px) {
-  /* The adopted badge rides on the name row's label line; on a narrow card it wraps instead of
-     pushing the row past the card. */
-  .inf-foe-editor .mon-editor-label-line, .inf-foe-editor .mon-editor-form-heading { flex-wrap: wrap; row-gap: 2px; min-width: 0; }
-  .inf-side .mon-editor-label-line, .inf-side .mon-editor-form-heading { height: auto; }
-  .inf-foe-table .stat-table-head, .inf-foe-table .stat-table-row {
-    grid-template-columns: 28px 28px minmax(92px, 2fr) 22px minmax(58px, 1fr) 34px; gap: 4px;
-  }
-  .inf-foe-inferred { grid-template-columns: minmax(0, 1fr) 34px; gap: 3px; }
-  .inf-foe-range { font-size: 10px; }
-}
-@media (max-width: 1100px) {
-  .inf-panel-grid { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 900px) {
-  .inf-stage { grid-template-columns: minmax(0, 1fr); }
-  .inf-natures { margin-left: 0; }
-  .inf-log-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
-  .inf-log-flags, .inf-log-left { grid-column: 2 / -1; text-align: left; }
-  .inf-spread { grid-template-columns: minmax(0, 1fr) auto; }
-  .inf-spread .inf-chips { grid-column: 1 / -1; }
+  .inf-panel { padding: 16px; gap: 14px; }
+  .inf-panel .inf-panel-head h2 { font-size: 20px; }
+  .inf-foe-editor .mon-editor-label-line, .inf-foe-editor .mon-editor-form-heading { flex-wrap: wrap; gap: 4px; }
+  .inf-known-fields label { font-size: 12px; }
+  .inf-stat-result { padding: 8px; }
+  .inf-foe-inferred { gap: 5px; }
+  .inf-reference-content { padding: 0 12px 12px; }
+  .inf-reference-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inf-possible-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inf-set { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "sp" "side"; gap: 6px; }
+  .inf-set-side { justify-content: flex-start; }
+  .inf-predict { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .inf-predict-text { white-space: normal; }
 }

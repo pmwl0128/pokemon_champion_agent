@@ -7,7 +7,7 @@ import type { BuildOption } from "../../../components/build/inputs.tsx";
 import { pressedStat, requestKey, type Rolls } from "../tune/model.ts";
 import { bulkRequest, offenseRequest, liveFrame, survivesAtOne, type HitFrame,
   type Observation, type RequestKit, type SpaceInfo } from "./context.ts";
-import { candidateShares, infer, nearestAfters, nearestSurviving, possibleAfters,
+import { candidateShares, infer, nearestAfters, possibleAfters,
   predictIntoFoe, predictIntoMine, spreadSurvives, type BulkKey, type BulkRolls,
   type Candidate, type Evidence, type InferKey, type OffKey, type OffRolls } from "./model.ts";
 import type { InferenceView, MoveReading } from "./useInference.ts";
@@ -85,8 +85,11 @@ export function evaluateInference(job: InferenceJob): InferenceView {
       else skipped.add(o.id);
     } else { evidence.push(e); accepted.push(o.id); }
   }
-  const prior = infer(space, []);
-  const inference = pending ? null : evidence.length ? infer(space, evidence) : prior;
+  const templateIndex = realSets.reduce((best, option, index) =>
+    (option.coverage ?? 0) > (realSets[best]?.coverage ?? -1) ? index : best, -1);
+  const template = candidates[templateIndex];
+  const prior = infer(space, [], false, template);
+  const inference = pending ? null : evidence.length ? infer(space, evidence, false, template) : prior;
   const remaining = new Map<string, number | null>();
   if (prior?.count && inference) accepted.forEach((id, index) => {
     const count = index === accepted.length - 1 ? inference.count : infer(space, evidence.slice(0, index + 1), true)?.count;
@@ -121,8 +124,7 @@ export function evaluateInference(job: InferenceJob): InferenceView {
     const candidate = candidates[index]!;
     const shares = pending ? null : candidateShares(space, evidence, candidate, multOf);
     const fits = !!shares && shares.every((value) => value > 0);
-    return { option, candidate, shares, fits,
-      nearest: shares && !fits && inference?.count ? nearestSurviving(space, inference, candidate) : null };
+    return { option, candidate, shares, fits };
   });
   const spreads = inference && detail ? detail.panels.spreads.map((row) => ({
     spread: { ...row.spread }, percentage: row.percentage,

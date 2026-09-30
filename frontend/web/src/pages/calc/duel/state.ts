@@ -119,6 +119,23 @@ export const ABILITY_NEEDS_TRIGGER = new Set([
 export type SideId = "a" | "b";
 export const otherSide = (side: SideId): SideId => (side === "a" ? "b" : "a");
 
+/** A no-op edit preserves the shared roster's identity, so focusing and committing the same input
+ * cannot invalidate inference dependencies. Only the edited side and member are replaced. */
+export function updateRosterMon(teams: Record<SideId, MonState[]>, uid: string,
+  update: MonState | ((current: MonState) => MonState)): Record<SideId, MonState[]> {
+  for (const side of ["a", "b"] as const) {
+    const at = teams[side].findIndex((candidate) => candidate.uid === uid);
+    const current = teams[side][at];
+    if (!current) continue;
+    const next = typeof update === "function" ? update(current) : update;
+    if (next === current) return teams;
+    const team = [...teams[side]];
+    team[at] = next;
+    return { ...teams, [side]: team };
+  }
+  return teams;
+}
+
 // -- stats --------------------------------------------------------------------------------
 
 export function natureMult(natures: NatureDto[], nature: string,
@@ -156,8 +173,10 @@ export function finalStat(mon: MonState, entry: DexIndexEntry | undefined, natur
 
 /** Abilities that set the field on entry. The calc models weather and terrain as FIELD input, not as
  * something an ability does on its own, so a Rillaboom with Grassy Surge computes on bare ground
- * unless the terrain is set. Rather than silently setting it — the mon may not be the one that led —
- * the page offers it as a one-click suggestion beside the picker.
+ * unless the terrain is set. The shared roster resolves these separately: one setter applies its
+ * field, two setters use the later-acting member's effect (including Tailwind, Trick Room and
+ * held-item speed modifiers), and a speed tie remains manual.
+ * The source stays visible as a clickable hint beside the picker after automatic application.
  *
  * Only the ones on the Champions roster are listed; an ability the shipped dex does not carry would
  * be an offer that can never appear. */

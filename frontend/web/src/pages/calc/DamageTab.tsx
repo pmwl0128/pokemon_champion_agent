@@ -388,7 +388,7 @@ export function DamageTab({ dex, natures, items, onRailApi }: {
   const notesFor = (side: SideId): string[] =>
     (outgoing(side)?.koCaveats ?? []).map((cv) => damageText.caveat(cv));
 
-  const offers = useFieldOffers([mon.a, mon.b], field);
+  const offers = useFieldOffers();
 
   const resetSide = (side: SideId) => {
     setTeams((prev) => ({ ...prev, [side]: [makeMon()] }));

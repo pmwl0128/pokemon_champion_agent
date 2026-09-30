@@ -7,7 +7,26 @@ import {
   withMega, type ModalSet,
 } from "../../components/build/inputs.tsx";
 import { buildCardOptionForMon } from "./duel/MonEditor.tsx";
-import { applyBuildOption, makeMon, rollModifier } from "./duel/state.ts";
+import { applyBuildOption, makeMon, rollModifier, updateRosterMon } from "./duel/state.ts";
+
+test("a no-op member commit preserves roster identity; a real edit changes only that member", () => {
+  const mine = { ...makeMon("garchomp"), moves: ["Earthquake", "", "", ""] };
+  const foe = makeMon("mimikyu");
+  const bench = makeMon("salamence");
+  const teams = { a: [mine, bench], b: [foe] };
+  expect(updateRosterMon(teams, mine.uid, (current) => current)).toBe(teams);
+  expect(updateRosterMon(teams, foe.uid, foe)).toBe(teams);
+  expect(updateRosterMon(teams, "missing", () => { throw new Error("must not update"); })).toBe(teams);
+
+  const edited = { ...mine, moves: ["Dragon Claw", "", "", ""] };
+  const next = updateRosterMon(teams, mine.uid, edited);
+  expect(next).not.toBe(teams);
+  expect(next.a).not.toBe(teams.a);
+  expect(next.a[0]).toBe(edited);
+  expect(next.a[1]).toBe(bench);
+  expect(next.b).toBe(teams.b);
+  expect(teams.a[0]).toBe(mine);
+});
 
 const stats = { hp: 1, atk: 1, def: 1, spa: 1, spd: 1, spe: 1 };
 const entry = (name: string, slug: string, ability: string,

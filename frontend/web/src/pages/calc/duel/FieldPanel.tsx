@@ -16,39 +16,44 @@ import { useRef, type Dispatch, type ReactNode, type SetStateAction } from "reac
 import { useLang, useT } from "../../../i18n.ts";
 import { localName, useNameMaps } from "../../../lib/names.ts";
 import { roveFocus, useFocusOnOpen, usePopover } from "../../../lib/popover.ts";
-import {
-  TERRAIN_ABILITIES, WEATHER_ABILITIES, type FieldState, type MonState, type SharedFlagKey,
-} from "./state.ts";
+import { useRoster } from "../roster.tsx";
+import type { FieldResolution, FieldSource } from "./entryFields.ts";
+import type { FieldState, SharedFlagKey } from "./state.ts";
 import { Caret, PlusGlyph } from "./TeamBar.tsx";
 
 export interface FieldSuggestion {
   /** English canonical of the ability that would set it — shown so the offer names its source. */
   ability: string;
   label: string;
+  effective: boolean;
+  automatic: boolean;
+  tied: boolean;
 }
 
-/** Field-setting abilities on the Pokémon currently up, offered next to the picker they would
- * fill — only while that field is still empty: an offer to set what is already set says nothing.
- * Both sides are listed: which setter actually landed is a battle fact the page cannot know. */
-export function useFieldOffers(mons: MonState[], field: FieldState): {
+/** Keep both sources visible after auto-application; the later-acting setter is the default, but the
+ * clickable hint still lets a user describe a different entry sequence or resolve a speed tie. */
+export function useFieldOffers(): {
   weather: Array<FieldSuggestion & { value: Weather }>;
   terrain: Array<FieldSuggestion & { value: Terrain }>;
 } {
   const abilityNames = useNameMaps().ability;
   const { lang } = useLang();
-  const offers = <V extends string,>(table: Record<string, V>, current: string) => {
-    if (current) return [];
+  const { field, entryFields: { plan, choices } } = useRoster();
+  const offers = <V extends string,>(sources: FieldSource<V>[], current: string,
+    resolution: FieldResolution<V> | undefined) => {
     const seen = new Set<string>();
-    return mons.flatMap((mon) => {
-      const value = mon.ability ? table[mon.ability] : undefined;
-      if (!value || seen.has(mon.ability)) return [];
-      seen.add(mon.ability);
-      return [{ ability: mon.ability, label: localName(abilityNames, mon.ability, lang), value }];
+    return sources.flatMap((source) => {
+      if (seen.has(source.ability)) return [];
+      seen.add(source.ability);
+      return [{ ability: source.ability, label: localName(abilityNames, source.ability, lang), value: source.value,
+        effective: current === source.value,
+        automatic: resolution?.source?.ability === source.ability && current === source.value,
+        tied: resolution?.reason === "tie" }];
     });
   };
   return {
-    weather: offers(WEATHER_ABILITIES, field.weather),
-    terrain: offers(TERRAIN_ABILITIES, field.terrain),
+    weather: offers(plan.weather.sources, field.weather, choices.weather),
+    terrain: offers(plan.terrain.sources, field.terrain, choices.terrain),
   };
 }
 
@@ -104,9 +109,7 @@ export function FieldPanel({
 }: {
   field: FieldState;
   setField: Dispatch<SetStateAction<FieldState>>;
-  /** On-field abilities that would set this, when it is not set already. Offered, never applied:
-   * the mon holding one may not be the one that led, and a silently changed field is a silently
-   * changed answer. BOTH sides are listed — which setter actually landed is a battle fact. */
+  /** On-field setter hints stay visible and clickable, including after automatic application. */
   weatherSuggestions: Array<FieldSuggestion & { value: Weather }>;
   terrainSuggestions: Array<FieldSuggestion & { value: Terrain }>;
   /** The field-wide switches this tool's numbers read. A switch no number reads is not shown —
@@ -119,7 +122,7 @@ export function FieldPanel({
   const sharedPop = usePopover();
   const sharedList = useRef<HTMLDivElement>(null);
   useFocusOnOpen(sharedPop.open, sharedList, ".duel-opt");
-  const setFormat = (format: FormatId) => setField((s) => ({ ...s, format }));
+  const setFormat = (format: FormatId) => setField((s) => s.format === format ? s : { ...s, format });
   const setShared = (key: SharedFlagKey, on: boolean) => setField((s) => ({ ...s, [key]: on }));
   const sharedVocab: Record<SharedFlagKey, { label: string; hint: string }> = {
     gravity: { label: t("calc.gravity"), hint: t("calc.gravityHint") },
@@ -131,9 +134,14 @@ export function FieldPanel({
   const showShared = shared.length > 0;
   const sharedTitle = t("calc.sharedConds");
   const offer = (sug: FieldSuggestion, target: string, apply: () => void) => (
-    <button key={`${sug.ability}:${target}`} type="button" className="field-offer"
-      title={t("calc.fieldSuggestHint").replace("{ability}", sug.label)} onClick={apply}>
+    <button key={`${sug.ability}:${target}`} type="button"
+      className={`field-offer ${sug.effective ? "effective" : "inactive"}`}
+      aria-label={`${sug.label} → ${target} · ${t(sug.effective ? "calc.fieldEffective" : "calc.fieldInactive")}`}
+      title={`${t(sug.effective ? "calc.fieldEffective" : "calc.fieldInactive")} · ${
+        t(sug.tied ? "calc.fieldTieHint" : sug.automatic ? "calc.fieldAutoHint" : "calc.fieldSuggestHint")
+          .replace("{ability}", sug.label)}`} onClick={apply}>
       <span>{sug.label}</span><span className="field-offer-arrow" aria-hidden>→</span><b>{target}</b>
+      {sug.tied ? <span>{t("calc.fieldTie")}</span> : null}
     </button>
   );
 
@@ -144,7 +152,7 @@ export function FieldPanel({
           options={["", ...WEATHERS]}
           label={(value) => value ? t(`weather.${value}`) : t("calc.noWeather")}
           mark={(value) => <span className="wx-swatch" data-weather={value || undefined} aria-hidden />}
-          onPick={(weather) => setField((s) => ({ ...s, weather }))} />
+          onPick={(weather) => setField((s) => s.weather === weather ? s : { ...s, weather })} />
         <div className="seg field-format" role="group" aria-label={t("a11y.format")}>
           {(["single", "double"] as const).map((format) => (
             <button key={format} type="button" className={field.format === format ? "on" : ""}
@@ -157,14 +165,14 @@ export function FieldPanel({
           options={["", ...TERRAINS]}
           label={(value) => value ? t(`terrain.${value}`) : t("calc.noTerrain")}
           mark={(value) => <span className="terrain-dot" data-terrain={value || undefined} aria-hidden />}
-          onPick={(terrain) => setField((s) => ({ ...s, terrain }))} />
+          onPick={(terrain) => setField((s) => s.terrain === terrain ? s : { ...s, terrain })} />
       </div>
 
       <div className="field-console-conds" ref={sharedPop.wrap} onBlur={sharedPop.onBlur}>
         {weatherSuggestions.map((sug) => offer(sug, t(`weather.${sug.value}`),
-          () => setField((s) => ({ ...s, weather: sug.value }))))}
+          () => setField((s) => s.weather === sug.value ? s : { ...s, weather: sug.value })))}
         {terrainSuggestions.map((sug) => offer(sug, t(`terrain.${sug.value}`),
-          () => setField((s) => ({ ...s, terrain: sug.value }))))}
+          () => setField((s) => s.terrain === sug.value ? s : { ...s, terrain: sug.value })))}
         {inlineShared && shared.map((flag) => (
           <button key={flag.key} type="button" data-cat="shared"
             className={`duel-toggle${field[flag.key] ? " on" : ""}`}

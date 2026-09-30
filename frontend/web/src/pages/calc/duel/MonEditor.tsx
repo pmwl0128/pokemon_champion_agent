@@ -154,7 +154,7 @@ export function MonEditor({
         </label>
         <label>{t("calc.item")}
           <ItemCombo idKey={label} value={mon.item} items={items} disabled={!!requiredStone} usage={usage}
-            onChange={(item) => setMon((s) => ({ ...s, item }))} />
+            onChange={(item) => setMon((s) => s.item === item ? s : { ...s, item })} />
         </label>
         <label>{t("calc.status")}
           <select value={mon.status}
@@ -191,9 +191,11 @@ export function MonEditor({
             <span className="num muted">{entry?.stats[key] ?? "—"}</span>
             <input type="number" min={0} max={32} step={1} className="num"
               value={mon.sps[key] ?? 0} aria-label={`${key} SP`}
-              onChange={(e) => setMon((s) => ({
-                ...s, sps: { ...s.sps, [key]: clampNum(e.target.value, 0, 32) },
-              }))} />
+              onChange={(e) => {
+                const value = clampNum(e.target.value, 0, 32);
+                setMon((s) => (s.sps[key] ?? 0) === value ? s
+                  : { ...s, sps: { ...s.sps, [key]: value } });
+              }} />
             {key === "hp"
               ? (() => {
                   // HP's "boost" cell holds the damage taken so far instead: current HP is a

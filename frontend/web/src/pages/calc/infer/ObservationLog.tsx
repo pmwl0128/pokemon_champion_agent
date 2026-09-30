@@ -1,13 +1,12 @@
-/** The hits recorded against the opponent on screen, right under the rosters so that dropping or
- * muting one is a click away from the cards that add them. Each row carries the frame it froze. */
-import { Fragment } from "react";
+/** The hits recorded against this opponent, beside the forms that add them. */
 import type { Observation } from "./context.ts";
 import { useInferT } from "./messages.ts";
 import type { InferenceView } from "./useInference.ts";
 
 const CIRCLED = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
 export const mark = (index: number) => CIRCLED[index] ?? `(${index + 1})`;
-export const percent = (value: number) => value >= 0.1 ? `${(value * 100).toFixed(0)}%`
+export const percent = (value: number) => value > 0 && value < 0.0001 ? "<0.01%"
+  : value >= 0.1 ? `${(value * 100).toFixed(0)}%`
   : value >= 0.001 ? `${(value * 100).toFixed(1)}%` : `${(value * 100).toFixed(2)}%`;
 
 export function ObservationLog({ foeName, observations, view, monName, moveName, frameOf, onToggle, onRemove }: {
@@ -32,6 +31,7 @@ export function ObservationLog({ foeName, observations, view, monName, moveName,
         <ol className="inf-log">
           {observations.map((observation, index) => {
             const impossible = observation.enabled ? view.impossible.get(observation.id) : undefined;
+            const skipped = observation.enabled && view.skipped.has(observation.id);
             const left = view.remaining.get(observation.id);
             const who = observation.kind === "bulk"
               ? `${monName(observation.mineId)} · ${moveName(observation.move)} → ${foeName}`
@@ -44,31 +44,32 @@ export function ObservationLog({ foeName, observations, view, monName, moveName,
               ...(observation.singleTarget ? [t("infer.log.single")] : []),
               ...frameOf(observation),
             ];
+            const conditions = flags.length ? flags.join(" · ") : t("infer.log.noFrame");
+            const issue = impossible ? t("infer.log.impossible").replace("{values}", impossible.length
+              ? impossible.map((value) => observation.kind === "bulk" ? `${value}%` : `${value} HP`).join(" / ")
+              : "—") : skipped ? t("infer.log.skipped") : null;
             return (
               <li key={observation.id} className={`inf-log-row${observation.enabled ? "" : " off"}`}>
                 <span className="inf-log-mark">{mark(index)}</span>
-                <span className="inf-log-who" title={who}>{who}</span>
-                <span className="inf-log-num num">{numbers}</span>
-                <span className="inf-log-flags muted" title={flags.join(" · ")}>
-                  {flags.length ? flags.map((flag, at) => <Fragment key={at}>{at ? " · " : ""}{flag}</Fragment>)
-                    : t("infer.log.noFrame")}
-                </span>
-                <span className="inf-log-left num" title={t("infer.log.remainingHint")}>
-                  {observation.enabled && left != null ? t("infer.log.remaining").replace("{pct}", percent(left)) : ""}
-                </span>
-                <span className="inf-log-actions">
-                  <button type="button" className="ghost-btn tiny" onClick={() => onToggle(observation.id)}>
-                    {t(observation.enabled ? "infer.log.disable" : "infer.log.enable")}</button>
-                  <button type="button" className="ghost-btn tiny" onClick={() => onRemove(observation.id)}>
-                    {t("infer.log.remove")}</button>
-                </span>
-                {impossible && (
-                  <p className="inf-log-bad" title={t("infer.log.impossibleHint")}>
-                    {t("infer.log.impossible").replace("{values}", impossible.length
-                      ? impossible.map((value) => observation.kind === "bulk" ? `${value}%` : `${value} HP`).join(" / ")
-                      : "—")}
-                  </p>
-                )}
+                <div className="inf-log-main">
+                  <span className="inf-log-who" title={who}>{who}</span>
+                  <span className="inf-log-num num">{numbers}</span>
+                </div>
+                <div className="inf-log-detail">
+                  <span className={`inf-log-flags ${issue ? "inf-log-bad" : "muted"}`}
+                    title={issue ? `${conditions}\n${issue}${impossible ? `\n${t("infer.log.impossibleHint")}` : ""}` : conditions}>
+                    {issue ?? conditions}
+                  </span>
+                  <span className="inf-log-left num" title={t("infer.log.remainingHint")}>
+                    {observation.enabled && left != null ? t("infer.log.remaining").replace("{pct}", percent(left)) : ""}
+                  </span>
+                  <span className="inf-log-actions">
+                    <button type="button" className="ghost-btn tiny" onClick={() => onToggle(observation.id)}>
+                      {t(observation.enabled ? "infer.log.disable" : "infer.log.enable")}</button>
+                    <button type="button" className="ghost-btn tiny" onClick={() => onRemove(observation.id)}>
+                      {t("infer.log.remove")}</button>
+                  </span>
+                </div>
               </li>
             );
           })}

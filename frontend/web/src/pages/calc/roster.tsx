@@ -12,7 +12,7 @@
  *
  * A future tool (the speed line) joins by reading `useRoster()` and mapping `MonState` onto its own
  * row shape; `swaps` tells any tool when the two sides changed places. */
-import { STAT_KEYS } from "@pokemon-champions/protocol";
+import { STAT_KEYS, type NatureDto } from "@pokemon-champions/protocol";
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type Dispatch, type ReactNode, type SetStateAction,
@@ -20,10 +20,13 @@ import {
 import { markTuneFillApplied, readTeamMembers, takeCalcTeams, takeTuneFill,
   type CalcMember } from "../../lib/team.ts";
 import type { DexIndexEntry } from "../../runtime/adapter.ts";
+import { useRuntime } from "../../runtime/context.tsx";
+import type { ItemRef } from "../../runtime/projection.ts";
 import { autofillSig, buildConfigSig, sideIsBare, useBuildOptions } from "../../components/build/inputs.tsx";
 import { cloneSps, type Baseline } from "./tune/model.ts";
 import { TEAM_MAX } from "./duel/TeamBar.tsx";
 import { loadRoster, saveRoster, type RosterSnapshot } from "./duel/persist.ts";
+import { applyEntryFields, entryFieldPlan, resolveEntryFields, type EntryFieldPlan, type EntryFields } from "./duel/entryFields.ts";
 import {
   EMPTY_FIELD, applyBuildOption, makeMon, newMonUid, withMoves, type FieldState, type MonState,
   type SideId,
@@ -40,6 +43,8 @@ export interface RosterApi {
   /** Each side's selected move slot (the move that side's result reads). */
   slot: PerSide<number>;
   field: FieldState;
+  /** Sources on the two active members, and the independently resolved weather/terrain result. */
+  entryFields: { plan: EntryFieldPlan; choices: Partial<EntryFields> };
   /** Increments on every `swapSides()`; tools reset side-bound view state when it changes. */
   swaps: number;
   setTeams: Dispatch<SetStateAction<PerSide<MonState[]>>>;
@@ -116,7 +121,10 @@ function initialRoster(dex: DexIndexEntry[]): RosterSnapshot & { demo?: boolean 
   return base;
 }
 
-export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; children: ReactNode }) {
+export function RosterProvider({ dex, items, natures, children }: {
+  dex: DexIndexEntry[]; items: ItemRef[]; natures: NatureDto[]; children: ReactNode;
+}) {
+  const { adapter } = useRuntime();
   const [initial] = useState(() => initialRoster(dex));
   const [teams, setTeams] = useState(initial.teams);
   const [active, setActive] = useState(initial.active);
@@ -124,6 +132,50 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   const [field, setField] = useState(initial.field);
   const [swaps, setSwaps] = useState(0);
   const loadBuildOptions = useBuildOptions();
+
+  // Trigger only on a changed entry source or (for a conflict) a changed speed input. Manual field
+  // picks and tab navigation are not new switch-ins and must not immediately reapply the default.
+  const neutral = natures.find((nature) => nature.upStat === nature.downStat)?.name ?? "Serious";
+  const entryPlan = entryFieldPlan(teams, active, field, dex, items, neutral);
+  const entryKey = JSON.stringify([entryPlan.weather.key, entryPlan.terrain.key]);
+  const appliedEntries = useRef({ weather: "", terrain: "" });
+  const [resolvedEntries, setResolvedEntries] = useState<{
+    weather?: { key: string; choice: EntryFields["weather"] };
+    terrain?: { key: string; choice: EntryFields["terrain"] };
+  }>({});
+  useEffect(() => {
+    const weatherChanged = appliedEntries.current.weather !== entryPlan.weather.key;
+    const terrainChanged = appliedEntries.current.terrain !== entryPlan.terrain.key;
+    if (!weatherChanged && !terrainChanged) return;
+    let live = true;
+    void resolveEntryFields(adapter, entryPlan).then((choices) => {
+      if (!live) return;
+      const updates: Partial<EntryFields> = {};
+      if (weatherChanged) {
+        appliedEntries.current.weather = entryPlan.weather.key;
+        updates.weather = choices.weather;
+      }
+      if (terrainChanged) {
+        appliedEntries.current.terrain = entryPlan.terrain.key;
+        updates.terrain = choices.terrain;
+      }
+      setResolvedEntries((previous) => ({ ...previous,
+        ...(weatherChanged ? { weather: { key: entryPlan.weather.key, choice: choices.weather } } : {}),
+        ...(terrainChanged ? { terrain: { key: entryPlan.terrain.key, choice: choices.terrain } } : {}),
+      }));
+      // A user may have made a manual choice while the speed worker was answering. Do not let
+      // that older automatic comparison overwrite it, and keep the other channel independent.
+      setField((previous) => applyEntryFields(previous, {
+        ...(previous.weather === field.weather ? { weather: updates.weather } : {}),
+        ...(previous.terrain === field.terrain ? { terrain: updates.terrain } : {}),
+      }));
+    });
+    return () => { live = false; };
+  }, [adapter, entryKey]);
+  const entryFields = { plan: entryPlan, choices: {
+    ...(resolvedEntries.weather?.key === entryPlan.weather.key ? { weather: resolvedEntries.weather.choice } : {}),
+    ...(resolvedEntries.terrain?.key === entryPlan.terrain.key ? { terrain: resolvedEntries.terrain.choice } : {}),
+  } };
 
   // The demo pair: Garchomp against Mimikyu, each with its first singles build (the highest-share
   // real joint configuration). The species are fixed because the pair demonstrates the tools well;
@@ -237,8 +289,8 @@ export function RosterProvider({ dex, children }: { dex: DexIndexEntry[]; childr
   }, []);
 
   const value = useMemo<RosterApi>(() => ({
-    teams, active, slot, field, swaps, setTeams, setActive, setSlot, setField, swapSides, demoMon,
+    teams, active, slot, field, entryFields, swaps, setTeams, setActive, setSlot, setField, swapSides, demoMon,
     baselineOf,
-  }), [teams, active, slot, field, swaps, swapSides, demoMon, baselineOf]);
+  }), [teams, active, slot, field, resolvedEntries, swaps, swapSides, demoMon, baselineOf]);
   return <RosterContext.Provider value={value}>{children}</RosterContext.Provider>;
 }

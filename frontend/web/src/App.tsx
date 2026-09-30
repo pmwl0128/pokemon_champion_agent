@@ -4,58 +4,14 @@ import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom"
 import { BRAND_LOGO } from "./assets/icons.ts";
 import { PageRailProvider, SearchEntry, useSiteSearch } from "./components/SideRail.tsx";
 import { LibraryDockButton } from "./components/LibraryDockButton.tsx";
+import { SiteFooter } from "./components/SiteFooter.tsx";
+import { ThemeToggle } from "./components/ThemeToggle.tsx";
+import { useThemePreference, type ThemePreference } from "./lib/theme.ts";
 import { LibraryWorkspaceProvider, useLibraryWorkspace } from "./lib/library/workspace.tsx";
 import { LangContext, detectLang, saveLang, useLang, useT, type Lang } from "./i18n.ts";
 import { RankingPage } from "./pages/RankingPage.tsx";
 import { RuntimeProvider, useRuntime } from "./runtime/context.tsx";
 import { ToastProvider } from "./components/Toast.tsx";
-
-type Theme = "light" | "dark";
-const THEME_KEY = "pcui-theme";
-
-function detectTheme(): Theme {
-  let theme: Theme = "light";
-  try {
-    const saved = window.localStorage.getItem(THEME_KEY);
-    theme = saved === "light" || saved === "dark"
-      ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
-    theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  }
-  document.documentElement.dataset.theme = theme;
-  document.documentElement.style.colorScheme = theme;
-  return theme;
-}
-
-function saveTheme(theme: Theme) {
-  try { window.localStorage.setItem(THEME_KEY, theme); } catch { /* storage may be unavailable */ }
-}
-
-function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (theme: Theme) => void }) {
-  const t = useT();
-  return (
-    <div className="theme-toggle" role="group" aria-label={t("theme.selector")}>
-      {/* Icon only: sun and moon are unambiguous at this size, and the words cost more width in the
-          top bar than they add. The selected state carries its own daylight/night hue so the active
-          mode reads at a glance instead of as one more blue-tinted control. */}
-      <button type="button" className={`day${theme === "light" ? " on" : ""}`}
-        aria-pressed={theme === "light"} title={t("theme.toLight")}
-        aria-label={t("theme.toLight")} onClick={() => onChange("light")}>
-        <svg viewBox="0 0 24 24" aria-hidden focusable="false">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-        </svg>
-      </button>
-      <button type="button" className={`night${theme === "dark" ? " on" : ""}`}
-        aria-pressed={theme === "dark"} title={t("theme.toDark")}
-        aria-label={t("theme.toDark")} onClick={() => onChange("dark")}>
-        <svg viewBox="0 0 24 24" aria-hidden focusable="false">
-          <path d="M20.2 15.3A8.7 8.7 0 0 1 8.7 3.8 8.7 8.7 0 1 0 20.2 15.3Z" />
-        </svg>
-      </button>
-    </div>
-  );
-}
 
 // Keep the ranking route in the entry chunk and split every secondary surface. Navigation intent
 // preloads the relevant module, so desktop hover/keyboard focus hides the network boundary while a
@@ -168,7 +124,7 @@ function LibraryDockLayer() {
   return <Suspense fallback={null}><LibraryDock /></Suspense>;
 }
 
-function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => void }) {
+function Shell({ theme, setTheme }: { theme: ThemePreference; setTheme: (theme: ThemePreference) => void }) {
   const topbar = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const node = topbar.current;
@@ -221,12 +177,12 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
             <span className="env-date"> · {capabilities.environment.asOf}</span>
           )}
         </span>
-        <ThemeToggle theme={theme} onChange={setTheme} />
         <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} aria-label={t("a11y.language")}>
           <option value="zh">中文</option>
           <option value="en">English</option>
           <option value="ja">日本語</option>
         </select>
+        <ThemeToggle theme={theme} onChange={setTheme} />
         <LibraryDockButton preload={() => void loadLibraryDock()} />
       </header>
       <LibraryDockLayer />
@@ -259,6 +215,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (theme: Theme) => 
           </Routes>
         </Suspense>
       </main>
+      <SiteFooter />
     </div>
   );
 }
@@ -275,7 +232,7 @@ function Workspace({ children }: { children: ReactNode }) {
 // Lang state lives above RuntimeProvider so error screens localize too.
 export function App() {
   const [lang, setLangState] = useState<Lang>(detectLang());
-  const [theme, setThemeState] = useState<Theme>(detectTheme);
+  const [theme, setTheme] = useThemePreference();
   useEffect(() => {
     document.documentElement.lang = { zh: "zh-CN", en: "en", ja: "ja" }[lang];
     document.title = {
@@ -284,17 +241,9 @@ export function App() {
       ja: "Pokémon Champions 構築アシスタント",
     }[lang];
   }, [lang]);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    document.documentElement.style.colorScheme = theme;
-  }, [theme]);
   const setLang = (l: Lang) => {
     saveLang(l);
     setLangState(l);
-  };
-  const setTheme = (next: Theme) => {
-    saveTheme(next);
-    setThemeState(next);
   };
   return (
     <LangContext.Provider value={{ lang, setLang }}>

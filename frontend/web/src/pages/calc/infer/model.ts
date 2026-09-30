@@ -12,7 +12,8 @@
  * stat value and the HP axis is pure arithmetic — the trick the `tune` operator uses for its HP lane.
  * A state survives when at least one of the sixteen rolls reproduces every observation; its weight is
  * the product of the fraction of rolls that do, times the environment's share of its nature, item
- * and ability. The views (ranges, rulers, lanes) read the surviving set; the weights only shade it.
+ * and ability. The views read the surviving set; weights shade it and give relative nature shares,
+ * not a confirmation of the opponent's true nature.
  *
  * Pure: the engine is reached through the `RollsAt` callbacks, and `undefined` from one means "not
  * computed yet", which makes the whole answer pending rather than wrong. */
@@ -191,9 +192,18 @@ export interface Inference {
   /** Surviving joint states, the budget applied. */
   count: number;
   natures: boolean[];
+  /** Per nature: normalized joint-state weight (environment priors times hit likelihoods).
+   * Null for an empty/zero-weight set or a count-only job; not the raw share of state counts. */
+  natureShares: number[] | null;
+  /** A maximum-weight complete joint state; speed is a feasible example within the leftover budget.
+   * Null only for no surviving state or a count-only job. */
+  mostLikely: Candidate | null;
   items: boolean[];
   abilities: boolean[];
-  stats: Record<SpKey, StatView>;
+  stats: Record<SpKey | "spe", StatView>;
+  /** Remaining Speed SP cap per nature × item × ability; -1 for an excluded joint option.
+   * Derived from the compatible damage axes and the same 66-SP budget, not an independent box. */
+  speedCaps: number[];
   rulers: Record<BulkKey, Ruler>;
   lanes: Record<OffKey, Lane[]>;
   /** Surviving (HP SP, stat SP) per nature x item x ability: index [(n * I + i) * A + a][hp * 33 + sp]. */
@@ -298,7 +308,8 @@ const ONES1 = new Float64Array(W).fill(1);
 
 /** Run the inference, or null while any roll it needs is still being computed. `countOnly` skips
  * every view and returns just the surviving-state count (for the narrowing history). */
-export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false): Inference | null {
+export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false,
+                      preferred?: Candidate): Inference | null {
   let prep: Prepared;
   try {
     prep = prepare(space, evidence);
@@ -311,17 +322,19 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
   const I = space.items.length;
   const A = space.abilities.length;
   const natureOk = new Array<boolean>(N).fill(false);
+  const natureMass = new Float64Array(N);
   const itemOk = new Array<boolean>(I).fill(false);
   const abilityOk = new Array<boolean>(A).fill(false);
-  const mass: Record<SpKey, Float64Array> = {
+  const mass: Record<SpKey | "spe", Float64Array> = {
     hp: new Float64Array(W), atk: new Float64Array(W), def: new Float64Array(W),
-    spa: new Float64Array(W), spd: new Float64Array(W),
+    spa: new Float64Array(W), spd: new Float64Array(W), spe: new Float64Array(W),
   };
   const axes = { def: rulerAxis(space, "def"), spd: rulerAxis(space, "spd") };
   const bins = { def: new Float64Array(RULER_BINS), spd: new Float64Array(RULER_BINS) };
   const band = { def: [Infinity, -Infinity], spd: [Infinity, -Infinity] };
   const bulkProj = { def: [] as Uint8Array[], spd: [] as Uint8Array[] };
   const offProj = { atk: [] as Uint8Array[], spa: [] as Uint8Array[] };
+  const speedCaps = new Array<number>(N * I * A).fill(-1);
   // The ruler bins, hoisted out of the per-state loop below (it runs W³ times per nature and
   // ability): the same arithmetic as reading the axis each time, so the same bins.
   const [loDef, hiDef] = axes.def;
@@ -334,6 +347,12 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
     Math.max(0, Math.min(RULER_BINS - 1, Math.floor(((product - loSpd) / spanSpd) * RULER_BINS)));
   let minDef = Infinity, maxDef = -Infinity, minSpd = Infinity, maxSpd = -Infinity;
   let count = 0;
+  let mostLikely: Candidate | null = null;
+  let bestWeight = -1, bestDistance = Infinity;
+  // Only an environment template breaks equal-weight ties. The shared calculator build does not
+  // participate in inference, even as a preference. The concrete example uses a feasible speed
+  // allocation from the environment template, bounded by the remaining budget.
+  const distance = (key: SpKey, sp: number) => Math.abs(sp - (preferred?.sps[key] ?? 0));
 
   const prefix = (values: Float64Array) => {
     const out = new Float64Array(SP_BUDGET + 1);
@@ -359,9 +378,22 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
         bulkProj.def[index] = projDef; bulkProj.spd[index] = projSpd;
         offProj.atk[index] = projAtk; offProj.spa[index] = projSpa;
         const offCount = new Float64Array(SP_BUDGET + 1), offMass = new Float64Array(SP_BUDGET + 1);
+        type OffChoice = { weight: number; distance: number; atk: number; spa: number };
+        const offBest = new Array<OffChoice | null>(SP_BUDGET + 1).fill(null);
         for (let x = 0; x < W; x++) for (let y = 0; y < W; y++) {
           const weight = la[x]! * ly[y]!;
           if (weight) { offCount[x + y]!++; offMass[x + y]! += weight; }
+          if (weight && !countOnly) {
+            const cost = distance("atk", x) + distance("spa", y), previous = offBest[x + y];
+            if (!previous || weight > previous.weight || weight === previous.weight && cost < previous.distance) {
+              offBest[x + y] = { weight, distance: cost, atk: x, spa: y };
+            }
+          }
+        }
+        if (!countOnly) for (let room = 1; room <= SP_BUDGET; room++) {
+          const lower = offBest[room - 1], current = offBest[room];
+          if (lower && (!current || lower.weight > current.weight
+            || lower.weight === current.weight && lower.distance < current.distance)) offBest[room] = lower;
         }
         const offCounts = prefix(offCount), offWeights = prefix(offMass);
         const bulkCount = new Float64Array(SP_BUDGET + 1), bulkMass = new Float64Array(SP_BUDGET + 1);
@@ -380,6 +412,16 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
             // Marginalize ALL compatible attack allocations, including their likelihood and
             // item prior. Counting a surviving projection once gives a different distribution.
             const weight = prior * wd * ws * offWeights[room]!;
+            natureMass[n]! += weight;
+            const choice = offBest[room]!;
+            const stateWeight = prior * wd * ws * choice.weight;
+            const cost = distance("hp", h) + distance("def", d) + distance("spd", b) + choice.distance;
+            if (stateWeight > bestWeight || stateWeight === bestWeight && cost < bestDistance) {
+              bestWeight = stateWeight; bestDistance = cost;
+              mostLikely = { nature: nature.name, item: item.name, ability: ability.name,
+                sps: { hp: h, def: d, spd: b, atk: choice.atk, spa: choice.spa,
+                  spe: Math.min(SP_MAX, preferred?.sps.spe ?? 0, room - choice.atk - choice.spa) } };
+            }
             projDef[h * W + d] = 1; projSpd[h * W + b] = 1;
             mass.hp[h]! += weight; mass.def[d]! += weight; mass.spd[b]! += weight;
             const pd = hp[h]! * statDef[d]!, ps = hp[h]! * statSpd[b]!;
@@ -390,6 +432,19 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
         }
         if (countOnly) continue;
         const bulkCounts = prefix(bulkCount), bulkWeights = prefix(bulkMass);
+        // Project the remaining budget onto Speed without expanding all six axes. For each
+        // speed investment, sum compatible bulk totals against the attack prefix. Damage-state
+        // counts and nature marginals keep their existing five-axis measure.
+        for (let spe = 0; spe < W; spe++) {
+          const room = SP_BUDGET - spe;
+          let possible = false, weight = 0;
+          for (let total = 0; total <= room; total++) {
+            if (bulkCount[total] && offCounts[room - total]) possible = true;
+            weight += bulkMass[total]! * offWeights[room - total]!;
+          }
+          if (possible) speedCaps[index] = spe;
+          mass.spe[spe]! += prior * weight;
+        }
         for (let x = 0; x < W; x++) for (let y = 0; y < W; y++) {
           const room = SP_BUDGET - x - y;
           if (!la[x] || !ly[y] || !bulkCounts[room]) continue;
@@ -403,13 +458,14 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
   band.def = [minDef, maxDef];
   band.spd = [minSpd, maxSpd];
 
-  const statView = (key: SpKey): StatView => {
+  const statView = (key: SpKey | "spe"): StatView => {
     const row = Array.from(mass[key]);
     const top = Math.max(...row);
     const lo = row.findIndex((value) => value > 0);
     let hi = -1;
     for (let at = W - 1; at >= 0; at--) if (row[at]! > 0) { hi = at; break; }
-    return { observed: observed[key], lo: lo < 0 ? 1 : lo, hi, mass: row.map((value) => top > 0 ? value / top : 0) };
+    return { observed: key === "spe" ? evidence.length > 0 : observed[key],
+      lo: lo < 0 ? 1 : lo, hi, mass: row.map((value) => top > 0 ? value / top : 0) };
   };
   const ruler = (key: BulkKey): Ruler => {
     const top = Math.max(...bins[key]);
@@ -447,13 +503,17 @@ export function infer(space: FoeSpace, evidence: Evidence[], countOnly = false):
     return [...groups.values()].sort((x, y) => Number(y.feasible) - Number(x.feasible));
   };
 
+  const totalNatureMass = natureMass.reduce((sum, value) => sum + value, 0);
   return {
     count,
     natures: natureOk,
+    natureShares: totalNatureMass > 0 ? Array.from(natureMass, (value) => value / totalNatureMass) : null,
+    mostLikely,
     items: itemOk,
     abilities: abilityOk,
     stats: { hp: statView("hp"), atk: statView("atk"), def: statView("def"),
-             spa: statView("spa"), spd: statView("spd") },
+             spa: statView("spa"), spd: statView("spd"), spe: statView("spe") },
+    speedCaps,
     rulers: { def: ruler("def"), spd: ruler("spd") },
     lanes: { atk: lanes("atk"), spa: lanes("spa") },
     bulkProj,

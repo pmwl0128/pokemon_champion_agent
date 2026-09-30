@@ -9,7 +9,7 @@ import { memo, type Dispatch, type SetStateAction } from "react";
 import { useT, type MsgKey } from "../../../i18n.ts";
 import type { DexIndexEntry } from "../../../runtime/adapter.ts";
 import type { ItemRef } from "../../../runtime/projection.ts";
-import { FieldPanel } from "../duel/FieldPanel.tsx";
+import { FieldPanel, useFieldOffers } from "../duel/FieldPanel.tsx";
 import { DuelBar, TeamBar, type ImportOutcome } from "../duel/TeamBar.tsx";
 import type { FieldState, MonState, SharedFlagKey } from "../duel/state.ts";
 import type { TuneSide } from "./model.ts";
@@ -40,6 +40,7 @@ export const TeamStrip = memo(function TeamStrip({ teams, active, field, setFiel
   onImport: (side: TuneSide, text: string) => Promise<ImportOutcome>;
 }) {
   const t = useT();
+  const offers = useFieldOffers();
   const roster = (side: TuneSide) => ({
     team: teams[side], index: active[side], dex, items, field, setField,
     onIndex: (index: number) => onActive(side, index),
@@ -52,7 +53,7 @@ export const TeamStrip = memo(function TeamStrip({ teams, active, field, setFiel
     <DuelBar field={field}>
       <TeamBar label={t("calc.attacker")} teamLabel={t("calc.attackerTeam")} {...roster("mine")} librarySide="a"
         side="a" allowedFlags={SCREEN_KEYS} flagNote={t("tune.ws.screensNote")} />
-      <FieldPanel field={field} setField={setField} weatherSuggestions={[]} terrainSuggestions={[]}
+      <FieldPanel field={field} setField={setField} weatherSuggestions={offers.weather} terrainSuggestions={offers.terrain}
         sharedFlags={NO_SHARED} />
       <TeamBar label={t("calc.defender")} teamLabel={t("calc.defenderTeam")} {...roster("foe")} librarySide="b"
         side="b" allowedFlags={NO_FLAGS} lockedNote={t("tune.ws.foeNoConds")} mirrored />

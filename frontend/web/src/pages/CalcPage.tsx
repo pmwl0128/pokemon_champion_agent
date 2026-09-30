@@ -89,7 +89,7 @@ export function CalcPage() {
           items={tabs} />
       </PageHeader>
 
-      <RosterProvider dex={dex.data}>
+      <RosterProvider dex={dex.data} items={items.data} natures={natures.data}>
       <CalcLibraryTransfers dex={dex.data} />
       {visited.has("damage") && hasDamage && (
         <div role="tabpanel" id={segmentedPanelId("calc-tool", "damage")}

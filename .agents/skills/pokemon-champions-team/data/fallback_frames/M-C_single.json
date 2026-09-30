@@ -5,11 +5,11 @@
   "format": "single",
   "rule": "M-C",
   "season": "M-6",
-  "built_at": "2026-09-28T08:17:34Z"
+  "built_at": "2026-09-30T09:40:35Z"
  },
  "counts": {
   "history": 6,
-  "partners": 22,
+  "partners": 21,
   "stand_in": 5
  },
  "anchors": {
@@ -23,7 +23,7 @@
     "roles": 3,
     "field": 0
    },
-   "teams": 113
+   "teams": 116
   },
   "Aegislash-Shield|": {
    "source": "stand_in",
@@ -35,7 +35,7 @@
     "roles": 3,
     "field": 0
    },
-   "teams": 113
+   "teams": 116
   },
   "Arbok|": {
    "source": "partners",
@@ -84,32 +84,32 @@
   "Dedenne|": {
    "source": "partners",
    "partners": [
-    "Charizard",
-    "Raichu"
+    "Mimikyu",
+    "Charizard"
    ],
-   "teams": 4
+   "teams": 28
   },
   "Farfetch'd|": {
    "source": "partners",
    "partners": [
     "Basculegion",
-    "Cinderace"
+    "Pawmot"
    ],
-   "teams": 5
+   "teams": 36
   },
   "Forretress|": {
    "source": "partners",
    "partners": [
     "Golisopod",
-    "Volcarona"
+    "Gyarados"
    ],
-   "teams": 5
+   "teams": 11
   },
   "Garbodor|": {
    "source": "partners",
    "partners": [
-    "Mimikyu",
-    "Metagross"
+    "Basculegion",
+    "Mimikyu"
    ],
    "teams": 9
   },
@@ -137,9 +137,9 @@
    "source": "partners",
    "partners": [
     "Golisopod",
-    "Basculegion"
+    "Cinderace"
    ],
-   "teams": 12
+   "teams": 13
   },
   "Lycanroc-Dusk|": {
    "source": "history",
@@ -154,9 +154,9 @@
    "source": "partners",
    "partners": [
     "Charizard",
-    "Meowscarada"
+    "Basculegion"
    ],
-   "teams": 13
+   "teams": 3
   },
   "Mega Sharpedo|": {
    "source": "history",
@@ -188,7 +188,7 @@
     "roles": 2,
     "field": 0
    },
-   "teams": 68
+   "teams": 69
   },
   "Mr. Rime|": {
    "source": "partners",
@@ -208,7 +208,7 @@
     "roles": 1,
     "field": 0
    },
-   "teams": 80
+   "teams": 82
   },
   "Passimian|": {
    "source": "partners",
@@ -282,7 +282,7 @@
     "Charizard",
     "Dragonite"
    ],
-   "teams": 5
+   "teams": 6
   },
   "Tauros-Paldea-Combat|": {
    "source": "partners",
@@ -292,21 +292,13 @@
    ],
    "teams": 3
   },
-  "Toxtricity-Low Key|": {
-   "source": "partners",
-   "partners": [
-    "Cinderace",
-    "Gyarados"
-   ],
-   "teams": 11
-  },
   "Wyrdeer|": {
    "source": "partners",
    "partners": [
-    "Dragonite",
-    "Basculegion"
+    "Basculegion",
+    "Dragonite"
    ],
-   "teams": 5
+   "teams": 6
   }
  }
 }
