@@ -5,10 +5,10 @@
   "format": "double",
   "rule": "M-C",
   "season": "M-6",
-  "built_at": "2026-09-30T09:58:03Z"
+  "built_at": "2026-10-03T14:03:48Z"
  },
  "counts": {
-  "history": 29,
+  "history": 21,
   "partners": 9
  },
  "anchors": {
@@ -18,7 +18,7 @@
     "Garchomp",
     "Sylveon"
    ],
-   "teams": 129
+   "teams": 168
   },
   "Aegislash-Shield|": {
    "source": "partners",
@@ -26,7 +26,7 @@
     "Garchomp",
     "Sylveon"
    ],
-   "teams": 129
+   "teams": 168
   },
   "Aromatisse|": {
    "source": "history",
@@ -64,43 +64,6 @@
    ],
    "teams": 10
   },
-  "Dedenne|": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 14
-  },
-  "Emolga|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 11
-  },
-  "Falinks|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 55
-  },
-  "Falinks|Falinksite": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 50
-  },
   "Flareon|": {
    "source": "history",
    "seasons": [
@@ -130,17 +93,17 @@
   "Gourgeist-Large|": {
    "source": "partners",
    "partners": [
-    "Garchomp",
     "Kingambit",
+    "Garchomp",
     "Sylveon"
    ],
-   "teams": 68
+   "teams": 77
   },
   "Gourgeist-Small|": {
    "source": "partners",
    "partners": [
-    "Talonflame",
-    "Tyranitar"
+    "Tyranitar",
+    "Talonflame"
    ],
    "teams": 13
   },
@@ -148,9 +111,10 @@
    "source": "partners",
    "partners": [
     "Tyranitar",
+    "Kingambit",
     "Indeedee"
    ],
-   "teams": 159
+   "teams": 8
   },
   "Leafeon|": {
    "source": "history",
@@ -178,7 +142,7 @@
     "Raichu",
     "Dragonite"
    ],
-   "teams": 26
+   "teams": 34
   },
   "Palafin-Hero|": {
    "source": "partners",
@@ -187,7 +151,7 @@
     "Archaludon",
     "Sinistcha"
    ],
-   "teams": 31
+   "teams": 35
   },
   "Passimian|": {
    "source": "history",
@@ -197,28 +161,6 @@
     "M-5"
    ],
    "teams": 9
-  },
-  "Pinsir|": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-2",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 30
-  },
-  "Pinsir|Pinsirite": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-2",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 30
   },
   "Polteageist|": {
    "source": "history",
@@ -238,25 +180,6 @@
    ],
    "teams": 15
   },
-  "Rampardos|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 35
-  },
-  "Rotom-Frost|": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 36
-  },
   "Rotom|": {
    "source": "history",
    "seasons": [
@@ -268,10 +191,11 @@
   "Samurott|": {
    "source": "partners",
    "partners": [
-    "Corviknight",
-    "Indeedee"
+    "Golisopod",
+    "Indeedee",
+    "Dragonite"
    ],
-   "teams": 89
+   "teams": 3
   },
   "Sandaconda|": {
    "source": "history",
@@ -324,10 +248,11 @@
   "Tauros-Paldea-Combat|": {
    "source": "partners",
    "partners": [
+    "Charizard",
     "Farigiraf",
-    "Torkoal"
+    "Whimsicott"
    ],
-   "teams": 80
+   "teams": 9
   },
   "Tauros|": {
    "source": "history",

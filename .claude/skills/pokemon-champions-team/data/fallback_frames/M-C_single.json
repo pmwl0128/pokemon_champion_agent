@@ -5,37 +5,29 @@
   "format": "single",
   "rule": "M-C",
   "season": "M-6",
-  "built_at": "2026-09-30T09:40:35Z"
+  "built_at": "2026-10-03T14:03:43Z"
  },
  "counts": {
   "history": 6,
-  "partners": 21,
-  "stand_in": 5
+  "partners": 20,
+  "stand_in": 4
  },
  "anchors": {
   "Aegislash-Blade|": {
-   "source": "stand_in",
-   "species": "Aegislash",
-   "hits": {
-    "types": 2,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 116
+   "source": "partners",
+   "partners": [
+    "Hippowdon",
+    "Meowscarada"
+   ],
+   "teams": 34
   },
   "Aegislash-Shield|": {
-   "source": "stand_in",
-   "species": "Aegislash",
-   "hits": {
-    "types": 2,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 116
+   "source": "partners",
+   "partners": [
+    "Hippowdon",
+    "Meowscarada"
+   ],
+   "teams": 34
   },
   "Arbok|": {
    "source": "partners",
@@ -82,20 +74,24 @@
    "teams": 8
   },
   "Dedenne|": {
-   "source": "partners",
-   "partners": [
-    "Mimikyu",
-    "Charizard"
-   ],
-   "teams": 28
+   "source": "stand_in",
+   "species": "Ninetales-Alola",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 48
   },
   "Farfetch'd|": {
    "source": "partners",
    "partners": [
-    "Basculegion",
-    "Pawmot"
+    "Pawmot",
+    "Basculegion"
    ],
-   "teams": 36
+   "teams": 37
   },
   "Forretress|": {
    "source": "partners",
@@ -137,9 +133,9 @@
    "source": "partners",
    "partners": [
     "Golisopod",
-    "Cinderace"
+    "Basculegion"
    ],
-   "teams": 13
+   "teams": 12
   },
   "Lycanroc-Dusk|": {
    "source": "history",
@@ -149,14 +145,6 @@
     "M-5"
    ],
    "teams": 4
-  },
-  "Maushold-Four|": {
-   "source": "partners",
-   "partners": [
-    "Charizard",
-    "Basculegion"
-   ],
-   "teams": 3
   },
   "Mega Sharpedo|": {
    "source": "history",
@@ -188,15 +176,7 @@
     "roles": 2,
     "field": 0
    },
-   "teams": 69
-  },
-  "Mr. Rime|": {
-   "source": "partners",
-   "partners": [
-    "Rillaboom",
-    "Sneasler"
-   ],
-   "teams": 11
+   "teams": 72
   },
   "Oranguru|": {
    "source": "stand_in",
@@ -208,7 +188,7 @@
     "roles": 1,
     "field": 0
    },
-   "teams": 82
+   "teams": 87
   },
   "Passimian|": {
    "source": "partners",
@@ -222,10 +202,9 @@
    "source": "partners",
    "partners": [
     "Blastoise",
-    "Sneasler",
-    "Indeedee"
+    "Sneasler"
    ],
-   "teams": 16
+   "teams": 19
   },
   "Rampardos|": {
    "source": "partners",
@@ -287,8 +266,8 @@
   "Tauros-Paldea-Combat|": {
    "source": "partners",
    "partners": [
-    "Sirfetch'd",
-    "Sneasler"
+    "Sneasler",
+    "Sirfetch'd"
    ],
    "teams": 3
   },
@@ -298,7 +277,7 @@
     "Basculegion",
     "Dragonite"
    ],
-   "teams": 6
+   "teams": 7
   }
  }
 }
