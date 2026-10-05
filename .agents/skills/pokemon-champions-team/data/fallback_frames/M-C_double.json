@@ -5,10 +5,10 @@
   "format": "double",
   "rule": "M-C",
   "season": "M-6",
-  "built_at": "2026-10-03T14:03:48Z"
+  "built_at": "2026-10-05T15:34:46Z"
  },
  "counts": {
-  "history": 21,
+  "history": 17,
   "partners": 9
  },
  "anchors": {
@@ -18,7 +18,7 @@
     "Garchomp",
     "Sylveon"
    ],
-   "teams": 168
+   "teams": 216
   },
   "Aegislash-Shield|": {
    "source": "partners",
@@ -26,7 +26,7 @@
     "Garchomp",
     "Sylveon"
    ],
-   "teams": 168
+   "teams": 216
   },
   "Aromatisse|": {
    "source": "history",
@@ -44,17 +44,6 @@
     "M-5"
    ],
    "teams": 4
-  },
-  "Banette|Banettite": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-2",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 30
   },
   "Castform|": {
    "source": "history",
@@ -97,15 +86,15 @@
     "Garchomp",
     "Sylveon"
    ],
-   "teams": 77
+   "teams": 81
   },
   "Gourgeist-Small|": {
    "source": "partners",
    "partners": [
     "Tyranitar",
-    "Talonflame"
+    "Kingambit"
    ],
-   "teams": 13
+   "teams": 21
   },
   "Gourgeist-Super|": {
    "source": "partners",
@@ -114,16 +103,7 @@
     "Kingambit",
     "Indeedee"
    ],
-   "teams": 8
-  },
-  "Leafeon|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 21
+   "teams": 9
   },
   "Lycanroc-Midday|": {
    "source": "history",
@@ -142,7 +122,7 @@
     "Raichu",
     "Dragonite"
    ],
-   "teams": 34
+   "teams": 40
   },
   "Palafin-Hero|": {
    "source": "partners",
@@ -151,7 +131,7 @@
     "Archaludon",
     "Sinistcha"
    ],
-   "teams": 35
+   "teams": 42
   },
   "Passimian|": {
    "source": "history",
@@ -192,20 +172,9 @@
    "source": "partners",
    "partners": [
     "Golisopod",
-    "Indeedee",
     "Dragonite"
    ],
-   "teams": 3
-  },
-  "Sandaconda|": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 8
+   "teams": 15
   },
   "Simipour|": {
    "source": "history",
@@ -249,10 +218,10 @@
    "source": "partners",
    "partners": [
     "Charizard",
-    "Farigiraf",
-    "Whimsicott"
+    "Whimsicott",
+    "Basculegion"
    ],
-   "teams": 9
+   "teams": 39
   },
   "Tauros|": {
    "source": "history",
@@ -261,18 +230,6 @@
     "M-5"
    ],
    "teams": 6
-  },
-  "Victreebel|Victreebelite": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-2",
-    "M-3",
-    "M-4",
-    "M-5",
-    "M-A-events"
-   ],
-   "teams": 40
   },
   "Watchog|": {
    "source": "history",

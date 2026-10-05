@@ -5,11 +5,11 @@
   "format": "single",
   "rule": "M-C",
   "season": "M-6",
-  "built_at": "2026-10-03T14:03:43Z"
+  "built_at": "2026-10-05T15:34:40Z"
  },
  "counts": {
   "history": 6,
-  "partners": 20,
+  "partners": 19,
   "stand_in": 4
  },
  "anchors": {
@@ -28,14 +28,6 @@
     "Meowscarada"
    ],
    "teams": 34
-  },
-  "Arbok|": {
-   "source": "partners",
-   "partners": [
-    "Gengar",
-    "Gyarados"
-   ],
-   "teams": 9
   },
   "Ariados|": {
    "source": "history",
@@ -59,7 +51,7 @@
     "Kingambit",
     "Basculegion"
    ],
-   "teams": 14
+   "teams": 15
   },
   "Decidueye-Hisui|": {
    "source": "history",
@@ -83,13 +75,13 @@
     "roles": 3,
     "field": 0
    },
-   "teams": 48
+   "teams": 49
   },
   "Farfetch'd|": {
    "source": "partners",
    "partners": [
-    "Pawmot",
-    "Basculegion"
+    "Basculegion",
+    "Pawmot"
    ],
    "teams": 37
   },
@@ -122,12 +114,16 @@
    "teams": 12
   },
   "Gourgeist-Small|": {
-   "source": "partners",
-   "partners": [
-    "Snorlax",
-    "Clefable"
-   ],
-   "teams": 4
+   "source": "stand_in",
+   "species": "Sinistcha",
+   "hits": {
+    "types": 2,
+    "lean": 0,
+    "speed_band": 0,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 12
   },
   "Hydrapple|": {
    "source": "partners",
@@ -167,16 +163,12 @@
    "teams": 4
   },
   "Morpeko-Hangry|": {
-   "source": "stand_in",
-   "species": "Pawmot",
-   "hits": {
-    "types": 1,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 2,
-    "field": 0
-   },
-   "teams": 72
+   "source": "partners",
+   "partners": [
+    "Gholdengo",
+    "Sneasler"
+   ],
+   "teams": 15
   },
   "Oranguru|": {
    "source": "stand_in",
@@ -188,7 +180,7 @@
     "roles": 1,
     "field": 0
    },
-   "teams": 87
+   "teams": 88
   },
   "Passimian|": {
    "source": "partners",
@@ -250,16 +242,16 @@
   "Stunfisk-Galar|": {
    "source": "partners",
    "partners": [
-    "Basculegion",
-    "Cinderace"
+    "Charizard",
+    "Basculegion"
    ],
-   "teams": 5
+   "teams": 3
   },
   "Tauros-Paldea-Aqua|": {
    "source": "partners",
    "partners": [
     "Charizard",
-    "Dragonite"
+    "Gholdengo"
    ],
    "teams": 6
   },
