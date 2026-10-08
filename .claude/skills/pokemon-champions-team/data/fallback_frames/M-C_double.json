@@ -4,29 +4,23 @@
  "built_for": {
   "format": "double",
   "rule": "M-C",
-  "season": "M-6",
-  "built_at": "2026-10-05T15:34:46Z"
+  "season": "M-7",
+  "built_at": "2026-10-08T06:30:59Z"
  },
  "counts": {
-  "history": 17,
-  "partners": 9
+  "history": 14,
+  "partners": 3,
+  "stand_in": 4
  },
  "anchors": {
-  "Aegislash-Blade|": {
-   "source": "partners",
-   "partners": [
-    "Garchomp",
-    "Sylveon"
-   ],
-   "teams": 216
-  },
   "Aegislash-Shield|": {
    "source": "partners",
    "partners": [
-    "Garchomp",
-    "Sylveon"
+    "Gardevoir",
+    "Kommo-o",
+    "Indeedee-F"
    ],
-   "teams": 216
+   "teams": 38
   },
   "Aromatisse|": {
    "source": "history",
@@ -70,40 +64,29 @@
    ],
    "teams": 5
   },
-  "Garbodor|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 6
-  },
   "Gourgeist-Large|": {
-   "source": "partners",
-   "partners": [
-    "Kingambit",
-    "Garchomp",
-    "Sylveon"
-   ],
-   "teams": 81
+   "source": "stand_in",
+   "species": "Sinistcha",
+   "hits": {
+    "types": 2,
+    "lean": 0,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 417
   },
   "Gourgeist-Small|": {
-   "source": "partners",
-   "partners": [
-    "Tyranitar",
-    "Kingambit"
-   ],
-   "teams": 21
-  },
-  "Gourgeist-Super|": {
-   "source": "partners",
-   "partners": [
-    "Tyranitar",
-    "Kingambit",
-    "Indeedee"
-   ],
-   "teams": 9
+   "source": "stand_in",
+   "species": "Sinistcha",
+   "hits": {
+    "types": 2,
+    "lean": 0,
+    "speed_band": 0,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 417
   },
   "Lycanroc-Midday|": {
    "source": "history",
@@ -120,18 +103,19 @@
    "source": "partners",
    "partners": [
     "Raichu",
-    "Dragonite"
+    "Volcarona",
+    "Basculegion"
    ],
-   "teams": 40
+   "teams": 62
   },
   "Palafin-Hero|": {
    "source": "partners",
    "partners": [
-    "Pelipper",
-    "Archaludon",
-    "Sinistcha"
+    "Incineroar",
+    "Froslass",
+    "Volcarona"
    ],
-   "teams": 42
+   "teams": 46
   },
   "Passimian|": {
    "source": "history",
@@ -141,15 +125,6 @@
     "M-5"
    ],
    "teams": 9
-  },
-  "Polteageist|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 8
   },
   "Qwilfish|": {
    "source": "history",
@@ -169,12 +144,16 @@
    "teams": 7
   },
   "Samurott|": {
-   "source": "partners",
-   "partners": [
-    "Golisopod",
-    "Dragonite"
-   ],
-   "teams": 15
+   "source": "stand_in",
+   "species": "Blastoise",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 3,
+    "field": 0
+   },
+   "teams": 148
   },
   "Simipour|": {
    "source": "history",
@@ -215,13 +194,16 @@
    "teams": 26
   },
   "Tauros-Paldea-Combat|": {
-   "source": "partners",
-   "partners": [
-    "Charizard",
-    "Whimsicott",
-    "Basculegion"
-   ],
-   "teams": 39
+   "source": "stand_in",
+   "species": "Annihilape",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 1,
+    "field": 0
+   },
+   "teams": 181
   },
   "Tauros|": {
    "source": "history",
@@ -230,15 +212,6 @@
     "M-5"
    ],
    "teams": 6
-  },
-  "Watchog|": {
-   "source": "history",
-   "seasons": [
-    "M-1",
-    "M-4",
-    "M-5"
-   ],
-   "teams": 7
   }
  }
 }

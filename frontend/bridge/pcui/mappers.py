@@ -360,6 +360,14 @@ def map_ko(doc: dict, row: dict, usage_rank: dict[str, int]) -> dict:
         out["coverage"]["moveShareCapturedAt"] = cov["move_share_captured_at"]
     if cov.get("move_share_agreement"):
         out["coverage"]["moveShareAgreement"] = cov["move_share_agreement"]
+    if cov.get("reused_from"):
+        donor = cov["reused_from"]
+        out["coverage"]["reusedFrom"] = {
+            "season": donor["season"], "rule": donor["rule"], "format": donor["format"],
+            "updatedAt": donor["updated_at"],
+        }
+        if donor.get("snapshot_id") is not None:
+            out["coverage"]["reusedFrom"]["snapshotId"] = int(donor["snapshot_id"])
     snapshot = (doc.get("snapshot") or {}).get("id")
     if snapshot is not None:
         out["snapshotId"] = int(snapshot)

@@ -137,6 +137,9 @@ MESSAGES: dict[str, dict[str, str]] = {
     "panel_koed_by_moves": {"zh": "被击倒的招式", "ja": "倒されたわざ",   "en": "KO'd by moves"},
     # --- KO coverage prose ---
     "ko_snapshot":      {"zh": "KO 快照", "ja": "KOスナップショット", "en": "KO snapshot"},
+    "ko_reused_from":   {"zh": "暂用 {season} 的采集值，尚未采集本赛季 KO 数据",
+                         "ja": "{season}の採取値を暫定使用（今シーズンのKOは未採取）",
+                         "en": "Temporarily using the {season} capture; this season's KO data is not collected"},
     "ko_no_pct":        {"zh": "对象列表只有顺序，来源不提供占比",
                          "ja": "相手一覧は順位のみ。出典に比率はありません",
                          "en": "opponent lists are an ordering only; the source publishes no share"},

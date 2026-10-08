@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>Metagame snapshot</b> · M-6 / M-C · updated <b>2026-10-05</b>
+  <b>Metagame snapshot</b> · M-7 / M-C · updated <b>2026-10-08</b>
 </p>
 
 <p align="center">

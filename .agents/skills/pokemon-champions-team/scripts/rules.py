@@ -113,6 +113,7 @@ SEASON_RULE: dict[str, str] = {
     "M-4": "M-B",
     "M-5": "M-B",
     "M-6": "M-C",
+    "M-7": "M-C",
 }
 
 

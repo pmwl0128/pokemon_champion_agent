@@ -531,6 +531,8 @@ def ko_md(row: dict[str, Any], meta: dict[str, Any], panel: str | None) -> str:
              f"- {i18n.t('ko_snapshot')}: {meta.get('updated_at', '')}",
              f"- {i18n.t('ko_no_pct')}",
              f"- {i18n.t('ko_species_level')}"]
+    if coverage.get("reused_from"):
+        lines.append(f"- {i18n.t('ko_reused_from', season=coverage['reused_from']['season'])}")
     if coverage.get("move_share") == "absent":
         lines.append(f"- {i18n.t('ko_moves_absent')}")
     lines.append("")
@@ -594,6 +596,8 @@ def command_ko(args: argparse.Namespace) -> None:
             f"- {i18n.t('pokemon')}: {len(meta.get('rows') or [])}",
             f"- {i18n.t('ko_no_pct')}",
             f"- {i18n.t('ko_species_level')}",
+            *([f"- {i18n.t('ko_reused_from', season=meta['coverage']['reused_from']['season'])}"]
+              if (meta.get("coverage") or {}).get("reused_from") else []),
             *([f"- {i18n.t('ko_moves_absent')}"] if absent else []),
         ]))
         return

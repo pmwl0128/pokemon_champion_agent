@@ -2,7 +2,7 @@
   "season": "M-6",
   "rule": "M-C",
   "format": "single",
-  "generated_at": "2026-10-05T15:15:55+00:00",
+  "generated_at": "2026-10-07T01:31:00+00:00",
   "thresholds": {
     "tiers": [
       {
@@ -50,12 +50,12 @@
   },
   "baseline": {
     "kind": "git-HEAD",
-    "ranking_updated_at": "2026-10-03T13:16:06+00:00",
-    "details_updated_at": "2026-10-03T13:16:06+00:00"
-  },
-  "current": {
     "ranking_updated_at": "2026-10-05T15:15:55+00:00",
     "details_updated_at": "2026-10-05T15:15:55+00:00"
+  },
+  "current": {
+    "ranking_updated_at": "2026-10-07T01:31:00+00:00",
+    "details_updated_at": "2026-10-07T01:31:00+00:00"
   },
   "rank_moves": [],
   "new_entries": [],

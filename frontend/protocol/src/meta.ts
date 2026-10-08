@@ -135,6 +135,14 @@ export const KoCoverageDtoSchema = z.object({
   moveDepth: z.number().int().nonnegative().nullable(),
   rows: z.number().int().nonnegative(),
   rowsWithMoveShare: z.number().int().nonnegative(),
+  /** Explicit same-rule donor capture; the DTO season remains the query context. */
+  reusedFrom: z.object({
+    season: z.string().min(1),
+    rule: z.string().min(1),
+    format: FormatIdSchema,
+    updatedAt: z.string().min(1),
+    snapshotId: z.number().int().positive().optional(),
+  }).optional(),
   /** A filled move tier comes from a DIFFERENT capture than the object lists — which is why it
    * states its own time here instead of letting the file's `updatedAt` stand for both — and carries
    * how far the two captures agreed about each row's KO opponents (0..1, its own denominator).

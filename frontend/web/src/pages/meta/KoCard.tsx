@@ -137,6 +137,9 @@ export function KoCard({ ko, trend, format, onPreviewOpen }: {
         <span className="mc-ko-note">{t("ko.orderOnly")} · {t("mc.ko.useNote")}</span>
         <span className="mc-ko-stamp">
           {data.season} · {t(`format.${format}`)} · {snapshot}
+          {data.coverage.reusedFrom && (
+            <> · {t("mc.ko.reusedFrom").replace("{season}", data.coverage.reusedFrom.season)}</>
+          )}
           {data.coverage.moveShareCapturedAt && (
             <> · {t("mc.ko.movesAt").replace("{time}", stampTime(data.coverage.moveShareCapturedAt))}</>
           )}

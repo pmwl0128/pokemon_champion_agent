@@ -68,6 +68,13 @@ A SECOND data axis, not a panel of `details`. It answers "who knocks out whom", 
 different upstream than the usage data, and advances on its own snapshot clock — so its `updated_at`
 is its own and must be quoted separately.
 
+An explicitly requested same-rule fallback has `coverage.reused_from` with the donor `season`,
+`rule`, `format`, `updated_at` and `snapshot_id`. The file's `season` is the query context; the
+KO relationships and KO move shares remain donor-season measurements. `updated_at`, `snapshot`
+and move-share capture clocks remain unchanged. Subjects are joined to the target ranking by
+canonical name within each format; missing subjects remain unavailable. Borrowed captures do
+not create target-season KO trend points. A fresh KO capture replaces this fallback marker.
+
 ```json
 {
   "version": 1,
