@@ -540,6 +540,10 @@ def ko_md(row: dict[str, Any], meta: dict[str, Any], panel: str | None) -> str:
     for key in ([panel] if panel else [*KO_OBJECT_PANELS, *KO_MOVE_PANELS]):
         entries = panels.get(key)
         lines.append(f"## {i18n.panel_label(key)}")
+        retained = (row.get("panel_reused_from") or {}).get(key)
+        if retained:
+            lines.append(i18n.t("ko_zero_retained", season=retained["season"],
+                                time=retained["updated_at"]))
         if entries is None:                      # tier not collected — never rendered as "none"
             lines.extend([i18n.t("ko_moves_absent"), ""])
             continue
@@ -1846,15 +1850,19 @@ META_SCHEMA = {
         "move_entry": "{rank, name, name_ja, key, percentage:float, type:Title, category:Title, power:int|null}",
         "spread_entry": "{rank, hp,atk,def,spa,spd,spe:int, percentage:float}",
         "ko_row": "{rank, name, name_zh, name_ja, slug, pokedex_no, panels:{ko_targets, koed_by, "
-                  "ko_moves, koed_by_moves}}",
+                  "ko_moves, koed_by_moves}, panel_reused_from?:{<panel>:{season,rule,format,"
+                  "updated_at,snapshot_id,reason:'current_zero_records'}}}",
         "ko_object_entry": "{rank, key:'<national dex no>', name:zh, name_ja, name_en}. SPECIES-level "
-                           "(the source keys KO opponents by dex number, with no form), and carries "
-                           "NO percentage — the source publishes an ordering only. name/name_ja are "
-                           "empty for a species the dex ships only as split forms.",
+                           "in the public contract, and carries NO percentage. name/name_ja use the "
+                           "dex species name; ambiguous split species also carry form_rep.",
         "ko_coverage": "{opponents, opponent_identity:'national_dex', opponent_depth, move_share:"
                        "'absent'|'ranked_pct', move_depth, rows, rows_with_move_share}. A `null` "
                        "ko_moves/koed_by_moves panel means NOT COLLECTED (move_share:'absent'); an "
-                       "empty list would mean the source reported none.",
+                       "empty list means confirmed zero with no historical fallback. Optional "
+                       "move_share_capture is same_snapshot_bulk_export, mixed_snapshot_bulk_exports "
+                       "or independent_bulk (legacy: same_snapshot_detail_pages). A mixed capture "
+                       "has rows_with_retained_ko and per-row panel_reused_from instead of a "
+                       "file-wide move_share_snapshot_id; each retained panel keeps its donor clock.",
         "name_resolution": "on a TYPO'd query only, detail/compare add {query, resolved_name, name_resolution:{match_type:'fuzzy', score, distance, from}}; an exact query omits all three",
     },
 }

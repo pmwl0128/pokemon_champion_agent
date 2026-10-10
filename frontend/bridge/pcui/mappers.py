@@ -368,6 +368,14 @@ def map_ko(doc: dict, row: dict, usage_rank: dict[str, int]) -> dict:
         }
         if donor.get("snapshot_id") is not None:
             out["coverage"]["reusedFrom"]["snapshotId"] = int(donor["snapshot_id"])
+    if row.get("panel_reused_from"):
+        panel_names = {"ko_targets": "koTargets", "koed_by": "koedBy",
+                       "ko_moves": "koMoves", "koed_by_moves": "koedByMoves"}
+        out["coverage"]["panelReusedFrom"] = {
+            panel_names[panel]: {"season": donor["season"], "rule": donor["rule"],
+                                 "format": donor["format"], "updatedAt": donor["updated_at"],
+                                 "snapshotId": int(donor["snapshot_id"])}
+            for panel, donor in row["panel_reused_from"].items()}
     snapshot = (doc.get("snapshot") or {}).get("id")
     if snapshot is not None:
         out["snapshotId"] = int(snapshot)

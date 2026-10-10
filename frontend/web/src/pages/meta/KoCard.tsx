@@ -1,10 +1,10 @@
 /** The KO card: who this Pokemon knocks out, and who knocks it out.
  *
- * Its own card with its own stamp, never a panel of the usage card: it is a different upstream on a
- * different snapshot clock (frontend/design.md §7.1.1), so it must not borrow the usage card's date.
+ * Its own card and stamp: backups or historical retention can use a different clock from usage.
+ * Per-direction retained panels display their donor's original time.
  *
  * What the rendering refuses to do, each following a property of the data:
- *   - no share on an opponent. The source publishes an ORDERING and no count; the tile shows the
+ *   - no share on an opponent. The public contract exposes an ORDERING; the tile shows the
  *     order and, separately, that opponent's own usage rank, which is what lets a reader discount a
  *     KO position that is really just exposure.
  *   - no green/red for the two directions. The matchup grid already owns the KO ramp and the check
@@ -76,6 +76,7 @@ function KoSide({ ko, side, trend, format, onPreviewOpen }: {
 }) {
   const t = useT();
   const outgoing = side === "koTargets";
+  const retained = ko.coverage.panelReusedFrom?.[side];
   const moves = ko.coverage.moveShare === "absent" ? null
     : outgoing ? ko.panels.koMoves : ko.panels.koedByMoves;
   return (
@@ -84,6 +85,12 @@ function KoSide({ ko, side, trend, format, onPreviewOpen }: {
         <span className="mc-ko-arrow" aria-hidden="true">{outgoing ? "→" : "←"}</span>
         {t(outgoing ? "ko.targets" : "ko.koedBy")}
       </div>
+      {retained ? (
+        <div className="mc-ko-stamp">
+          {t("mc.ko.zeroRetained").replace("{season}", retained.season)
+            .replace("{time}", stampTime(retained.updatedAt))}
+        </div>
+      ) : null}
       <div className="mc-tiles">
         {ko.panels[side].map((e) => {
           const ranks = trend.status === "ready" && trend.data

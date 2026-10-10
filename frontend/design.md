@@ -215,7 +215,8 @@ projection、bridge、skills 与 SPA 共享 `deploymentId`；内容 URL 带发�
 
 ### 7.1.1 环境详情页的两条数据轴与页边栏
 
-meta 详情页承载两条独立数据轴。usage 轴（ranking/details）与 KO 轴（`ko_*`）来自同一主源但走不同快照时钟，
+meta 详情页承载两条独立数据轴。usage 轴（ranking/details）与 KO 轴（`ko_*`）默认来自同一格式的 bulk 快照；
+备用来源或历史保留时数据时间可能不同，
 因此 KO 是独立 DTO 与独立投影文件族。页面由两张卡组成：使用率卡只放 usage 轴，击倒卡自带快照号与
 `updatedAt`（有招式层时另注 `coverage.moveShareCapturedAt`），不并入使用率卡，也不共用它的数据戳。
 
@@ -238,9 +239,11 @@ meta 详情页承载两条独立数据轴。usage 轴（ranking/details）与 KO
   1440×1920）再转 PNG；框自带 `data-theme`，所以图片主题可独立于页面选择。图中不含任何控件，
   所有图片 eager 加载并等待解析完成后才截取。截图库与弹窗是按需加载的独立 chunk。
 
-- KO 对象只有顺序、没有占比（来源不发布），DTO 因此**不含** percentage 字段——留 nullable 会被读成实测 0。
+- KO 对象的公开契约只有顺序、没有占比，DTO 因此**不含** percentage 字段——留 nullable 会被读成实测 0。
 - KO 招式占比是保留层：未采集时为 `null` 而非 `[]`，`coverage.moveShare` 同步声明；渲染必须占位说明，
   消失会被读成"没有击倒招式"。
+- 本期零记录方向使用历史回填时，`coverage.panelReusedFrom` 携带各面板的原赛季、规则、格式、快照与时间。
+  KO 卡片在该方向展示原赛季和时间；另一方向仍显示本期数据。回填面板不冒充本期趋势观测。
 - KO 对象身份只到种族级（全国图鉴编号），同一编号在一条列表里重复时两条都保留并标记，不去重。
   打印出来的名字保持种族级，但 `slug`/`key` 必须指向**一个真实形态**——sprite 和链接没法指向一个种族。
   能被 dex 精确命名的种族就是它自己，否则用 dex 给那个光秃秃种族名指定的代表形态；使用率名次跟着同一个

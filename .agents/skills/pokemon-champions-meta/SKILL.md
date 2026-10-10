@@ -17,6 +17,10 @@ how is it used?"; canonical battle facts remain the responsibility of `$pokemon-
 4. Use `ko` for the knock-out axis — whom a Pokémon knocks out and who knocks it out.
 5. Use `report` for snapshot changes. Use `export-excel` only when the user requests workbooks.
 6. Keep usage marginals factual: common moves/items/partners are not a guaranteed joint set.
+7. When asked to update only meta, run `python dev/update/update.py meta` from the repository root.
+   The default flow collects full single and double usage, KO objects and both KO move-share panels
+   together. Do not ask for separate KO or move collection. Use `refresh` when real teams also need
+   updating; developer source and backup operations are documented in `dev/update/README.md`.
 
 ## Commands
 
@@ -102,5 +106,7 @@ query commands use the Python standard library.
 - Do not infer legality or learnsets from usage data.
 - Do not combine move, item, ability, nature, partner, or spread marginals into an asserted joint set.
 - A change report records factual differences between snapshots, not an interpretation of the metagame.
-- KO facts come from a different upstream snapshot than the usage data; quote each one's own
-  `updated_at` and never treat a KO ordering as a win rate, a counter verdict, or a damage result.
+- Usage and KO normally share a complete snapshot; backups or retained KO can have different clocks.
+  Quote each one's own `updated_at` and never treat a KO ordering as a win rate, a counter verdict,
+  or a damage result. For zero-record directions retained from history, quote each panel's donor
+  clock; feedback evidence and upstream reports use English.

@@ -5,83 +5,64 @@
   "format": "single",
   "rule": "M-C",
   "season": "M-7",
-  "built_at": "2026-10-08T06:30:52Z"
+  "built_at": "2026-10-10T03:15:53Z"
  },
  "counts": {
-  "history": 2,
-  "partners": 10,
-  "stand_in": 5
+  "history": 1,
+  "partners": 12,
+  "stand_in": 2
  },
  "anchors": {
   "Aegislash-Shield|": {
    "source": "partners",
    "partners": [
     "Hippowdon",
-    "Meowscarada",
-    "Metagross"
-   ],
-   "teams": 5
-  },
-  "Ariados|": {
-   "source": "history",
-   "seasons": [
-    "M-3",
-    "M-4"
+    "Dragonite",
+    "Meowscarada"
    ],
    "teams": 4
   },
   "Castform|": {
-   "source": "stand_in",
-   "species": "Toucannon",
-   "hits": {
-    "types": 1,
-    "lean": 0,
-    "speed_band": 1,
-    "roles": 1,
-    "field": 0
-   },
-   "teams": 12
+   "source": "partners",
+   "partners": [
+    "Basculegion",
+    "Swampert",
+    "Pelipper"
+   ],
+   "teams": 6
   },
   "Garbodor|": {
    "source": "partners",
    "partners": [
-    "Venusaur",
-    "Gengar"
+    "Meowscarada",
+    "Dragonite"
    ],
-   "teams": 3
+   "teams": 14
   },
   "Gourgeist-Large|": {
-   "source": "stand_in",
-   "species": "Sinistcha",
-   "hits": {
-    "types": 2,
-    "lean": 0,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 17
+   "source": "partners",
+   "partners": [
+    "Indeedee",
+    "Sneasler"
+   ],
+   "teams": 68
   },
   "Gourgeist-Small|": {
-   "source": "stand_in",
-   "species": "Sinistcha",
-   "hits": {
-    "types": 2,
-    "lean": 0,
-    "speed_band": 0,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 17
+   "source": "partners",
+   "partners": [
+    "Clefable",
+    "Arcanine"
+   ],
+   "teams": 5
   },
   "Hydrapple|": {
    "source": "partners",
    "partners": [
-    "Indeedee",
-    "Sneasler",
-    "Armarouge"
+    "Greninja",
+    "Toucannon",
+    "Pawmot"
    ],
-   "teams": 16
+   "teams": 3
   },
   "Lycanroc-Dusk|": {
    "source": "history",
@@ -95,18 +76,19 @@
   "Meowstic-F|": {
    "source": "partners",
    "partners": [
-    "Hippowdon",
-    "Rotom-Heat"
+    "Golisopod",
+    "Cinderace",
+    "Indeedee"
    ],
-   "teams": 22
+   "teams": 3
   },
   "Morpeko-Hangry|": {
    "source": "partners",
    "partners": [
-    "Salamence",
-    "Aegislash"
+    "Metagross",
+    "Gholdengo"
    ],
-   "teams": 46
+   "teams": 9
   },
   "Oranguru|": {
    "source": "stand_in",
@@ -121,61 +103,50 @@
    "teams": 10
   },
   "Passimian|": {
-   "source": "stand_in",
-   "species": "Blaziken",
-   "hits": {
-    "types": 1,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 52
+   "source": "partners",
+   "partners": [
+    "Gyarados",
+    "Gholdengo"
+   ],
+   "teams": 21
   },
   "Raichu-Alola|": {
    "source": "partners",
    "partners": [
-    "Corviknight",
-    "Baxcalibur",
-    "Gengar"
+    "Blastoise",
+    "Golisopod",
+    "Indeedee"
    ],
-   "teams": 3
+   "teams": 8
   },
   "Squawkabilly-Yellow|": {
    "source": "partners",
    "partners": [
-    "Basculegion",
-    "Meowscarada",
-    "Glimmora"
+    "Golisopod",
+    "Blastoise",
+    "Indeedee"
    ],
-   "teams": 3
-  },
-  "Stunfisk-Galar|": {
-   "source": "partners",
-   "partners": [
-    "Indeedee",
-    "Armarouge",
-    "Sneasler"
-   ],
-   "teams": 16
+   "teams": 8
   },
   "Tauros-Paldea-Aqua|": {
    "source": "partners",
    "partners": [
-    "Indeedee",
-    "Sneasler",
-    "Armarouge"
+    "Dragonite",
+    "Metagross"
    ],
    "teams": 16
   },
   "Tauros-Paldea-Combat|": {
-   "source": "partners",
-   "partners": [
-    "Indeedee",
-    "Sneasler",
-    "Armarouge"
-   ],
-   "teams": 16
+   "source": "stand_in",
+   "species": "Pawmot",
+   "hits": {
+    "types": 1,
+    "lean": 1,
+    "speed_band": 1,
+    "roles": 1,
+    "field": 0
+   },
+   "teams": 119
   }
  }
 }

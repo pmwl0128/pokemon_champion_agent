@@ -11,7 +11,7 @@ Runtime data root: `data/`. This is prebuilt, read-only data.
 
 - `ranking_<season>_<format>.json`
 - `details_<season>_<format>.json`
-- `ko_<season>_<format>.json` (KO axis; its own upstream and snapshot clock)
+- `ko_<season>_<format>.json` (KO axis; its own snapshot clock)
 - `report_<season>_<format>.json`
 - `trend_<season>_<format>.json` (current season only; rolling refresh history for chart export)
 - `usage_trend_<season>_<format>.json` (rolling per-panel history: percentages, plus teammate RANKS)
@@ -64,9 +64,10 @@ per-pokemon update time; the file-level `updated_at` is the refresh stamp for ev
 
 ## KO File
 
-A SECOND data axis, not a panel of `details`. It answers "who knocks out whom", comes from a
-different upstream than the usage data, and advances on its own snapshot clock — so its `updated_at`
-is its own and must be quoted separately.
+A second data axis, stored separately from `details`, answering "who knocks out whom". The default
+complete refresh collects usage, KO objects and KO move shares from one bulk snapshot per format.
+Backups and explicitly retained captures can advance on separate clocks, so quote each file's own
+`updated_at`.
 
 An explicitly requested same-rule fallback has `coverage.reused_from` with the donor `season`,
 `rule`, `format`, `updated_at` and `snapshot_id`. The file's `season` is the query context; the
@@ -74,6 +75,15 @@ KO relationships and KO move shares remain donor-season measurements. `updated_a
 and move-share capture clocks remain unchanged. Subjects are joined to the target ranking by
 canonical name within each format; missing subjects remain unavailable. Borrowed captures do
 not create target-season KO trend points. A fresh KO capture replaces this fallback marker.
+
+For a confirmed zero-record direction, the default update retains the previous same-rule,
+same-format capture by canonical form. If the previous capture is also empty, use the nearest
+nonempty capture within the same rule. The row's `panel_reused_from` maps each retained panel to
+`{season, rule, format, updated_at, snapshot_id, reason: "current_zero_records"}`. Other nonzero
+directions stay current. `coverage.rows_with_retained_ko` counts affected rows and
+`move_share_capture: mixed_snapshot_bulk_exports` omits a file-wide move-share snapshot ID.
+Only native panels belong to the file's current snapshot; quote the retained panel's own clock.
+Retained panels do not produce current-snapshot KO trend observations.
 
 ```json
 {
@@ -110,15 +120,16 @@ not create target-season KO trend points. A fresh KO capture replaces this fallb
 ("Most KO'd By"). Four rules govern reading this file:
 
 - **Ordering, not share.** Object entries deliberately have NO `percentage` field — the source
-  publishes a ranked list and no count. Do not derive one, and do not read the list as a win rate.
+  exposes an ordering in this contract. Raw upstream counts are not a percentage or a win rate.
 - **`null` means not collected.** `ko_moves` / `koed_by_moves` are a reserved tier. While
   `coverage.move_share` is `absent` they are `null`; an empty list would mean the source reported
   none. When the tier ships, `move_share` becomes `ranked_pct` and the panels hold move entries in
   the same shape as `details`' `moves` panel (with `percentage`).
 - **Move-share capture provenance.** `move_share_captured_at` timestamps that tier.
-  `move_share_capture: independent_bulk` also carries `move_share_agreement`; the explicit singles
-  page walk uses `same_snapshot_detail_pages` plus `move_share_snapshot_id`, which must equal the
-  file's verified snapshot. Automatic refresh does not enable the singles page walk.
+  `move_share_capture: independent_bulk` also carries `move_share_agreement`; historical single
+  captures may retain the legacy `same_snapshot_detail_pages` marker. The default bulk collection uses
+  `same_snapshot_bulk_export` for both formats; `move_share_snapshot_id` must equal the file's
+  verified snapshot. Same-snapshot captures carry no cross-capture agreement score.
 - **Objects are species-level.** `key` is the national dex number and there is no form: the source
   drops it. The names come from the dex at whatever precision that number allows: the base-form row
   when there is one, the single form when the dex ships the species as exactly one (#670 can only
@@ -131,8 +142,8 @@ not create target-season KO trend points. A fresh KO capture replaces this fallb
   `"form_collapsed": true`. `coverage.opponent_form_collapsed` counts them file-wide.
 
 Row subjects ARE form-level and identified by the dex canonical (`pokemon_en`), which is how this
-file joins `ranking`/`details`. `slug` is copied from the usage file for convenience and is empty
-when the usage snapshot does not carry that Pokémon.
+file joins `ranking`/`details`. `slug` is copied from usage when available, otherwise derived from
+the same dex canonical naming rule.
 
 ## Current State
 

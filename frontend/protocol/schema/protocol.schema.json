@@ -6476,11 +6476,7 @@
               "minLength": 1
             },
             "format": {
-              "type": "string",
-              "enum": [
-                "single",
-                "double"
-              ]
+              "$ref": "#/$defs/KoCoverageDtoSchema/$defs/__schema0"
             },
             "updatedAt": {
               "type": "string",
@@ -6499,6 +6495,51 @@
             "updatedAt"
           ],
           "additionalProperties": false
+        },
+        "panelReusedFrom": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "koTargets",
+              "koedBy",
+              "koMoves",
+              "koedByMoves"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "season": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "format": {
+                "$ref": "#/$defs/KoCoverageDtoSchema/$defs/__schema0"
+              },
+              "updatedAt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "snapshotId": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "season",
+              "rule",
+              "format",
+              "updatedAt",
+              "snapshotId"
+            ],
+            "additionalProperties": false
+          }
         },
         "moveShareCapturedAt": {
           "type": "string",
@@ -6554,7 +6595,16 @@
         "rows",
         "rowsWithMoveShare"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "$defs": {
+        "__schema0": {
+          "type": "string",
+          "enum": [
+            "single",
+            "double"
+          ]
+        }
+      }
     },
     "KoEntryDtoSchema": {
       "type": "object",
@@ -7784,6 +7834,51 @@
                 "updatedAt"
               ],
               "additionalProperties": false
+            },
+            "panelReusedFrom": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "koTargets",
+                  "koedBy",
+                  "koMoves",
+                  "koedByMoves"
+                ]
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "season": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rule": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "format": {
+                    "$ref": "#/$defs/MetaKoDtoSchema/$defs/__schema3"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "snapshotId": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "season",
+                  "rule",
+                  "format",
+                  "updatedAt",
+                  "snapshotId"
+                ],
+                "additionalProperties": false
+              }
             },
             "moveShareCapturedAt": {
               "type": "string",

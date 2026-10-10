@@ -93,8 +93,8 @@ export const MetaDetailDtoSchema = z.object({
 export type MetaDetailDto = z.infer<typeof MetaDetailDtoSchema>;
 
 /* ── KO axis ──────────────────────────────────────────────────────────────────────────────
- * A SECOND data family with its own upstream and its own snapshot clock, so it is NOT folded
- * into MetaDetailDto: one file carrying both would have to lie about one of the two `updatedAt`s.
+ * A separate data family: backups or retained historical panels can use a different clock from
+ * usage. Native default bulk panels share their format's snapshot; provenance preserves exceptions.
  * Two rules the shapes below encode rather than document:
  *   - opponent entries carry NO percentage. The source publishes an ORDERING; a nullable pct
  *     field would read as a measured zero to anything that plots it.
@@ -102,7 +102,7 @@ export type MetaDetailDto = z.infer<typeof MetaDetailDtoSchema>;
  *     source reported no KO moves. `coverage.moveShare` states the same fact at file level.
  */
 
-/** One KO opponent. SPECIES-level: the source keys these by national dex number with no form, so
+/** One KO opponent. SPECIES-level: this contract keys these by national dex number with no form, so
  * `nationalDex` is the identity and `name` is a species name. `slug`/`key` name ONE form, because a
  * sprite and a link have to — the species itself where the dex names it exactly, otherwise the form
  * the dex points that bare species name at. `usageRank` pairs the ordering with how often that
@@ -143,7 +143,16 @@ export const KoCoverageDtoSchema = z.object({
     updatedAt: z.string().min(1),
     snapshotId: z.number().int().positive().optional(),
   }).optional(),
-  /** A filled move tier comes from a DIFFERENT capture than the object lists — which is why it
+  /** Confirmed zero-record directions retain the previous same-rule capture, by panel. */
+  panelReusedFrom: z.partialRecord(z.enum(["koTargets", "koedBy", "koMoves", "koedByMoves"]),
+    z.object({
+      season: z.string().min(1),
+      rule: z.string().min(1),
+      format: FormatIdSchema,
+      updatedAt: z.string().min(1),
+      snapshotId: z.number().int().positive(),
+    })).optional(),
+  /** A filled move tier can come from a DIFFERENT capture than the object lists — which is why it
    * states its own time here instead of letting the file's `updatedAt` stand for both — and carries
    * how far the two captures agreed about each row's KO opponents (0..1, its own denominator).
    * Both absent while `moveShare` is "absent". */

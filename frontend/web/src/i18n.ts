@@ -591,6 +591,7 @@ const STRINGS = {
   "mc.ko.updated": { zh: "击倒数据 {time}", en: "KO data {time}", ja: "KOデータ {time}" },
   "mc.ko.movesAt": { zh: "招式占比 {time}", en: "move shares {time}", ja: "わざ採用率 {time}" },
   "mc.ko.reusedFrom": { zh: "暂用 {season} 的采集值，本赛季 KO 数据尚未采集", en: "Using the {season} capture; this season's KO data is not collected yet", ja: "{season}の採取値を暫定使用（今シーズンのKOは未採取）" },
+  "mc.ko.zeroRetained": { zh: "本期该方向为零记录，沿用 {season} · {time} 的采集值", en: "No current records in this direction; retaining {season} · {time}", ja: "今期この方向は記録なし。{season} · {time}の採取値を使用" },
   "mc.ko.movesAbsent": { zh: "招式占比待采集", en: "Move shares not collected yet", ja: "わざの採用率は未取得" },
   "share.title": { zh: "保存分享图", en: "Save as image", ja: "画像として保存" },
   "share.content": { zh: "内容", en: "Content", ja: "内容" },

@@ -5,22 +5,21 @@
   "format": "double",
   "rule": "M-C",
   "season": "M-7",
-  "built_at": "2026-10-08T06:30:59Z"
+  "built_at": "2026-10-10T03:16:03Z"
  },
  "counts": {
   "history": 14,
-  "partners": 3,
-  "stand_in": 4
+  "partners": 7
  },
  "anchors": {
   "Aegislash-Shield|": {
    "source": "partners",
    "partners": [
-    "Gardevoir",
-    "Kommo-o",
-    "Indeedee-F"
+    "Raichu",
+    "Salamence",
+    "Sylveon"
    ],
-   "teams": 38
+   "teams": 55
   },
   "Aromatisse|": {
    "source": "history",
@@ -65,28 +64,21 @@
    "teams": 5
   },
   "Gourgeist-Large|": {
-   "source": "stand_in",
-   "species": "Sinistcha",
-   "hits": {
-    "types": 2,
-    "lean": 0,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 417
+   "source": "partners",
+   "partners": [
+    "Kommo-o",
+    "Grimmsnarl"
+   ],
+   "teams": 4
   },
   "Gourgeist-Small|": {
-   "source": "stand_in",
-   "species": "Sinistcha",
-   "hits": {
-    "types": 2,
-    "lean": 0,
-    "speed_band": 0,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 417
+   "source": "partners",
+   "partners": [
+    "Delphox",
+    "Raichu",
+    "Kommo-o"
+   ],
+   "teams": 18
   },
   "Lycanroc-Midday|": {
    "source": "history",
@@ -103,19 +95,19 @@
    "source": "partners",
    "partners": [
     "Raichu",
-    "Volcarona",
-    "Basculegion"
+    "Dragonite",
+    "Gholdengo"
    ],
-   "teams": 62
+   "teams": 33
   },
   "Palafin-Hero|": {
    "source": "partners",
    "partners": [
     "Incineroar",
-    "Froslass",
-    "Volcarona"
+    "Gengar",
+    "Raichu"
    ],
-   "teams": 46
+   "teams": 14
   },
   "Passimian|": {
    "source": "history",
@@ -144,16 +136,13 @@
    "teams": 7
   },
   "Samurott|": {
-   "source": "stand_in",
-   "species": "Blastoise",
-   "hits": {
-    "types": 1,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 3,
-    "field": 0
-   },
-   "teams": 148
+   "source": "partners",
+   "partners": [
+    "Raichu",
+    "Pelipper",
+    "Archaludon"
+   ],
+   "teams": 57
   },
   "Simipour|": {
    "source": "history",
@@ -194,16 +183,12 @@
    "teams": 26
   },
   "Tauros-Paldea-Combat|": {
-   "source": "stand_in",
-   "species": "Annihilape",
-   "hits": {
-    "types": 1,
-    "lean": 1,
-    "speed_band": 1,
-    "roles": 1,
-    "field": 0
-   },
-   "teams": 181
+   "source": "partners",
+   "partners": [
+    "Talonflame",
+    "Froslass"
+   ],
+   "teams": 21
   },
   "Tauros|": {
    "source": "history",
